@@ -2,7 +2,17 @@
 
 ## 介绍
 
-*WeBan* 安全微伴-大学安全教育 刷课脚本
+*WeBan* 安全微伴-大学安全教育 学习工具
+
+只实现了课程学习如果想找考试题库可以参考[WeibanQuestionsBank](https://github.com/pooneyy/WeibanQuestionsBank/blob/main/Wei-ban_Questions_Bank.json)
+
+### 其他
+
+点点 star 谢谢喵~
+
+截图的时候注意保护账号密码
+
+仅供学习交流使用，如果有空会补充下实现过程，欢迎 PR
 
 ## 直接使用
 
@@ -22,14 +32,10 @@
 
 3. 在终端运行 pip install requests pycryptodome 或者 pip install -r requirements.txt
 
-4. 编辑 WeBan.py，修改 11-13 行的配置信息。其他行应该可以不用动，当然想二次开发也是可以
+4. 编辑 WeBan.py，在 11-13 行的双引号内填入配置信息。其他行可以不用动
 
-5. 运行 python WeBan.py，打开验证码图片输入验证码，等待即可。每个任务需要需要 15 秒才能完成，太快会被 Ban，符合标题
+5. 运行 python WeBan.py，打开验证码图片输入验证码，等待即可。每个任务大概需要等待 15 秒才不会触发限制
 
 ### 演示
 
 ![image](image.png)
-
-### 其他
-
-仅供学习交流使用，如果有空会补充下实现过程。
