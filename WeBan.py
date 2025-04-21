@@ -42,9 +42,7 @@ session.headers = {
 
 def getTenantListWithLetter(tenantName):
     url = "https://weiban.mycourse.cn/pharos/login/getTenantListWithLetter.do"
-    params = {
-        "timestamp": int(time.time())
-    }
+    params = {"timestamp": int(time.time())}
     response = session.post(url, params=params)
     for a in response.json()["data"]:
         for l in a["list"]:
@@ -56,9 +54,7 @@ def getTenantListWithLetter(tenantName):
 
 def randLetterImage(verifyTime):
     url = "https://weiban.mycourse.cn/pharos/login/randLetterImage.do"
-    params = {
-        "time": verifyTime
-    }
+    params = {"time": verifyTime}
     response = session.get(url, params=params)
     with open("captcha.png", "wb") as f:
         f.write(response.content)
@@ -66,18 +62,26 @@ def randLetterImage(verifyTime):
 
 
 def encrypt(data):
-    return urlsafe_b64encode(cipher.encrypt(pad(data.encode(), AES.block_size))).decode()
+    return urlsafe_b64encode(
+        cipher.encrypt(pad(data.encode(), AES.block_size))
+    ).decode()
 
 
 def login(account, password, tenantCode, verifyTime, verifyCode):
     url = "https://weiban.mycourse.cn/pharos/login/login.do"
-    params = {
-        "timestamp": int(time.time())
+    params = {"timestamp": int(time.time())}
+    data = {
+        "keyNumber": account,
+        "password": password,
+        "tenantCode": tenantCode,
+        "time": verifyTime,
+        "verifyCode": verifyCode,
     }
-    data = {"keyNumber": account, "password": password,
-            "tenantCode": tenantCode, "time": verifyTime, "verifyCode": verifyCode}
-    response = session.post(url, params=params, data={
-                            "data": encrypt(json.dumps(data, separators=(",", ":")))})
+    response = session.post(
+        url,
+        params=params,
+        data={"data": encrypt(json.dumps(data, separators=(",", ":")))},
+    )
     if "token" in response.text:
         return response.json()["data"]
     print(response.status_code, response.text)
@@ -86,13 +90,8 @@ def login(account, password, tenantCode, verifyTime, verifyCode):
 
 def listStudyTask(tenantCode, UserId, XToken):
     url = "https://weiban.mycourse.cn/pharos/index/listStudyTask.do"
-    params = {
-        "timestamp": time.time()
-    }
-    data = {
-        "tenantCode": tenantCode,
-        "userId": UserId
-    }
+    params = {"timestamp": time.time()}
+    data = {"tenantCode": tenantCode, "userId": UserId}
     session.headers["X-Token"] = XToken
     response = session.post(url, params=params, data=data)
     session.headers.pop("X-Token")
@@ -104,9 +103,7 @@ def listStudyTask(tenantCode, UserId, XToken):
 
 def listCategory(tenantCode, userId, userProjectId, XToken):
     url = "https://weiban.mycourse.cn/pharos/usercourse/listCategory.do"
-    params = {
-        "timestamp": time.time()
-    }
+    params = {"timestamp": time.time()}
     data = {
         "tenantCode": tenantCode,
         "userId": userId,
@@ -125,15 +122,13 @@ def listCategory(tenantCode, userId, userProjectId, XToken):
 
 def listCourse(tenantCode, userId, userProjectId, categoryCode, XToken):
     url = "https://weiban.mycourse.cn/pharos/usercourse/listCourse.do"
-    params = {
-        "timestamp": time.time()
-    }
+    params = {"timestamp": time.time()}
     data = {
         "tenantCode": tenantCode,
         "userId": userId,
         "userProjectId": userProjectId,
         "chooseType": 3,
-        "categoryCode": categoryCode
+        "categoryCode": categoryCode,
     }
     session.headers["X-Token"] = XToken
     response = session.post(url, params=params, data=data)
@@ -147,20 +142,23 @@ def listCourse(tenantCode, userId, userProjectId, categoryCode, XToken):
 def study(courseId, userProjectId, userId, tenantCode, XToken):
     url1 = "https://weiban.mycourse.cn/pharos/usercourse/study.do"
     url2 = "https://weiban.mycourse.cn/pharos/usercourse/getCourseUrl.do"
-    params = {
-        "timestamp": time.time()
-    }
+    params = {"timestamp": time.time()}
     data = {
         "tenantCode": tenantCode,
         "userId": userId,
         "courseId": courseId,
-        "userProjectId": userProjectId
+        "userProjectId": userProjectId,
     }
     session.headers["X-Token"] = XToken
     response1 = session.post(url1, params=params, data=data)
     response2 = session.post(url2, params=params, data=data)
     session.headers.pop("X-Token")
-    if "code" in response1.text and response1.json()["code"] == "0" and "code" in response2.text and response2.json()["code"] == "0":
+    if (
+        "code" in response1.text
+        and response1.json()["code"] == "0"
+        and "code" in response2.text
+        and response2.json()["code"] == "0"
+    ):
         return True
     print(response1.status_code, response1.text)
     print(response2.status_code, response2.text)
@@ -173,7 +171,7 @@ def getCaptcha(userCourseId, userProjectId, userId, tenantCode):
         "userCourseId": userCourseId,
         "userProjectId": userProjectId,
         "userId": userId,
-        "tenantCode": tenantCode
+        "tenantCode": tenantCode,
     }
     response = session.get(url, params=params)
     if "captcha" in response.text:
@@ -193,16 +191,14 @@ def checkCaptcha(userCourseId, userProjectId, userId, tenantCode, questionId):
         "userProjectId": userProjectId,
         "userId": userId,
         "tenantCode": tenantCode,
-        "questionId": questionId
+        "questionId": questionId,
     }
     coordinateXYs = [
-        {"x": 207+randomXY(), "y": 436+randomXY()},
-        {"x": 67+randomXY(), "y": 424+randomXY()},
-        {"x": 141+randomXY(), "y": 427+randomXY()}
+        {"x": 207 + randomXY(), "y": 436 + randomXY()},
+        {"x": 67 + randomXY(), "y": 424 + randomXY()},
+        {"x": 141 + randomXY(), "y": 427 + randomXY()},
     ]
-    data = {
-        "coordinateXYs": json.dumps(coordinateXYs, separators=(",", ":"))
-    }
+    data = {"coordinateXYs": json.dumps(coordinateXYs, separators=(",", ":"))}
     response = session.post(url, params=params, data=data)
     if "methodToken" in response.text:
         return response.json()["data"]["methodToken"]
@@ -211,12 +207,13 @@ def checkCaptcha(userCourseId, userProjectId, userId, tenantCode, questionId):
 
 
 def finish(methodToken, userCourseId, tenantCode):
-    url = "https://weiban.mycourse.cn/pharos/usercourse/v2/"+methodToken+".do"
+    print("ten: ", tenantCode)
+    url = "https://weiban.mycourse.cn/pharos/usercourse/v2/" + userCourseId + ".do"
     params = {
         "callback": f"jQuery{random.randint(100000000000000, 999999999999999)}_{int(time.time()*1000)}",
         "userCourseId": userCourseId,
         "tenantCode": tenantCode,
-        "_": int(time.time()*1000)
+        "_": int(time.time() * 1000),
     }
     response = session.get(url, params=params)
     if "ok" in response.text:
@@ -231,7 +228,7 @@ def main():
         print("没找到你的学校代码，请检查学校全称是否正确")
         return
     print("获取学校代码成功", tenantCode)
-    verifyTime = int(time.time()*1000)
+    verifyTime = int(time.time() * 1000)
     verifyCode = randLetterImage(verifyTime)
     data = login(account, password, tenantCode, verifyTime, verifyCode)
     if not data:
@@ -245,8 +242,10 @@ def main():
         print("获取项目失败")
     for userProject in userProjects:
         userProjectId = userProject["userProjectId"]
-        print(userProject["projectName"],
-              "好了" if userProject["finished"] == "1" else "还没看")
+        print(
+            userProject["projectName"],
+            "好了" if userProject["finished"] == "1" else "还没看",
+        )
         if userProject["finished"] == "1":
             continue
         categories = listCategory(tenantCode, userId, userProjectId, XToken)
@@ -257,16 +256,20 @@ def main():
             categoryCode = category["categoryCode"]
             categoryName = category["categoryName"]
             print(categoryName)
-            courses = listCourse(tenantCode, userId,
-                                 userProjectId, categoryCode, XToken)
+            courses = listCourse(
+                tenantCode, userId, userProjectId, categoryCode, XToken
+            )
             if not courses:
                 print("获取课程失败")
                 continue
             for course in courses:
                 userCourseId = course["userCourseId"]
                 resourceId = course["resourceId"]
-                print("好了" if course["finished"] == 1 else "还没看",
-                      categoryName, course["resourceName"])
+                print(
+                    "好了" if course["finished"] == 1 else "还没看",
+                    categoryName,
+                    course["resourceName"],
+                )
                 if course["finished"] == 1:
                     continue
                 if not study(resourceId, userProjectId, userId, tenantCode, XToken):
@@ -274,14 +277,14 @@ def main():
                     continue
                 print("预请求成功，请等待 20 秒，不然不记入学习进度")
                 time.sleep(20)
-                questionId = getCaptcha(
-                    userCourseId, userProjectId, userId, tenantCode)
+                questionId = getCaptcha(userCourseId, userProjectId, userId, tenantCode)
                 if not questionId:
                     print("获取验证码失败")
                     continue
                 print("获取验证码成功")
                 methodToken = checkCaptcha(
-                    userCourseId, userProjectId, userId, tenantCode, questionId)
+                    userCourseId, userProjectId, userId, tenantCode, questionId
+                )
                 if not methodToken:
                     print("获取验证 Token 失败")
                     continue
@@ -294,6 +297,7 @@ def main():
     print("全部完成")
     if fail:
         print("失败课程，可过会重试", fail)
+
 
 main()
 input("按回车键退出")
