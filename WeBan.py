@@ -39,10 +39,12 @@ session.headers = {
     "Te": "trailers",
 }
 
+def getTimestamp():
+    return f"{int(time.time() * 1000)}.{random.randint(000, 999)}"
 
 def getTenantListWithLetter(tenantName):
     url = "https://weiban.mycourse.cn/pharos/login/getTenantListWithLetter.do"
-    params = {"timestamp": int(time.time())}
+    params = {"timestamp": getTimestamp()}
     response = session.post(url, params=params)
     for a in response.json()["data"]:
         for l in a["list"]:
@@ -69,7 +71,7 @@ def encrypt(data):
 
 def login(account, password, tenantCode, verifyTime, verifyCode):
     url = "https://weiban.mycourse.cn/pharos/login/login.do"
-    params = {"timestamp": int(time.time())}
+    params = {"timestamp": getTimestamp()}
     data = {
         "keyNumber": account,
         "password": password,
@@ -90,7 +92,7 @@ def login(account, password, tenantCode, verifyTime, verifyCode):
 
 def listStudyTask(tenantCode, UserId, XToken):
     url = "https://weiban.mycourse.cn/pharos/index/listStudyTask.do"
-    params = {"timestamp": time.time()}
+    params = {"timestamp": getTimestamp()}
     data = {"tenantCode": tenantCode, "userId": UserId}
     session.headers["X-Token"] = XToken
     response = session.post(url, params=params, data=data)
@@ -103,7 +105,7 @@ def listStudyTask(tenantCode, UserId, XToken):
 
 def listCategory(tenantCode, userId, userProjectId, XToken):
     url = "https://weiban.mycourse.cn/pharos/usercourse/listCategory.do"
-    params = {"timestamp": time.time()}
+    params = {"timestamp": getTimestamp()}
     data = {
         "tenantCode": tenantCode,
         "userId": userId,
@@ -122,7 +124,7 @@ def listCategory(tenantCode, userId, userProjectId, XToken):
 
 def listCourse(tenantCode, userId, userProjectId, categoryCode, XToken):
     url = "https://weiban.mycourse.cn/pharos/usercourse/listCourse.do"
-    params = {"timestamp": time.time()}
+    params = {"timestamp": getTimestamp()}
     data = {
         "tenantCode": tenantCode,
         "userId": userId,
@@ -142,7 +144,7 @@ def listCourse(tenantCode, userId, userProjectId, categoryCode, XToken):
 def study(courseId, userProjectId, userId, tenantCode, XToken):
     url1 = "https://weiban.mycourse.cn/pharos/usercourse/study.do"
     url2 = "https://weiban.mycourse.cn/pharos/usercourse/getCourseUrl.do"
-    params = {"timestamp": time.time()}
+    params = {"timestamp": getTimestamp()}
     data = {
         "tenantCode": tenantCode,
         "userId": userId,
