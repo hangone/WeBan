@@ -1,7 +1,9 @@
 import requests
 import json
 import time
+import os
 import random
+import webbrowser
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
 from base64 import urlsafe_b64encode, urlsafe_b64decode
@@ -60,6 +62,7 @@ def randLetterImage(verifyTime):
     response = session.get(url, params=params)
     with open("captcha.png", "wb") as f:
         f.write(response.content)
+    webbrowser.open(f"file://{os.path.abspath("captcha.png")}")
     return input("验证码已保存为 captcha.png，请打开查看并输入：")
 
 
