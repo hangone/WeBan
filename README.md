@@ -4,7 +4,7 @@
 
 *WeBan* 安全微伴-大学安全教育 学习工具
 
-只实现了课程学习如果想找考试题库可以参考[WeibanQuestionsBank](https://github.com/pooneyy/WeibanQuestionsBank/blob/main/Wei-ban_Questions_Bank.json)
+只实现了课程学习如果想找考试题库可以参考[WeibanQuestionsBank](https://github.com/pooneyy/WeibanQuestionsBank/blob/main/weibanQuestionBank.md)
 
 ### 其他
 
