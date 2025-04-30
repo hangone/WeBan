@@ -208,7 +208,7 @@ def checkCaptcha(userCourseId, userProjectId, userId, tenantCode, questionId):
 
 def finish(methodToken, userCourseId, tenantCode):
     print("ten: ", tenantCode)
-    url = "https://weiban.mycourse.cn/pharos/usercourse/v1/" + methodToken + ".do"
+    url = "https://weiban.mycourse.cn/pharos/usercourse/v2/" + methodToken + ".do"
     params = {
         "callback": f"jQuery{random.randint(100000000000000, 999999999999999)}_{int(time.time()*1000)}",
         "userCourseId": userCourseId,
