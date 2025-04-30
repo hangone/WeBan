@@ -15,7 +15,7 @@ account = ""  # 账号（考生号）
 password = ""  # 密码
 
 # 下面不用动
-TIMEOUT = 15  # 学习时间，太短完成失败，单位秒
+TIMEOUT = 20  # 学习时间，太短完成失败，单位秒
 if tenantName == "":
     tenantName = input("[+] 请输入学校全称：")
 if account == "":
