@@ -252,11 +252,11 @@ def main():
     XToken = data["token"]
     userProjects = listStudyTask(tenantCode, userId, XToken)
     if not userProjects:
-        print("获取项目失败")
-    for userProject in userProjects:
+        print("[-] 获取项目失败")
+    for i, userProject in enumerate(userProjects):
         userProjectId = userProject["userProjectId"]
         print(
-            f"{'[+] 好了' if userProject['finished'] == '1' else '[-] 还没看'}{userProject['projectName']}"
+            f"{'[+] 好了' if userProject['finished'] == '1' else '[-] 还没看'} {userProject['projectName']}"
         )
         if userProject["finished"] == "1":
             continue
@@ -264,28 +264,35 @@ def main():
         if not categories:
             print("[-] 获取分类失败")
             return
-        for category in categories:
+        lenCategories = len(categories)
+        for j, category in enumerate(categories):
             categoryCode = category["categoryCode"]
             categoryName = category["categoryName"]
-            print("[+]", categoryName)
+            print(f"[+][{j}/{lenCategories}]", categoryName)
             courses = listCourse(
                 tenantCode, userId, userProjectId, categoryCode, XToken
             )
             if not courses:
                 print("[-] 获取课程失败")
                 continue
-            for course in courses:
+            lenCourses = len(courses)
+            for k, course in enumerate(courses):
+                print(
+                    f"[+][{j}/{lenCategories}][{k}/{lenCourses}]",
+                    categoryName,
+                    course["resourceName"],
+                )
                 userCourseId = course["userCourseId"]
                 resourceId = course["resourceId"]
                 print(
-                    f"{'[+] 好了' if userProject['finished'] == '1' else '[-] 还没看'} {categoryName} {userProject['resourceName']}"
+                    f"{'[+] 好了' if userProject['finished'] == '1' else '[-] 还没看'} {categoryName}{course['resourceName']}"
                 )
                 if course["finished"] == 1:
                     continue
                 if not study(resourceId, userProjectId, userId, tenantCode, XToken):
                     print("[-] 预请求失败")
                     continue
-                print("[+] 预请求成功，请等待 20 秒，不然不记入学习进度")
+                print(f"[+] 预请求成功，请等待 {TIMEOUT} 秒，不然不记入学习进度")
                 time.sleep(TIMEOUT)
                 questionId = getCaptcha(userCourseId, userProjectId, userId, tenantCode)
                 if not questionId:
@@ -298,7 +305,7 @@ def main():
                 if not methodToken:
                     print("[-] 获取验证 Token 失败")
                     continue
-                print("获取验证 Token 成功")
+                print("[+] 获取验证 Token 成功")
                 if finish(methodToken, userCourseId, tenantCode):
                     print("[+] 完成课程", categoryName, course["resourceName"])
                 else:
