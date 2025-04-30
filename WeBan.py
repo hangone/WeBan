@@ -20,7 +20,7 @@ if account == "":
 if password == "":
     password = input("请输入密码：")
 
-key = urlsafe_b64decode("eGllMmdnAAAAAAAAAAAAAA==")
+key = urlsafe_b64decode("d2JzNTEyAAAAAAAAAAAAAA==")
 cipher = AES.new(key, AES.MODE_ECB)
 fail = []
 session = requests.session()
