@@ -15,12 +15,13 @@ account = ""  # 账号（考生号）
 password = ""  # 密码
 
 # 下面不用动
+TIMEOUT = 15 # 学习时间，太短完成失败，单位秒
 if tenantName == "":
     tenantName = input("请输入学校全称：")
 if account == "":
     account = input("请输入账号（考生号）：")
 if password == "":
-    password = input("请输入密码：")
+    password = input("请输入密码（考生号）：")
 
 key = urlsafe_b64decode("d2JzNTEyAAAAAAAAAAAAAA==")
 cipher = AES.new(key, AES.MODE_ECB)
@@ -212,17 +213,22 @@ def checkCaptcha(userCourseId, userProjectId, userId, tenantCode, questionId):
 
 
 def finish(methodToken, userCourseId, tenantCode):
-    print("ten: ", tenantCode)
-    url = "https://weiban.mycourse.cn/pharos/usercourse/v2/" + methodToken + ".do"
+    url1 = "https://weiban.mycourse.cn/pharos/usercourse/v2/" + userCourseId + ".do"
+    url2 = "https://weiban.mycourse.cn/pharos/usercourse/v2/" + methodToken + ".do"
     params = {
         "callback": f"jQuery{random.randint(100000000000000, 999999999999999)}_{int(time.time()*1000)}",
         "userCourseId": userCourseId,
         "tenantCode": tenantCode,
         "_": int(time.time() * 1000),
     }
-    response = session.get(url, params=params)
+    response = session.get(url1, params=params)
     if "ok" in response.text:
         return True
+    print("使用 userCourseId 完成失败，将使用 methodToken 尝试")
+    response = session.get(url2, params=params)
+    if "ok" in response.text:
+        return True
+    print("使用 methodToken 完成失败，请反馈")
     print(response.status_code, response.text)
     return False
 
@@ -281,7 +287,7 @@ def main():
                     print("预请求失败")
                     continue
                 print("预请求成功，请等待 20 秒，不然不记入学习进度")
-                time.sleep(20)
+                time.sleep(TIMEOUT)
                 questionId = getCaptcha(userCourseId, userProjectId, userId, tenantCode)
                 if not questionId:
                     print("获取验证码失败")
