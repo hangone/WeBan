@@ -297,7 +297,7 @@ def main():
                 userCourseId = course["userCourseId"]
                 resourceId = course["resourceId"]
                 print(
-                    f"{'[+] 好了' if userProject['finished'] == '1' else '[-] 还没看'} {categoryName}{course['resourceName']}"
+                    f"{'[+] 好了' if course['finished'] == 1 else '[-] 还没看'} {categoryName}{course['resourceName']}"
                 )
                 if course["finished"] == 1:
                     continue
