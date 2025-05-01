@@ -16,7 +16,6 @@ password = ""  # 密码
 
 # 下面不用动
 TIMEOUT = 20  # 学习时间，太短完成失败，单位秒
-REQUEST_DELAY = 1  # 请求间隔时间，单位秒
 if tenantName == "":
     tenantName = input("[+] 请输入学校全称：")
 if account == "":
@@ -51,7 +50,6 @@ def getTimestamp():
 def getTenantListWithLetter(tenantName):
     url = "https://weiban.mycourse.cn/pharos/login/getTenantListWithLetter.do"
     params = {"timestamp": getTimestamp()}
-    time.sleep(REQUEST_DELAY)
     response = session.post(url, params=params)
     for a in response.json()["data"]:
         for l in a["list"]:
@@ -64,7 +62,6 @@ def getTenantListWithLetter(tenantName):
 def randLetterImage(verifyTime):
     url = "https://weiban.mycourse.cn/pharos/login/randLetterImage.do"
     params = {"time": verifyTime}
-    time.sleep(REQUEST_DELAY)
     response = session.get(url, params=params)
     with open("captcha.png", "wb") as f:
         f.write(response.content)
@@ -88,7 +85,6 @@ def login(account, password, tenantCode, verifyTime, verifyCode):
         "time": verifyTime,
         "verifyCode": verifyCode,
     }
-    time.sleep(REQUEST_DELAY)
     response = session.post(
         url,
         params=params,
@@ -105,7 +101,6 @@ def listStudyTask(tenantCode, UserId, XToken):
     params = {"timestamp": getTimestamp()}
     data = {"tenantCode": tenantCode, "userId": UserId}
     session.headers["X-Token"] = XToken
-    time.sleep(REQUEST_DELAY)
     response = session.post(url, params=params, data=data)
     session.headers.pop("X-Token")
     if "userProjectId" in response.text:
@@ -124,7 +119,6 @@ def listCategory(tenantCode, userId, userProjectId, XToken):
         "chooseType": 3,
     }
     session.headers["X-Token"] = XToken
-    time.sleep(REQUEST_DELAY)
     response = session.post(url, params=params, data=data)
     session.headers.pop("X-Token")
     if "categoryCode" in response.text:
@@ -145,7 +139,6 @@ def listCourse(tenantCode, userId, userProjectId, categoryCode, XToken):
         "categoryCode": categoryCode,
     }
     session.headers["X-Token"] = XToken
-    time.sleep(REQUEST_DELAY)
     response = session.post(url, params=params, data=data)
     session.headers.pop("X-Token")
     if "userCourseId" in response.text:
@@ -165,9 +158,7 @@ def study(courseId, userProjectId, userId, tenantCode, XToken):
         "userProjectId": userProjectId,
     }
     session.headers["X-Token"] = XToken
-    time.sleep(REQUEST_DELAY)
     response1 = session.post(url1, params=params, data=data)
-    time.sleep(REQUEST_DELAY)
     response2 = session.post(url2, params=params, data=data)
     session.headers.pop("X-Token")
     if (
@@ -190,7 +181,6 @@ def getCaptcha(userCourseId, userProjectId, userId, tenantCode):
         "userId": userId,
         "tenantCode": tenantCode,
     }
-    time.sleep(REQUEST_DELAY)
     response = session.get(url, params=params)
     if "captcha" in response.text:
         return response.json()["captcha"]["questionId"]
@@ -217,7 +207,6 @@ def checkCaptcha(userCourseId, userProjectId, userId, tenantCode, questionId):
         {"x": 141 + randomXY(), "y": 427 + randomXY()},
     ]
     data = {"coordinateXYs": json.dumps(coordinateXYs, separators=(",", ":"))}
-    time.sleep(REQUEST_DELAY)
     response = session.post(url, params=params, data=data)
     if "methodToken" in response.text:
         return response.json()["data"]["methodToken"]
@@ -234,12 +223,10 @@ def finish(methodToken, userCourseId, tenantCode):
         "tenantCode": tenantCode,
         "_": int(time.time() * 1000),
     }
-    time.sleep(REQUEST_DELAY)
     response = session.get(url1, params=params)
     if "ok" in response.text:
         return True
     print("[-] 使用 userCourseId 完成失败，将使用 methodToken 尝试")
-    time.sleep(REQUEST_DELAY)
     response = session.get(url2, params=params)
     if "ok" in response.text:
         return True
@@ -256,14 +243,22 @@ def main():
     print("[+] 获取学校代码成功", tenantCode)
     verifyTime = int(time.time() * 1000)
     verifyCode = randLetterImage(verifyTime)
-    data = login(account, password, tenantCode, verifyTime, verifyCode)
+    try:
+        data = login(account, password, tenantCode, verifyTime, verifyCode)
+    except Exception as e:
+        print(f"[-] {e}\n[-] 登录失败，可能是网络问题，过会重试")
+        return
     if not data:
         print("[-] 登录失败")
         return
     print("[+] 登录成功")
     userId = data["userId"]
     XToken = data["token"]
-    userProjects = listStudyTask(tenantCode, userId, XToken)
+    try:
+        userProjects = listStudyTask(tenantCode, userId, XToken)
+    except Exception as e:
+        print(f"[-] {e}\n[-] 获取项目失败，可能是网络问题，过会重试")
+        return
     if not userProjects:
         print("[-] 获取项目失败")
     for i, userProject in enumerate(userProjects):
@@ -273,20 +268,28 @@ def main():
         )
         if userProject["finished"] == "1":
             continue
-        categories = listCategory(tenantCode, userId, userProjectId, XToken)
+        try:
+            categories = listCategory(tenantCode, userId, userProjectId, XToken)
+        except Exception as e:
+            print(f"[-] {e}\n[-] 获取 {userProject['projectName']} 分类失败，可能是网络问题，过会重试")
+            continue
         if not categories:
-            print("[-] 获取分类失败")
-            return
+            print(f"[-] 获取 {userProject['projectName']} 分类失败")
+            continue
         lenCategories = len(categories)
         for j, category in enumerate(categories):
             categoryCode = category["categoryCode"]
             categoryName = category["categoryName"]
             print(f"[+][{j}/{lenCategories}]", categoryName)
-            courses = listCourse(
-                tenantCode, userId, userProjectId, categoryCode, XToken
-            )
+            try:
+                courses = listCourse(
+                    tenantCode, userId, userProjectId, categoryCode, XToken
+                )
+            except Exception as e:
+                print(f"[-] {e}\n[-]获取 {categoryName} 课程失败，可能是网络问题，过会重试")
+                continue
             if not courses:
-                print("[-] 获取课程失败")
+                print(f"[-] 获取 {categoryName} 课程失败")
                 continue
             lenCourses = len(courses)
             for k, course in enumerate(courses):
@@ -302,28 +305,34 @@ def main():
                 )
                 if course["finished"] == 1:
                     continue
-                if not study(resourceId, userProjectId, userId, tenantCode, XToken):
-                    print("[-] 预请求失败")
-                    continue
-                print(f"[+] 预请求成功，请等待 {TIMEOUT} 秒，不然不记入学习进度")
-                time.sleep(TIMEOUT)
-                questionId = getCaptcha(userCourseId, userProjectId, userId, tenantCode)
-                if not questionId:
-                    print("[-] 获取完成验证码失败")
-                    continue
-                print("[+] 获取完成验证码成功")
-                methodToken = checkCaptcha(
-                    userCourseId, userProjectId, userId, tenantCode, questionId
-                )
-                if not methodToken:
-                    print("[-] 获取验证 Token 失败")
-                    continue
-                print("[+] 获取验证 Token 成功")
-                if finish(methodToken, userCourseId, tenantCode):
-                    print("[+] 完成课程", categoryName, course["resourceName"])
-                else:
-                    fail.append(course["resourceName"])
+                try:
+                    if not study(resourceId, userProjectId, userId, tenantCode, XToken):
+                        print("[-] 预请求失败")
+                        continue
+                    print(f"[+] 预请求成功，请等待 {TIMEOUT} 秒，不然不记入学习进度")
+                    time.sleep(TIMEOUT)
+                    questionId = getCaptcha(userCourseId, userProjectId, userId, tenantCode)
+                    if not questionId:
+                        print("[-] 获取完成验证码失败")
+                        continue
+                    print("[+] 获取完成验证码成功")
+                    methodToken = checkCaptcha(
+                        userCourseId, userProjectId, userId, tenantCode, questionId
+                    )
+                    if not methodToken:
+                        print("[-] 获取验证 Token 失败")
+                        continue
+                    print("[+] 获取验证 Token 成功")
+                    if finish(methodToken, userCourseId, tenantCode):
+                        print("[+] 完成课程", categoryName, course["resourceName"])
+                    else:
+                        Exception(f"[-] 完成课程 {categoryName}{course['resourceName']} 失败")
+                except Exception as e:
+                    print("[-] 发生错误", e)
                     print("[-] 失败课程", categoryName, course["resourceName"])
+                    fail.append(f"{categoryName} {course['resourceName']},")
+                    continue
+                    
     print("[+] 全部完成")
     if fail:
         print("[-] 失败课程，可过会重试", fail)
