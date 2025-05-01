@@ -214,24 +214,20 @@ def checkCaptcha(userCourseId, userProjectId, userId, tenantCode, questionId):
     return False
 
 
-def finish(methodToken, userCourseId, tenantCode):
-    url1 = "https://weiban.mycourse.cn/pharos/usercourse/v2/" + userCourseId + ".do"
-    url2 = "https://weiban.mycourse.cn/pharos/usercourse/v2/" + methodToken + ".do"
+def finish(userCourseId, tenantCode, methodToken=""):
+    url = "https://weiban.mycourse.cn/pharos/usercourse/v2/" + userCourseId + ".do"
+    if len(methodToken) != 0:
+        url = "https://weiban.mycourse.cn/pharos/usercourse/v2/" + methodToken + ".do"
     params = {
         "callback": f"jQuery{random.randint(100000000000000, 999999999999999)}_{int(time.time()*1000)}",
         "userCourseId": userCourseId,
         "tenantCode": tenantCode,
         "_": int(time.time() * 1000),
     }
-    response = session.get(url1, params=params)
+    response = session.get(url, params=params)
     if "ok" in response.text:
         return True
-    print("[-] 使用 userCourseId 完成失败，将使用 methodToken 尝试")
-    response = session.get(url2, params=params)
-    if "ok" in response.text:
-        return True
-    print("[-] 使用 methodToken 完成失败，请反馈")
-    print(response.status_code, response.text)
+    print("[-] 完成课程失败: ", response.status_code, response.text)
     return False
 
 
@@ -311,6 +307,13 @@ def main():
                         continue
                     print(f"[+] 预请求成功，请等待 {TIMEOUT} 秒，不然不记入学习进度")
                     time.sleep(TIMEOUT)
+                    try:
+                        if finish(userCourseId, tenantCode):
+                            print(f"[-] 完成课程 {categoryName} {course["resourceName"]} 成功")
+                            continue
+                    except Exception as e:
+                        print("[-] 方式一完成课程失败", e) 
+                    print("[-] 使用方式一完成失败，将使用方式二")
                     questionId = getCaptcha(userCourseId, userProjectId, userId, tenantCode)
                     if not questionId:
                         print("[-] 获取完成验证码失败")
@@ -323,10 +326,11 @@ def main():
                         print("[-] 获取验证 Token 失败")
                         continue
                     print("[+] 获取验证 Token 成功")
-                    if finish(methodToken, userCourseId, tenantCode):
-                        print("[+] 完成课程", categoryName, course["resourceName"])
+                    if finish(userCourseId, tenantCode, methodToken):
+                        print(f"[-] 方式二完成课程 {categoryName} {course['resourceName']} 成功")
+                        continue
                     else:
-                        Exception(f"[-] 完成课程 {categoryName}{course['resourceName']} 失败")
+                        Exception(f"[-] 方式二完成课程 {categoryName}{course['resourceName']} 失败")
                 except Exception as e:
                     print("[-] 发生错误", e)
                     print("[-] 失败课程", categoryName, course["resourceName"])
