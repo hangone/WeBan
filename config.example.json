@@ -1,0 +1,10 @@
+[
+  {
+    "tenant_name": "学校名称",
+    "account": "用户名 1",
+    "password": "密码 1",
+    "study": true,
+    "exam": false,
+    "exam_use_time": 2000
+  }
+]
