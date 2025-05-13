@@ -1,2 +1,4 @@
-requests
+ddddocr
+loguru
 pycryptodome
+requests
