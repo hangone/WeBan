@@ -1,0 +1,17 @@
+[project]
+name = "weban"
+version = "0.1.0"
+description = "auto finish weiban"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "ddddocr>=1.5.6",
+    "loguru>=0.7.3",
+    "pycryptodome>=3.22.0",
+    "requests>=2.32.3",
+]
+
+[dependency-groups]
+dev = [
+    "black>=25.1.0",
+]
