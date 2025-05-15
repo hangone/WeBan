@@ -1,4 +1,5 @@
-ddddocr
+# 需要验证码识别自行启用
+#ddddocr
 loguru
 pycryptodome
 requests
