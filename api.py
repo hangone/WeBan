@@ -211,6 +211,7 @@ class WeBanAPI:
         if response.json().get("data", {}).get("token"):
             self.user = response.json().get("data")
             self.session.headers["X-Token"] = self.user.get("token")
+            self.password = None
         return response.json()
 
     def list_study_task(self) -> Dict:
@@ -429,7 +430,7 @@ class WeBanAPI:
             "tenantCode": self.tenant_code,
         }
         response = self.session.get(fetch_url, params=params, timeout=self.timeout)  # {"captcha":{"num":3,"questionId":"${uuid}","imageUrl":"${url}"}}
-        params["questionId"] = response.json().get("data", {}).get("questionId", "")
+        params["questionId"] = response.json().get("captcha", {}).get("questionId", "")
         coordinates = [{"x": x + randint(-5, 5), "y": y + randint(-5, 5)} for x, y in [(207, 436), (67, 424), (141, 427)]]
         data = {"coordinateXYs": json.dumps(coordinates, separators=(",", ":"))}
         response = self.session.post(check_url, params=params, data=data, timeout=self.timeout)

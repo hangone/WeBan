@@ -101,6 +101,10 @@ class WeBanClient:
         for task in study_task.get("data", []):
             project_prefix = task.get("projectName", "")
             logger.info(f"开始处理任务：{project_prefix}")
+            if (progress := self.api.show_progress(task.get("userProjectId"))).get("code") == "0":
+                progress = progress.get("data", {})
+                logger.info(f"{project_prefix} 总进度：{progress.get('requiredFinishedNum', 0)}/{progress.get('requiredNum', 0)}")
+
             categories1 = self.api.list_category(task.get("userProjectId"), 1)
             categories2 = self.api.list_category(task.get("userProjectId"), 2)
             categories3 = self.api.list_category(task.get("userProjectId"))
@@ -124,12 +128,16 @@ class WeBanClient:
                     course_url = self.api.get_course_url(course.get("resourceId"), task.get("userProjectId")).get("data")
                     logger.info(f"等待 {self.study_time} 秒，模拟学习中...")
                     time.sleep(self.study_time)
+
                     # 检查是否需要验证码
                     query = parse_qs(urlparse(course_url).query)
-                    cs_capt = query.get("csCapt", [None])[0]
                     token = None
-                    if cs_capt == "true" and (res := self.api.invoke_captcha(course.get("userCourseId"), task.get("userProjectId"))).get("code") == "0":
-                        token = res.get("data", {}).get("token")
+                    if query.get("csCapt", [None])[0] == "true":
+                        logger.info(f"课程需要验证码")
+                        res = self.api.invoke_captcha(course.get("userCourseId"), task.get("userProjectId"))
+                        if res.get("code") != "0":
+                            logger.error(f"获取验证码失败：{res}")
+                        token = res["data"]["methodToken"]
 
                     if not self.api.finish_by_token(course.get("userCourseId"), token):
                         logger.error(f"完成课程失败：{course_prefix}")
