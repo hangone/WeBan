@@ -436,7 +436,7 @@ class WeBanAPI:
         response = self.session.post(check_url, params=params, data=data, timeout=self.timeout)
         return response.json()
 
-    def finish_by_token(self, user_course_id: str, token: str | None = None) -> str:
+    def finish_by_token(self, user_course_id: str, token: str | None) -> str:
         """
         通过 userCourseId 或验证码 token 完成课程
         :param user_course_id: 用户课程 ID
@@ -453,3 +453,351 @@ class WeBanAPI:
         }
         response = self.session.get(url, params=params, timeout=self.timeout)
         return response.text
+
+    def exam_list_plan(self, user_course_id: str) -> Dict | None:
+        """
+        获取考试计划列表
+        :param user_course_id: 用户课程 ID
+        :return:
+        {
+          "code": "0",
+          "data": [
+            {
+              "id": "${uuid}",
+              "examPlanId": "${uuid}",
+              "examPlanName": "结课考试",
+              "answerNum": 3,
+              "answerTime": 60,
+              "passScore": 80,
+              "isRetake": 2,
+              "examType": 2,
+              "isAssessment": 1,
+              "startTime": "2025-03-01 00:00:00",
+              "endTime": "2025-04-31 23:59:59",
+              "examFinishNum": 1,
+              "examOddNum": 2,
+              "examScore": 100,
+              "examTimeState": 2,
+              "displayState": 1,
+              "prompt": ""
+            }
+          ],
+          "detailCode": "0"
+        }
+        """
+        url = f"{self.baseurl}/pharos/exam/listPlan.do"
+        params = {"timestamp": self.get_timestamp()}
+        data = {
+            "tenantCode": self.tenant_code,
+            "userId": self.user["userId"],
+            "userCourseId": user_course_id,
+        }
+        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
+        return response.json()
+
+    def exam_before_paper(self, user_exam_plan_id: str) -> Dict:
+        """
+        获取是否有未提交的答案
+        :param user_exam_plan_id: 用户考试计划 ID
+        :return:
+        {
+          "code": "0",
+          "data": {
+            "isExistedNotSubmit": false
+          },
+          "detailCode": "0"
+        }
+        """
+        url = f"{self.baseurl}/pharos/exam/beforePaper.do"
+        params = {"timestamp": self.get_timestamp()}
+        data = {
+            "tenantCode": self.tenant_code,
+            "userId": self.user["userId"],
+            "userExamPlanId": user_exam_plan_id,
+        }
+        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
+        return response.json()
+
+    def exam_prepare_paper(self, user_exam_plan_id: str) -> Dict:
+        """
+        准备考试
+        :param user_exam_plan_id: 用户考试计划 ID
+        :return:
+        {
+          "code": "0",
+          "data": {
+            "realName": "张三",
+            "userIDLabel": "学号：",
+            "questionNum": 50,
+            "paperScore": 100,
+            "answerTime": 60
+          },
+          "detailCode": "0"
+        }
+        """
+        url = f"{self.baseurl}/pharos/exam/preparePaper.do"
+        params = {"timestamp": self.get_timestamp()}
+        data = {
+            "tenantCode": self.tenant_code,
+            "userId": self.user["userId"],
+            "userExamPlanId": user_exam_plan_id,
+        }
+        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
+        return response.json()
+
+    def exam_check_verify_code(self, user_exam_plan_id: str, verfy_code: str) -> Dict:
+        """
+        检查考试验证码
+        :param user_exam_plan_id: 用户考试计划 ID
+        :param verfy_code: 验证码
+        :return:
+        {
+          "code": "0",
+          "detailCode": "0"
+        }
+        """
+        url = f"{self.baseurl}/pharos/exam/checkVerifyCode.do"
+        params = {"timestamp": self.get_timestamp()}
+        data = {
+            "tenantCode": self.tenant_code,
+            "userId": self.user["userId"],
+            "userExamPlanId": user_exam_plan_id,
+            "verifyCode": verfy_code,
+        }
+        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
+        return response.json()
+
+    def exam_start_paper(self, user_exam_plan_id: str) -> Dict:
+        """
+        开始考试
+        :param user_exam_plan_id: 用户考试计划 ID
+        :return:
+        {
+          "code": "0",
+          "data": {
+            "answerTime": 60,
+            "questionList": [
+              {
+                "id": "${uuid}",
+                "title": "小玲有辆最高时速40公里每小时的电动自行车，按照这个时速上路，如果遇到事故，极有可能被认定为（     ）追责。",
+                "type": 1,
+                "typeLabel": "单选题",
+                "score": 2,
+                "sequence": 0,
+                "isRight": 0,
+                "optionList": [
+                  {
+                    "id": "${uuid}",
+                    "questionId": "${uuid}",
+                    "content": "机动车",
+                    "sequence": 1,
+                    "selected": 2,
+                    "attachmentList": []
+                  },
+                  {
+                    "id": "${uuid}",
+                    "questionId": "${uuid}",
+                    "content": "非机动车",
+                    "sequence": 2,
+                    "selected": 2,
+                    "attachmentList": []
+                  },
+                  {
+                    "id": "${uuid}",
+                    "questionId": "${uuid}",
+                    "content": "行人",
+                    "sequence": 3,
+                    "selected": 2,
+                    "attachmentList": []
+                  },
+                  {
+                    "id": "${uuid}",
+                    "questionId": "${uuid}",
+                    "content": "残疾人用车",
+                    "sequence": 4,
+                    "selected": 2,
+                    "attachmentList": []
+                  }
+                ],
+                "attachmentList": []
+              }
+            ]
+          },
+          "detailCode": "0"
+        }
+        """
+        url = f"{self.baseurl}/pharos/exam/startPaper.do"
+        params = {"timestamp": self.get_timestamp()}
+        data = {
+            "tenantCode": self.tenant_code,
+            "userId": self.user["userId"],
+            "userExamPlanId": user_exam_plan_id,
+        }
+        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
+        return response.json()
+
+    def exam_record_question(self, user_exam_plan_id: str, question_id: str, use_time: int, answer_ids: str, exam_plan_id: str) -> Dict:
+        """
+        记录考试答案
+        :param user_exam_plan_id: 用户考试计划 ID
+        :param question_id: 题目 ID
+        :param use_time: 本题用时，单位为秒
+        :param answer_ids: 答案 ID，多个答案用逗号分隔后 url 编码
+        :param exam_plan_id: 考试计划 ID
+        :return:
+        {
+          "code": "0",
+          "detailCode": "0"
+        }
+        """
+        url = f"{self.baseurl}/pharos/exam/recordQuestion.do"
+        params = {"timestamp": self.get_timestamp()}
+        data = {
+            "tenantCode": self.tenant_code,
+            "userId": self.user["userId"],
+            "userExamPlanId": user_exam_plan_id,
+            "questionId": question_id,
+            "useTime": use_time,
+            "answerIds": answer_ids,
+            "examPlanId": exam_plan_id,
+        }
+        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
+        return response.json()
+
+    def exam_submit_paper(self, user_exam_plan_id: str) -> Dict:
+        """
+        提交考试
+        :param user_exam_plan_id: 用户考试计划 ID
+        :return:
+        {
+          "code": "0",
+          "data": {
+            "score": 100,
+            "redpacketInfo": {
+              "redpacketName": "",
+              "redpacketComment": "",
+              "redpacketMoney": 0.0,
+              "isSendRedpacket": 2
+            },
+            "ebookInfo": { "displayBook": 2 }
+          },
+          "detailCode": "0"
+        }
+        """
+        url = f"{self.baseurl}/pharos/exam/submitPaper.do"
+        params = {"timestamp": self.get_timestamp()}
+        data = {
+            "tenantCode": self.tenant_code,
+            "userId": self.user["userId"],
+            "userExamPlanId": user_exam_plan_id,
+        }
+        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
+        return response.json()
+
+    def exam_fresh_paper(self, user_exam_plan_id: str) -> Dict:
+        """
+        重置考试题目
+        :param user_exam_plan_id: 用户考试计划 ID
+        :return:
+        {
+          "code": "0",
+          "data": {
+            "answerTime": 56,
+            "questionList": [
+              {
+                "id": "536a43c6-c6f4-4fbf-97f5-a64e53cb813c",
+                "title": "昏厥的病人不能随意搬动，但可适当挪动头部来保持病人呼吸通畅。",
+                "type": 1,
+                "typeLabel": "单选题",
+                "score": 2,
+                "sequence": 0,
+                "isRight": 0,
+                "optionList": [
+                  {
+                    "id": "afab5aea-2cab-46c2-b3cc-6009c6b6de55",
+                    "questionId": "536a43c6-c6f4-4fbf-97f5-a64e53cb813c",
+                    "content": "对。",
+                    "sequence": 1,
+                    "selected": 1,
+                    "attachmentList": []
+                  },
+                  {
+                    "id": "2913e6b8-51a8-4716-a2d9-9d019ef900da",
+                    "questionId": "536a43c6-c6f4-4fbf-97f5-a64e53cb813c",
+                    "content": "错。",
+                    "sequence": 2,
+                    "selected": 2,
+                    "attachmentList": []
+                  }
+                ],
+                "attachmentList": []
+              }
+            ]
+          },
+          "detailCode": "0"
+        }
+        """
+        url = f"{self.baseurl}/pharos/exam/freshPaper.do"
+        params = {"timestamp": self.get_timestamp()}
+        data = {
+            "tenantCode": self.tenant_code,
+            "userId": self.user["userId"],
+            "userExamPlanId": user_exam_plan_id,
+        }
+        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
+        return response.json()
+
+    def exam_review_paper(self, user_exam_id: str, is_retake: int = 2) -> Dict:
+        """
+        查看考试结果
+        :param user_exam_id: 用户考试 ID
+        :param is_retake: 是否重考，1：是，2：否
+        :return:
+        {
+          "code": "0",
+          "data": {
+            "submitTime": "2025-05-19 01:59:37",
+            "score": 100,
+            "useTime": 526,
+            "questions": [
+              {
+                "title": "题目",
+                "type": 1,
+                "typeLabel": "单选题",
+                "score": 2,
+                "sequence": 0,
+                "analysis": "",
+                "isRight": 1,
+                "optionList": [
+                  {
+                    "content": "正确。",
+                    "sequence": 1,
+                    "selected": 1,
+                    "isCorrect": 1,
+                    "attachmentList": []
+                  },
+                  {
+                    "content": "错误。",
+                    "sequence": 2,
+                    "selected": 2,
+                    "isCorrect": 2,
+                    "attachmentList": []
+                  }
+                ],
+                "attachmentList": []
+              }
+            ]
+          },
+          "detailCode": "0"
+        }
+        """
+        url = f"{self.baseurl}/pharos/exam/reviewPaper.do"
+        params = {"timestamp": self.get_timestamp()}
+        data = {
+            "tenantCode": self.tenant_code,
+            "userId": self.user["userId"],
+            "userExamId": user_exam_id,
+            "isRetake": is_retake,
+        }
+        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
+        return response.json()
