@@ -13,11 +13,12 @@ if TYPE_CHECKING:
 
 
 class WeBanClient:
-    def __init__(self, account: str, password: str, tenant_name: str, study_time: int = 15):
+
+    def __init__(self, account: str, password: str, tenant_name: str) -> None:
         self.tenant_name = tenant_name
         self.ocr = self.get_ocr_instance()
         self.api = WeBanAPI(account, password)
-        self.study_time = study_time
+        self.study_time = 15
         self.fail = []
 
     @staticmethod
@@ -82,18 +83,9 @@ class WeBanClient:
             logger.error(f"登录出错: {res}")
         return self.api.user
 
-    def run(self):
-        logger.add("weban.log", encoding="utf-8", retention="10 days")
-        logger.info("开始执行")
-
-        if not self.get_tenant_code(self.tenant_name):
-            return
-
-        if not self.login():
-            logger.error("登录失败")
-            return
-        logger.success("登录成功")
-
+    def run_study(self, study_time: int | None) -> None:
+        if study_time:
+            self.study_time = study_time
         study_task = self.api.list_study_task()
         if study_task.get("code") == "0":
             logger.info("获取任务列表成功")
@@ -154,3 +146,6 @@ class WeBanClient:
             logger.warning(f"以下课程学习失败：{self.fail}")
         else:
             logger.success("所有课程学习完成")
+
+    def run_exam(self, use_time: int = 2000):
+        return
