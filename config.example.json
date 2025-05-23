@@ -1,11 +1,12 @@
 [
   {
     "tenant_name": "学校名称",
-    "account": "用户名 1",
-    "password": "密码 1",
+    "account": "用户名",
+    "password": "密码",
+    "study_time": 15,
     "study_time": 15,
     "study": true,
-    "exam": false,
-    "exam_use_time": 2000
+    "exam": true,
+    "exam_use_time": 600
   }
 ]
