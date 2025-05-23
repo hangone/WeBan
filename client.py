@@ -60,7 +60,22 @@ class WeBanClient:
         logger.error(f"没找到你的学校代码，请检查学校全称是否正确: {tenant_name}\n{tenant_list}")
         return None
 
+    def get_progress(self, user_project_id: str, project_prefix: str | None) -> Dict[str, Any]:
+        """
+        获取学习进度
+        :param user_project_id: 用户项目 ID
+        :param project_prefix: 项目前缀
+        :return:
+        """
+        progress = self.api.show_progress(user_project_id)
+        if progress.get("code", "-1") == "0":
+            progress = progress.get("data", {})
+            logger.info(f"{project_prefix} 总进度：{progress.get('requiredFinishedNum', 0)}/{progress.get('requiredNum', 0)}")
+        return progress
+
     def login(self) -> Dict | None:
+        if not self.get_tenant_code(self.tenant_name):
+            return None
         retry_limit = 3
         for i in range(retry_limit + 2):
             if i > 0:
@@ -81,6 +96,9 @@ class WeBanClient:
             if self.api.user:
                 break
             logger.error(f"登录出错: {res}")
+            if res.get("detailCode") == "10002":
+                logger.error(f"请检查账号是否正确（比如多出空格之类的）")
+                break
         return self.api.user
 
     def run_study(self, study_time: int | None) -> None:
@@ -93,13 +111,14 @@ class WeBanClient:
         for task in study_task.get("data", []):
             project_prefix = task.get("projectName", "")
             logger.info(f"开始处理任务：{project_prefix}")
-            if (progress := self.api.show_progress(task.get("userProjectId"))).get("code") == "0":
-                progress = progress.get("data", {})
-                logger.info(f"{project_prefix} 总进度：{progress.get('requiredFinishedNum', 0)}/{progress.get('requiredNum', 0)}")
 
-            categories1 = self.api.list_category(task.get("userProjectId"), 1)
-            categories2 = self.api.list_category(task.get("userProjectId"), 2)
-            categories3 = self.api.list_category(task.get("userProjectId"))
+            # 获取学习进度
+            self.get_progress(task.get("userProjectId"), project_prefix)
+
+            # 聚合类别
+            categories1 = self.api.list_category(task.get("userProjectId"), 1)  # 推送课
+            categories2 = self.api.list_category(task.get("userProjectId"), 2)  # 自选课
+            categories3 = self.api.list_category(task.get("userProjectId"), 3)  # 必修课
             categories = categories1.get("data", []) + categories2.get("data", []) + categories3.get("data", [])
             for category in categories:
                 category_prefix = f"{project_prefix}/{category.get("categoryName")}"
@@ -138,9 +157,8 @@ class WeBanClient:
 
                     logger.success(f"{course_prefix} 完成")
 
-                    if (progress := self.api.show_progress(task.get("userProjectId"))).get("code") == "0":
-                        progress = progress.get("data", {})
-                        logger.info(f"{project_prefix} 总进度：{progress.get('requiredFinishedNum', 0)}/{progress.get('requiredNum', 0)}")
+                    # 获取学习进度
+                    self.get_progress(task.get("userProjectId"), project_prefix)
 
         if len(self.fail) > 0:
             logger.warning(f"以下课程学习失败：{self.fail}")
