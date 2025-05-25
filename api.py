@@ -255,6 +255,41 @@ class WeBanAPI:
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
         return response.json()
 
+    def list_my_project(self, ended: int = 2) -> Dict:
+        """
+        获取我的项目列表，和 list_study_task 几乎相同
+        :param ended: 1:进行中 2:已结束
+        :return:
+        {
+          "code": "0",
+          "data": [
+            {
+              "projectId": "${uuid}",
+              "projectName": "2025年春季安全教育",
+              "projectImageUrl": "",
+              "endTime": "2025-05-31",
+              "finished": 2,
+              "progressPet": 5,
+              "exceedPet": 46,
+              "assessment": "完成进度达到100%视为完成",
+              "userProjectId": "${uuid}",
+              "projectMode": 1,
+              "projectCategory": 9,
+              "projectAttribute": 1,
+              "studyState": 5,
+              "studyStateLabel": "未完成",
+              "certificateAcquired": 2
+            }
+          ],
+          "detailCode": "0"
+        }
+        """
+        url = f"{self.baseurl}/pharos/index/listMyProject.do"
+        params = {"timestamp": self.get_timestamp()}
+        data = {"tenantCode": self.tenant_code, "userId": self.user["userId"], "ended": ended}
+        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
+        return response.json()
+
     def show_progress(self, user_project_id: str) -> Dict:
         """
         获取学习任务进度
@@ -454,10 +489,10 @@ class WeBanAPI:
         response = self.session.get(url, params=params, timeout=self.timeout)
         return response.text
 
-    def exam_list_plan(self, user_course_id: str) -> Dict | None:
+    def exam_list_plan(self, user_project_id: str) -> Dict | None:
         """
         获取考试计划列表
-        :param user_course_id: 用户课程 ID
+        :param user_project_id: 用户课程 ID
         :return:
         {
           "code": "0",
@@ -490,7 +525,7 @@ class WeBanAPI:
         data = {
             "tenantCode": self.tenant_code,
             "userId": self.user["userId"],
-            "userCourseId": user_course_id,
+            "userProjectId": user_project_id,
         }
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
         return response.json()
@@ -545,11 +580,12 @@ class WeBanAPI:
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
         return response.json()
 
-    def exam_check_verify_code(self, user_exam_plan_id: str, verfy_code: str) -> Dict:
+    def exam_check_verify_code(self, user_exam_plan_id: str, verfy_code: str, verify_time: int | None) -> Dict:
         """
         检查考试验证码
         :param user_exam_plan_id: 用户考试计划 ID
         :param verfy_code: 验证码
+        :param verify_time: 验证码 13 位时间戳
         :return:
         {
           "code": "0",
@@ -561,6 +597,7 @@ class WeBanAPI:
         data = {
             "tenantCode": self.tenant_code,
             "userId": self.user["userId"],
+            "time": verify_time or int(self.get_timestamp(frac_len=0)),
             "userExamPlanId": user_exam_plan_id,
             "verifyCode": verfy_code,
         }
@@ -636,13 +673,13 @@ class WeBanAPI:
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
         return response.json()
 
-    def exam_record_question(self, user_exam_plan_id: str, question_id: str, use_time: int, answer_ids: str, exam_plan_id: str) -> Dict:
+    def exam_record_question(self, user_exam_plan_id: str, question_id: str, use_time: int, answer_ids: list | None, exam_plan_id: str) -> Dict:
         """
         记录考试答案
         :param user_exam_plan_id: 用户考试计划 ID
         :param question_id: 题目 ID
         :param use_time: 本题用时，单位为秒
-        :param answer_ids: 答案 ID，多个答案用逗号分隔后 url 编码
+        :param answer_ids: 答案 ID, 列表形式
         :param exam_plan_id: 考试计划 ID
         :return:
         {
@@ -658,9 +695,10 @@ class WeBanAPI:
             "userExamPlanId": user_exam_plan_id,
             "questionId": question_id,
             "useTime": use_time,
-            "answerIds": answer_ids,
             "examPlanId": exam_plan_id,
         }
+        if answer_ids:
+            data["answerIds"] = ",".join(answer_ids)
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
         return response.json()
 
