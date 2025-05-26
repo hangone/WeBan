@@ -177,6 +177,23 @@
     ],
     "type": 1
   },
+  "AIDS孕妇生下的小孩有可能得艾滋病，是吗？": {
+    "optionList": [
+      {
+        "content": "是",
+        "isCorrect": 1
+      },
+      {
+        "content": "否",
+        "isCorrect": 2
+      },
+      {
+        "content": "不知道",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "AI诈骗手法不包括？": {
     "optionList": [
       {
@@ -1259,16 +1276,16 @@
   "“扫黑除恶专项行动”2020年的工作重点是？": {
     "optionList": [
       {
-        "content": "建机制，取得压倒性胜利。",
-        "isCorrect": 1
-      },
-      {
         "content": "严态势，营造人人喊打的氛围；",
         "isCorrect": 2
       },
       {
         "content": "攻案件，提升群众满意度；",
         "isCorrect": 2
+      },
+      {
+        "content": "建机制，取得压倒性胜利。",
+        "isCorrect": 1
       }
     ],
     "type": 1
@@ -1889,6 +1906,23 @@
     ],
     "type": 1
   },
+  "《中华人民共和国民用航空法》规定：\r\n禁止在依法规定的民用机场范围内和按照国家规定的机场净空保护区域内从事哪些活动？": {
+    "optionList": [
+      {
+        "content": "设置影响机场目视助航设施使用的灯光、标志或者物体",
+        "isCorrect": 1
+      },
+      {
+        "content": "饲养、放飞影响飞行安全的鸟类动物和其他物体",
+        "isCorrect": 1
+      },
+      {
+        "content": "放养牲畜",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "《中华人民共和国消防法》规定：任何单位、个人都有（   ）的义务。": {
     "optionList": [
       {
@@ -2289,6 +2323,10 @@
       {
         "content": "对",
         "isCorrect": 1
+      },
+      {
+        "content": "错",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -5590,6 +5628,10 @@
       {
         "content": "缺乏证据。",
         "isCorrect": 1
+      },
+      {
+        "content": "无法可依。",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -5686,10 +5728,6 @@
   "中国共产党第十九次全国代表大会，是在全面建成小康社会决胜阶段、中国特色社会主义进入（）的关键时期召开的一次十分重要的大会。": {
     "optionList": [
       {
-        "content": "新时代",
-        "isCorrect": 1
-      },
-      {
         "content": "新时期",
         "isCorrect": 2
       },
@@ -5700,6 +5738,10 @@
       {
         "content": "新征程",
         "isCorrect": 2
+      },
+      {
+        "content": "新时代",
+        "isCorrect": 1
       }
     ],
     "type": 1
@@ -6398,6 +6440,27 @@
       {
         "content": "降低自己传播细菌到别处的几率。",
         "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "为什么高校容易成为间谍的关注对象？": {
+    "optionList": [
+      {
+        "content": "涉外交往频繁",
+        "isCorrect": 1
+      },
+      {
+        "content": "参与国家级课题",
+        "isCorrect": 1
+      },
+      {
+        "content": "信息资源丰富",
+        "isCorrect": 1
+      },
+      {
+        "content": "间谍喜欢和年轻人接触",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -8513,6 +8576,10 @@
       {
         "content": "K粉",
         "isCorrect": 1
+      },
+      {
+        "content": "海洛因",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -9060,13 +9127,9 @@
       {
         "content": "火势发展比较缓慢。",
         "isCorrect": 2
-      },
-      {
-        "content": "火势急，有浓烟",
-        "isCorrect": 1
       }
     ],
-    "type": 2
+    "type": 1
   },
   "以下哪项不属于扑救初起火灾的原则？": {
     "optionList": [
@@ -9812,6 +9875,27 @@
       }
     ],
     "type": 1
+  },
+  "作为高校学生，应如何避免出现政治性问题？": {
+    "optionList": [
+      {
+        "content": "坚定理想信念",
+        "isCorrect": 1
+      },
+      {
+        "content": "树立正确的荣辱观",
+        "isCorrect": 1
+      },
+      {
+        "content": "严格遵守政治纪律",
+        "isCorrect": 1
+      },
+      {
+        "content": "多看网络热搜、娱乐新闻",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
   },
   "作为高校学生，应如何避免出现政治性问题？（）": {
     "optionList": [
@@ -11221,6 +11305,14 @@
   "全世界商用喷气运输机飞行事故中，起飞和降落事故约占全部飞行事故的（）。": {
     "optionList": [
       {
+        "content": "30%",
+        "isCorrect": 2
+      },
+      {
+        "content": "50%",
+        "isCorrect": 2
+      },
+      {
         "content": "70%",
         "isCorrect": 1
       }
@@ -11730,6 +11822,31 @@
       }
     ],
     "type": 1
+  },
+  "关于K粉，以下说法正确的是：": {
+    "optionList": [
+      {
+        "content": "外观上是白色结晶性粉末，无臭，易溶于水，可随意勾兑进饮料、红酒中服下。",
+        "isCorrect": 1
+      },
+      {
+        "content": "又名氯胺酮，俗称K仔、K他命、克他命、恺他命，在台湾被称为“裤子”。",
+        "isCorrect": 1
+      },
+      {
+        "content": "短期可使人说话迷糊，引起幻觉、情绪抑郁、镇静、催眠，甚至昏睡。",
+        "isCorrect": 1
+      },
+      {
+        "content": "长期可使人记忆力衰退、认知能力障碍，导致心功能受损害。",
+        "isCorrect": 1
+      },
+      {
+        "content": "会给人带来生理和心理依赖，并会因出现幻觉而伤及自己或他人。",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
   },
   "关于love可以解读为？": {
     "optionList": [
@@ -17855,6 +17972,10 @@
       {
         "content": "正确。",
         "isCorrect": 1
+      },
+      {
+        "content": "错误。",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -18987,6 +19108,10 @@
       {
         "content": "不围观、不参与非法聚集活动",
         "isCorrect": 1
+      },
+      {
+        "content": "多学习法律法规知识",
+        "isCorrect": 1
       }
     ],
     "type": 2
@@ -19037,6 +19162,27 @@
       }
     ],
     "type": 1
+  },
+  "如何去帮助一个出现自杀征兆的人？": {
+    "optionList": [
+      {
+        "content": "多倾听对方的表达",
+        "isCorrect": 1
+      },
+      {
+        "content": "建议他寻找专业的心理医疗机构",
+        "isCorrect": 1
+      },
+      {
+        "content": "冷静，不批判，不试图改变他们的感受",
+        "isCorrect": 1
+      },
+      {
+        "content": "不要害怕他们强烈的情感反应",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
   },
   "如何告别拖延症？": {
     "optionList": [
@@ -19417,6 +19563,10 @@
       {
         "content": "始终保持警惕性",
         "isCorrect": 1
+      },
+      {
+        "content": "不和外国人说话",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -22283,12 +22433,12 @@
   "寻找家教兼职时，当你来到一个男性雇主的家中，发现家里的女主人和孩子都不在，怎么做更恰当？": {
     "optionList": [
       {
-        "content": "找理由在外面的公共场所等候，让家长等孩子回来时联系你。",
-        "isCorrect": 1
-      },
-      {
         "content": "在家里坐一会儿，等孩子回来。",
         "isCorrect": 2
+      },
+      {
+        "content": "找理由在外面的公共场所等候，让家长等孩子回来时联系你。",
+        "isCorrect": 1
       }
     ],
     "type": 1
@@ -24721,6 +24871,10 @@
       {
         "content": "正确。",
         "isCorrect": 1
+      },
+      {
+        "content": "错误。",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -27025,12 +27179,12 @@
   "携带HIV意味着患有艾滋病。": {
     "optionList": [
       {
-        "content": "错。",
-        "isCorrect": 1
-      },
-      {
         "content": "对。",
         "isCorrect": 2
+      },
+      {
+        "content": "错。",
+        "isCorrect": 1
       }
     ],
     "type": 1
@@ -28827,8 +28981,20 @@
   "机场净空区的作用是（）。": {
     "optionList": [
       {
+        "content": "为机场塔台指挥专用",
+        "isCorrect": 2
+      },
+      {
+        "content": "为飞机起飞专用",
+        "isCorrect": 2
+      },
+      {
         "content": "为飞机起降专用的",
         "isCorrect": 1
+      },
+      {
+        "content": "为航线交通线专用",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -30376,26 +30542,6 @@
       },
       {
         "content": "产生攻击性",
-        "isCorrect": 1
-      },
-      {
-        "content": "情绪抑郁",
-        "isCorrect": 1
-      },
-      {
-        "content": "行为失控",
-        "isCorrect": 1
-      },
-      {
-        "content": "产生幻觉",
-        "isCorrect": 1
-      },
-      {
-        "content": "心脏功能受损",
-        "isCorrect": 1
-      },
-      {
-        "content": "失去知觉",
         "isCorrect": 1
       }
     ],
@@ -39642,12 +39788,12 @@
   "饮酒驾驶机动车辆的处罚为（）。": {
     "optionList": [
       {
-        "content": "罚款1000元—2000元、记12分并暂扣驾照6个月。",
-        "isCorrect": 1
-      },
-      {
         "content": "罚款5000元，记12分，处以15日以下拘留，并且5年内不得重新获得驾照。",
         "isCorrect": 2
+      },
+      {
+        "content": "罚款1000元—2000元、记12分并暂扣驾照6个月。",
+        "isCorrect": 1
       },
       {
         "content": "吊销驾照，5年内不得重新获取驾照，经过判决后处以拘役，并处罚金。",
@@ -40618,10 +40764,6 @@
   "（）是一个国家、一个民族发展中更基本、更深沉、更持久的力量。": {
     "optionList": [
       {
-        "content": "文化自信",
-        "isCorrect": 1
-      },
-      {
         "content": "道路自信",
         "isCorrect": 2
       },
@@ -40632,6 +40774,10 @@
       {
         "content": "制度自信",
         "isCorrect": 2
+      },
+      {
+        "content": "文化自信",
+        "isCorrect": 1
       }
     ],
     "type": 1
@@ -40700,12 +40846,12 @@
   "（）是引领发展的第一动力，是建设现代化经济体系的战略支撑。": {
     "optionList": [
       {
-        "content": "创新",
-        "isCorrect": 1
-      },
-      {
         "content": "改革",
         "isCorrect": 2
+      },
+      {
+        "content": "创新",
+        "isCorrect": 1
       },
       {
         "content": "开放",
