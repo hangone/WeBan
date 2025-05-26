@@ -363,7 +363,8 @@ class WeBanClient:
             for plan in self.api.exam_list_plan(user_project_id).get("data", []):
                 for history in self.api.exam_list_history(plan["examPlanId"], plan["examType"]).get("data", []):
                     for answer in self.api.exam_review_paper(history["id"], history["isRetake"]).get("data", {}).get("questions", []):
-                        title = answer.get("title")
-                        logger.info(f"发现新题目：{title}")
-                        answers_json[answer["title"]] = {"type": answer["type"], "optionList": [{"content": option["content"], "isCorrect": option["isCorrect"]} for option in answer.get("optionList", [])]}
+                        title = answer["title"]
+                        if title not in answers_json:
+                            logger.info(f"发现新题目：{title}")
+                        answers_json[title] = {"type": answer["type"], "optionList": [{"content": option["content"], "isCorrect": option["isCorrect"]} for option in answer.get("optionList", [])]}
         open("answer/answer.json", "w", encoding="utf-8").write(json.dumps(answers_json, indent=2, ensure_ascii=False, sort_keys=True))
