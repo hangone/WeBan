@@ -185,12 +185,10 @@ class WeBanClient:
 
     def run_exam(self, use_time: int = 600):
         # 加载题库
-        answers_list = []
         answers_json = {}
 
         with open("answer/answer.json", encoding="utf-8") as f:
             for title, options in json.load(f).items():
-                answers_list.append(title)
                 correct_answers = [answer["content"] for answer in options.get("optionList", []) if answer.get("isCorrect") == 1]
                 if correct_answers:
                     answers_json[title] = correct_answers
@@ -281,7 +279,7 @@ class WeBanClient:
                 failed_questions = []  # 答题失败的题目
 
                 for i, question in enumerate(question_list):
-                    if question.get("title") in answers_list:
+                    if question.get("title") in answers_json:
                         have_answer.append(question)
                         continue
                     no_answer.append(question)
@@ -322,19 +320,17 @@ class WeBanClient:
                     answers = answers_json[question["title"]]
                     logger.info(f"题库答案：{', '.join(answers)}")
                     answers_ids = []
-                    for ans in answers:
-                        for option in question["optionList"]:
-                            if option["content"] == ans:
-                                answers_ids.append(option["id"])
-                                break
+                    for option in question["optionList"]:
+                        if option["content"] in answers:
+                            answers_ids.append(option["id"])
                     if not self.record_answer(user_exam_plan_id, question["id"], per_time, answers_ids, exam_plan_id):
                         failed_questions.append(question)
                         continue
 
                 logger.info("完成考试，正在提交答案...")
                 submit_res = self.api.exam_submit_paper(user_exam_plan_id)
-                if submit_res.get("code") != "0":
-                    logger.error(f"提交答案失败：{submit_res}")
+                if submit_res.get("code", -1) != "0":
+                    logger.error(f"提交答案失败，请重启考试：{submit_res}")
                     continue
                 logger.success(f"答案提交成功，考试完成，成绩：{submit_res.get('data', {}).get('score', 0)} 分")
 
@@ -357,3 +353,19 @@ class WeBanClient:
             logger.error(f"答题失败，请重新开启考试")
             return False
         return True
+
+    def sync_answers(self) -> None:
+        """
+        同步答案
+        :return:
+        """
+        answers_json = json.load(open("answer/answer.json", encoding="utf-8"))
+        for project in self.api.list_my_project().get("data", []):
+            user_project_id = project["userProjectId"]
+            for plan in self.api.exam_list_plan(user_project_id).get("data", []):
+                for history in self.api.exam_list_history(plan["examPlanId"], plan["examType"]).get("data", []):
+                    for answer in self.api.exam_review_paper(history["id"], history["isRetake"]).get("data", {}).get("questions", []):
+                        title = answer.get("title")
+                        logger.info(f"发现新题目：{title}")
+                        answers_json[answer["title"]] = {"type": answer["type"], "optionList": [{"content": option["content"], "isCorrect": option["isCorrect"]} for option in answer.get("optionList", [])]}
+        open("answer/answer.json", "w", encoding="utf-8").write(json.dumps(answers_json, indent=2, ensure_ascii=False, sort_keys=True))
