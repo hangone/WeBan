@@ -70,9 +70,9 @@ class WeBanClient:
         for item in tenant_list.get("data", []):
             for entry in item.get("list", []):
                 if entry.get("name", "") == tenant_name:
-                    logger.success(f"找到学校代码: {entry.get("code", "")}")
-                    self.api.set_tenant_code(entry.get("code", ""))
-                    return entry.get("code", "")
+                    logger.success(f"找到学校代码: {entry['code']}")
+                    self.api.set_tenant_code(entry["code"])
+                    return entry["code"]
         logger.error(f"没找到你的学校代码，请检查学校全称是否正确: {tenant_name}\n{tenant_list}")
         return None
 
@@ -108,7 +108,7 @@ class WeBanClient:
                     continue
             else:
                 open("verify_code.png", "wb").write(verify_image)
-                webbrowser.open(f"file://{os.path.abspath("verify_code.png")}")
+                webbrowser.open(f"file://{os.path.abspath('verify_code.png')}")
                 verify_code = input("请查看 verify_code.png 输入验证码：")
             res = self.api.login(verify_code, int(verify_time))
             if self.api.user:
@@ -132,20 +132,20 @@ class WeBanClient:
             self.get_progress(task.get("userProjectId"), project_prefix)
 
             # 聚合类别
-            categories1 = self.api.list_category(task.get("userProjectId"), 1)  # 推送课
-            categories2 = self.api.list_category(task.get("userProjectId"), 2)  # 自选课
-            categories3 = self.api.list_category(task.get("userProjectId"), 3)  # 必修课
+            categories1 = self.api.list_category(task["userProjectId"], 1)  # 推送课
+            categories2 = self.api.list_category(task["userProjectId"], 2)  # 自选课
+            categories3 = self.api.list_category(task["userProjectId"], 3)  # 必修课
             categories = categories1.get("data", []) + categories2.get("data", []) + categories3.get("data", [])
             for category in categories:
-                category_prefix = f"{project_prefix}/{category.get("categoryName")}"
+                category_prefix = f"{project_prefix}/{category['categoryName']}"
                 logger.info(f"开始处理分类 {category_prefix}")
-                if category.get("finishedNum") >= category.get("totalNum"):
+                if category["finishedNum"] >= category["totalNum"]:
                     logger.success(f"{category_prefix} 已完成")
                     continue
 
-                courses = self.api.list_course(task.get("userProjectId"), category.get("categoryCode"))
+                courses = self.api.list_course(task["userProjectId"], category["categoryCode"])
                 for course in courses.get("data", []):
-                    course_prefix = f"{category_prefix}/{course.get("resourceName")}"
+                    course_prefix = f"{category_prefix}/{course['resourceName']}"
                     logger.info(f"开始处理课程：{course_prefix}")
                     if course.get("finished") == 1:
                         logger.success(f"{course_prefix} 已完成")
@@ -166,7 +166,7 @@ class WeBanClient:
                             logger.error(f"获取验证码失败：{res}")
                         token = res["data"]["methodToken"]
 
-                    if not self.api.finish_by_token(course.get("userCourseId"), token):
+                    if not self.api.finish_by_token(course["userCourseId"], token):
                         logger.error(f"完成课程失败：{course_prefix}")
                         self.fail.append(course.get("courseName"))
                         continue
@@ -174,7 +174,7 @@ class WeBanClient:
                     logger.success(f"{course_prefix} 完成")
 
                     # 获取学习进度
-                    self.get_progress(task.get("userProjectId"), project_prefix)
+                    self.get_progress(task["userProjectId"], project_prefix)
 
         if len(self.fail) > 0:
             logger.warning(f"以下课程学习失败：{self.fail}")
@@ -187,7 +187,7 @@ class WeBanClient:
 
         with open("answer/answer.json", encoding="utf-8") as f:
             for title, options in json.load(f).items():
-                correct_answers = [answer["content"] for answer in options.get("optionList", []) if answer.get("isCorrect") == 1]
+                correct_answers = [answer["content"] for answer in options.get("optionList", []) if answer["isCorrect"] == 1]
                 if correct_answers:
                     answers_json[title] = correct_answers
 
@@ -252,7 +252,7 @@ class WeBanClient:
                             continue
                     else:
                         open("verify_code.png", "wb").write(verify_image)
-                        webbrowser.open(f"file://{os.path.abspath("verify_code.png")}")
+                        webbrowser.open(f"file://{os.path.abspath('verify_code.png')}")
                         verify_code = input("请查看 verify_code.png 输入验证码：")
                     res = self.api.exam_check_verify_code(user_exam_plan_id, verify_code, int(verify_time))
                     if res.get("code") == "0":
