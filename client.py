@@ -357,6 +357,10 @@ class WeBanClient:
         同步答案
         :return:
         """
+        os.makedirs("answer", exist_ok=True)
+        if not os.path.exists("answer/answer.json"):
+            logger.info("题库不存在，正在下载...")
+            open("answer/answer.json", "w", encoding="utf-8").write(self.api.download_answer())
         answers_json = json.load(open("answer/answer.json", encoding="utf-8"))
         for project in self.api.list_my_project().get("data", []):
             user_project_id = project["userProjectId"]

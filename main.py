@@ -6,7 +6,7 @@ from loguru import logger
 from client import WeBanClient
 
 if __name__ == "__main__":
-    logger.add("weban.log", encoding="utf-8", retention="10 days")
+    logger.add("weban.log", encoding="utf-8", retention="1 days")
     logger.info("开始执行")
 
     try:
@@ -15,7 +15,7 @@ if __name__ == "__main__":
     except FileNotFoundError:
         logger.error("config.json 文件不存在，自动创建")
         with open("config.json", "w", encoding="utf-8") as f:
-            data = [{"tenant_name": "学校名称", "account": "用户名", "password": "密码", "study": True, "study_time": 15, "exam": False, "exam_use_time": 2000}]
+            data = [{"tenant_name": "学校名称", "account": "用户名", "password": "密码", "study": True, "study_time": 15, "exam": False, "exam_use_time": 600}]
             f.write(json.dumps(data, indent=2, ensure_ascii=False))
         sys.exit(1)
     except json.JSONDecodeError:

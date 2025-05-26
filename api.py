@@ -882,3 +882,21 @@ class WeBanAPI:
         }
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
         return response.json()
+
+    def download_answer(self) -> str:
+        """
+        下载最新题库
+        :return:
+        {
+          "(       )是麻醉诱导常用的药物之一。": {
+            "optionList": [
+              {
+                "content": "“依托咪酯”",
+                "isCorrect": 1
+              }
+            ],
+            "type": 1
+          }
+        }
+        """
+        return requests.get(f"https://ghfast.top/https://github.com/hangone/WeBan/raw/refs/heads/main/answer/answer.json", timeout=self.timeout).text
