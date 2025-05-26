@@ -6,6 +6,8 @@
 
 实现了课程学习和根据题库自动考试，支持多用户，自动验证码识别（需要安装 ddddocr）。
 
+运行前后会自动合并题库，如果一次没满分可以再考一次。 可将 answer/answer.json 文件提交 PR 一起完善题库。
+
 ## 直接使用
 
 从 [Releases](https://github.com/hangone/WeBan/releases) 下载 WeBan.exe 单文件运行，根据提示输入。
