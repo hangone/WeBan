@@ -839,3 +839,46 @@ class WeBanAPI:
         }
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
         return response.json()
+
+    def exam_list_history(self, exam_plan_id: str, exam_type: int) -> Dict:
+        """
+        获取考试历史记录
+        :param exam_plan_id: 考试计划 ID
+        :param exam_type: 考试类型
+        :return:
+        {
+          "code": "0",
+          "data": [
+            {
+              "id": "${uuid}",
+              "examPlanId": "${uuid}",
+              "examPlanName": "结课考试",
+              "answerNum": 5,
+              "answerTime": 60,
+              "passScore": 80,
+              "isRetake": 2,
+              "examType": 2,
+              "isAssessment": 1,
+              "startTime": "2025-02-21 00:00:00",
+              "endTime": "2025-02-26 23:59:59",
+              "examFinishNum": 1,
+              "examOddNum": 4,
+              "examScore": 86,
+              "examTimeState": 3,
+              "displayState": 1,
+              "prompt": ""
+            }
+          ],
+          "detailCode": "0"
+        }
+        """
+        url = f"{self.baseurl}/pharos/exam/listHistory.do"
+        params = {"timestamp": self.get_timestamp()}
+        data = {
+            "tenantCode": self.tenant_code,
+            "userId": self.user["userId"],
+            "examPlanId": exam_plan_id,
+            "examType": exam_type,
+        }
+        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
+        return response.json()

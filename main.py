@@ -41,12 +41,21 @@ if __name__ == "__main__":
             if not client.login():
                 logger.error(f"[{account}] 登录失败")
                 continue
+
             if study:
                 logger.info(f"[{account}] 开始学习")
                 client.run_study(study_time)
+
+            logger.info(f"[{account}] 同步答案")
+            client.sync_answers()
+
             if exam:
                 logger.info(f"[{account}] 开始考试")
                 client.run_exam(exam_use_time)
+
+            logger.info(f"[{account}] 同步答案")
+            client.sync_answers()
+
         except Exception as e:
             logger.error(f"[{account}] 运行失败: {e}")
             continue
