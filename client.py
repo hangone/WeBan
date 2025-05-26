@@ -114,9 +114,7 @@ class WeBanClient:
             if self.api.user:
                 break
             logger.error(f"登录出错: {res}")
-            if res.get("detailCode") == "10002":
-                logger.error(f"请检查账号是否正确（比如多出空格之类的）")
-                break
+            break
         return self.api.user
 
     def run_study(self, study_time: int | None) -> None:
