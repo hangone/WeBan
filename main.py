@@ -42,12 +42,12 @@ if __name__ == "__main__":
                 logger.error(f"[{account}] 登录失败")
                 continue
 
+            logger.info(f"[{account}] 同步答案")
+            client.sync_answers()
+
             if study:
                 logger.info(f"[{account}] 开始学习")
                 client.run_study(study_time)
-
-            logger.info(f"[{account}] 同步答案")
-            client.sync_answers()
 
             if exam:
                 logger.info(f"[{account}] 开始考试")
