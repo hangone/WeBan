@@ -13,7 +13,7 @@ if __name__ == "__main__":
         with open("config.json", encoding="utf-8") as f:
             configs = json.load(f)
     except FileNotFoundError:
-        logger.error("config.json 文件不存在，自动创建")
+        logger.error("config.json 文件不存在，自动创建，请填写相关信息后重新运行")
         with open("config.json", "w", encoding="utf-8") as f:
             data = [{"tenant_name": "学校名称", "account": "用户名", "password": "密码", "study": True, "study_time": 15, "exam": False, "exam_use_time": 600}]
             f.write(json.dumps(data, indent=2, ensure_ascii=False))
@@ -59,3 +59,5 @@ if __name__ == "__main__":
         except Exception as e:
             logger.error(f"[{account}] 运行失败: {e}")
             continue
+
+    input("按回车键退出")
