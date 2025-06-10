@@ -31,7 +31,7 @@ jobs:
         run: pyinstaller -F main.py -n WeBan
 
       - name: Upload to Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v2.2.2
         with:
           files: |
             dist/WeBan.exe
