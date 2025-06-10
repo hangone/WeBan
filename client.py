@@ -362,15 +362,22 @@ class WeBanClient:
         os.makedirs("answer", exist_ok=True)
         if not os.path.exists("answer/answer.json"):
             logger.info("题库不存在，正在下载...")
-            open("answer/answer.json", "w", encoding="utf-8").write(self.api.download_answer())
+            with open("answer/answer.json", "w", encoding="utf-8") as f:
+                f.write(self.api.download_answer())
         answers_json = json.load(open("answer/answer.json", encoding="utf-8"))
         for project in self.api.list_my_project().get("data", []):
-            user_project_id = project["userProjectId"]
-            for plan in self.api.exam_list_plan(user_project_id).get("data", []):
+            for plan in self.api.exam_list_plan(project["userProjectId"]).get("data", []):
                 for history in self.api.exam_list_history(plan["examPlanId"], plan["examType"]).get("data", []):
                     for answer in self.api.exam_review_paper(history["id"], history["isRetake"]).get("data", {}).get("questions", []):
                         title = answer["title"]
-                        if title not in answers_json:
-                            logger.info(f"发现新题目：{title}")
-                        answers_json[title] = {"type": answer["type"], "optionList": [{"content": option["content"], "isCorrect": option["isCorrect"]} for option in answer.get("optionList", [])]}
-        open("answer/answer.json", "w", encoding="utf-8").write(json.dumps(answers_json, indent=2, ensure_ascii=False, sort_keys=True))
+                        old_opts = {o["content"]: o["isCorrect"] for o in answers_json.get(title, {}).get("optionList", [])}
+                        new_opts = old_opts | {o["content"]: o["isCorrect"] for o in answer.get("optionList", [])}
+                        for content in new_opts.keys() - old_opts.keys():
+                            logger.info(f"发现题目：{title} 新选项：{content}")
+                        answers_json[title] = {
+                            "type": answer["type"],
+                            "optionList": [{"content": content, "isCorrect": is_correct} for content, is_correct in new_opts.items()],
+                        }
+
+        with open("answer/answer.json", "w", encoding="utf-8") as f:
+            f.write(json.dumps(answers_json, indent=2, ensure_ascii=False, sort_keys=True))
