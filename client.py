@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 class WeBanClient:
 
     def __init__(self, account: str, password: str, tenant_name: str) -> None:
+        self.tenant_code = None
         self.tenant_name = tenant_name
         self.ocr = self.get_ocr_instance()
         self.api = WeBanAPI(account, password)
@@ -55,25 +56,26 @@ class WeBanClient:
 
         return _cache["ocr"]
 
-    def get_tenant_code(self, tenant_name: str) -> str | None:
+    def get_tenant_code(self) -> str | None:
         """
         获取学校代码
-        :param tenant_name:
         :return: code
         """
-        if not tenant_name:
+        if not self.tenant_name:
             logger.error("学校全称不能为空")
             return None
         tenant_list = self.api.get_tenant_list_with_letter()
         if tenant_list.get("code", 1) == "0":
             logger.info(f"获取学校列表成功")
+        tenant_names = []
         for item in tenant_list.get("data", []):
             for entry in item.get("list", []):
-                if entry.get("name", "") == tenant_name:
+                tenant_names.append(entry.get("name", ""))
+                if entry.get("name", "") == self.tenant_name:
                     logger.success(f"找到学校代码: {entry['code']}")
                     self.api.set_tenant_code(entry["code"])
                     return entry["code"]
-        logger.error(f"没找到你的学校代码，请检查学校全称是否正确: {tenant_name}\n{tenant_list}")
+        logger.error(f"没找到你的学校代码，请检查学校全称是否正确: {self.tenant_name}\n{tenant_names}")
         return None
 
     def get_progress(self, user_project_id: str, project_prefix: str | None) -> Dict[str, Any]:
@@ -92,7 +94,7 @@ class WeBanClient:
         return progress
 
     def login(self) -> Dict | None:
-        if not self.get_tenant_code(self.tenant_name):
+        if not self.get_tenant_code():
             return None
         retry_limit = 3
         for i in range(retry_limit + 2):

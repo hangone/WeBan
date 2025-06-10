@@ -1,5 +1,4 @@
 import json
-import sys
 
 from loguru import logger
 
@@ -10,17 +9,25 @@ if __name__ == "__main__":
     logger.info("开始执行")
 
     try:
-        with open("config.json", encoding="utf-8") as f:
-            configs = json.load(f)
+        configs = json.load(open("config.json", encoding="utf-8"))
     except FileNotFoundError:
-        logger.error("config.json 文件不存在，自动创建，请填写相关信息后重新运行")
+        logger.error("config.json 文件不存在，请填写信息")
+        tenant_name = input("请填写学校名称: ").strip()
+        client = WeBanClient("", "", tenant_name)
+        tenant_code = client.get_tenant_code()
+        if not tenant_code:
+            exit(1)
+        prompt = client.api.get_tenant_config(tenant_code).get("data", {})
+        logger.info(prompt.get("popPrompt", ""))
+        account = input(f"账号{prompt.get("userNamePrompt", "") or "请填写用户名"}：").strip()
+        password = input(f"密码{prompt.get("passwordPrompt", "") or "请填写密码"}：").strip()
         with open("config.json", "w", encoding="utf-8") as f:
-            data = [{"tenant_name": "学校名称", "account": "用户名", "password": "密码", "study": True, "study_time": 15, "exam": False, "exam_use_time": 600}]
-            f.write(json.dumps(data, indent=2, ensure_ascii=False))
-        sys.exit(1)
+            configs = [{"tenant_name": tenant_name, "account": account, "password": password, "study": True, "study_time": 15, "exam": True, "exam_use_time": 600}]
+            f.write(json.dumps(configs, indent=2, ensure_ascii=False))
+            f.close()
     except json.JSONDecodeError:
         logger.error("config.json 文件格式错误，请检查")
-        sys.exit(1)
+        exit(1)
 
     logger.info(f"共加载到 {len(configs)} 个账号")
     for config in configs:
