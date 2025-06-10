@@ -368,7 +368,8 @@ class WeBanClient:
         for project in self.api.list_my_project().get("data", []):
             for plan in self.api.exam_list_plan(project["userProjectId"]).get("data", []):
                 for history in self.api.exam_list_history(plan["examPlanId"], plan["examType"]).get("data", []):
-                    for answer in self.api.exam_review_paper(history["id"], history["isRetake"]).get("data", {}).get("questions", []):
+                    questions = self.api.exam_review_paper(history["id"], history["isRetake"]).get("data", {}).get("questions", [])
+                    for answer in questions:
                         title = answer["title"]
                         old_opts = {o["content"]: o["isCorrect"] for o in answers_json.get(title, {}).get("optionList", [])}
                         new_opts = old_opts | {o["content"]: o["isCorrect"] for o in answer.get("optionList", [])}
