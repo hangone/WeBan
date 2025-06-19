@@ -134,50 +134,51 @@ class WeBanClient:
             # 获取学习进度
             self.get_progress(task.get("userProjectId"), project_prefix)
 
-            # 聚合类别
-            categories1 = self.api.list_category(task["userProjectId"], 1)  # 推送课
-            categories2 = self.api.list_category(task["userProjectId"], 2)  # 自选课
-            categories3 = self.api.list_category(task["userProjectId"], 3)  # 必修课
-            categories = categories1.get("data", []) + categories2.get("data", []) + categories3.get("data", [])
-            for category in categories:
-                category_prefix = f"{project_prefix}/{category['categoryName']}"
-                logger.info(f"开始处理分类 {category_prefix}")
-                if category["finishedNum"] >= category["totalNum"]:
-                    logger.success(f"{category_prefix} 已完成")
+            # 聚合类别 1：推送课，2：自选课，3：必修课
+            for choose_type in [(1, "推送课"), (2, "自选课"), (3, "必修课")]:
+                categories = self.api.list_category(task["userProjectId"], choose_type[0])
+                if categories.get("code") != "0":
+                    logger.error(f"获取 {choose_type[1]} 分类失败：{categories}")
                     continue
-
-                courses = self.api.list_course(task["userProjectId"], category["categoryCode"])
-                for course in courses.get("data", []):
-                    course_prefix = f"{category_prefix}/{course['resourceName']}"
-                    logger.info(f"开始处理课程：{course_prefix}")
-                    if course.get("finished") == 1:
-                        logger.success(f"{course_prefix} 已完成")
+                for category in categories.get("data", []):
+                    category_prefix = f"{project_prefix}/{category['categoryName']}"
+                    logger.info(f"开始处理 {choose_type[1]} 分类 {category_prefix}")
+                    if category["finishedNum"] >= category["totalNum"]:
+                        logger.success(f"{category_prefix} 已完成")
                         continue
 
-                    self.api.study(course.get("resourceId"), task.get("userProjectId"))
-                    course_url = self.api.get_course_url(course.get("resourceId"), task.get("userProjectId")).get("data")
-                    logger.info(f"等待 {self.study_time} 秒，模拟学习中...")
-                    time.sleep(self.study_time)
+                    courses = self.api.list_course(task["userProjectId"], category["categoryCode"], choose_type[0])
+                    for course in courses.get("data", []):
+                        course_prefix = f"{category_prefix}/{course['resourceName']}"
+                        logger.info(f"开始处理课程：{course_prefix}")
+                        if course.get("finished") == 1:
+                            logger.success(f"{course_prefix} 已完成")
+                            continue
 
-                    # 检查是否需要验证码
-                    query = parse_qs(urlparse(course_url).query)
-                    token = None
-                    if query.get("csCapt", [None])[0] == "true":
-                        logger.info(f"课程需要验证码")
-                        res = self.api.invoke_captcha(course.get("userCourseId"), task.get("userProjectId"))
-                        if res.get("code") != "0":
-                            logger.error(f"获取验证码失败：{res}")
-                        token = res["data"]["methodToken"]
+                        self.api.study(course.get("resourceId"), task.get("userProjectId"))
+                        course_url = self.api.get_course_url(course.get("resourceId"), task.get("userProjectId")).get("data")
+                        logger.info(f"等待 {self.study_time} 秒，模拟学习中...")
+                        time.sleep(self.study_time)
 
-                    if not self.api.finish_by_token(course["userCourseId"], token):
-                        logger.error(f"完成课程失败：{course_prefix}")
-                        self.fail.append(course.get("courseName"))
-                        continue
+                        # 检查是否需要验证码
+                        query = parse_qs(urlparse(course_url).query)
+                        token = None
+                        if query.get("csCapt", [None])[0] == "true":
+                            logger.info(f"课程需要验证码")
+                            res = self.api.invoke_captcha(course.get("userCourseId"), task.get("userProjectId"))
+                            if res.get("code") != "0":
+                                logger.error(f"获取验证码失败：{res}")
+                            token = res["data"]["methodToken"]
 
-                    logger.success(f"{course_prefix} 完成")
+                        if not self.api.finish_by_token(course["userCourseId"], token):
+                            logger.error(f"完成课程失败：{course_prefix}")
+                            self.fail.append(course.get("courseName"))
+                            continue
 
-                    # 获取学习进度
-                    self.get_progress(task["userProjectId"], project_prefix)
+                        logger.success(f"{course_prefix} 完成")
+
+                        # 获取学习进度
+                        self.get_progress(task["userProjectId"], project_prefix)
 
         if len(self.fail) > 0:
             logger.warning(f"以下课程学习失败：{self.fail}")
