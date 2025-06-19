@@ -157,11 +157,10 @@ class WeBanClient:
                     continue
                 for category in categories.get("data", []):
                     category_prefix = f"{project_prefix}/{category['categoryName']}"
-                    if category["finishedNum"] >= category["totalNum"]:
-                        # logger.success(f"{category_prefix} 已完成")
-                        continue
-
                     logger.info(f"开始处理 {choose_type[1]} 分类 {category_prefix}")
+                    if category["finishedNum"] >= category["totalNum"]:
+                        logger.success(f"{category_prefix} 已完成")
+                        continue
 
                     # 获取学习进度
                     progress = self.get_progress(task["userProjectId"], project_prefix, False)
