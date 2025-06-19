@@ -468,6 +468,8 @@ class WeBanAPI:
         params["questionId"] = response.json().get("captcha", {}).get("questionId", "")
         coordinates = [{"x": x + randint(-5, 5), "y": y + randint(-5, 5)} for x, y in [(207, 436), (67, 424), (141, 427)]]
         data = {"coordinateXYs": json.dumps(coordinates, separators=(",", ":"))}
+        # 等待一段时间，不然会系统处理错误
+        time.sleep(2)
         response = self.session.post(check_url, params=params, data=data, timeout=self.timeout)
         return response.json()
 
