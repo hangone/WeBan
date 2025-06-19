@@ -126,7 +126,8 @@ class WeBanClient:
         if study_task.get("code") == "0":
             logger.info("获取任务列表成功")
 
-        for task in study_task.get("data", []):
+        study_task = study_task.get("data", {})
+        for task in study_task.get("studyTaskList", []):
             project_prefix = task.get("projectName", "")
             logger.info(f"开始处理任务：{project_prefix}")
 
