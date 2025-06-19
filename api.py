@@ -464,14 +464,11 @@ class WeBanAPI:
             "userId": self.user["userId"],
             "tenantCode": self.tenant_code,
         }
-        # 等待一段时间，不然会系统处理错误
-        time.sleep(self.timeout[0] if isinstance(self.timeout, tuple) else self.timeout)
         response = self.session.get(fetch_url, params=params, timeout=self.timeout)  # {"captcha":{"num":3,"questionId":"${uuid}","imageUrl":"${url}"}}
         params["questionId"] = response.json().get("captcha", {}).get("questionId", "")
         coordinates = [{"x": x + randint(-5, 5), "y": y + randint(-5, 5)} for x, y in [(207, 436), (67, 424), (141, 427)]]
         data = {"coordinateXYs": json.dumps(coordinates, separators=(",", ":"))}
-        # 等待一段时间，不然会系统处理错误
-        time.sleep(self.timeout[0] if isinstance(self.timeout, tuple) else self.timeout)
+        time.sleep(3)
         response = self.session.post(check_url, params=params, data=data, timeout=self.timeout)
         return response.json()
 
