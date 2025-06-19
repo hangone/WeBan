@@ -3884,6 +3884,22 @@
       {
         "content": "细菌性痢疾。",
         "isCorrect": 1
+      },
+      {
+        "content": "细菌性痢疾",
+        "isCorrect": 1
+      },
+      {
+        "content": "胃肠炎",
+        "isCorrect": 2
+      },
+      {
+        "content": "溃疡性结肠炎",
+        "isCorrect": 2
+      },
+      {
+        "content": "阑尾炎",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -3961,9 +3977,13 @@
       {
         "content": "驾驶电动自行车横过机动车道时应当下车推行",
         "isCorrect": 1
+      },
+      {
+        "content": "低温易凝固的不是地沟油。",
+        "isCorrect": 2
       }
     ],
-    "type": 2
+    "type": 1
   },
   "下列说法错误的是：": {
     "optionList": [
@@ -5753,6 +5773,19 @@
     ],
     "type": 1
   },
+  "个人背包出游前，是否应该做好详细的路线调查？": {
+    "optionList": [
+      {
+        "content": "要做好调查，还要把可能的路线告诉别人，以防万一",
+        "isCorrect": 1
+      },
+      {
+        "content": "不用呀，想去哪就去哪才好玩呢",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "个人诈骗数额（   ）以上，单位诈骗数额（   ）以上的，应当认定为刑法第一百九十八条规定的“数额特别巨大”。": {
     "optionList": [
       {
@@ -7154,6 +7187,19 @@
       {
         "content": "12月2日。",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "人与人之间应该平等沟通。": {
+    "optionList": [
+      {
+        "content": "对",
+        "isCorrect": 1
+      },
+      {
+        "content": "错",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -14011,6 +14057,27 @@
     ],
     "type": 1
   },
+  "包扎的目的错误的是（）。": {
+    "optionList": [
+      {
+        "content": "止血",
+        "isCorrect": 2
+      },
+      {
+        "content": "减少感染",
+        "isCorrect": 2
+      },
+      {
+        "content": "保护伤口",
+        "isCorrect": 2
+      },
+      {
+        "content": "避免神经损伤",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
   "包扎面积小，主要用于四肢、额及颈部小面积伤口的包扎材料是（）。": {
     "optionList": [
       {
@@ -17768,6 +17835,10 @@
       {
         "content": "如果解脱不了，可大声呼救",
         "isCorrect": 1
+      },
+      {
+        "content": "如果不幸遇到水草或渔网缠绕，要用力挣扎",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -24902,6 +24973,10 @@
       {
         "content": "降低",
         "isCorrect": 1
+      },
+      {
+        "content": "增强",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -25858,6 +25933,27 @@
       }
     ],
     "type": 1
+  },
+  "我国受沙尘天气影响的地区主要分布在哪里？": {
+    "optionList": [
+      {
+        "content": "西北",
+        "isCorrect": 1
+      },
+      {
+        "content": "华北",
+        "isCorrect": 1
+      },
+      {
+        "content": "东北",
+        "isCorrect": 2
+      },
+      {
+        "content": "西南",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
   },
   "我国国家主权、统一和领土完整面临多重挑战？": {
     "optionList": [
@@ -39732,6 +39828,10 @@
       {
         "content": "正确",
         "isCorrect": 1
+      },
+      {
+        "content": "错误",
+        "isCorrect": 2
       }
     ],
     "type": 1
