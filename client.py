@@ -88,9 +88,20 @@ class WeBanClient:
         progress = self.api.show_progress(user_project_id)
         if progress.get("code", "-1") == "0":
             progress = progress.get("data", {})
-            required_finished_num = progress["requiredFinishedNum"]
+            # 推送课
+            push_num = progress["pushNum"]
+            push_finished_num = progress["pushFinishedNum"]
+            # 自选课
+            optional_num = progress["optionalNum"]
+            optional_finished_num = progress["optionalFinishedNum"]
+            # 必修课
             required_num = progress["requiredNum"]
-            logger.info(f"{project_prefix} 总进度：{required_finished_num}/{required_num}，预计剩余时间：{self.study_time*(required_num-required_finished_num)} 秒")
+            required_finished_num = progress["requiredFinishedNum"]
+            # 考试
+            exam_num = progress["examNum"]
+            exam_finished_num = progress["examFinishedNum"]
+            eta = self.study_time * (required_num - required_finished_num + optional_num - optional_finished_num + push_num - push_finished_num)
+            logger.info(f"{project_prefix} 进度：必修课：{required_finished_num}/{required_num}，自选课：{optional_finished_num}/{optional_num}，推送课：{push_finished_num}/{push_num}，考试：{exam_finished_num}/{exam_num}，预计剩余时间：{eta} 秒")
         return progress
 
     def login(self) -> Dict | None:
