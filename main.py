@@ -1,4 +1,6 @@
 import json
+import sys
+import traceback
 
 from loguru import logger
 
@@ -64,7 +66,8 @@ if __name__ == "__main__":
             client.sync_answers()
 
         except Exception as e:
-            logger.error(f"[{account}] 运行失败: {e}")
+            logger.error(f"[{account}] 运行失败: {e}", file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
             continue
 
     input("按回车键退出")

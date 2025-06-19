@@ -176,6 +176,7 @@ class WeBanClient:
                         token = None
                         if query.get("csCapt", [None])[0] == "true":
                             logger.info(f"课程需要验证码，等待时间 +20 秒")
+                            time.sleep(20)
                             res = self.api.invoke_captcha(course.get("userCourseId"), task.get("userProjectId"))
                             if res.get("code") != "0":
                                 logger.error(f"获取验证码失败：{res}")
