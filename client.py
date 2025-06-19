@@ -175,10 +175,11 @@ class WeBanClient:
                         query = parse_qs(urlparse(course_url).query)
                         token = None
                         if query.get("csCapt", [None])[0] == "true":
-                            logger.info(f"课程需要验证码")
+                            logger.info(f"课程需要验证码，等待时间 +20 秒")
                             res = self.api.invoke_captcha(course.get("userCourseId"), task.get("userProjectId"))
                             if res.get("code") != "0":
                                 logger.error(f"获取验证码失败：{res}")
+                                continue
                             token = res["data"]["methodToken"]
 
                         if not self.api.finish_by_token(course["userCourseId"], token):
