@@ -103,7 +103,7 @@ class WeBanClient:
             exam_finished_num = progress["examFinishedNum"]
             eta = max(0, self.study_time * (required_num - required_finished_num + optional_num - optional_finished_num + push_num - push_finished_num))
             if output:
-                logger.info(f"{project_prefix} 进度：必修课：{required_finished_num}/{required_num}，自选课：{optional_finished_num}/{optional_num}，推送课：{push_finished_num}/{push_num}，考试：{exam_finished_num}/{exam_num}，预计剩余时间：{eta} 秒")
+                logger.info(f"{project_prefix} 进度：必修课：{required_finished_num}/{required_num}，推送课：{push_finished_num}/{push_num}，自选课：{optional_finished_num}/{optional_num}，考试：{exam_finished_num}/{exam_num}，预计剩余时间：{eta} 秒")
         return progress
 
     def login(self) -> Dict | None:
@@ -150,23 +150,22 @@ class WeBanClient:
             self.get_progress(task["userProjectId"], project_prefix)
 
             # 聚合类别 1：推送课，2：自选课，3：必修课
-            for choose_type in [(1, "推送课", "pushNum", "pushFinishedNum"), (2, "自选课", "optionalNum", "optionalFinishedNum"), (3, "必修课", "requiredNum", "requiredFinishedNum")]:
+            for choose_type in [(3, "必修课", "requiredNum", "requiredFinishedNum"), (1, "推送课", "pushNum", "pushFinishedNum"), (2, "自选课", "optionalNum", "optionalFinishedNum")]:
                 categories = self.api.list_category(task["userProjectId"], choose_type[0])
                 if categories.get("code") != "0":
                     logger.error(f"获取 {choose_type[1]} 分类失败：{categories}")
                     continue
                 for category in categories.get("data", []):
-                    category_prefix = f"{project_prefix}/{category['categoryName']}"
+                    category_prefix = f"{choose_type[1]} {project_prefix}/{category['categoryName']}"
+                    logger.info(f"开始处理 {category_prefix}")
                     if category["finishedNum"] >= category["totalNum"]:
-                        # logger.success(f"{category_prefix} 已完成")
+                        logger.success(f"{category_prefix} 已完成")
                         continue
-
-                    logger.info(f"开始处理 {choose_type[1]} 分类 {category_prefix}")
 
                     # 获取学习进度
                     progress = self.get_progress(task["userProjectId"], project_prefix, False)
                     if progress[choose_type[3]] >= progress[choose_type[2]]:
-                        logger.info(f"{choose_type[1]} {category_prefix} 已达到要求，跳过")
+                        logger.info(f"{category_prefix} 已达到要求，跳过")
                         break
 
                     courses = self.api.list_course(task["userProjectId"], category["categoryCode"], choose_type[0])
@@ -175,7 +174,7 @@ class WeBanClient:
                         # 获取学习进度
                         progress = self.get_progress(task["userProjectId"], category_prefix)
                         if progress[choose_type[3]] >= progress[choose_type[2]]:
-                            logger.info(f"{choose_type[1]} {category_prefix} 已达到要求，跳过")
+                            logger.info(f"{category_prefix} 已达到要求，跳过")
                             break
 
                         logger.info(f"开始处理课程：{course_prefix}")
@@ -184,7 +183,7 @@ class WeBanClient:
                             continue
 
                         self.api.study(course["resourceId"], task["userProjectId"])
-                        course_url = self.api.get_course_url(course["resourceId"], task["userProjectId"])["data"]
+                        course_url = self.api.get_course_url(course["resourceId"], task["userProjectId"])["data"] + "&weiban=weiban"
                         logger.info(f"等待 {self.study_time} 秒，模拟学习中...")
                         time.sleep(self.study_time)
 
@@ -192,22 +191,26 @@ class WeBanClient:
                             logger.success(f"{course_prefix} 完成")
                             continue
 
-                        # 检查是否需要验证码
                         query = parse_qs(urlparse(course_url).query)
-                        token = None
-                        if query.get("csCapt", [None])[0] == "true":
-                            logger.info(f"课程需要验证码，正在获取...")
-                            res = self.api.invoke_captcha(course["userCourseId"], task["userProjectId"])
-                            if res.get("code", -1) != "0":
-                                logger.error(f"获取验证码失败：{res}")
-                            token = res.get("data", {}).get("methodToken", None)
+                        if query.get("lyra", [None])[0] == "lyra":  # 安全实训
+                            res = self.api.finish_lyra(query.get("userActivityId", [None])[0])
+                        elif query.get("weiban", [None])[0] != "weiban":
+                            res = self.api.finish_by_token(course["userCourseId"], course_type="open")
+                        elif query.get("source", [None])[0] == "moon":
+                            res = self.api.finish_by_token(course["userCourseId"], course_type="moon")
+                        else:
+                            # 检查是否需要验证码
+                            token = None
+                            if query.get("csCapt", [None])[0] == "true":
+                                logger.info(f"课程需要验证码，正在获取...")
+                                res = self.api.invoke_captcha(course["userCourseId"], task["userProjectId"])
+                                if res.get("code", -1) != "0":
+                                    logger.error(f"获取验证码失败：{res}")
+                                token = res.get("data", {}).get("methodToken", None)
 
-                        if not self.api.finish_by_token(course["userCourseId"], token):
-                            logger.error(f"完成课程失败：{course_prefix}")
-                            self.fail.append(course["courseName"])
-                            continue
+                            res = self.api.finish_by_token(course["userCourseId"], token)
 
-                        logger.success(f"{course_prefix} 完成")
+                        logger.success(f"{course_prefix} 完成 {res}")
 
         if len(self.fail) > 0:
             logger.warning(f"以下课程学习失败：{self.fail}")
@@ -365,7 +368,7 @@ class WeBanClient:
                     continue
                 logger.success(f"答案提交成功，考试完成，成绩：{submit_res['data']['score']} 分")
 
-    def record_answer(self, user_exam_plan_id: str, question_id: str, per_time: int, answers_ids: list, exam_plan_id: str) -> bool:
+    def record_answer(self, user_exam_plan_id: str, question_id: str, per_time: int, answers_ids: list, exam_plan_id: str, skip_wait: bool = True) -> bool:
         """
         记录答题
         :param user_exam_plan_id: 用户考试计划 ID
@@ -373,11 +376,13 @@ class WeBanClient:
         :param per_time: 用时
         :param answers_ids: 答案 ID 列表
         :param exam_plan_id: 考试计划 ID
+        :param skip_wait: 是否跳过等待
         :return:
         """
         this_time = per_time + randint(-1, 1)
-        logger.info(f"等待 {this_time-2} 秒，模拟答题中...")
-        time.sleep(this_time - 2)
+        if not skip_wait:
+            logger.info(f"等待 {this_time-2} 秒，模拟答题中...")
+            time.sleep(this_time - 2)
         res = self.api.exam_record_question(user_exam_plan_id, question_id, this_time, answers_ids, exam_plan_id)
         logger.info(f"答题结果：{res}")
         if res.get("code", -1) != "0":

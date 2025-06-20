@@ -472,11 +472,12 @@ class WeBanAPI:
         response = self.session.post(check_url, params=params, data=data, timeout=self.timeout)
         return response.json()
 
-    def finish_by_token(self, user_course_id: str, token: str | None) -> str:
+    def finish_by_token(self, user_course_id: str, token: str | None = None, course_type: str | None = "weiban") -> str:
         """
         通过 userCourseId 或验证码 token 完成课程
         :param user_course_id: 用户课程 ID
         :param token: 用户课程 ID 或验证码 token
+        :param course_type: 课程类型 weiban, lyra, open, moon
         :return:
         jQuery341002461326005930642_1747119073594({"msg":"ok","code":"0","detailCode":"0"})
         """
@@ -487,8 +488,26 @@ class WeBanAPI:
             "tenantCode": self.tenant_code,
             "_": int(self.get_timestamp(13, 0)),
         }
+
+        if course_type == "open":
+            url = f"https://open.mycourse.cn/proteus/usercourse/finish.do"
+        elif course_type == "moon":
+            url = f"https://moon.mycourse.cn/moonapi/api/study/activity/microCourse/v1/finishedCourse"
+
         response = self.session.get(url, params=params, timeout=self.timeout)
         return response.text
+
+    def finish_lyra(self, user_activity_id: str) -> Dict:
+        """
+        完成安全实训
+        :param user_activity_id: 用户活动 ID
+        :return:
+        {"msg":"ok","code":"0","detailCode":"0"}
+        """
+        url = f"https://lyra.mycourse.cn/lyraapi/study/course/finish.api"
+        data = {"userActivityId": user_activity_id}
+        response = self.session.post(url, data=data, timeout=self.timeout)
+        return response.json()
 
     def exam_list_plan(self, user_project_id: str) -> Dict | None:
         """
