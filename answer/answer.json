@@ -460,6 +460,10 @@
       {
         "content": "10.16",
         "isCorrect": 1
+      },
+      {
+        "content": "10.1",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -4717,6 +4721,27 @@
     ],
     "type": 2
   },
+  "下面哪些是属于吃药的误区：": {
+    "optionList": [
+      {
+        "content": "随便停药",
+        "isCorrect": 1
+      },
+      {
+        "content": "不按时吃药",
+        "isCorrect": 1
+      },
+      {
+        "content": "服用药量偏大或偏小",
+        "isCorrect": 1
+      },
+      {
+        "content": "擅自更换药物",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "下面哪些是情绪ABC的典型写照？": {
     "optionList": [
       {
@@ -8884,6 +8909,27 @@
     ],
     "type": 2
   },
+  "以下哪些药服用时，最好不要喝牛奶？": {
+    "optionList": [
+      {
+        "content": "钙片",
+        "isCorrect": 1
+      },
+      {
+        "content": "补铁药物",
+        "isCorrect": 1
+      },
+      {
+        "content": "抗生素药物",
+        "isCorrect": 1
+      },
+      {
+        "content": "止泻药",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "以下哪些行为可能导致国家秘密泄露？": {
     "optionList": [
       {
@@ -11217,6 +11263,10 @@
       {
         "content": "立即放弃",
         "isCorrect": 1
+      },
+      {
+        "content": "等等试试",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -12693,6 +12743,22 @@
       {
         "content": "只有批评教育，不涉及刑罚。",
         "isCorrect": 2
+      },
+      {
+        "content": "量刑较重",
+        "isCorrect": 1
+      },
+      {
+        "content": "将受到秘密处决",
+        "isCorrect": 2
+      },
+      {
+        "content": "有自首或者立功表现的，可以从轻、减轻或者免除处罚",
+        "isCorrect": 1
+      },
+      {
+        "content": "只有批评教育，不涉及刑罚",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -14061,6 +14127,27 @@
     ],
     "type": 1
   },
+  "包扎伤员头部伤口，应尽量采用（）压迫止血，用尼龙网套固定敷料包扎。": {
+    "optionList": [
+      {
+        "content": "棉花",
+        "isCorrect": 2
+      },
+      {
+        "content": "伤员衣服",
+        "isCorrect": 2
+      },
+      {
+        "content": "纸巾",
+        "isCorrect": 2
+      },
+      {
+        "content": "无菌敷料或洁净布料",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
   "包扎的目的错误的是（）。": {
     "optionList": [
       {
@@ -14087,6 +14174,18 @@
       {
         "content": "绷带",
         "isCorrect": 1
+      },
+      {
+        "content": "三角巾",
+        "isCorrect": 2
+      },
+      {
+        "content": "创可贴",
+        "isCorrect": 2
+      },
+      {
+        "content": "毛巾",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -16682,6 +16781,14 @@
       {
         "content": "室外吸烟区。",
         "isCorrect": 1
+      },
+      {
+        "content": "大学宿舍。",
+        "isCorrect": 2
+      },
+      {
+        "content": "教学楼楼道。",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -20655,6 +20762,10 @@
       {
         "content": "不直接点开附有的链接，但是会登录官网核实、查看",
         "isCorrect": 1
+      },
+      {
+        "content": "很感兴趣，顺势点开链接",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -22376,6 +22487,18 @@
       {
         "content": "回返式包扎法",
         "isCorrect": 1
+      },
+      {
+        "content": "环形包扎法",
+        "isCorrect": 2
+      },
+      {
+        "content": "螺旋包扎法",
+        "isCorrect": 2
+      },
+      {
+        "content": "8字环绕包扎法",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -25657,6 +25780,10 @@
       {
         "content": "错误",
         "isCorrect": 1
+      },
+      {
+        "content": "正确",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -26973,6 +27100,10 @@
       {
         "content": "不可以",
         "isCorrect": 1
+      },
+      {
+        "content": "可以",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -28698,6 +28829,10 @@
       {
         "content": "是",
         "isCorrect": 1
+      },
+      {
+        "content": "否",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -29151,6 +29286,10 @@
       {
         "content": "不可以",
         "isCorrect": 1
+      },
+      {
+        "content": "可以",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -29160,6 +29299,10 @@
       {
         "content": "不可以",
         "isCorrect": 1
+      },
+      {
+        "content": "可以",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -31588,6 +31731,27 @@
     ],
     "type": 1
   },
+  "海洋中有足以围绕地球超过400周的塑料碎片，它的数量大概是（     ）。": {
+    "optionList": [
+      {
+        "content": "3万亿",
+        "isCorrect": 2
+      },
+      {
+        "content": "4万亿",
+        "isCorrect": 2
+      },
+      {
+        "content": "5万亿",
+        "isCorrect": 1
+      },
+      {
+        "content": "6万亿",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "消防产品，是指专门用于火灾预防、灭火救援和火灾（）的产品。": {
     "optionList": [
       {
@@ -31914,6 +32078,10 @@
       {
         "content": "正确",
         "isCorrect": 1
+      },
+      {
+        "content": "错误",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -32922,6 +33090,10 @@
       {
         "content": "看广告吃药",
         "isCorrect": 1
+      },
+      {
+        "content": "根据说明书吃药",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -34132,6 +34304,10 @@
       {
         "content": "正确",
         "isCorrect": 1
+      },
+      {
+        "content": "错误",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -34141,6 +34317,10 @@
       {
         "content": "便秘",
         "isCorrect": 1
+      },
+      {
+        "content": "上火",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -34319,6 +34499,18 @@
       {
         "content": "16",
         "isCorrect": 1
+      },
+      {
+        "content": "2",
+        "isCorrect": 2
+      },
+      {
+        "content": "5",
+        "isCorrect": 2
+      },
+      {
+        "content": "10",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -38100,6 +38292,14 @@
       {
         "content": "不可以",
         "isCorrect": 1
+      },
+      {
+        "content": "可以。",
+        "isCorrect": 2
+      },
+      {
+        "content": "不可以。",
+        "isCorrect": 1
       }
     ],
     "type": 1
@@ -39285,6 +39485,19 @@
     "optionList": [
       {
         "content": "不予理睬、直接删除",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "降压药可以和柚子同食吗？": {
+    "optionList": [
+      {
+        "content": "可以",
+        "isCorrect": 2
+      },
+      {
+        "content": "不可以",
         "isCorrect": 1
       }
     ],
