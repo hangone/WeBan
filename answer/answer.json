@@ -5717,6 +5717,10 @@
       {
         "content": "好瓜",
         "isCorrect": 1
+      },
+      {
+        "content": "较差的瓜",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -14995,6 +14999,27 @@
     ],
     "type": 1
   },
+  "吃了下列哪种药后不能再喝酒？": {
+    "optionList": [
+      {
+        "content": "头孢",
+        "isCorrect": 1
+      },
+      {
+        "content": "阿司匹林",
+        "isCorrect": 1
+      },
+      {
+        "content": "降压、降糖药物",
+        "isCorrect": 1
+      },
+      {
+        "content": "维生素",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
   "吃避孕药前要仔细阅读用药说明书，了解药效和适用情况。": {
     "optionList": [
       {
@@ -15726,6 +15751,23 @@
       }
     ],
     "type": 1
+  },
+  "喝酒给人造成的影响还有哪些？": {
+    "optionList": [
+      {
+        "content": "喝酒会使人触觉能力降低",
+        "isCorrect": 1
+      },
+      {
+        "content": "喝酒会使人反应能力降低",
+        "isCorrect": 1
+      },
+      {
+        "content": "喝酒使人清醒",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
   },
   "因一时贪心而出卖国家机密的，应当（）。": {
     "optionList": [
@@ -18545,6 +18587,10 @@
       {
         "content": "要带，以备不时之需。",
         "isCorrect": 1
+      },
+      {
+        "content": "没必要。",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -26824,6 +26870,27 @@
     ],
     "type": 1
   },
+  "找出其中哪些属于不良信息？": {
+    "optionList": [
+      {
+        "content": "网红自编自导的“抓马”剧本当真事儿传播",
+        "isCorrect": 1
+      },
+      {
+        "content": "“惨！快来看看这虐猫现场，鲜血淋漓，肢体横飞……”",
+        "isCorrect": 1
+      },
+      {
+        "content": "群内有人发“刷单日结，日进斗金”的信息及二维码",
+        "isCorrect": 1
+      },
+      {
+        "content": "“某城市获奖宣传片，极具创意的设计！”",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
   "找到一个小伙伴准备一块儿去网吧，怎么做更安全呢？": {
     "optionList": [
       {
@@ -32341,6 +32408,23 @@
       }
     ],
     "type": 1
+  },
+  "燃气器具在使用过程中，应该注意哪些安全事项？": {
+    "optionList": [
+      {
+        "content": "尽量不要离开",
+        "isCorrect": 1
+      },
+      {
+        "content": "火不要开的太小",
+        "isCorrect": 1
+      },
+      {
+        "content": "发现漏气、迅速关闭气源、并开窗",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
   },
   "燃烧有几个必要条件？": {
     "optionList": [
