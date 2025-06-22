@@ -22,7 +22,7 @@
 
 2. 打开终端，克隆本仓库 `git clone https://github.com/hangone/WeBan`
 
-3. 在终端运行 `pip install -r requirements.txt` 或者 `uv sync`
+3. 在终端运行 `pip install -r requirements-ocr.txt` 或者 `uv sync`
 
 4. 运行 `python main.py`，按提示输入学校和账号密码。每个任务大概需要 ≥13 秒才不会触发限制。
 

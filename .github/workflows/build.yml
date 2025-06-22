@@ -8,9 +8,19 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
+    name: Build for ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: write
+
+    strategy:
+      matrix:
+        os: [ windows-latest, ubuntu-latest ]
+        include:
+          - os: windows-latest
+            pyinstaller-ext: .exe
+          - os: ubuntu-latest
+            pyinstaller-ext: ""
 
     steps:
       - name: Checkout code
@@ -27,12 +37,20 @@ jobs:
           pip install pyinstaller
           pip install -r requirements.txt
 
-      - name: Build executable
+      - name: Build base executable
         run: pyinstaller -F main.py -n WeBan
 
-      - name: Upload to Release
+      - name: Install ddddocr
+        run: pip install ddddocr
+
+      - name: Build ddddocr version
+        run: pyinstaller -F main.py -n WeBan_OCR
+
+      - name: Upload release assets
         uses: softprops/action-gh-release@v2.2.2
+        if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            dist/WeBan.exe
+            dist/WeBan${{ matrix.pyinstaller-ext }}
+            dist/WeBan_OCR${{ matrix.pyinstaller-ext }}
           generate_release_notes: true
