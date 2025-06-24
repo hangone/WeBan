@@ -230,13 +230,8 @@ class WeBanClient:
 
         projects = projects.get("data", [])
         for project in projects:
-            if project["finished"] == 1:
-                self.log.success(f"考试项目 {project['projectName']} 已完成")
-                continue
-
             self.log.info(f"开始考试项目 {project['projectName']}")
             user_project_id = project["userProjectId"]
-
             # 获取考试计划
             exam_plans = self.api.exam_list_plan(user_project_id)
             if exam_plans.get("code", -1) != "0":
@@ -244,6 +239,11 @@ class WeBanClient:
                 return
             exam_plans = exam_plans["data"]
             for plan in exam_plans:
+                if project["finished"] == 1:
+                    self.log.success(f"考试项目 {project['projectName']}/{plan['examPlanName']} 已完成，最高成绩 {plan['examScore']} 分。已考试次数 {plan['examFinishNum']} 次，还剩 {plan['examOddNum']} 次。需要重考吗(Y/n)？")
+                    if input().strip().lower() != "y":
+                        self.log.info(f"不重考项目 {project['projectName']}")
+                        continue
                 user_exam_plan_id = plan["id"]
                 exam_plan_id = plan["examPlanId"]
                 # 是否存在完成的考试记录
@@ -336,7 +336,7 @@ class WeBanClient:
                             continue
                         self.log.error(f"无效的答案序号：{ans}，跳过")
                     self.log.info(f"正在提交当前答案")
-                    if not self.record_answer(user_exam_plan_id, question["id"], 7, answers_ids, exam_plan_id):
+                    if not self.record_answer(user_exam_plan_id, question["id"], 2, answers_ids, exam_plan_id):
                         failed_questions.append(question)
                         continue
 
@@ -348,10 +348,7 @@ class WeBanClient:
                         self.log.info(f"{j + 1}. {option['content']}")
                     answers = answers_json[question["title"]]
                     self.log.info(f"题库答案：{', '.join(answers)}")
-                    answers_ids = []
-                    for option in question["optionList"]:
-                        if option["content"] in answers:
-                            answers_ids.append(option["id"])
+                    answers_ids = [option["id"] for option in question["optionList"] if option["content"] in answers]
                     if not self.record_answer(user_exam_plan_id, question["id"], per_time, answers_ids, exam_plan_id):
                         failed_questions.append(question)
                         continue
@@ -363,7 +360,7 @@ class WeBanClient:
                     continue
                 self.log.success(f"答案提交成功，考试完成，成绩：{submit_res['data']['score']} 分")
 
-    def record_answer(self, user_exam_plan_id: str, question_id: str, per_time: int, answers_ids: list, exam_plan_id: str, skip_wait: bool = True) -> bool:
+    def record_answer(self, user_exam_plan_id: str, question_id: str, per_time: int, answers_ids: list, exam_plan_id: str) -> bool:
         """
         记录答题
         :param user_exam_plan_id: 用户考试计划 ID
@@ -371,13 +368,11 @@ class WeBanClient:
         :param per_time: 用时
         :param answers_ids: 答案 ID 列表
         :param exam_plan_id: 考试计划 ID
-        :param skip_wait: 是否跳过等待
         :return:
         """
         this_time = per_time + randint(-1, 1)
-        if not skip_wait:
-            self.log.info(f"等待 {this_time-2} 秒，模拟答题中...")
-            time.sleep(this_time - 2)
+        self.log.info(f"等待 {this_time-2} 秒，模拟答题中...")
+        time.sleep(this_time - 2)
         res = self.api.exam_record_question(user_exam_plan_id, question_id, this_time, answers_ids, exam_plan_id)
         self.log.info(f"答题结果：{res}")
         if res.get("code", -1) != "0":
