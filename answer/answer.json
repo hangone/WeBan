@@ -23127,6 +23127,22 @@
       {
         "content": "要求缴纳“会费”、“提货款”。",
         "isCorrect": 1
+      },
+      {
+        "content": "要求以销售人员的名义上岗",
+        "isCorrect": 1
+      },
+      {
+        "content": "许诺高回报、挣大钱",
+        "isCorrect": 1
+      },
+      {
+        "content": "工作时要求着正装",
+        "isCorrect": 2
+      },
+      {
+        "content": "要求缴纳“会费”“提货款”",
+        "isCorrect": 1
       }
     ],
     "type": 2
