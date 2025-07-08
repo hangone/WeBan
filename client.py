@@ -390,8 +390,12 @@ class WeBanClient:
             self.log.info(f"题库不存在，正在下载...")
             with open("answer/answer.json", "w", encoding="utf-8") as f:
                 f.write(self.api.download_answer())
-        with open("answer/answer.json", encoding="utf-8") as f:
-            answers_json = json.load(f)
+        try:
+            with open("answer/answer.json", encoding="utf-8") as f:
+                answers_json = json.load(f)
+        except Exception as e:
+            self.log.error(f"读取题库失败，请重新下载题库：{e}")
+            return
         for project in self.api.list_my_project().get("data", []):
             for plan in self.api.exam_list_plan(project["userProjectId"]).get("data", []):
                 for history in self.api.exam_list_history(plan["examPlanId"], plan["examType"]).get("data", []):
