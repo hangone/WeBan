@@ -240,7 +240,7 @@ class WeBanClient:
             exam_plans = exam_plans["data"]
             for plan in exam_plans:
                 if project["finished"] == 1:
-                    self.log.success(f"考试项目 {project['projectName']}/{plan['examPlanName']} 已完成，最高成绩 {plan['examScore']} 分。已考试次数 {plan['examFinishNum']} 次，还剩 {plan['examOddNum']} 次。需要重考吗(Y/n)？")
+                    self.log.success(f"考试项目 {project['projectName']}/{plan['examPlanName']} 已完成，最高成绩 {plan['examScore']} 分。已考试次数 {plan['examFinishNum']} 次，还剩 {plan['examOddNum']} 次。需要重考吗(y/N)？")
                     if input().strip().lower() != "y":
                         self.log.info(f"不重考项目 {project['projectName']}")
                         continue
@@ -268,32 +268,32 @@ class WeBanClient:
                 per_time = use_time // prepare_paper["answerTime"]
 
                 # 检查验证码
-                is_verified = False
-                retry_limit = 3
-                for i in range(retry_limit + 2):
-                    if i > 0:
-                        self.log.error(f"识别失败，正在重试 {i}/{retry_limit+2} 次")
-                    verify_time = self.api.get_timestamp(13, 0)
-                    verify_image = self.api.rand_letter_image(verify_time)
-                    if i < retry_limit and self.ocr:
-                        verify_code = self.ocr.classification(verify_image)
-                        self.log.info(f"自动验证码识别结果: {verify_code}")
-                        if len(verify_code) != 4:
-                            self.log.error(f"验证码识别失败，正在重试")
-                            continue
-                    else:
-                        open("verify_code.png", "wb").write(verify_image)
-                        webbrowser.open(f"file://{os.path.abspath('verify_code.png')}")
-                        verify_code = input("请查看 verify_code.png 输入验证码：")
-                    res = self.api.exam_check_verify_code(user_exam_plan_id, verify_code, int(verify_time))
-                    if res.get("code") == "0":
-                        self.log.success(f"验证码正确")
-                        is_verified = True
-                        break
-                    self.log.error(f"验证码错误：{res}")
-                if not is_verified:
-                    self.log.error(f"验证码错误，请重新考试")
-                    continue
+                # is_verified = False
+                # retry_limit = 3
+                # for i in range(retry_limit + 2):
+                #     if i > 0:
+                #         self.log.error(f"识别失败，正在重试 {i}/{retry_limit+2} 次")
+                #     verify_time = self.api.get_timestamp(13, 0)
+                #     verify_image = self.api.rand_letter_image(verify_time)
+                #     if i < retry_limit and self.ocr:
+                #         verify_code = self.ocr.classification(verify_image)
+                #         self.log.info(f"自动验证码识别结果: {verify_code}")
+                #         if len(verify_code) != 4:
+                #             self.log.error(f"验证码识别失败，正在重试")
+                #             continue
+                #     else:
+                #         open("verify_code.png", "wb").write(verify_image)
+                #         webbrowser.open(f"file://{os.path.abspath('verify_code.png')}")
+                #         verify_code = input("请查看 verify_code.png 输入验证码：")
+                #     res = self.api.exam_check_verify_code(user_exam_plan_id, verify_code, int(verify_time))
+                #     if res.get("code") == "0":
+                #         self.log.success(f"验证码正确")
+                #         is_verified = True
+                #         break
+                #     self.log.error(f"验证码错误：{res}")
+                # if not is_verified:
+                #     self.log.error(f"验证码错误，请重新考试")
+                #     continue
                 self.log.info(f"验证码正确，开始考试")
 
                 # 获取考试题目
