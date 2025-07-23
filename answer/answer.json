@@ -147,6 +147,10 @@
       {
         "content": "好啊，我马上去。",
         "isCorrect": 2
+      },
+      {
+        "content": "400开头的电话一般是用作被叫的，打来的不是推销就是诈骗，挂掉。",
+        "isCorrect": 1
       }
     ],
     "type": 1
@@ -2245,6 +2249,18 @@
       {
         "content": "国务院",
         "isCorrect": 1
+      },
+      {
+        "content": "各级人民政府",
+        "isCorrect": 2
+      },
+      {
+        "content": "生产经营单位",
+        "isCorrect": 2
+      },
+      {
+        "content": "各单位主要负责人",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -5181,6 +5197,10 @@
       {
         "content": "向外丢碎石块。",
         "isCorrect": 1
+      },
+      {
+        "content": "明明听不到任何人声，也大声呼喊。",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -5317,6 +5337,18 @@
       {
         "content": "门窗从早到晚一直关闭，直到数天后雾霾解除。",
         "isCorrect": 1
+      },
+      {
+        "content": "关闭门窗和各种通气口，减少雾霾进入。",
+        "isCorrect": 2
+      },
+      {
+        "content": "趁中午阳光较充足、污染物较少时，短时间开窗换气。",
+        "isCorrect": 2
+      },
+      {
+        "content": "减少户外活动，尤其不要外出锻炼身体。",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -11332,6 +11364,19 @@
     ],
     "type": 2
   },
+  "信用卡不设密码、凭签名消费，这样如果被盗刷能获得银行赔偿——这句话是正确的吗？": {
+    "optionList": [
+      {
+        "content": "正确。如果有密码，被盗刷属于持卡人密码、卡片管理不当；凭签名消费的话责任就在银行，银行负责赔偿。",
+        "isCorrect": 2
+      },
+      {
+        "content": "不完全正确。在我国，部分银行不给予赔偿，要提前了解好银行政策。",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
   "信用卡有密码，在场所消费时：": {
     "optionList": [
       {
@@ -11414,6 +11459,10 @@
       {
         "content": "对。",
         "isCorrect": 1
+      },
+      {
+        "content": "错。",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -12516,6 +12565,10 @@
       {
         "content": "雾霾天气，进入室内可以不戴口罩",
         "isCorrect": 1
+      },
+      {
+        "content": "图好看，佩戴在地摊上买的花色口罩",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -24291,6 +24344,23 @@
     ],
     "type": 1
   },
+  "广州也被誉为？": {
+    "optionList": [
+      {
+        "content": "千年商都",
+        "isCorrect": 1
+      },
+      {
+        "content": "花城",
+        "isCorrect": 1
+      },
+      {
+        "content": "千湖之市",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
   "应对公车地铁色狼的正确方法有？": {
     "optionList": [
       {
@@ -28946,6 +29016,19 @@
     "type": 1
   },
   "无论你是否会做海姆立克急救法，都要拨打120急救电话。": {
+    "optionList": [
+      {
+        "content": "对",
+        "isCorrect": 1
+      },
+      {
+        "content": "错",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "无论家长是否会海姆立克急救法，都一定要先拨打急救电话。": {
     "optionList": [
       {
         "content": "对",
@@ -37020,6 +37103,18 @@
       {
         "content": "捡起砖石、木棍支撑残垣断壁。",
         "isCorrect": 1
+      },
+      {
+        "content": "胳膊一动就疼，所以干脆一动不动。",
+        "isCorrect": 2
+      },
+      {
+        "content": "声嘶力竭地喊救命，直到嗓子喊哑。",
+        "isCorrect": 2
+      },
+      {
+        "content": "一想到马上就要死了就失声痛哭。",
+        "isCorrect": 2
       }
     ],
     "type": 1
