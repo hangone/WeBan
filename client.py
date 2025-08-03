@@ -265,7 +265,7 @@ class WeBanClient:
                 prepare_paper = prepare_paper["data"]
                 question_num = prepare_paper["questionNum"]
                 self.log.info(f"考试信息：用户：{prepare_paper['realName']}，ID：{prepare_paper['userIDLabel']}，题目数：{question_num}，试卷总分：{prepare_paper['paperScore']}，限时 {prepare_paper['answerTime']} 分钟")
-                per_time = use_time // prepare_paper["answerTime"]
+                per_time = use_time // prepare_paper["questionNum"]
 
                 # 检查验证码
                 # is_verified = False
@@ -370,9 +370,9 @@ class WeBanClient:
         :param exam_plan_id: 考试计划 ID
         :return:
         """
-        this_time = per_time + randint(-1, 1)
-        self.log.info(f"等待 {this_time-2} 秒，模拟答题中...")
-        time.sleep(this_time - 2)
+        this_time = per_time + randint(0, 1)
+        self.log.info(f"等待 {this_time} 秒，模拟答题中...")
+        time.sleep(this_time)
         res = self.api.exam_record_question(user_exam_plan_id, question_id, this_time, answers_ids, exam_plan_id)
         self.log.info(f"答题结果：{res}")
         if res.get("code", -1) != "0":
