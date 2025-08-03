@@ -1,10 +1,10 @@
-# *WeBan*
+# _WeBan_
 
 **由于完成课程的验证码换成了腾讯云，暂时无法完成需要验证码的课程。目前考虑从两个方案解决，使用浏览器油猴脚本或使用无头浏览器模拟**
 
 ## 介绍
 
-*WeBan* 安全微伴-大学安全教育 学习工具
+_WeBan_ 安全微伴-大学安全教育 学习工具
 
 实现了课程学习和根据题库自动考试，支持多用户多线程运行（配置 config.json），自动验证码识别（需要安装 ddddocr）。
 
@@ -17,6 +17,31 @@
 [Github 下载地址](https://github.com/hangone/WeBan/releases/latest/download/WeBan.exe)
 
 [镜像下载地址](https://ghfast.top/https://github.com/hangone/WeBan/releases/latest/download/WeBan.exe)
+
+## 配置说明
+config.json
+```json
+[
+  {
+    "tenant_name": "学校名称",
+    "account": "账号",
+    "password": "密码",
+    "study": true, // 是否学习课程
+    "study_time": 15, // 每节课学习时间，单位（秒）
+    "exam": true, // 是否考试
+    "exam_use_time": 600 // 考试总时间，单位（秒），会平均到每到题上
+  },
+  {
+    "tenant_name": "学校名称",
+    "account": "账号2",
+    "password": "密码2",
+    "study": true,
+    "study_time": 15,
+    "exam": true,
+    "exam_use_time": 600
+  }
+]
+```
 
 ## 源码运行
 
