@@ -1,26 +1,32 @@
-# _WeBan_
+# _WeBan_ 安全微课 安全微伴 大学安全教育
 
-**由于完成课程的验证码换成了腾讯云，暂时无法完成需要验证码的课程。目前考虑从两个方案解决，使用浏览器油猴脚本或使用无头浏览器模拟**
+> **由于验证码换成了腾讯云，暂时无法完成部分需要验证码的课程。**
 
 ## 介绍
 
-_WeBan_ 安全微伴-大学安全教育 学习工具
+如果本项目帮到了你，可以在右上角点亮 Star，谢谢你！
 
-实现了课程学习和根据题库自动考试，支持多用户多线程运行（配置 config.json），自动验证码识别（需要安装 ddddocr）。
+实现了课程学习和根据题库自动考试，支持多用户多线程运行（配置 config.json），自动验证码识别（需要安装 ddddocr 或使用带 -OCR 后缀的程序）。
 
 运行前后会自动合并题库，如果一次没满分可以再考一次。 可将 answer/answer.json 文件提交 PR 一起完善题库。
 
-## 直接使用
+## 使用
 
-从 [Releases](https://github.com/hangone/WeBan/releases) 下载 WeBan.exe 单文件运行，根据提示输入。
+从 [Releases](https://github.com/hangone/WeBan/releases) 下载 WeBan.exe/WeBan-OCR.xe 单文件运行，根据提示输入信息。
 
-[Github 下载地址](https://github.com/hangone/WeBan/releases/latest/download/WeBan.exe)
+如果密码输入错误，请删除 config.json 文件后重试。
 
-[镜像下载地址](https://ghfast.top/https://github.com/hangone/WeBan/releases/latest/download/WeBan.exe)
+| 类型                    | 镜像下载地址                                                                                               | Github 下载地址                                                                        |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Windows                 | [镜像下载地址](https://ghfast.top/https://github.com/hangone/WeBan/releases/latest/download/WeBan.exe)     | [Github 下载地址](https://github.com/hangone/WeBan/releases/latest/download/WeBan.exe) |
+| Windows(自动验证码识别) | [镜像下载地址](https://ghfast.top/https://github.com/hangone/WeBan/releases/latest/download/WeBan-OCR.exe) | [Github 下载地址](https://github.com/hangone/WeBan/releases/latest/download/WeBan.exe) |
+| Linux                   | [镜像下载地址](https://ghfast.top/https://github.com/hangone/WeBan/releases/latest/download/WeBan)         | [Github 下载地址](https://github.com/hangone/WeBan/releases/latest/download/WeBan.exe) |
+| Linux(自动验证码识别)   | [镜像下载地址](https://ghfast.top/https://github.com/hangone/WeBan/releases/latest/download/WeBan-OCR)     | [Github 下载地址](https://github.com/hangone/WeBan/releases/latest/download/WeBan.exe) |
 
 ## 配置说明
-config.json
+
 ```json
+// config.json
 [
   {
     "tenant_name": "学校名称",
@@ -45,28 +51,48 @@ config.json
 
 ## 源码运行
 
-1. 安装 Python3 （可选使用 [uv](https://github.com/astral-sh/uv)）
+1.  安装 Python3([下载地址](https://www.python.org/downloads))（可选使用 [uv](https://github.com/astral-sh/uv)）和 Git([下载地址](https://git-scm.com))
 
-2. 打开终端，克隆本仓库 `git clone https://github.com/hangone/WeBan`
+2. 打开终端，克隆本仓库
 
-3. 在终端运行 `pip install -r requirements-ocr.txt` 或者 `uv sync`
+```bash
+git clone https://github.com/hangone/WeBan
+```
 
-4. 运行 `python main.py`，按提示输入学校和账号密码。每个任务大概需要 ≥13 秒才不会触发限制。
+3. 安装依赖
 
-### 演示
+```bash
+pip install -r requirements-ocr.txt # 或 uv sync
+```
+
+4. 运行
+
+```bash
+python main.py
+```
+
+按提示输入学校和账号密码。每个任务大概需要 15 秒才不会触发限制。
+
+## 演示
 
 ![image1](images/image1.png)
 
-### 其他
+## 鸣谢
 
-本项目仅供学习交流使用，请勿用于商业用途，否则后果自负。
+- [Coaixy/weiban-tool](https://github.com/Coaixy/weiban-tool) 提供题库和一些代码思路
 
-截图时注意打码个人信息
+- [pooneyy/WeibanQuestionsBank](https://github.com/pooneyy/WeibanQuestionsBank) 提供题库
 
-欢迎 PR
+## 其他
 
-### 鸣谢
+1. 本项目仅供学习交流使用，请勿用于商业用途，否则后果自负。
 
-[Coaixy/weiban-tool](https://github.com/Coaixy/weiban-tool) 提供题库和一些代码思路
+2. 欢迎 Star 喵，欢迎 PR 喵。
 
-[pooneyy/WeibanQuestionsBank](https://github.com/pooneyy/WeibanQuestionsBank) 提供题库
+3. 截图时注意打码个人信息。
+
+4. **如果看不懂上面说的也可以直接扫码备注学校和账号密码，乐意效劳。**
+
+   |             微信             |            支付宝            |
+   | :--------------------------: | :--------------------------: |
+   | ![wechat](images/wechat.png) | ![alipay](images/alipay.png) |
