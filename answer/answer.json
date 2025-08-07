@@ -56,6 +56,27 @@
     ],
     "type": 1
   },
+  "下列哪些属于烟草中的有害物质？": {
+    "optionList": [
+      {
+        "content": "甲醛",
+        "isCorrect": 1
+      },
+      {
+        "content": "苯并芘",
+        "isCorrect": 1
+      },
+      {
+        "content": "放射性物质",
+        "isCorrect": 1
+      },
+      {
+        "content": "重金属",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "100毫升血液中，酒精含量达到多少毫克以上会被认定为醉驾？": {
     "optionList": [
       {
