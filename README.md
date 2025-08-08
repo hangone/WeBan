@@ -60,7 +60,7 @@ git clone https://github.com/hangone/WeBan
 3. 安装依赖
 
 ```bash
-pip install -r requirements-ocr.txt # 或 uv sync
+pip install -r requirements.txt # 或 uv sync
 ```
 
 4. 运行
