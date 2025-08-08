@@ -19,9 +19,9 @@
 | 类型                    | 镜像下载地址                                                                                               | Github 下载地址                                                                        |
 | ----------------------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | Windows                 | [镜像下载地址](https://ghfast.top/https://github.com/hangone/WeBan/releases/latest/download/WeBan.exe)     | [Github 下载地址](https://github.com/hangone/WeBan/releases/latest/download/WeBan.exe) |
-| Windows(自动验证码识别) | [镜像下载地址](https://ghfast.top/https://github.com/hangone/WeBan/releases/latest/download/WeBan-OCR.exe) | [Github 下载地址](https://github.com/hangone/WeBan/releases/latest/download/WeBan.exe) |
-| Linux                   | [镜像下载地址](https://ghfast.top/https://github.com/hangone/WeBan/releases/latest/download/WeBan)         | [Github 下载地址](https://github.com/hangone/WeBan/releases/latest/download/WeBan.exe) |
-| Linux(自动验证码识别)   | [镜像下载地址](https://ghfast.top/https://github.com/hangone/WeBan/releases/latest/download/WeBan-OCR)     | [Github 下载地址](https://github.com/hangone/WeBan/releases/latest/download/WeBan.exe) |
+| Windows(自动验证码识别) | [镜像下载地址](https://ghfast.top/https://github.com/hangone/WeBan/releases/latest/download/WeBan_OCR.exe) | [Github 下载地址](https://github.com/hangone/WeBan/releases/latest/download/WeBan_OCR.exe) |
+| Linux                   | [镜像下载地址](https://ghfast.top/https://github.com/hangone/WeBan/releases/latest/download/WeBan)         | [Github 下载地址](https://github.com/hangone/WeBan/releases/latest/download/WeBan) |
+| Linux(自动验证码识别)   | [镜像下载地址](https://ghfast.top/https://github.com/hangone/WeBan/releases/latest/download/WeBan-OCR)     | [Github 下载地址](https://github.com/hangone/WeBan/releases/latest/download/WeBan_OCR) |
 
 ## 配置说明
 
