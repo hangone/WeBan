@@ -73,7 +73,8 @@ class WeBanClient:
                     self.log.success(f"找到学校代码: {entry['code']}")
                     self.api.set_tenant_code(entry["code"])
                     return entry["code"]
-        self.log.error(f"没找到你的学校代码，请检查学校全称是否正确: {self.tenant_name}\n{tenant_names}")
+        self.log.error(f"{tenant_names}")
+        self.log.error(f"没找到你的学校代码，请检查学校全称是否正确（上面是有效的学校名称）: {self.tenant_name}")
         return None
 
     def get_progress(self, user_project_id: str, project_prefix: str | None, output: bool = True) -> Dict[str, Any]:
@@ -126,7 +127,7 @@ class WeBanClient:
             res = self.api.login(verify_code, int(verify_time))
             if self.api.user:
                 break
-            self.log.error(f"登录出错: {res}")
+            self.log.error(f"登录出错，请检查 config.json 内账号密码，或删除文件后重试: {res}")
             break
         return self.api.user
 
