@@ -5376,7 +5376,7 @@
         "isCorrect": 2
       }
     ],
-    "type": 1
+    "type": 2
   },
   "下面躲避雾霾的方式中错误的是：": {
     "optionList": [
@@ -11025,6 +11025,27 @@
     ],
     "type": 1
   },
+  "使用“翻墙”软件散布不实言论、信息后，可能会触犯什么罪名？": {
+    "optionList": [
+      {
+        "content": "寻衅滋事罪",
+        "isCorrect": 1
+      },
+      {
+        "content": "诽谤罪",
+        "isCorrect": 1
+      },
+      {
+        "content": "妨害司法罪",
+        "isCorrect": 2
+      },
+      {
+        "content": "以上都是",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
   "使用公共的充电宝、充电口充电时，可以任意点击弹窗提示。": {
     "optionList": [
       {
@@ -14897,6 +14918,27 @@
       }
     ],
     "type": 2
+  },
+  "发现森林火灾后，以下哪项措施是正确的：": {
+    "optionList": [
+      {
+        "content": "立即自行扑灭",
+        "isCorrect": 2
+      },
+      {
+        "content": "等待消防人员到来",
+        "isCorrect": 2
+      },
+      {
+        "content": "迅速撤离并报警",
+        "isCorrect": 1
+      },
+      {
+        "content": "拍照发朋友圈",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "发现病人面色通红、心跳很慢，应该：": {
     "optionList": [
@@ -30117,6 +30159,27 @@
       {
         "content": "新闻出版工作失误造成泄密",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "李女士通过某交友软件认识一名自称“金融顾问”的男子，对方频繁嘘寒问暖并赠送礼物。1个月后，男子推荐其参与“内幕股票”投资，初期小额提现成功。李女士加大投入20万元后无法提现，对方失联。该案例属于哪种诈骗类型？": {
+    "optionList": [
+      {
+        "content": "杀鸟盘诈骗",
+        "isCorrect": 2
+      },
+      {
+        "content": "杀猪盘诈骗",
+        "isCorrect": 1
+      },
+      {
+        "content": "冒充公检法诈骗",
+        "isCorrect": 2
+      },
+      {
+        "content": "冒充客服诈骗",
+        "isCorrect": 2
       }
     ],
     "type": 1
