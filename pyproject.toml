@@ -1,6 +1,6 @@
 [project]
 name = "weban"
-version = "0.1.0"
+version = "3.5.4"
 description = "auto finish weiban"
 readme = "README.md"
 requires-python = ">=3.12"
