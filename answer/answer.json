@@ -56,27 +56,6 @@
     ],
     "type": 1
   },
-  "下列哪些属于烟草中的有害物质？": {
-    "optionList": [
-      {
-        "content": "甲醛",
-        "isCorrect": 1
-      },
-      {
-        "content": "苯并芘",
-        "isCorrect": 1
-      },
-      {
-        "content": "放射性物质",
-        "isCorrect": 1
-      },
-      {
-        "content": "重金属",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
   "100毫升血液中，酒精含量达到多少毫克以上会被认定为醉驾？": {
     "optionList": [
       {
@@ -3314,6 +3293,10 @@
       {
         "content": "做自己喜欢的任何事",
         "isCorrect": 2
+      },
+      {
+        "content": "做自己喜欢的任何事情",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -3372,6 +3355,27 @@
       },
       {
         "content": "营造友爱的社会环境",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "下列哪些属于烟草中的有害物质？": {
+    "optionList": [
+      {
+        "content": "甲醛",
+        "isCorrect": 1
+      },
+      {
+        "content": "苯并芘",
+        "isCorrect": 1
+      },
+      {
+        "content": "放射性物质",
+        "isCorrect": 1
+      },
+      {
+        "content": "重金属",
         "isCorrect": 1
       }
     ],
@@ -8445,6 +8449,27 @@
       },
       {
         "content": "防酸碱鞋",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "以下哪些属于骗子常用的诈骗话术？": {
+    "optionList": [
+      {
+        "content": "您的账户存在异常，需要转入“安全账户”进行核查",
+        "isCorrect": 1
+      },
+      {
+        "content": "您有一笔违约金未缴纳，需立即转账支付",
+        "isCorrect": 1
+      },
+      {
+        "content": "我没收到您的转账，请再转一次",
+        "isCorrect": 1
+      },
+      {
+        "content": "我们是官方客服，需要您提供银行卡密码进行身份验证",
         "isCorrect": 1
       }
     ],
@@ -22385,6 +22410,14 @@
       },
       {
         "content": "遇到问题及时和辅导员、心理老师沟通。",
+        "isCorrect": 1
+      },
+      {
+        "content": "别人的行为习惯没有伤害或影响任何人时，不评价指点别人。",
+        "isCorrect": 1
+      },
+      {
+        "content": "多尊重他人感受，调整自己行为。",
         "isCorrect": 1
       }
     ],
@@ -37222,6 +37255,27 @@
       },
       {
         "content": "20年",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "被动吸烟对健康的影响是什么？": {
+    "optionList": [
+      {
+        "content": "无影响",
+        "isCorrect": 2
+      },
+      {
+        "content": "影响较小",
+        "isCorrect": 2
+      },
+      {
+        "content": "与主动吸烟者相同",
+        "isCorrect": 1
+      },
+      {
+        "content": "影响比主动吸烟者小",
         "isCorrect": 2
       }
     ],
