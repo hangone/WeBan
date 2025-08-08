@@ -1,4 +1,0 @@
-ddddocr
-loguru
-pycryptodome
-requests

@@ -1,4 +1,4 @@
-#ddddocr
+ddddocr
 loguru
 pycryptodome
 requests

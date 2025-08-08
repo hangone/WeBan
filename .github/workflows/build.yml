@@ -15,42 +15,35 @@ jobs:
 
     strategy:
       matrix:
-        os: [ windows-latest, ubuntu-latest ]
+        os: [ windows-latest, ubuntu-latest, macos-latest ]
         include:
           - os: windows-latest
             pyinstaller-ext: .exe
           - os: ubuntu-latest
             pyinstaller-ext: ""
+          - os: macos-latest
+            pyinstaller-ext: "_mac"
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install pyinstaller
-          pip install -r requirements.txt
+          pip install pyinstaller loguru pycryptodome requests
 
       - name: Build base executable
         run: pyinstaller -F main.py -n WeBan
 
-      - name: Install ddddocr
-        run: pip install ddddocr
-
-      - name: Build ddddocr version
-        run: pyinstaller -F main.py -n WeBan_OCR
-
       - name: Upload release assets
-        uses: softprops/action-gh-release@v2.2.2
+        uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
             dist/WeBan${{ matrix.pyinstaller-ext }}
-            dist/WeBan_OCR${{ matrix.pyinstaller-ext }}
           generate_release_notes: true
