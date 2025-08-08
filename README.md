@@ -42,7 +42,7 @@
     "study": true,
     "study_time": 15,
     "exam": true,
-    "exam_use_time": 600
+    "exam_use_time": 250
   }
 ]
 ```

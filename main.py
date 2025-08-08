@@ -29,7 +29,7 @@ def run_account(config, account_index):
     study = config.get("study", True)
     study_time = config.get("study_time", 15)
     exam = config.get("exam", False)
-    exam_use_time = config.get("exam_use_time", 600)
+    exam_use_time = config.get("exam_use_time", 250)
 
     if not all([account, password, tenant_name]):
         logger.error(f"[账号{account_index+1}] config.json 文件中缺少必要的配置信息 (tenant_name, account, password): {config}")
@@ -49,11 +49,11 @@ def run_account(config, account_index):
             client.sync_answers()
 
         if study:
-            log.info(f"开始学习 (时长: {study_time}分钟)")
+            log.info(f"开始学习 (每个任务时长: {study_time}秒)")
             client.run_study(study_time)
 
         if exam:
-            log.info(f"开始考试 (时长: {exam_use_time}秒)")
+            log.info(f"开始考试 (总时长: {exam_use_time}秒)")
             client.run_exam(exam_use_time)
 
         log.info(f"最终同步答案")
@@ -82,7 +82,7 @@ def create_initial_config():
     account = input(f"账号{prompt.get('userNamePrompt', '') or '请填写用户名'}：").strip()
     password = input(f"密码{prompt.get('passwordPrompt', '') or '请填写密码'}：").strip()
 
-    configs = [{"tenant_name": tenant_name, "account": account, "password": password, "study": True, "study_time": 15, "exam": True, "exam_use_time": 600}]
+    configs = [{"tenant_name": tenant_name, "account": account, "password": password, "study": True, "study_time": 15, "exam": True, "exam_use_time": 250}]
 
     with open("config.json", "w", encoding="utf-8") as f:
         f.write(json.dumps(configs, indent=2, ensure_ascii=False))

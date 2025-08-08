@@ -213,7 +213,7 @@ class WeBanClient:
 
         self.log.success(f"课程学习完成")
 
-    def run_exam(self, use_time: int = 600):
+    def run_exam(self, use_time: int = 250):
         # 加载题库
         answers_json = {}
 
