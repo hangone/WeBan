@@ -6,7 +6,7 @@
 
 如果本项目帮到了你，可以在右上角点亮 Star，谢谢你！
 
-实现了课程学习和根据题库自动考试，支持多用户多线程运行（配置 config.json），自动验证码识别（需要安装 ddddocr 或使用带 -OCR 后缀的程序）。
+实现了课程学习和根据题库自动考试，支持多用户多线程运行（配置 config.json），自动验证码识别（需要安装 ddddocr 或使用带 _OCR 后缀的程序）。
 
 运行前后会自动合并题库，如果一次没满分可以再考一次。 可将 answer/answer.json 文件提交 PR 一起完善题库。
 
@@ -21,7 +21,7 @@
 | Windows                 | [镜像下载地址](https://ghfast.top/https://github.com/hangone/WeBan/releases/latest/download/WeBan.exe)     | [Github 下载地址](https://github.com/hangone/WeBan/releases/latest/download/WeBan.exe) |
 | Windows(自动验证码识别) | [镜像下载地址](https://ghfast.top/https://github.com/hangone/WeBan/releases/latest/download/WeBan_OCR.exe) | [Github 下载地址](https://github.com/hangone/WeBan/releases/latest/download/WeBan_OCR.exe) |
 | Linux                   | [镜像下载地址](https://ghfast.top/https://github.com/hangone/WeBan/releases/latest/download/WeBan)         | [Github 下载地址](https://github.com/hangone/WeBan/releases/latest/download/WeBan) |
-| Linux(自动验证码识别)   | [镜像下载地址](https://ghfast.top/https://github.com/hangone/WeBan/releases/latest/download/WeBan-OCR)     | [Github 下载地址](https://github.com/hangone/WeBan/releases/latest/download/WeBan_OCR) |
+| Linux(自动验证码识别)   | [镜像下载地址](https://ghfast.top/https://github.com/hangone/WeBan/releases/latest/download/WeBan_OCR)     | [Github 下载地址](https://github.com/hangone/WeBan/releases/latest/download/WeBan_OCR) |
 
 ## 配置说明
 
