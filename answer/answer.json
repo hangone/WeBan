@@ -25373,6 +25373,10 @@
       {
         "content": "要先确认朋友的真实性，别被诈骗了",
         "isCorrect": 1
+      },
+      {
+        "content": "不问缘由，直接拒绝",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -25594,6 +25598,10 @@
       {
         "content": "给好朋友打电话询问是不是中木马或者盗号。",
         "isCorrect": 1
+      },
+      {
+        "content": "好朋友一定支持，赶紧投票。",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -31434,6 +31442,27 @@
       {
         "content": "装燃气泄露报警器",
         "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "森林火灾的预防措施包括哪些？": {
+    "optionList": [
+      {
+        "content": "加强森林防火宣传教育",
+        "isCorrect": 1
+      },
+      {
+        "content": "建立森林防火预警系统",
+        "isCorrect": 1
+      },
+      {
+        "content": "定期进行森林火灾隐患排查",
+        "isCorrect": 1
+      },
+      {
+        "content": "限制人员进入林区",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -37343,6 +37372,27 @@
       }
     ],
     "type": 1
+  },
+  "被动吸烟的危害包括：": {
+    "optionList": [
+      {
+        "content": "增加患肺癌风险",
+        "isCorrect": 1
+      },
+      {
+        "content": "影响儿童智力发育",
+        "isCorrect": 1
+      },
+      {
+        "content": "诱发心脏病",
+        "isCorrect": 1
+      },
+      {
+        "content": "加重哮喘症状",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
   },
   "被困在了着火的6层楼上，你最不应该做的逃生方法是什么？": {
     "optionList": [
