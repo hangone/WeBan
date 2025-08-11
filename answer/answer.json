@@ -4194,6 +4194,27 @@
     ],
     "type": 1
   },
+  "下列驾校的报名交款方式哪个最靠谱？": {
+    "optionList": [
+      {
+        "content": "网络社交平台上的低价链接",
+        "isCorrect": 2
+      },
+      {
+        "content": "熟人朋友介绍的有优惠的中介",
+        "isCorrect": 2
+      },
+      {
+        "content": "知名驾校的官方报名电话、网点",
+        "isCorrect": 1
+      },
+      {
+        "content": "在街头找到的驾校报名点",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "下列（   ）妨碍国家安全机关依法执行任务的行为，依法追究刑事责任。": {
     "optionList": [
       {
@@ -7473,7 +7494,7 @@
         "isCorrect": 1
       }
     ],
-    "type": 2
+    "type": 1
   },
   "人民检察院是国家的（）。": {
     "optionList": [
@@ -39573,6 +39594,10 @@
       {
         "content": "不信、不理睬",
         "isCorrect": 1
+      },
+      {
+        "content": "报名试试",
+        "isCorrect": 2
       }
     ],
     "type": 1
