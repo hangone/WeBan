@@ -16231,6 +16231,27 @@
     ],
     "type": 1
   },
+  "售卖军事机密的行为可能构成？": {
+    "optionList": [
+      {
+        "content": "间谍罪",
+        "isCorrect": 1
+      },
+      {
+        "content": "为境外窃取、刺探、收买、非法提供国家秘密、情报罪",
+        "isCorrect": 1
+      },
+      {
+        "content": "危害国家安全罪",
+        "isCorrect": 1
+      },
+      {
+        "content": "非法经营罪",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
   "喜欢网络游戏的同学，需要注意哪些安全事项？": {
     "optionList": [
       {
@@ -26374,6 +26395,10 @@
       {
         "content": "海洋垃圾无法分解的塑料微粒最终会被人类吃掉",
         "isCorrect": 1
+      },
+      {
+        "content": "和人类没有关系，不需要理会",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -36822,6 +36847,14 @@
       {
         "content": "正确",
         "isCorrect": 1
+      },
+      {
+        "content": "正确。",
+        "isCorrect": 1
+      },
+      {
+        "content": "错误。",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -41886,6 +41919,27 @@
       }
     ],
     "type": 2
+  },
+  "高校教授马某在学术交流中得知官员赵某子女成绩差，主动提出帮助其子女入读国外名校，条件是赵某提供军工业科研成果。赵某明知马某意图，仍为子女前途妥协。马某的策反手段属于？": {
+    "optionList": [
+      {
+        "content": "学术渗透",
+        "isCorrect": 2
+      },
+      {
+        "content": "家庭情感绑架",
+        "isCorrect": 1
+      },
+      {
+        "content": "技术窃密",
+        "isCorrect": 2
+      },
+      {
+        "content": "意识形态攻击",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "高校校园常见的安全问题有(    )。": {
     "optionList": [
