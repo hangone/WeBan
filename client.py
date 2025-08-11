@@ -207,8 +207,10 @@ class WeBanClient:
                                 token = res.get("data", {}).get("methodToken", None)
 
                             res = self.api.finish_by_token(course["userCourseId"], token)
+                            if "ok" not in res:
+                                self.log.error(f"{course_prefix} 完成失败：{res}")
 
-                        self.log.success(f"{course_prefix} 完成 {res}")
+                        self.log.success(f"{course_prefix} 完成")
 
         self.log.success(f"课程学习完成")
 
