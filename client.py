@@ -200,7 +200,8 @@ class WeBanClient:
                             # 检查是否需要验证码
                             token = None
                             if query.get("csCapt", [None])[0] == "true":
-                                self.log.info(f"课程需要验证码，正在获取...")
+                                self.log.info(f"课程需要验证码，暂时无法处理...")
+                                continue
                                 res = self.api.invoke_captcha(course["userCourseId"], task["userProjectId"])
                                 if res.get("code", -1) != "0":
                                     self.log.error(f"获取验证码失败：{res}")
