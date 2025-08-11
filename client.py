@@ -124,11 +124,11 @@ class WeBanClient:
                 webbrowser.open(f"file://{os.path.abspath('verify_code.png')}")
                 verify_code = input(f"请查看 verify_code.png 输入验证码：")
             res = self.api.login(verify_code, int(verify_time))
-            if self.api.user:
-                break
+            if self.api.user["userId"]:
+                return self.api.user
             self.log.error(f"登录出错，请检查 config.json 内账号密码，或删除文件后重试: {res}")
             break
-        return self.api.user
+        return None
 
     def run_study(self, study_time: int | None) -> None:
         if study_time:
