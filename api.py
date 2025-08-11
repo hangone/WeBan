@@ -481,7 +481,7 @@ class WeBanAPI:
             "tenantCode": self.tenant_code,
         }
         response = self.session.get(fetch_url, params=params, timeout=self.timeout)  # {"captcha":{"num":3,"questionId":"${uuid}","imageUrl":"${url}"}}
-        params["questionId"] = response.json().get("captcha", {}).get("questionId", "")
+        params["questionId"] = self.handle_response(response).get("captcha", {}).get("questionId", "")
         coordinates = [{"x": x + randint(-5, 5), "y": y + randint(-5, 5)} for x, y in [(207, 436), (67, 424), (141, 427)]]
         data = {"coordinateXYs": json.dumps(coordinates, separators=(",", ":"))}
         time.sleep(3)
