@@ -17,12 +17,12 @@ if TYPE_CHECKING:
 class WeBanClient:
 
     def __init__(self, account: str, password: str, tenant_name: str, log: logger = logger) -> None:
-        self.tenant_code = None
+        self.log = log
         self.tenant_name = tenant_name
+        self.study_time = 15
         self.ocr = self.get_ocr_instance()
         self.api = WeBanAPI(account, password)
-        self.study_time = 15
-        self.log = log
+        self.api.set_tenant_code(self.get_tenant_code())
 
     @staticmethod
     def get_project_type(project_category: int) -> str:
@@ -54,14 +54,14 @@ class WeBanClient:
 
         return _cache["ocr"]
 
-    def get_tenant_code(self) -> str | None:
+    def get_tenant_code(self) -> str:
         """
         获取学校代码
         :return: code
         """
         if not self.tenant_name:
             self.log.error(f"学校全称不能为空")
-            return None
+            return ""
         tenant_list = self.api.get_tenant_list_with_letter()
         if tenant_list.get("code", 1) == "0":
             self.log.info(f"获取学校列表成功")
@@ -71,11 +71,10 @@ class WeBanClient:
                 tenant_names.append(entry.get("name", ""))
                 if entry.get("name", "") == self.tenant_name:
                     self.log.success(f"找到学校代码: {entry['code']}")
-                    self.api.set_tenant_code(entry["code"])
                     return entry["code"]
         self.log.error(f"{tenant_names}")
         self.log.error(f"没找到你的学校代码，请检查学校全称是否正确（上面是有效的学校名称）: {self.tenant_name}")
-        return None
+        return ""
 
     def get_progress(self, user_project_id: str, project_prefix: str | None, output: bool = True) -> Dict[str, Any]:
         """
