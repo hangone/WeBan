@@ -3956,7 +3956,7 @@
         "isCorrect": 1
       }
     ],
-    "type": 2
+    "type": 1
   },
   "下列有安全隐患的行为是：（）": {
     "optionList": [
@@ -5376,7 +5376,7 @@
         "isCorrect": 2
       }
     ],
-    "type": 2
+    "type": 1
   },
   "下面躲避雾霾的方式中错误的是：": {
     "optionList": [
@@ -9724,6 +9724,23 @@
     ],
     "type": 2
   },
+  "以下哪项是有效的防盗措施？": {
+    "optionList": [
+      {
+        "content": "将背包挂在公共区域挂钩上",
+        "isCorrect": 2
+      },
+      {
+        "content": "贵重物品贴身放置，不离视线",
+        "isCorrect": 1
+      },
+      {
+        "content": "设置简单密码",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "以下哪项是正确的就业态度？": {
     "optionList": [
       {
@@ -12486,6 +12503,27 @@
     ],
     "type": 2
   },
+  "关于“双卡管理法”，以下哪项操作是正确的？": {
+    "optionList": [
+      {
+        "content": "将全部生活费存入日常卡方便取用",
+        "isCorrect": 2
+      },
+      {
+        "content": "存钱卡绑定支付宝便于随时转账",
+        "isCorrect": 2
+      },
+      {
+        "content": "日常卡设置单日消费限额500元",
+        "isCorrect": 1
+      },
+      {
+        "content": "存钱卡开通免密支付提升效率",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "关于“托运带毒”，下面行为正确的是：": {
     "optionList": [
       {
@@ -14583,6 +14621,23 @@
       }
     ],
     "type": 1
+  },
+  "北京的特色美食很多，如何安全、健康地品尝美食呢？": {
+    "optionList": [
+      {
+        "content": "选择正规、干净的餐厅就餐",
+        "isCorrect": 1
+      },
+      {
+        "content": "不暴饮暴食",
+        "isCorrect": 1
+      },
+      {
+        "content": "出现腹泻及时就医",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
   },
   "十九大的主题是：不忘初心，（），高举中国特色社会主义伟大旗帜，决胜全面建成小康社会，夺取新时代中国特色社会主义伟大胜利，为实现中华民族伟大复兴的中国梦不懈奋斗。": {
     "optionList": [
@@ -19295,6 +19350,14 @@
       {
         "content": "餐后一小时。",
         "isCorrect": 1
+      },
+      {
+        "content": "餐前一小时。",
+        "isCorrect": 2
+      },
+      {
+        "content": "餐后半小时。",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -28454,7 +28517,7 @@
         "isCorrect": 1
       }
     ],
-    "type": 2
+    "type": 1
   },
   "收到“官方账号”的短信也未必就一定是可信的。": {
     "optionList": [
@@ -32796,6 +32859,40 @@
       },
       {
         "content": "静止不动",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "湖北有多少少数民族成分？": {
+    "optionList": [
+      {
+        "content": "51",
+        "isCorrect": 2
+      },
+      {
+        "content": "52",
+        "isCorrect": 2
+      },
+      {
+        "content": "53",
+        "isCorrect": 1
+      },
+      {
+        "content": "54",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "湖北省的梅雨期一般出现在什么时候？": {
+    "optionList": [
+      {
+        "content": "6月中旬到7月上、中旬",
+        "isCorrect": 1
+      },
+      {
+        "content": "7月下旬到8月上旬",
         "isCorrect": 2
       }
     ],
@@ -42054,6 +42151,27 @@
       }
     ],
     "type": 2
+  },
+  "高空坠物可能造成的最严重后果是：": {
+    "optionList": [
+      {
+        "content": "车辆损坏",
+        "isCorrect": 2
+      },
+      {
+        "content": "财物损失",
+        "isCorrect": 2
+      },
+      {
+        "content": "人员伤亡",
+        "isCorrect": 1
+      },
+      {
+        "content": "房屋受损",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "高等学校实验室安全项目检查表中关于“个人防护”说法正确的是（）。": {
     "optionList": [
