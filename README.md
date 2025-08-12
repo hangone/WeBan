@@ -33,7 +33,7 @@
     "study": true, // 是否学习课程
     "study_time": 15, // 每节课学习时间，单位（秒）
     "exam": true, // 是否考试
-    "exam_use_time": 600 // 考试总时间，单位（秒），会平均到每到题上
+    "exam_use_time": 250 // 考试总时间，单位（秒），会平均到每到题上
   },
   {
     "tenant_name": "学校名称",
