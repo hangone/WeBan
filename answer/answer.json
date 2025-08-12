@@ -12706,6 +12706,27 @@
     ],
     "type": 2
   },
+  "关于刷牙和洗手的工具，以下说法正确的是：": {
+    "optionList": [
+      {
+        "content": "刷牙时应使用硬毛牙刷，因为清洁效果更好",
+        "isCorrect": 2
+      },
+      {
+        "content": "刷牙时应使用软毛牙刷，洗手时应根据情况选择合适的洗手液",
+        "isCorrect": 1
+      },
+      {
+        "content": "洗手时必须使用抗菌洗手液",
+        "isCorrect": 2
+      },
+      {
+        "content": "刷牙时牙刷越贵越好，洗手时洗手液越香越好",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "关于剧烈运动后喝冷饮易心衰的原理，下面说法正确的是：": {
     "optionList": [
       {
@@ -24538,6 +24559,27 @@
     "optionList": [
       {
         "content": "偏低",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "干粉灭火器适用于扑灭哪种类型的火灾？": {
+    "optionList": [
+      {
+        "content": "仅适用于固体物质火灾",
+        "isCorrect": 2
+      },
+      {
+        "content": "仅适用于液体火灾",
+        "isCorrect": 2
+      },
+      {
+        "content": "仅适用于气体火灾",
+        "isCorrect": 2
+      },
+      {
+        "content": "适用于多种类型的火灾，包括固体、液体和气体火灾",
         "isCorrect": 1
       }
     ],
