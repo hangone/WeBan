@@ -5418,7 +5418,7 @@
         "isCorrect": 2
       }
     ],
-    "type": 1
+    "type": 2
   },
   "下面躲避雾霾的方式中错误的是：": {
     "optionList": [
@@ -28241,6 +28241,23 @@
     "optionList": [
       {
         "content": "其他三个选项皆是。",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "接到 “某银行信贷员” 电话：“您符合我行低息贷款资格，需先缴纳 2000 元手续费即可放款”，你的做法是：": {
+    "optionList": [
+      {
+        "content": "按要求转账，等待放款",
+        "isCorrect": 2
+      },
+      {
+        "content": "要求对方减免手续费后再办理",
+        "isCorrect": 2
+      },
+      {
+        "content": "到银行柜台或官方 APP 申请贷款",
         "isCorrect": 1
       }
     ],
