@@ -69,18 +69,19 @@ def run_account(config, account_index):
         return False
 
 
-def create_initial_config():
+def create_initial_config() -> list[dict]:
     """创建初始配置文件"""
     logger.error("config.json 文件不存在，请填写信息")
     tenant_name = input("请填写学校名称: ").strip()
     client = WeBanClient("", "", tenant_name, logger)
-    tenant_code = client.get_tenant_code()
-    if not tenant_code:
+    tenant_config = client.api.get_tenant_config()
+    if tenant_config.get("code", -1) != "0":
+        logger.error(f"未找到学校 {tenant_name} 的配置，请检查学校名称是否正确")
         exit(1)
-    prompt = client.api.get_tenant_config(tenant_code)["data"]
+    prompt = tenant_config["data"]
     logger.info(prompt.get("popPrompt", ""))
-    account = input(f"账号{prompt.get('userNamePrompt', '') or '请填写用户名'}：").strip()
-    password = input(f"密码{prompt.get('passwordPrompt', '') or '请填写密码'}：").strip()
+    account = input(f"账号{'请输入'+prompt.get('userNamePrompt', '')}：").strip()
+    password = input(f"密码{'请输入'+prompt.get('passwordPrompt', '')}：").strip()
 
     configs = [{"tenant_name": tenant_name, "account": account, "password": password, "study": True, "study_time": 15, "exam": True, "exam_use_time": 250}]
 
@@ -161,5 +162,9 @@ if __name__ == "__main__":
         print("用户终止")
     except Exception as e:
         logger.error(f"运行失败: {e}")
-        traceback.print_exc(file=sys.stderr)  
-    input("按回车键退出")  
+        traceback.print_exc(file=sys.stderr)
+
+    try:
+        input("按回车键退出")
+    except:
+        pass

@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 class WeBanClient:
 
-    def __init__(self, account: str, password: str, tenant_name: str, log: logger = logger) -> None:
+    def __init__(self, account: str, password: str, tenant_name: str, log=logger) -> None:
         self.log = log
         self.tenant_name = tenant_name
         self.study_time = 15
@@ -63,7 +63,7 @@ class WeBanClient:
             self.log.error(f"学校全称不能为空")
             return ""
         tenant_list = self.api.get_tenant_list_with_letter()
-        if tenant_list.get("code", 1) == "0":
+        if tenant_list.get("code", -1) == "0":
             self.log.info(f"获取学校列表成功")
         tenant_names = []
         for item in tenant_list.get("data", []):
@@ -105,8 +105,6 @@ class WeBanClient:
         return progress
 
     def login(self) -> Dict | None:
-        if not self.get_tenant_code():
-            return None
         retry_limit = 3
         for i in range(retry_limit + 2):
             if i > 0:
@@ -270,35 +268,6 @@ class WeBanClient:
                 self.log.info(f"考试信息：用户：{prepare_paper['realName']}，ID：{prepare_paper['userIDLabel']}，题目数：{question_num}，试卷总分：{prepare_paper['paperScore']}，限时 {prepare_paper['answerTime']} 分钟")
                 per_time = use_time // prepare_paper["questionNum"]
 
-                # 检查验证码
-                # is_verified = False
-                # retry_limit = 3
-                # for i in range(retry_limit + 2):
-                #     if i > 0:
-                #         self.log.error(f"识别失败，正在重试 {i}/{retry_limit+2} 次")
-                #     verify_time = self.api.get_timestamp(13, 0)
-                #     verify_image = self.api.rand_letter_image(verify_time)
-                #     if i < retry_limit and self.ocr:
-                #         verify_code = self.ocr.classification(verify_image)
-                #         self.log.info(f"自动验证码识别结果: {verify_code}")
-                #         if len(verify_code) != 4:
-                #             self.log.error(f"验证码识别失败，正在重试")
-                #             continue
-                #     else:
-                #         open("verify_code.png", "wb").write(verify_image)
-                #         webbrowser.open(f"file://{os.path.abspath('verify_code.png')}")
-                #         verify_code = input("请查看 verify_code.png 输入验证码：")
-                #     res = self.api.exam_check_verify_code(user_exam_plan_id, verify_code, int(verify_time))
-                #     if res.get("code") == "0":
-                #         self.log.success(f"验证码正确")
-                #         is_verified = True
-                #         break
-                #     self.log.error(f"验证码错误：{res}")
-                # if not is_verified:
-                #     self.log.error(f"验证码错误，请重新考试")
-                #     continue
-                self.log.info(f"验证码正确，开始考试")
-
                 # 获取考试题目
                 exam_paper = self.api.exam_start_paper(user_exam_plan_id)
                 if exam_paper.get("code", -1) != "0":
@@ -319,8 +288,8 @@ class WeBanClient:
                 self.log.info(f"题目总数：{question_num}，有答案的题目数：{len(have_answer)}，无答案的题目数：{len(no_answer)}")
                 correct_rate = len(have_answer) / question_num
                 if correct_rate < 0.9:
-                    self.log.warning(f"题库正确率 {correct_rate} 少于 90%，是否继续考试？（y/N）")
-                    if input().lower() != "y":
+                    self.log.warning(f"题库正确率 {correct_rate} 少于 90%，是否继续考试？（Y/n）")
+                    if input().lower() == "n":
                         self.log.error(f"用户取消")
                         continue
 
@@ -329,6 +298,7 @@ class WeBanClient:
                     self.log.info(f"题目类型：{question['typeLabel']}，题目标题：{question['title']}")
                     for j, option in enumerate(question["optionList"]):
                         self.log.info(f"{j + 1}. {option['content']}")
+                    start_time = time.time()
                     answer = input(f"请输入答案序号（多个选项用英文逗号分隔，如 1,2,3,4）：")
                     answers_ids = []
                     for ans in answer.strip().split(","):
@@ -339,7 +309,8 @@ class WeBanClient:
                             continue
                         self.log.error(f"无效的答案序号：{ans}，跳过")
                     self.log.info(f"正在提交当前答案")
-                    if not self.record_answer(user_exam_plan_id, question["id"], 2, answers_ids, exam_plan_id):
+                    end_time = time.time()
+                    if not self.record_answer(user_exam_plan_id, question["id"], round(end_time - start_time), answers_ids, exam_plan_id):
                         failed_questions.append(question)
                         continue
 
@@ -352,16 +323,18 @@ class WeBanClient:
                     answers = answers_json[question["title"]]
                     self.log.info(f"题库答案：{', '.join(answers)}")
                     answers_ids = [option["id"] for option in question["optionList"] if option["content"] in answers]
+                    self.log.info(f"等待 {per_time} 秒，模拟答题中...")
+                    time.sleep(per_time)
                     if not self.record_answer(user_exam_plan_id, question["id"], per_time, answers_ids, exam_plan_id):
                         failed_questions.append(question)
                         continue
 
-                self.log.info(f"完成考试，正在提交答案...")
+                self.log.info(f"完成考试，正在提交试卷...")
                 submit_res = self.api.exam_submit_paper(user_exam_plan_id)
                 if submit_res.get("code", -1) != "0":
-                    self.log.error(f"提交答案失败，请重启考试：{submit_res}")
+                    self.log.error(f"提交试卷失败，请重启考试：{submit_res}")
                     continue
-                self.log.success(f"答案提交成功，考试完成，成绩：{submit_res['data']['score']} 分")
+                self.log.success(f"试卷提交成功，考试完成，成绩：{submit_res['data']['score']} 分")
 
     def record_answer(self, user_exam_plan_id: str, question_id: str, per_time: int, answers_ids: list, exam_plan_id: str) -> bool:
         """
@@ -373,14 +346,11 @@ class WeBanClient:
         :param exam_plan_id: 考试计划 ID
         :return:
         """
-        this_time = per_time + randint(0, 1)
-        self.log.info(f"等待 {this_time} 秒，模拟答题中...")
-        time.sleep(this_time)
-        res = self.api.exam_record_question(user_exam_plan_id, question_id, this_time, answers_ids, exam_plan_id)
-        self.log.info(f"答题结果：{res}")
+        res = self.api.exam_record_question(user_exam_plan_id, question_id, per_time, answers_ids, exam_plan_id)
         if res.get("code", -1) != "0":
-            self.log.error(f"答题失败，请重新开启考试")
+            self.log.error(f"答题失败，请重新开启考试：{res}")
             return False
+        self.log.info(f"保存答案成功")
         return True
 
     def sync_answers(self) -> None:

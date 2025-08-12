@@ -2,7 +2,7 @@ import json
 import time
 from base64 import urlsafe_b64decode, urlsafe_b64encode
 from random import choice, randint
-from typing import Dict
+from typing import Any, Dict
 
 import requests
 from Crypto.Cipher import AES
@@ -25,7 +25,6 @@ def create_retry_session(baseurl) -> requests.Session:
         "Sec-Fetch-Dest": "script",
         "Sec-Fetch-Mode": "no-cors",
         "Sec-Fetch-Site": "same-site",
-        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
         "Te": "trailers",
     }
     return session
@@ -72,7 +71,7 @@ class WeBanAPI:
         """
         self.tenant_code = tenant_code
 
-    def handle_response(self, response: requests.Response) -> Dict:
+    def handle_response(self, response: requests.Response) -> Dict[str, Any]:
         """
         处理接口响应
         :param response: 接口响应
@@ -88,7 +87,7 @@ class WeBanAPI:
             return {}
         return response_data
 
-    def get_tenant_list_with_letter(self) -> Dict:
+    def get_tenant_list_with_letter(self) -> Dict[str, Any]:
         """
         获取学校代码和名称列表
 
@@ -111,7 +110,7 @@ class WeBanAPI:
         response = self.session.post(url, params=params, timeout=self.timeout)
         return self.handle_response(response)
 
-    def get_tenant_config(self, tenant_code: str) -> Dict:
+    def get_tenant_config(self, tenant_code: str | None = None) -> Dict[str, Any]:
         """
         获取学校配置
 
@@ -136,11 +135,11 @@ class WeBanAPI:
         """
         url = f"{self.baseurl}/pharos/login/getTenantConfig.do"
         params = {"timestamp": self.get_timestamp()}
-        data = {"tenantCode": tenant_code}
+        data = {"tenantCode": tenant_code or self.tenant_code}
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
         return self.handle_response(response)
 
-    def get_help(self, tenant_code: str) -> Dict:
+    def get_help(self, tenant_code: str | None = None) -> Dict[str, Any]:
         """
         获取帮助文件
         :return:
@@ -154,7 +153,7 @@ class WeBanAPI:
         """
         url = f"{self.baseurl}/pharos/login/getHelp.do"
         params = {"timestamp": self.get_timestamp()}
-        data = {"tenantCode": tenant_code}
+        data = {"tenantCode": tenant_code or self.tenant_code}
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
         return self.handle_response(response)
 
@@ -169,7 +168,7 @@ class WeBanAPI:
         response = self.session.get(url, params=params, timeout=self.timeout)
         return response.content
 
-    def login(self, verify_code: str, verify_time: int | None) -> Dict:
+    def login(self, verify_code: str, verify_time: int | None) -> Dict[str, Any]:
         """
         登录
         :param verify_code: 验证码
@@ -230,7 +229,7 @@ class WeBanAPI:
             self.password = None
         return self.handle_response(response)
 
-    def list_study_task(self) -> Dict:
+    def list_study_task(self) -> Dict[str, Any]:
         """
         获取学习任务列表
         :return:
@@ -271,7 +270,7 @@ class WeBanAPI:
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
         return self.handle_response(response)
 
-    def list_my_project(self, ended: int = 2) -> Dict:
+    def list_my_project(self, ended: int = 2) -> Dict[str, Any]:
         """
         获取我的项目列表，和 list_study_task 几乎相同
         :param ended: 1:进行中 2:已结束
@@ -306,7 +305,7 @@ class WeBanAPI:
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
         return self.handle_response(response)
 
-    def show_progress(self, user_project_id: str) -> Dict:
+    def show_progress(self, user_project_id: str) -> Dict[str, Any]:
         """
         获取学习任务进度
         :param user_project_id: 用户项目ID
@@ -349,7 +348,7 @@ class WeBanAPI:
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
         return self.handle_response(response)
 
-    def list_category(self, user_project_id: str, choose_type: int = 3) -> Dict:
+    def list_category(self, user_project_id: str, choose_type: int = 3) -> Dict[str, Any]:
         """
         获取课程分类列表
         :param user_project_id: 用户项目ID
@@ -380,7 +379,7 @@ class WeBanAPI:
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
         return self.handle_response(response)
 
-    def list_course(self, user_project_id: str, category_code: str, choose_type: int = 3) -> Dict:
+    def list_course(self, user_project_id: str, category_code: str, choose_type: int = 3) -> Dict[str, Any]:
         """
         获取课程列表
         :param user_project_id: 用户项目ID
@@ -419,7 +418,7 @@ class WeBanAPI:
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
         return self.handle_response(response)
 
-    def study(self, course_id: str, user_project_id: str) -> Dict:
+    def study(self, course_id: str, user_project_id: str) -> Dict[str, Any]:
         """
         开始学习课程
         :param course_id: 课程ID
@@ -441,7 +440,7 @@ class WeBanAPI:
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
         return self.handle_response(response)
 
-    def get_course_url(self, course_id: str, user_project_id: str) -> Dict:
+    def get_course_url(self, course_id: str, user_project_id: str) -> Dict[str, Any]:
         """
         获取课程链接
         :param course_id: 课程ID
@@ -464,7 +463,7 @@ class WeBanAPI:
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
         return self.handle_response(response)
 
-    def invoke_captcha(self, user_course_id: str, user_project_id: str) -> Dict:
+    def invoke_captcha(self, user_course_id: str, user_project_id: str) -> Dict[str, Any]:
         """
         通过验证码获取完成 token
         :param user_course_id: 用户课程ID
@@ -513,7 +512,7 @@ class WeBanAPI:
         response = self.session.get(url, params=params, timeout=self.timeout)
         return response.text
 
-    def finish_lyra(self, user_activity_id: str) -> Dict:
+    def finish_lyra(self, user_activity_id: str) -> Dict[str, Any]:
         """
         完成安全实训
         :param user_activity_id: 用户活动 ID
@@ -525,7 +524,7 @@ class WeBanAPI:
         response = self.session.post(url, data=data, timeout=self.timeout)
         return self.handle_response(response)
 
-    def exam_list_plan(self, user_project_id: str) -> Dict | None:
+    def exam_list_plan(self, user_project_id: str) -> Dict[str, Any]:
         """
         获取考试计划列表
         :param user_project_id: 用户课程 ID
@@ -566,7 +565,7 @@ class WeBanAPI:
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
         return self.handle_response(response)
 
-    def exam_before_paper(self, user_exam_plan_id: str) -> Dict:
+    def exam_before_paper(self, user_exam_plan_id: str) -> Dict[str, Any]:
         """
         获取是否有未提交的答案
         :param user_exam_plan_id: 用户考试计划 ID
@@ -589,7 +588,7 @@ class WeBanAPI:
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
         return self.handle_response(response)
 
-    def exam_prepare_paper(self, user_exam_plan_id: str) -> Dict:
+    def exam_prepare_paper(self, user_exam_plan_id: str) -> Dict[str, Any]:
         """
         准备考试
         :param user_exam_plan_id: 用户考试计划 ID
@@ -616,7 +615,7 @@ class WeBanAPI:
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
         return self.handle_response(response)
 
-    def exam_check_verify_code(self, user_exam_plan_id: str, verfy_code: str, verify_time: int | None) -> Dict:
+    def exam_check_verify_code(self, user_exam_plan_id: str, verfy_code: str, verify_time: int | None) -> Dict[str, Any]:
         """
         检查考试验证码
         :param user_exam_plan_id: 用户考试计划 ID
@@ -640,7 +639,7 @@ class WeBanAPI:
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
         return self.handle_response(response)
 
-    def exam_start_paper(self, user_exam_plan_id: str) -> Dict:
+    def exam_start_paper(self, user_exam_plan_id: str) -> Dict[str, Any]:
         """
         开始考试
         :param user_exam_plan_id: 用户考试计划 ID
@@ -709,7 +708,7 @@ class WeBanAPI:
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
         return self.handle_response(response)
 
-    def exam_record_question(self, user_exam_plan_id: str, question_id: str, use_time: int, answer_ids: list | None, exam_plan_id: str) -> Dict:
+    def exam_record_question(self, user_exam_plan_id: str, question_id: str, use_time: int, answer_ids: list | None, exam_plan_id: str) -> Dict[str, Any]:
         """
         记录考试答案
         :param user_exam_plan_id: 用户考试计划 ID
@@ -738,7 +737,7 @@ class WeBanAPI:
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
         return self.handle_response(response)
 
-    def exam_submit_paper(self, user_exam_plan_id: str) -> Dict:
+    def exam_submit_paper(self, user_exam_plan_id: str) -> Dict[str, Any]:
         """
         提交考试
         :param user_exam_plan_id: 用户考试计划 ID
@@ -768,7 +767,7 @@ class WeBanAPI:
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
         return self.handle_response(response)
 
-    def exam_fresh_paper(self, user_exam_plan_id: str) -> Dict:
+    def exam_fresh_paper(self, user_exam_plan_id: str) -> Dict[str, Any]:
         """
         重置考试题目
         :param user_exam_plan_id: 用户考试计划 ID
@@ -821,7 +820,7 @@ class WeBanAPI:
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
         return self.handle_response(response)
 
-    def exam_review_paper(self, user_exam_id: str, is_retake: int = 2) -> Dict:
+    def exam_review_paper(self, user_exam_id: str, is_retake: int = 2) -> Dict[str, Any]:
         """
         查看考试结果
         :param user_exam_id: 用户考试 ID
@@ -876,7 +875,7 @@ class WeBanAPI:
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
         return self.handle_response(response)
 
-    def exam_list_history(self, exam_plan_id: str, exam_type: int) -> Dict:
+    def exam_list_history(self, exam_plan_id: str, exam_type: int) -> Dict[str, Any]:
         """
         获取考试历史记录
         :param exam_plan_id: 考试计划 ID
