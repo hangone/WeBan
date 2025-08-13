@@ -18948,6 +18948,10 @@
       {
         "content": "留意车上广播，听从工作人员指挥。",
         "isCorrect": 1
+      },
+      {
+        "content": "拉门、砸窗、跳车，只要能逃命就行。",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -36612,6 +36616,23 @@
       {
         "content": "都会利用你的个人信息进行二次贷款",
         "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "翻越护栏会受到的处罚有？": {
+    "optionList": [
+      {
+        "content": "警告",
+        "isCorrect": 1
+      },
+      {
+        "content": "罚款",
+        "isCorrect": 1
+      },
+      {
+        "content": "没有处罚",
+        "isCorrect": 2
       }
     ],
     "type": 2
