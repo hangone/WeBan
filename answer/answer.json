@@ -928,6 +928,10 @@
       {
         "content": "“好的，谢谢你。”然后给自己的家人打电话确认。",
         "isCorrect": 1
+      },
+      {
+        "content": "“什么？我的家人出事了？我马上去汇钱。”",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -7709,6 +7713,10 @@
       {
         "content": "身心受毒品伤害后，造成无法挽救的局面的人。",
         "isCorrect": 1
+      },
+      {
+        "content": "获得家庭和社会的支持，脱离原有的朋友圈，自己不断努力的人。",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -13465,6 +13473,14 @@
       {
         "content": "95%以上",
         "isCorrect": 1
+      },
+      {
+        "content": "85%以上",
+        "isCorrect": 2
+      },
+      {
+        "content": "90%以上",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -17260,6 +17276,23 @@
     ],
     "type": 1
   },
+  "在党的十九大报告中，多少次提到“国家安全”？": {
+    "optionList": [
+      {
+        "content": "18",
+        "isCorrect": 1
+      },
+      {
+        "content": "28",
+        "isCorrect": 2
+      },
+      {
+        "content": "36",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "在党的十九大报告中，多少次提到“国家安全”？（）": {
     "optionList": [
       {
@@ -18409,6 +18442,10 @@
       {
         "content": "喷水系统启动",
         "isCorrect": 1
+      },
+      {
+        "content": "没有影响",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -21984,6 +22021,27 @@
     ],
     "type": 1
   },
+  "存钱卡的安全管理原则不包括以下哪一项？": {
+    "optionList": [
+      {
+        "content": "绑定支付宝、微信等支付平台，便于快速支付",
+        "isCorrect": 1
+      },
+      {
+        "content": "开通交易短信及",
+        "isCorrect": 2
+      },
+      {
+        "content": "不开启免密支付功能，保障资金安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "仅接收日常卡超额资金转入，不用于日常消费",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "学习就是为了获得好成绩然后找个好工作挣大钱。": {
     "optionList": [
       {
@@ -23228,6 +23286,23 @@
       }
     ],
     "type": 1
+  },
+  "对于经济困难的人来说，可能通过哪些合理的方式获取经济来源？": {
+    "optionList": [
+      {
+        "content": "申请社会救助",
+        "isCorrect": 1
+      },
+      {
+        "content": "勤工俭学",
+        "isCorrect": 1
+      },
+      {
+        "content": "申请贫困补助",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
   },
   "对于维护军事安全，我们大学生该怎么做？": {
     "optionList": [
@@ -25468,6 +25543,27 @@
       {
         "content": "不轻信，先确认对方身份",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "当接到自称“人社部门”电话，告知可申领补贴并提供链接时，最高效正确的做法是？": {
+    "optionList": [
+      {
+        "content": "立即点击链接，填写信息申领补贴",
+        "isCorrect": 2
+      },
+      {
+        "content": "先与同学商量，再决定是否操作",
+        "isCorrect": 2
+      },
+      {
+        "content": "挂断电话，通过人社部门官网或线下窗口核实",
+        "isCorrect": 1
+      },
+      {
+        "content": "按照对方要求，提供个人银行卡信息",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -28732,6 +28828,14 @@
       {
         "content": "不轻信任何不明身份的客服电话",
         "isCorrect": 1
+      },
+      {
+        "content": "回拨短信中提到的电话号码",
+        "isCorrect": 2
+      },
+      {
+        "content": "向陌生账户转账",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -30146,6 +30250,19 @@
     ],
     "type": 2
   },
+  "木桶原理是否适用于安全领域？": {
+    "optionList": [
+      {
+        "content": "适用",
+        "isCorrect": 1
+      },
+      {
+        "content": "不适用",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "未满几周岁的儿童，不准在道路上学自行车？": {
     "optionList": [
       {
@@ -31357,6 +31474,14 @@
       {
         "content": "罚款",
         "isCorrect": 1
+      },
+      {
+        "content": "有期徒刑",
+        "isCorrect": 2
+      },
+      {
+        "content": "死刑",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -35917,6 +36042,69 @@
     ],
     "type": 1
   },
+  "约炮类诈骗中，骗子要求受害人绑定银行卡的常见借口是？": {
+    "optionList": [
+      {
+        "content": "方便退款",
+        "isCorrect": 2
+      },
+      {
+        "content": "身份认证",
+        "isCorrect": 1
+      },
+      {
+        "content": "防止诈骗",
+        "isCorrect": 2
+      },
+      {
+        "content": "提升信用",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "约炮诈骗中，骗子以“操作失误需解冻账号”为由要求转账，属于诈骗的哪个阶段？": {
+    "optionList": [
+      {
+        "content": "初期引流",
+        "isCorrect": 2
+      },
+      {
+        "content": "中期诱导",
+        "isCorrect": 1
+      },
+      {
+        "content": "后期敲诈",
+        "isCorrect": 2
+      },
+      {
+        "content": "收网消失",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "约炮诈骗中，骗子常用的心理操控手段包括？​": {
+    "optionList": [
+      {
+        "content": "利用色情欲望",
+        "isCorrect": 1
+      },
+      {
+        "content": "制造紧迫感（如限时优惠）",
+        "isCorrect": 1
+      },
+      {
+        "content": "伪造信任（如群内虚假好评）",
+        "isCorrect": 1
+      },
+      {
+        "content": "威胁曝光隐私",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "约炮诈骗中，骗子要求“现金打包通过网约车送达”，目的是？​": {
     "optionList": [
       {
@@ -35937,6 +36125,27 @@
       }
     ],
     "type": 1
+  },
+  "约炮诈骗的常见引流手段包括？​": {
+    "optionList": [
+      {
+        "content": "涉黄APP广告",
+        "isCorrect": 1
+      },
+      {
+        "content": "附近的人添加好友",
+        "isCorrect": 1
+      },
+      {
+        "content": "短信色情链接",
+        "isCorrect": 1
+      },
+      {
+        "content": "交友软件导流",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
   },
   "线路火灾发生的原因有哪些？": {
     "optionList": [
