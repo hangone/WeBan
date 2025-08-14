@@ -228,6 +228,27 @@
     ],
     "type": 2
   },
+  "AI骗局都可能有哪些形式？": {
+    "optionList": [
+      {
+        "content": "用“AI取代人类”论调渲染危机，再贩卖从素人到AI大神只需2980元的天价课程，学完还能提现",
+        "isCorrect": 1
+      },
+      {
+        "content": "通过技术伪装名人身份，以投资、恋爱的名义索要钱财或进行直播卖货",
+        "isCorrect": 1
+      },
+      {
+        "content": "通过AI合成图片造黄谣，并敲诈勒索",
+        "isCorrect": 1
+      },
+      {
+        "content": "跟着AI买彩票：说是AI智选中奖率高，其实开奖随机，没有任何规律",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "App在申请可收集个人信息的权限时，以下做法正确的是：": {
     "optionList": [
       {
@@ -16997,6 +17018,27 @@
     "optionList": [
       {
         "content": "对",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "在一节行驶的高铁车厢内，以下最可能是盗贼的人？": {
+    "optionList": [
+      {
+        "content": "拿着泡面路过的人",
+        "isCorrect": 2
+      },
+      {
+        "content": "热烈交谈的人",
+        "isCorrect": 2
+      },
+      {
+        "content": "熟睡的人",
+        "isCorrect": 2
+      },
+      {
+        "content": "眼神游移不定，左看右看的人",
         "isCorrect": 1
       }
     ],
@@ -34821,6 +34863,23 @@
       }
     ],
     "type": 2
+  },
+  "电动自行车充电，原则上不应超过多久？": {
+    "optionList": [
+      {
+        "content": "6小时",
+        "isCorrect": 2
+      },
+      {
+        "content": "10小时",
+        "isCorrect": 1
+      },
+      {
+        "content": "8小时",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "电动自行车发生起火事故的原因一般有哪些？": {
     "optionList": [
