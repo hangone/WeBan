@@ -9180,6 +9180,27 @@
     ],
     "type": 2
   },
+  "以下哪些行为可能导致高空坠物：": {
+    "optionList": [
+      {
+        "content": "在阳台放杂物",
+        "isCorrect": 1
+      },
+      {
+        "content": "随意向窗户外丢弃垃圾",
+        "isCorrect": 1
+      },
+      {
+        "content": "不规范安装空调外机",
+        "isCorrect": 1
+      },
+      {
+        "content": "窗户玻璃松动未及时维修",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "以下哪些行为存在安全隐患？": {
     "optionList": [
       {
@@ -25859,6 +25880,10 @@
       {
         "content": "错误。",
         "isCorrect": 1
+      },
+      {
+        "content": "正确。",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -36104,6 +36129,27 @@
     ],
     "type": 1
   },
+  "约炮类诈骗的常见话术包括？": {
+    "optionList": [
+      {
+        "content": "“需验证身份信息”",
+        "isCorrect": 1
+      },
+      {
+        "content": "“完成任务即可获得高额奖励”",
+        "isCorrect": 2
+      },
+      {
+        "content": "“免费服务需先交保证金”",
+        "isCorrect": 2
+      },
+      {
+        "content": "“系统漏洞可稳赚不赔”",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
   "约炮诈骗中，骗子以“操作失误需解冻账号”为由要求转账，属于诈骗的哪个阶段？": {
     "optionList": [
       {
@@ -36231,6 +36277,10 @@
       {
         "content": "属于",
         "isCorrect": 1
+      },
+      {
+        "content": "不属于",
+        "isCorrect": 2
       }
     ],
     "type": 1
