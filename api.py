@@ -39,7 +39,8 @@ class WeBanAPI:
         self.baseurl = baseurl
         self.timeout = timeout  # 连接超时和读取超时
         self.session = session or create_retry_session(baseurl)
-        self.user = {"userId": None}
+        self.user = {"userId": None, "token": ""} # 如果需要，可以在这里设置用户信息（登录后在 LocalStorage 的 user 中）
+        self.session.headers["X-Token"] = self.user.get("token", "")
 
     @staticmethod
     def get_timestamp(int_len: int = 10, frac_len: int = 3) -> str:

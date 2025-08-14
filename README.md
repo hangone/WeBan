@@ -21,6 +21,8 @@
 | Windows                 | [镜像下载地址](https://ghfast.top/https://github.com/hangone/WeBan/releases/latest/download/WeBan.exe)     | [Github 下载地址](https://github.com/hangone/WeBan/releases/latest/download/WeBan.exe) |
 | Linux                   | [镜像下载地址](https://ghfast.top/https://github.com/hangone/WeBan/releases/latest/download/WeBan)         | [Github 下载地址](https://github.com/hangone/WeBan/releases/latest/download/WeBan) |
 
+对于部分无法直接登录的学校，软件使用至少需要 `tenant_code` `userId` `token` 三个参数，均可通过浏览器 F12 开发者选项中 Local Storage 的 user 项中获取，替换 api.py 第 42 行后正常运行。
+
 ## 配置说明
 
 ```json
