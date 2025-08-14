@@ -21,7 +21,11 @@
 | Windows                 | [镜像下载地址](https://ghfast.top/https://github.com/hangone/WeBan/releases/latest/download/WeBan.exe)     | [Github 下载地址](https://github.com/hangone/WeBan/releases/latest/download/WeBan.exe) |
 | Linux                   | [镜像下载地址](https://ghfast.top/https://github.com/hangone/WeBan/releases/latest/download/WeBan)         | [Github 下载地址](https://github.com/hangone/WeBan/releases/latest/download/WeBan) |
 
-对于部分无法直接登录的学校，软件使用至少需要 `tenant_code` `userId` `token` 三个参数，均可通过浏览器 F12 开发者选项中 Local Storage 的 user 项中获取，替换 api.py 第 42 行后正常运行。
+### 部分无法直接登录的学校
+
+有些从迎新系统跳转的可以试试账号密码都是学号，比如北京交通大学
+
+软件使用至少需要 `tenant_code` `userId` `token` 三个参数，可通过浏览器 F12 开发者选项中 Local Storage 的 user 项中获取，下载源码后替换 api.py 第 42 行后正常运行。
 
 ## 配置说明
 
@@ -91,7 +95,7 @@ python main.py
 
 3. 截图时注意打码个人信息。
 
-4. **如果看不懂上面说的也可以直接扫码备注学校和账号密码，乐意效劳。**
+4. **如果看不懂上面说的也可以直接扫码备注学校和账号密码（建议留言微信号），乐意效劳。**
 
    |             微信             |            支付宝            |
    | :--------------------------: | :--------------------------: |
