@@ -162,6 +162,10 @@
         "isCorrect": 1
       },
       {
+        "content": "400开头不是推销就是诈骗；安全账户=骗子话术。挂掉！",
+        "isCorrect": 1
+      },
+      {
         "content": "这么危险啊，赶紧转账吧。",
         "isCorrect": 2
       }
