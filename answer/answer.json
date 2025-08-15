@@ -228,27 +228,6 @@
     ],
     "type": 2
   },
-  "AI骗局都可能有哪些形式？": {
-    "optionList": [
-      {
-        "content": "用“AI取代人类”论调渲染危机，再贩卖从素人到AI大神只需2980元的天价课程，学完还能提现",
-        "isCorrect": 1
-      },
-      {
-        "content": "通过技术伪装名人身份，以投资、恋爱的名义索要钱财或进行直播卖货",
-        "isCorrect": 1
-      },
-      {
-        "content": "通过AI合成图片造黄谣，并敲诈勒索",
-        "isCorrect": 1
-      },
-      {
-        "content": "跟着AI买彩票：说是AI智选中奖率高，其实开奖随机，没有任何规律",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
   "App在申请可收集个人信息的权限时，以下做法正确的是：": {
     "optionList": [
       {
@@ -1434,27 +1413,6 @@
     ],
     "type": 2
   },
-  "“杀猪盘”诈骗中，骗子通常会通过以下哪种方式诱导受害者转账？": {
-    "optionList": [
-      {
-        "content": "要求支付“会员费”解锁服务",
-        "isCorrect": 2
-      },
-      {
-        "content": "推荐“稳赚不赔”的虚假投资平台",
-        "isCorrect": 1
-      },
-      {
-        "content": "声称需要缴纳“保证金”才能退款",
-        "isCorrect": 2
-      },
-      {
-        "content": "以“快递丢失”为由索要赔偿金",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
   "“杀猪盘”诈骗的套路一般为： （    ）": {
     "optionList": [
       {
@@ -1471,27 +1429,6 @@
       },
       {
         "content": "当事主发现平台无法提现时，再也联系不上骗子",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
-  "“杀猪盘”诈骗的常见步骤包括？​": {
-    "optionList": [
-      {
-        "content": "伪造成功人士身份建立感情",
-        "isCorrect": 1
-      },
-      {
-        "content": "推荐虚假投资平台并展示“盈利”",
-        "isCorrect": 1
-      },
-      {
-        "content": "诱导受害者借贷加大投入",
-        "isCorrect": 1
-      },
-      {
-        "content": "最终卷款消失",
         "isCorrect": 1
       }
     ],
@@ -3410,27 +3347,6 @@
     ],
     "type": 2
   },
-  "下列哪些属于烟草中的有害物质？": {
-    "optionList": [
-      {
-        "content": "甲醛",
-        "isCorrect": 1
-      },
-      {
-        "content": "苯并芘",
-        "isCorrect": 1
-      },
-      {
-        "content": "放射性物质",
-        "isCorrect": 1
-      },
-      {
-        "content": "重金属",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
   "下列哪些情况，艾滋病病毒会死亡？": {
     "optionList": [
       {
@@ -4240,27 +4156,6 @@
       {
         "content": "远离艾滋病病毒感染者和艾滋病患者，不与他们接触",
         "isCorrect": 1
-      }
-    ],
-    "type": 1
-  },
-  "下列驾校的报名交款方式哪个最靠谱？": {
-    "optionList": [
-      {
-        "content": "网络社交平台上的低价链接",
-        "isCorrect": 2
-      },
-      {
-        "content": "熟人朋友介绍的有优惠的中介",
-        "isCorrect": 2
-      },
-      {
-        "content": "知名驾校的官方报名电话、网点",
-        "isCorrect": 1
-      },
-      {
-        "content": "在街头找到的驾校报名点",
-        "isCorrect": 2
       }
     ],
     "type": 1
@@ -6939,27 +6834,6 @@
     ],
     "type": 2
   },
-  "为防止个人信息泄露，下列行为中错误的是？": {
-    "optionList": [
-      {
-        "content": "收到快递后，涂抹掉快递单上的个人信息再丢弃",
-        "isCorrect": 2
-      },
-      {
-        "content": "不随意点击陌生链接",
-        "isCorrect": 2
-      },
-      {
-        "content": "将银行卡照片拍照保存到手机相册，方便随时查看",
-        "isCorrect": 1
-      },
-      {
-        "content": "不扫描不明来源的二维码，防止手机被植入病毒",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
   "为防止身份证丢失，出门前应做好哪些准备？": {
     "optionList": [
       {
@@ -8529,27 +8403,6 @@
     ],
     "type": 2
   },
-  "以下哪些属于骗子常用的诈骗话术？": {
-    "optionList": [
-      {
-        "content": "您的账户存在异常，需要转入“安全账户”进行核查",
-        "isCorrect": 1
-      },
-      {
-        "content": "您有一笔违约金未缴纳，需立即转账支付",
-        "isCorrect": 1
-      },
-      {
-        "content": "我没收到您的转账，请再转一次",
-        "isCorrect": 1
-      },
-      {
-        "content": "我们是官方客服，需要您提供银行卡密码进行身份验证",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
   "以下哪些属于高速运转类设备可能对实验人员带来机械危险（）": {
     "optionList": [
       {
@@ -9201,27 +9054,6 @@
     ],
     "type": 2
   },
-  "以下哪些行为可能导致高空坠物：": {
-    "optionList": [
-      {
-        "content": "在阳台放杂物",
-        "isCorrect": 1
-      },
-      {
-        "content": "随意向窗户外丢弃垃圾",
-        "isCorrect": 1
-      },
-      {
-        "content": "不规范安装空调外机",
-        "isCorrect": 1
-      },
-      {
-        "content": "窗户玻璃松动未及时维修",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
   "以下哪些行为存在安全隐患？": {
     "optionList": [
       {
@@ -9819,23 +9651,6 @@
       }
     ],
     "type": 2
-  },
-  "以下哪项是有效的防盗措施？": {
-    "optionList": [
-      {
-        "content": "将背包挂在公共区域挂钩上",
-        "isCorrect": 2
-      },
-      {
-        "content": "贵重物品贴身放置，不离视线",
-        "isCorrect": 1
-      },
-      {
-        "content": "设置简单密码",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
   },
   "以下哪项是正确的就业态度？": {
     "optionList": [
@@ -12599,27 +12414,6 @@
     ],
     "type": 2
   },
-  "关于“双卡管理法”，以下哪项操作是正确的？": {
-    "optionList": [
-      {
-        "content": "将全部生活费存入日常卡方便取用",
-        "isCorrect": 2
-      },
-      {
-        "content": "存钱卡绑定支付宝便于随时转账",
-        "isCorrect": 2
-      },
-      {
-        "content": "日常卡设置单日消费限额500元",
-        "isCorrect": 1
-      },
-      {
-        "content": "存钱卡开通免密支付提升效率",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
   "关于“托运带毒”，下面行为正确的是：": {
     "optionList": [
       {
@@ -12759,27 +12553,6 @@
       }
     ],
     "type": 2
-  },
-  "关于刷牙和洗手的工具，以下说法正确的是：": {
-    "optionList": [
-      {
-        "content": "刷牙时应使用硬毛牙刷，因为清洁效果更好",
-        "isCorrect": 2
-      },
-      {
-        "content": "刷牙时应使用软毛牙刷，洗手时应根据情况选择合适的洗手液",
-        "isCorrect": 1
-      },
-      {
-        "content": "洗手时必须使用抗菌洗手液",
-        "isCorrect": 2
-      },
-      {
-        "content": "刷牙时牙刷越贵越好，洗手时洗手液越香越好",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
   },
   "关于剧烈运动后喝冷饮易心衰的原理，下面说法正确的是：": {
     "optionList": [
@@ -14747,23 +14520,6 @@
     ],
     "type": 1
   },
-  "北京的特色美食很多，如何安全、健康地品尝美食呢？": {
-    "optionList": [
-      {
-        "content": "选择正规、干净的餐厅就餐",
-        "isCorrect": 1
-      },
-      {
-        "content": "不暴饮暴食",
-        "isCorrect": 1
-      },
-      {
-        "content": "出现腹泻及时就医",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
   "十九大的主题是：不忘初心，（），高举中国特色社会主义伟大旗帜，决胜全面建成小康社会，夺取新时代中国特色社会主义伟大胜利，为实现中华民族伟大复兴的中国梦不懈奋斗。": {
     "optionList": [
       {
@@ -15098,27 +14854,6 @@
       }
     ],
     "type": 2
-  },
-  "发现森林火灾后，以下哪项措施是正确的：": {
-    "optionList": [
-      {
-        "content": "立即自行扑灭",
-        "isCorrect": 2
-      },
-      {
-        "content": "等待消防人员到来",
-        "isCorrect": 2
-      },
-      {
-        "content": "迅速撤离并报警",
-        "isCorrect": 1
-      },
-      {
-        "content": "拍照发朋友圈",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
   },
   "发现病人面色通红、心跳很慢，应该：": {
     "optionList": [
@@ -16411,27 +16146,6 @@
     ],
     "type": 1
   },
-  "售卖军事机密的行为可能构成？": {
-    "optionList": [
-      {
-        "content": "间谍罪",
-        "isCorrect": 1
-      },
-      {
-        "content": "为境外窃取、刺探、收买、非法提供国家秘密、情报罪",
-        "isCorrect": 1
-      },
-      {
-        "content": "危害国家安全罪",
-        "isCorrect": 1
-      },
-      {
-        "content": "非法经营罪",
-        "isCorrect": 2
-      }
-    ],
-    "type": 2
-  },
   "喜欢网络游戏的同学，需要注意哪些安全事项？": {
     "optionList": [
       {
@@ -17023,27 +16737,6 @@
     ],
     "type": 1
   },
-  "在一节行驶的高铁车厢内，以下最可能是盗贼的人？": {
-    "optionList": [
-      {
-        "content": "拿着泡面路过的人",
-        "isCorrect": 2
-      },
-      {
-        "content": "热烈交谈的人",
-        "isCorrect": 2
-      },
-      {
-        "content": "熟睡的人",
-        "isCorrect": 2
-      },
-      {
-        "content": "眼神游移不定，左看右看的人",
-        "isCorrect": 1
-      }
-    ],
-    "type": 1
-  },
   "在中国文化背景下，特别是在中国古代，“安全”关注的是？": {
     "optionList": [
       {
@@ -17339,23 +17032,6 @@
       {
         "content": "55",
         "isCorrect": 1
-      }
-    ],
-    "type": 1
-  },
-  "在党的十九大报告中，多少次提到“国家安全”？": {
-    "optionList": [
-      {
-        "content": "18",
-        "isCorrect": 1
-      },
-      {
-        "content": "28",
-        "isCorrect": 2
-      },
-      {
-        "content": "36",
-        "isCorrect": 2
       }
     ],
     "type": 1
@@ -17882,27 +17558,6 @@
       }
     ],
     "type": 1
-  },
-  "在我国多个省市的控烟条例中提到的“室内公共场所”，包括但不限于：": {
-    "optionList": [
-      {
-        "content": "医院候诊区",
-        "isCorrect": 1
-      },
-      {
-        "content": "电影院",
-        "isCorrect": 1
-      },
-      {
-        "content": "公交车",
-        "isCorrect": 1
-      },
-      {
-        "content": "餐饮场所",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
   },
   "在我国，人民法院依法独立行使审判权，不受（   ）的干涉：①行政机关  ②社会团体  ③个人": {
     "optionList": [
@@ -22104,27 +21759,6 @@
     ],
     "type": 1
   },
-  "存钱卡的安全管理原则不包括以下哪一项？": {
-    "optionList": [
-      {
-        "content": "绑定支付宝、微信等支付平台，便于快速支付",
-        "isCorrect": 1
-      },
-      {
-        "content": "开通交易短信及",
-        "isCorrect": 2
-      },
-      {
-        "content": "不开启免密支付功能，保障资金安全",
-        "isCorrect": 2
-      },
-      {
-        "content": "仅接收日常卡超额资金转入，不用于日常消费",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
   "学习就是为了获得好成绩然后找个好工作挣大钱。": {
     "optionList": [
       {
@@ -23369,23 +23003,6 @@
       }
     ],
     "type": 1
-  },
-  "对于经济困难的人来说，可能通过哪些合理的方式获取经济来源？": {
-    "optionList": [
-      {
-        "content": "申请社会救助",
-        "isCorrect": 1
-      },
-      {
-        "content": "勤工俭学",
-        "isCorrect": 1
-      },
-      {
-        "content": "申请贫困补助",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
   },
   "对于维护军事安全，我们大学生该怎么做？": {
     "optionList": [
@@ -24726,27 +24343,6 @@
     ],
     "type": 1
   },
-  "干粉灭火器适用于扑灭哪种类型的火灾？": {
-    "optionList": [
-      {
-        "content": "仅适用于固体物质火灾",
-        "isCorrect": 2
-      },
-      {
-        "content": "仅适用于液体火灾",
-        "isCorrect": 2
-      },
-      {
-        "content": "仅适用于气体火灾",
-        "isCorrect": 2
-      },
-      {
-        "content": "适用于多种类型的火灾，包括固体、液体和气体火灾",
-        "isCorrect": 1
-      }
-    ],
-    "type": 1
-  },
   "平安校园的意义有哪些？": {
     "optionList": [
       {
@@ -25081,27 +24677,6 @@
       },
       {
         "content": "酗酒与寻衅滋事",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
-  "张某通过某交友软件认识一名自称“模特”的女性，对方以“线下约会”为名要求张某下载指定APP并充值会员。随后，张某被拉入群聊，群内“顾客”分享“成功约炮”经历，并诱导张某完成“刷单任务”解锁服务。张某充值3万元后，对方以“操作失误”为由要求继续转账，张某意识到被骗后报警。该案例可能涉及哪些违法犯罪行为？": {
-    "optionList": [
-      {
-        "content": "约炮诈骗（复合式刷单诈骗）",
-        "isCorrect": 1
-      },
-      {
-        "content": "传播淫秽物品",
-        "isCorrect": 1
-      },
-      {
-        "content": "刷单",
-        "isCorrect": 1
-      },
-      {
-        "content": "嫖娼",
         "isCorrect": 1
       }
     ],
@@ -25647,27 +25222,6 @@
       {
         "content": "不轻信，先确认对方身份",
         "isCorrect": 1
-      }
-    ],
-    "type": 1
-  },
-  "当接到自称“人社部门”电话，告知可申领补贴并提供链接时，最高效正确的做法是？": {
-    "optionList": [
-      {
-        "content": "立即点击链接，填写信息申领补贴",
-        "isCorrect": 2
-      },
-      {
-        "content": "先与同学商量，再决定是否操作",
-        "isCorrect": 2
-      },
-      {
-        "content": "挂断电话，通过人社部门官网或线下窗口核实",
-        "isCorrect": 1
-      },
-      {
-        "content": "按照对方要求，提供个人银行卡信息",
-        "isCorrect": 2
       }
     ],
     "type": 1
@@ -28454,23 +28008,6 @@
     ],
     "type": 1
   },
-  "接到 “某银行信贷员” 电话：“您符合我行低息贷款资格，需先缴纳 2000 元手续费即可放款”，你的做法是：": {
-    "optionList": [
-      {
-        "content": "按要求转账，等待放款",
-        "isCorrect": 2
-      },
-      {
-        "content": "要求对方减免手续费后再办理",
-        "isCorrect": 2
-      },
-      {
-        "content": "到银行柜台或官方 APP 申请贷款",
-        "isCorrect": 1
-      }
-    ],
-    "type": 1
-  },
   "接到“子女出车祸，已经在医院了，要求转账”的电话时，正确的做法是？": {
     "optionList": [
       {
@@ -28897,23 +28434,6 @@
       {
         "content": "不理，删除短信。",
         "isCorrect": 1
-      }
-    ],
-    "type": 1
-  },
-  "收到短信：“您的征信报告存在逾期记录，添加‘征信专员’微信可修复，手续费 3000 元”，你的选择是：": {
-    "optionList": [
-      {
-        "content": "微信转账缴费，尽快修复征信",
-        "isCorrect": 2
-      },
-      {
-        "content": "登录央行征信中心官网查询真实记录",
-        "isCorrect": 1
-      },
-      {
-        "content": "添加“征信专员”微信，进行咨询",
-        "isCorrect": 2
       }
     ],
     "type": 1
@@ -30357,19 +29877,6 @@
       }
     ],
     "type": 2
-  },
-  "木桶原理是否适用于安全领域？": {
-    "optionList": [
-      {
-        "content": "适用",
-        "isCorrect": 1
-      },
-      {
-        "content": "不适用",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
   },
   "未满几周岁的儿童，不准在道路上学自行车？": {
     "optionList": [
@@ -31872,27 +31379,6 @@
     ],
     "type": 2
   },
-  "森林火灾的预防措施包括哪些？": {
-    "optionList": [
-      {
-        "content": "加强森林防火宣传教育",
-        "isCorrect": 1
-      },
-      {
-        "content": "建立森林防火预警系统",
-        "isCorrect": 1
-      },
-      {
-        "content": "定期进行森林火灾隐患排查",
-        "isCorrect": 1
-      },
-      {
-        "content": "限制人员进入林区",
-        "isCorrect": 2
-      }
-    ],
-    "type": 2
-  },
   "止咳水不能随便乱用，需要遵医嘱。": {
     "optionList": [
       {
@@ -33197,40 +32683,6 @@
       },
       {
         "content": "静止不动",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
-  "湖北有多少少数民族成分？": {
-    "optionList": [
-      {
-        "content": "51",
-        "isCorrect": 2
-      },
-      {
-        "content": "52",
-        "isCorrect": 2
-      },
-      {
-        "content": "53",
-        "isCorrect": 1
-      },
-      {
-        "content": "54",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
-  "湖北省的梅雨期一般出现在什么时候？": {
-    "optionList": [
-      {
-        "content": "6月中旬到7月上、中旬",
-        "isCorrect": 1
-      },
-      {
-        "content": "7月下旬到8月上旬",
         "isCorrect": 2
       }
     ],
@@ -34864,23 +34316,6 @@
     ],
     "type": 2
   },
-  "电动自行车充电，原则上不应超过多久？": {
-    "optionList": [
-      {
-        "content": "6小时",
-        "isCorrect": 2
-      },
-      {
-        "content": "10小时",
-        "isCorrect": 1
-      },
-      {
-        "content": "8小时",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
   "电动自行车发生起火事故的原因一般有哪些？": {
     "optionList": [
       {
@@ -36167,132 +35602,6 @@
     ],
     "type": 1
   },
-  "约炮类诈骗中，骗子要求受害人绑定银行卡的常见借口是？": {
-    "optionList": [
-      {
-        "content": "方便退款",
-        "isCorrect": 2
-      },
-      {
-        "content": "身份认证",
-        "isCorrect": 1
-      },
-      {
-        "content": "防止诈骗",
-        "isCorrect": 2
-      },
-      {
-        "content": "提升信用",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
-  "约炮类诈骗的常见话术包括？": {
-    "optionList": [
-      {
-        "content": "“需验证身份信息”",
-        "isCorrect": 1
-      },
-      {
-        "content": "“完成任务即可获得高额奖励”",
-        "isCorrect": 2
-      },
-      {
-        "content": "“免费服务需先交保证金”",
-        "isCorrect": 2
-      },
-      {
-        "content": "“系统漏洞可稳赚不赔”",
-        "isCorrect": 2
-      }
-    ],
-    "type": 2
-  },
-  "约炮诈骗中，骗子以“操作失误需解冻账号”为由要求转账，属于诈骗的哪个阶段？": {
-    "optionList": [
-      {
-        "content": "初期引流",
-        "isCorrect": 2
-      },
-      {
-        "content": "中期诱导",
-        "isCorrect": 1
-      },
-      {
-        "content": "后期敲诈",
-        "isCorrect": 2
-      },
-      {
-        "content": "收网消失",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
-  "约炮诈骗中，骗子常用的心理操控手段包括？​": {
-    "optionList": [
-      {
-        "content": "利用色情欲望",
-        "isCorrect": 1
-      },
-      {
-        "content": "制造紧迫感（如限时优惠）",
-        "isCorrect": 1
-      },
-      {
-        "content": "伪造信任（如群内虚假好评）",
-        "isCorrect": 1
-      },
-      {
-        "content": "威胁曝光隐私",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
-  "约炮诈骗中，骗子要求“现金打包通过网约车送达”，目的是？​": {
-    "optionList": [
-      {
-        "content": "避免电子记录",
-        "isCorrect": 2
-      },
-      {
-        "content": "加快获款速度",
-        "isCorrect": 2
-      },
-      {
-        "content": "降低自身风险",
-        "isCorrect": 2
-      },
-      {
-        "content": "以上都是",
-        "isCorrect": 1
-      }
-    ],
-    "type": 1
-  },
-  "约炮诈骗的常见引流手段包括？​": {
-    "optionList": [
-      {
-        "content": "涉黄APP广告",
-        "isCorrect": 1
-      },
-      {
-        "content": "附近的人添加好友",
-        "isCorrect": 1
-      },
-      {
-        "content": "短信色情链接",
-        "isCorrect": 1
-      },
-      {
-        "content": "交友软件导流",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
   "线路火灾发生的原因有哪些？": {
     "optionList": [
       {
@@ -36975,23 +36284,6 @@
       {
         "content": "都会利用你的个人信息进行二次贷款",
         "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
-  "翻越护栏会受到的处罚有？": {
-    "optionList": [
-      {
-        "content": "警告",
-        "isCorrect": 1
-      },
-      {
-        "content": "罚款",
-        "isCorrect": 1
-      },
-      {
-        "content": "没有处罚",
-        "isCorrect": 2
       }
     ],
     "type": 2
@@ -37963,48 +37255,6 @@
     ],
     "type": 1
   },
-  "被动吸烟对健康的影响是什么？": {
-    "optionList": [
-      {
-        "content": "无影响",
-        "isCorrect": 2
-      },
-      {
-        "content": "影响较小",
-        "isCorrect": 2
-      },
-      {
-        "content": "与主动吸烟者相同",
-        "isCorrect": 1
-      },
-      {
-        "content": "影响比主动吸烟者小",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
-  "被动吸烟的危害包括：": {
-    "optionList": [
-      {
-        "content": "增加患肺癌风险",
-        "isCorrect": 1
-      },
-      {
-        "content": "影响儿童智力发育",
-        "isCorrect": 1
-      },
-      {
-        "content": "诱发心脏病",
-        "isCorrect": 1
-      },
-      {
-        "content": "加重哮喘症状",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
   "被困在了着火的6层楼上，你最不应该做的逃生方法是什么？": {
     "optionList": [
       {
@@ -38445,27 +37695,6 @@
       },
       {
         "content": "看文号。",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
-  "诈骗分子会利用受害者的“恐惧”心理，使受害者进行转账。以下哪些是每一次转账都利用了“恐惧”心理的诈骗？": {
-    "optionList": [
-      {
-        "content": "冒充公检法诈骗",
-        "isCorrect": 1
-      },
-      {
-        "content": "兼职诈骗",
-        "isCorrect": 2
-      },
-      {
-        "content": "投资诈骗",
-        "isCorrect": 2
-      },
-      {
-        "content": "裸聊诈骗",
         "isCorrect": 1
       }
     ],
@@ -39946,6 +39175,19 @@
     "type": 1
   },
   "遇到困难不要抱怨，因为情绪会影响人的判断。": {
+    "optionList": [
+      {
+        "content": "正确",
+        "isCorrect": 1
+      },
+      {
+        "content": "错误",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "遇到困难不要沉浸于抱怨，因为情绪会影响人的判断。": {
     "optionList": [
       {
         "content": "正确",
@@ -42523,27 +41765,6 @@
     ],
     "type": 2
   },
-  "高校教授马某在学术交流中得知官员赵某子女成绩差，主动提出帮助其子女入读国外名校，条件是赵某提供军工业科研成果。赵某明知马某意图，仍为子女前途妥协。马某的策反手段属于？": {
-    "optionList": [
-      {
-        "content": "学术渗透",
-        "isCorrect": 2
-      },
-      {
-        "content": "家庭情感绑架",
-        "isCorrect": 1
-      },
-      {
-        "content": "技术窃密",
-        "isCorrect": 2
-      },
-      {
-        "content": "意识形态攻击",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
   "高校校园常见的安全问题有(    )。": {
     "optionList": [
       {
@@ -42657,27 +41878,6 @@
       }
     ],
     "type": 2
-  },
-  "高空坠物可能造成的最严重后果是：": {
-    "optionList": [
-      {
-        "content": "车辆损坏",
-        "isCorrect": 2
-      },
-      {
-        "content": "财物损失",
-        "isCorrect": 2
-      },
-      {
-        "content": "人员伤亡",
-        "isCorrect": 1
-      },
-      {
-        "content": "房屋受损",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
   },
   "高等学校实验室安全项目检查表中关于“个人防护”说法正确的是（）。": {
     "optionList": [
@@ -43353,6 +42553,819 @@
       },
       {
         "content": "MMDS",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "AI骗局都可能有哪些形式？": {
+    "optionList": [
+      {
+        "content": "用“AI取代人类”论调渲染危机，再贩卖从素人到AI大神只需2980元的天价课程，学完还能提现",
+        "isCorrect": 1
+      },
+      {
+        "content": "通过技术伪装名人身份，以投资、恋爱的名义索要钱财或进行直播卖货",
+        "isCorrect": 1
+      },
+      {
+        "content": "通过AI合成图片造黄谣，并敲诈勒索",
+        "isCorrect": 1
+      },
+      {
+        "content": "跟着AI买彩票：说是AI智选中奖率高，其实开奖随机，没有任何规律",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "“杀猪盘”诈骗中，骗子通常会通过以下哪种方式诱导受害者转账？": {
+    "optionList": [
+      {
+        "content": "要求支付“会员费”解锁服务",
+        "isCorrect": 2
+      },
+      {
+        "content": "推荐“稳赚不赔”的虚假投资平台",
+        "isCorrect": 1
+      },
+      {
+        "content": "声称需要缴纳“保证金”才能退款",
+        "isCorrect": 2
+      },
+      {
+        "content": "以“快递丢失”为由索要赔偿金",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "“杀猪盘”诈骗的常见步骤包括？​": {
+    "optionList": [
+      {
+        "content": "伪造成功人士身份建立感情",
+        "isCorrect": 1
+      },
+      {
+        "content": "推荐虚假投资平台并展示“盈利”",
+        "isCorrect": 1
+      },
+      {
+        "content": "诱导受害者借贷加大投入",
+        "isCorrect": 1
+      },
+      {
+        "content": "最终卷款消失",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "下列哪些属于烟草中的有害物质？": {
+    "optionList": [
+      {
+        "content": "甲醛",
+        "isCorrect": 1
+      },
+      {
+        "content": "苯并芘",
+        "isCorrect": 1
+      },
+      {
+        "content": "放射性物质",
+        "isCorrect": 1
+      },
+      {
+        "content": "重金属",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "下列驾校的报名交款方式哪个最靠谱？": {
+    "optionList": [
+      {
+        "content": "网络社交平台上的低价链接",
+        "isCorrect": 2
+      },
+      {
+        "content": "熟人朋友介绍的有优惠的中介",
+        "isCorrect": 2
+      },
+      {
+        "content": "知名驾校的官方报名电话、网点",
+        "isCorrect": 1
+      },
+      {
+        "content": "在街头找到的驾校报名点",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "为防止个人信息泄露，下列行为中错误的是？": {
+    "optionList": [
+      {
+        "content": "收到快递后，涂抹掉快递单上的个人信息再丢弃",
+        "isCorrect": 2
+      },
+      {
+        "content": "不随意点击陌生链接",
+        "isCorrect": 2
+      },
+      {
+        "content": "将银行卡照片拍照保存到手机相册，方便随时查看",
+        "isCorrect": 1
+      },
+      {
+        "content": "不扫描不明来源的二维码，防止手机被植入病毒",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "以下哪些属于骗子常用的诈骗话术？": {
+    "optionList": [
+      {
+        "content": "您的账户存在异常，需要转入“安全账户”进行核查",
+        "isCorrect": 1
+      },
+      {
+        "content": "您有一笔违约金未缴纳，需立即转账支付",
+        "isCorrect": 1
+      },
+      {
+        "content": "我没收到您的转账，请再转一次",
+        "isCorrect": 1
+      },
+      {
+        "content": "我们是官方客服，需要您提供银行卡密码进行身份验证",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "以下哪些行为可能导致高空坠物：": {
+    "optionList": [
+      {
+        "content": "在阳台放杂物",
+        "isCorrect": 1
+      },
+      {
+        "content": "随意向窗户外丢弃垃圾",
+        "isCorrect": 1
+      },
+      {
+        "content": "不规范安装空调外机",
+        "isCorrect": 1
+      },
+      {
+        "content": "窗户玻璃松动未及时维修",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "以下哪项是有效的防盗措施？": {
+    "optionList": [
+      {
+        "content": "将背包挂在公共区域挂钩上",
+        "isCorrect": 2
+      },
+      {
+        "content": "贵重物品贴身放置，不离视线",
+        "isCorrect": 1
+      },
+      {
+        "content": "设置简单密码",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "关于“双卡管理法”，以下哪项操作是正确的？": {
+    "optionList": [
+      {
+        "content": "将全部生活费存入日常卡方便取用",
+        "isCorrect": 2
+      },
+      {
+        "content": "存钱卡绑定支付宝便于随时转账",
+        "isCorrect": 2
+      },
+      {
+        "content": "日常卡设置单日消费限额500元",
+        "isCorrect": 1
+      },
+      {
+        "content": "存钱卡开通免密支付提升效率",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "关于刷牙和洗手的工具，以下说法正确的是：": {
+    "optionList": [
+      {
+        "content": "刷牙时应使用硬毛牙刷，因为清洁效果更好",
+        "isCorrect": 2
+      },
+      {
+        "content": "刷牙时应使用软毛牙刷，洗手时应根据情况选择合适的洗手液",
+        "isCorrect": 1
+      },
+      {
+        "content": "洗手时必须使用抗菌洗手液",
+        "isCorrect": 2
+      },
+      {
+        "content": "刷牙时牙刷越贵越好，洗手时洗手液越香越好",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "北京的特色美食很多，如何安全、健康地品尝美食呢？": {
+    "optionList": [
+      {
+        "content": "选择正规、干净的餐厅就餐",
+        "isCorrect": 1
+      },
+      {
+        "content": "不暴饮暴食",
+        "isCorrect": 1
+      },
+      {
+        "content": "出现腹泻及时就医",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "发现森林火灾后，以下哪项措施是正确的：": {
+    "optionList": [
+      {
+        "content": "立即自行扑灭",
+        "isCorrect": 2
+      },
+      {
+        "content": "等待消防人员到来",
+        "isCorrect": 2
+      },
+      {
+        "content": "迅速撤离并报警",
+        "isCorrect": 1
+      },
+      {
+        "content": "拍照发朋友圈",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "售卖军事机密的行为可能构成？": {
+    "optionList": [
+      {
+        "content": "间谍罪",
+        "isCorrect": 1
+      },
+      {
+        "content": "为境外窃取、刺探、收买、非法提供国家秘密、情报罪",
+        "isCorrect": 1
+      },
+      {
+        "content": "危害国家安全罪",
+        "isCorrect": 1
+      },
+      {
+        "content": "非法经营罪",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
+  "在一节行驶的高铁车厢内，以下最可能是盗贼的人？": {
+    "optionList": [
+      {
+        "content": "拿着泡面路过的人",
+        "isCorrect": 2
+      },
+      {
+        "content": "热烈交谈的人",
+        "isCorrect": 2
+      },
+      {
+        "content": "熟睡的人",
+        "isCorrect": 2
+      },
+      {
+        "content": "眼神游移不定，左看右看的人",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "在党的十九大报告中，多少次提到“国家安全”？": {
+    "optionList": [
+      {
+        "content": "18",
+        "isCorrect": 1
+      },
+      {
+        "content": "28",
+        "isCorrect": 2
+      },
+      {
+        "content": "36",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "在我国多个省市的控烟条例中提到的“室内公共场所”，包括但不限于：": {
+    "optionList": [
+      {
+        "content": "医院候诊区",
+        "isCorrect": 1
+      },
+      {
+        "content": "电影院",
+        "isCorrect": 1
+      },
+      {
+        "content": "公交车",
+        "isCorrect": 1
+      },
+      {
+        "content": "餐饮场所",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "存钱卡的安全管理原则不包括以下哪一项？": {
+    "optionList": [
+      {
+        "content": "绑定支付宝、微信等支付平台，便于快速支付",
+        "isCorrect": 1
+      },
+      {
+        "content": "开通交易短信及",
+        "isCorrect": 2
+      },
+      {
+        "content": "不开启免密支付功能，保障资金安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "仅接收日常卡超额资金转入，不用于日常消费",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "对于经济困难的人来说，可能通过哪些合理的方式获取经济来源？": {
+    "optionList": [
+      {
+        "content": "申请社会救助",
+        "isCorrect": 1
+      },
+      {
+        "content": "勤工俭学",
+        "isCorrect": 1
+      },
+      {
+        "content": "申请贫困补助",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "干粉灭火器适用于扑灭哪种类型的火灾？": {
+    "optionList": [
+      {
+        "content": "仅适用于固体物质火灾",
+        "isCorrect": 2
+      },
+      {
+        "content": "仅适用于液体火灾",
+        "isCorrect": 2
+      },
+      {
+        "content": "仅适用于气体火灾",
+        "isCorrect": 2
+      },
+      {
+        "content": "适用于多种类型的火灾，包括固体、液体和气体火灾",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "张某通过某交友软件认识一名自称“模特”的女性，对方以“线下约会”为名要求张某下载指定APP并充值会员。随后，张某被拉入群聊，群内“顾客”分享“成功约炮”经历，并诱导张某完成“刷单任务”解锁服务。张某充值3万元后，对方以“操作失误”为由要求继续转账，张某意识到被骗后报警。该案例可能涉及哪些违法犯罪行为？": {
+    "optionList": [
+      {
+        "content": "约炮诈骗（复合式刷单诈骗）",
+        "isCorrect": 1
+      },
+      {
+        "content": "传播淫秽物品",
+        "isCorrect": 1
+      },
+      {
+        "content": "刷单",
+        "isCorrect": 1
+      },
+      {
+        "content": "嫖娼",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "当接到自称“人社部门”电话，告知可申领补贴并提供链接时，最高效正确的做法是？": {
+    "optionList": [
+      {
+        "content": "立即点击链接，填写信息申领补贴",
+        "isCorrect": 2
+      },
+      {
+        "content": "先与同学商量，再决定是否操作",
+        "isCorrect": 2
+      },
+      {
+        "content": "挂断电话，通过人社部门官网或线下窗口核实",
+        "isCorrect": 1
+      },
+      {
+        "content": "按照对方要求，提供个人银行卡信息",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "接到 “某银行信贷员” 电话：“您符合我行低息贷款资格，需先缴纳 2000 元手续费即可放款”，你的做法是：": {
+    "optionList": [
+      {
+        "content": "按要求转账，等待放款",
+        "isCorrect": 2
+      },
+      {
+        "content": "要求对方减免手续费后再办理",
+        "isCorrect": 2
+      },
+      {
+        "content": "到银行柜台或官方 APP 申请贷款",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "收到短信：“您的征信报告存在逾期记录，添加‘征信专员’微信可修复，手续费 3000 元”，你的选择是：": {
+    "optionList": [
+      {
+        "content": "微信转账缴费，尽快修复征信",
+        "isCorrect": 2
+      },
+      {
+        "content": "登录央行征信中心官网查询真实记录",
+        "isCorrect": 1
+      },
+      {
+        "content": "添加“征信专员”微信，进行咨询",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "木桶原理是否适用于安全领域？": {
+    "optionList": [
+      {
+        "content": "适用",
+        "isCorrect": 1
+      },
+      {
+        "content": "不适用",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "森林火灾的预防措施包括哪些？": {
+    "optionList": [
+      {
+        "content": "加强森林防火宣传教育",
+        "isCorrect": 1
+      },
+      {
+        "content": "建立森林防火预警系统",
+        "isCorrect": 1
+      },
+      {
+        "content": "定期进行森林火灾隐患排查",
+        "isCorrect": 1
+      },
+      {
+        "content": "限制人员进入林区",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
+  "湖北有多少少数民族成分？": {
+    "optionList": [
+      {
+        "content": "51",
+        "isCorrect": 2
+      },
+      {
+        "content": "52",
+        "isCorrect": 2
+      },
+      {
+        "content": "53",
+        "isCorrect": 1
+      },
+      {
+        "content": "54",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "湖北省的梅雨期一般出现在什么时候？": {
+    "optionList": [
+      {
+        "content": "6月中旬到7月上、中旬",
+        "isCorrect": 1
+      },
+      {
+        "content": "7月下旬到8月上旬",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "电动自行车充电，原则上不应超过多久？": {
+    "optionList": [
+      {
+        "content": "6小时",
+        "isCorrect": 2
+      },
+      {
+        "content": "10小时",
+        "isCorrect": 1
+      },
+      {
+        "content": "8小时",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "约炮类诈骗中，骗子要求受害人绑定银行卡的常见借口是？": {
+    "optionList": [
+      {
+        "content": "方便退款",
+        "isCorrect": 2
+      },
+      {
+        "content": "身份认证",
+        "isCorrect": 1
+      },
+      {
+        "content": "防止诈骗",
+        "isCorrect": 2
+      },
+      {
+        "content": "提升信用",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "约炮类诈骗的常见话术包括？": {
+    "optionList": [
+      {
+        "content": "“需验证身份信息”",
+        "isCorrect": 1
+      },
+      {
+        "content": "“完成任务即可获得高额奖励”",
+        "isCorrect": 2
+      },
+      {
+        "content": "“免费服务需先交保证金”",
+        "isCorrect": 2
+      },
+      {
+        "content": "“系统漏洞可稳赚不赔”",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
+  "约炮诈骗中，骗子以“操作失误需解冻账号”为由要求转账，属于诈骗的哪个阶段？": {
+    "optionList": [
+      {
+        "content": "初期引流",
+        "isCorrect": 2
+      },
+      {
+        "content": "中期诱导",
+        "isCorrect": 1
+      },
+      {
+        "content": "后期敲诈",
+        "isCorrect": 2
+      },
+      {
+        "content": "收网消失",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "约炮诈骗中，骗子常用的心理操控手段包括？​": {
+    "optionList": [
+      {
+        "content": "利用色情欲望",
+        "isCorrect": 1
+      },
+      {
+        "content": "制造紧迫感（如限时优惠）",
+        "isCorrect": 1
+      },
+      {
+        "content": "伪造信任（如群内虚假好评）",
+        "isCorrect": 1
+      },
+      {
+        "content": "威胁曝光隐私",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "约炮诈骗中，骗子要求“现金打包通过网约车送达”，目的是？​": {
+    "optionList": [
+      {
+        "content": "避免电子记录",
+        "isCorrect": 2
+      },
+      {
+        "content": "加快获款速度",
+        "isCorrect": 2
+      },
+      {
+        "content": "降低自身风险",
+        "isCorrect": 2
+      },
+      {
+        "content": "以上都是",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "约炮诈骗的常见引流手段包括？​": {
+    "optionList": [
+      {
+        "content": "涉黄APP广告",
+        "isCorrect": 1
+      },
+      {
+        "content": "附近的人添加好友",
+        "isCorrect": 1
+      },
+      {
+        "content": "短信色情链接",
+        "isCorrect": 1
+      },
+      {
+        "content": "交友软件导流",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "翻越护栏会受到的处罚有？": {
+    "optionList": [
+      {
+        "content": "警告",
+        "isCorrect": 1
+      },
+      {
+        "content": "罚款",
+        "isCorrect": 1
+      },
+      {
+        "content": "没有处罚",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
+  "被动吸烟对健康的影响是什么？": {
+    "optionList": [
+      {
+        "content": "无影响",
+        "isCorrect": 2
+      },
+      {
+        "content": "影响较小",
+        "isCorrect": 2
+      },
+      {
+        "content": "与主动吸烟者相同",
+        "isCorrect": 1
+      },
+      {
+        "content": "影响比主动吸烟者小",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "被动吸烟的危害包括：": {
+    "optionList": [
+      {
+        "content": "增加患肺癌风险",
+        "isCorrect": 1
+      },
+      {
+        "content": "影响儿童智力发育",
+        "isCorrect": 1
+      },
+      {
+        "content": "诱发心脏病",
+        "isCorrect": 1
+      },
+      {
+        "content": "加重哮喘症状",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "诈骗分子会利用受害者的“恐惧”心理，使受害者进行转账。以下哪些是每一次转账都利用了“恐惧”心理的诈骗？": {
+    "optionList": [
+      {
+        "content": "冒充公检法诈骗",
+        "isCorrect": 1
+      },
+      {
+        "content": "兼职诈骗",
+        "isCorrect": 2
+      },
+      {
+        "content": "投资诈骗",
+        "isCorrect": 2
+      },
+      {
+        "content": "裸聊诈骗",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "高校教授马某在学术交流中得知官员赵某子女成绩差，主动提出帮助其子女入读国外名校，条件是赵某提供军工业科研成果。赵某明知马某意图，仍为子女前途妥协。马某的策反手段属于？": {
+    "optionList": [
+      {
+        "content": "学术渗透",
+        "isCorrect": 2
+      },
+      {
+        "content": "家庭情感绑架",
+        "isCorrect": 1
+      },
+      {
+        "content": "技术窃密",
+        "isCorrect": 2
+      },
+      {
+        "content": "意识形态攻击",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "高空坠物可能造成的最严重后果是：": {
+    "optionList": [
+      {
+        "content": "车辆损坏",
+        "isCorrect": 2
+      },
+      {
+        "content": "财物损失",
+        "isCorrect": 2
+      },
+      {
+        "content": "人员伤亡",
+        "isCorrect": 1
+      },
+      {
+        "content": "房屋受损",
         "isCorrect": 2
       }
     ],
