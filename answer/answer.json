@@ -301,6 +301,27 @@
     ],
     "type": 2
   },
+  "C类火灾一般选用（）灭火器。": {
+    "optionList": [
+      {
+        "content": "清水",
+        "isCorrect": 2
+      },
+      {
+        "content": "干粉",
+        "isCorrect": 1
+      },
+      {
+        "content": "二氧化碳",
+        "isCorrect": 1
+      },
+      {
+        "content": "卤代烷",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
   "D女与男友热恋时偷尝禁果，而后对男友千依百顺，并顺从男友的意愿尝试毒品而沾染毒瘾，此时D女才知道男友故意让自己沾染毒瘾是为了逼迫自己卖淫为其筹措毒资。D女的表现是什么心理？": {
     "optionList": [
       {
@@ -1544,6 +1565,27 @@
     ],
     "type": 2
   },
+  "“正确国家安全意识”应具备哪些特征？": {
+    "optionList": [
+      {
+        "content": "涵盖多领域综合安全",
+        "isCorrect": 1
+      },
+      {
+        "content": "聚焦传统军事安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "与时俱进更新观念",
+        "isCorrect": 1
+      },
+      {
+        "content": "排斥非传统安全议题",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
   "“正规”的刷单能挣到钱吗？": {
     "optionList": [
       {
@@ -2168,6 +2210,27 @@
       },
       {
         "content": "错误",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "《反分裂国家法》主要针对？": {
+    "optionList": [
+      {
+        "content": "国际恐怖主义",
+        "isCorrect": 2
+      },
+      {
+        "content": "国家领土的分裂势力",
+        "isCorrect": 1
+      },
+      {
+        "content": "经济危机",
+        "isCorrect": 2
+      },
+      {
+        "content": "气候变化",
         "isCorrect": 2
       }
     ],
@@ -3829,6 +3892,27 @@
       },
       {
         "content": "完成或没完成计划时，及时给予自己奖惩。",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "下列哪项属于“人祸”威胁？": {
+    "optionList": [
+      {
+        "content": "地震",
+        "isCorrect": 2
+      },
+      {
+        "content": "内战",
+        "isCorrect": 1
+      },
+      {
+        "content": "台风",
+        "isCorrect": 2
+      },
+      {
+        "content": "虫灾",
         "isCorrect": 2
       }
     ],
@@ -6217,6 +6301,27 @@
       {
         "content": "95%以上",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "中央提出的“统筹维护和塑造国家安全”强调？": {
+    "optionList": [
+      {
+        "content": "仅依靠军事力量",
+        "isCorrect": 2
+      },
+      {
+        "content": "仅依靠文化手段",
+        "isCorrect": 2
+      },
+      {
+        "content": "两者结合，全面保障安全",
+        "isCorrect": 1
+      },
+      {
+        "content": "放弃传统安全手段",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -9642,6 +9747,27 @@
     ],
     "type": 2
   },
+  "以下哪项不属于传统安全范畴？": {
+    "optionList": [
+      {
+        "content": "军事冲突",
+        "isCorrect": 2
+      },
+      {
+        "content": "领土争端",
+        "isCorrect": 2
+      },
+      {
+        "content": "网络攻击",
+        "isCorrect": 1
+      },
+      {
+        "content": "政权稳定",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "以下哪项不属于初起火灾的特点？": {
     "optionList": [
       {
@@ -9797,6 +9923,27 @@
       },
       {
         "content": "试用期工资可以低于当地最低工资标准",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "以下哪项属于“维护国家安全”的传统手段？": {
+    "optionList": [
+      {
+        "content": "文化教育合作",
+        "isCorrect": 2
+      },
+      {
+        "content": "军事防御与情报工作",
+        "isCorrect": 1
+      },
+      {
+        "content": "经济科技发展",
+        "isCorrect": 2
+      },
+      {
+        "content": "国际交流贸易",
         "isCorrect": 2
       }
     ],
@@ -16994,6 +17141,27 @@
       },
       {
         "content": "错误",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "国际恐怖主义的核心特征是？": {
+    "optionList": [
+      {
+        "content": "国家行为体主导",
+        "isCorrect": 2
+      },
+      {
+        "content": "以军事目标为袭击对象",
+        "isCorrect": 2
+      },
+      {
+        "content": "非国家行为体、跨国性",
+        "isCorrect": 1
+      },
+      {
+        "content": "仅针对特定宗教群体",
         "isCorrect": 2
       }
     ],
@@ -25021,6 +25189,23 @@
     ],
     "type": 1
   },
+  "建筑高度大于100米的民用建筑，建筑内消防应急照明和灯光疏散指示标志的备用电源的连续供电时间不应小于（ ）小时。": {
+    "optionList": [
+      {
+        "content": "0.5",
+        "isCorrect": 2
+      },
+      {
+        "content": "1.5",
+        "isCorrect": 1
+      },
+      {
+        "content": "2.5",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "开启通风柜之前，应打开进风通道（门、窗等），为了保证足够的风速，应尽量使柜门放（）。": {
     "optionList": [
       {
@@ -26445,6 +26630,27 @@
       }
     ],
     "type": 2
+  },
+  "总体国家安全观首次提出的时间是？": {
+    "optionList": [
+      {
+        "content": "2012年11月8日",
+        "isCorrect": 2
+      },
+      {
+        "content": "2014年4月15日",
+        "isCorrect": 1
+      },
+      {
+        "content": "2017年2月",
+        "isCorrect": 2
+      },
+      {
+        "content": "2019年1月",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "恐怖活动人员，是指（）。": {
     "optionList": [
@@ -29261,6 +29467,27 @@
     ],
     "type": 1
   },
+  "文化威胁的双重性指？": {
+    "optionList": [
+      {
+        "content": "完全负面",
+        "isCorrect": 2
+      },
+      {
+        "content": "完全正面",
+        "isCorrect": 2
+      },
+      {
+        "content": "既有破坏也有促进",
+        "isCorrect": 1
+      },
+      {
+        "content": "无关紧要",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "文明上网应遵守哪些行为？": {
     "optionList": [
       {
@@ -31309,6 +31536,27 @@
       }
     ],
     "type": 2
+  },
+  "核安全关联以下哪些基本要素？": {
+    "optionList": [
+      {
+        "content": "军事安全、文化安全、社会安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "科技安全、资源安全、生产安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "军事安全、科技安全、资源安全",
+        "isCorrect": 1
+      },
+      {
+        "content": "政治安全、经济安全、国土安全",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "核安全是一个分别处于资源安全、军事安全、科技安全之下的次级要素，它在军事安全中属于（    ）。": {
     "optionList": [
@@ -34412,6 +34660,27 @@
       },
       {
         "content": "生物遗传资源",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "生物安全的威胁可能来自哪些领域？": {
+    "optionList": [
+      {
+        "content": "生物技术应用风险",
+        "isCorrect": 1
+      },
+      {
+        "content": "生物武器开发",
+        "isCorrect": 1
+      },
+      {
+        "content": "生物资源过度开发",
+        "isCorrect": 1
+      },
+      {
+        "content": "生态平衡破坏",
         "isCorrect": 1
       }
     ],
