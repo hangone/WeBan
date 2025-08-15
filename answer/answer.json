@@ -1842,6 +1842,22 @@
       {
         "content": "马上给老师汇款。",
         "isCorrect": 2
+      },
+      {
+        "content": "通过电话或其他可靠方式联系赵教授本人，核实信息真伪",
+        "isCorrect": 1
+      },
+      {
+        "content": "置之不理，认为这是诈骗信息",
+        "isCorrect": 2
+      },
+      {
+        "content": "回复微信询问赵教授具体情况，确认信息的真实性",
+        "isCorrect": 2
+      },
+      {
+        "content": "直接按照信息中的卡号和金额进行汇款",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -39946,6 +39962,19 @@
     "type": 1
   },
   "遇到困难不要抱怨，因为情绪会影响人的判断。": {
+    "optionList": [
+      {
+        "content": "正确",
+        "isCorrect": 1
+      },
+      {
+        "content": "错误",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "遇到困难不要沉浸于抱怨，因为情绪会影响人的判断。": {
     "optionList": [
       {
         "content": "正确",
