@@ -5568,7 +5568,7 @@
         "isCorrect": 2
       }
     ],
-    "type": 2
+    "type": 1
   },
   "下面躲避雾霾的方式中错误的是：": {
     "optionList": [
@@ -9359,6 +9359,27 @@
       },
       {
         "content": "止泻药",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "以下哪些行为会受到法律的处罚？": {
+    "optionList": [
+      {
+        "content": "饮酒驾驶机动车",
+        "isCorrect": 1
+      },
+      {
+        "content": "饮酒驾驶运营机动车",
+        "isCorrect": 1
+      },
+      {
+        "content": "醉酒驾驶机动车",
+        "isCorrect": 1
+      },
+      {
+        "content": "醉酒驾驶营运机动车",
         "isCorrect": 1
       }
     ],
