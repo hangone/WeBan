@@ -1013,6 +1013,27 @@
     ],
     "type": 1
   },
+  "“塑造国家安全”强调的软性手段包括？": {
+    "optionList": [
+      {
+        "content": "武力威慑",
+        "isCorrect": 2
+      },
+      {
+        "content": "文化影响力",
+        "isCorrect": 1
+      },
+      {
+        "content": "经济合作",
+        "isCorrect": 1
+      },
+      {
+        "content": "科技发展",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "“套现” 的后果有哪些？": {
     "optionList": [
       {
@@ -6106,6 +6127,27 @@
     ],
     "type": 1
   },
+  "个人维护国家安全的方式是？": {
+    "optionList": [
+      {
+        "content": "传播谣言",
+        "isCorrect": 2
+      },
+      {
+        "content": "遵守法律",
+        "isCorrect": 1
+      },
+      {
+        "content": "忽视日常安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "拒绝参与教育",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "个人背包出游前，是否应该做好详细的路线调查？": {
     "optionList": [
       {
@@ -9259,6 +9301,27 @@
     ],
     "type": 2
   },
+  "以下哪些是诈骗分子常用的色情诱惑诈骗手段？": {
+    "optionList": [
+      {
+        "content": "以“完成任务即可免费约会”为名要求刷单或充值",
+        "isCorrect": 1
+      },
+      {
+        "content": "“招嫖”或“同城约会“时要求受害者先提供“保证金”“车费”等",
+        "isCorrect": 1
+      },
+      {
+        "content": "“约炮”App上进行投票打榜，并承诺高额返利并允许随时提现",
+        "isCorrect": 1
+      },
+      {
+        "content": "通过言语诱惑，引导受害者下载指定App进行裸聊，随后进行敲诈",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "以下哪些毒品会导致性病、艾滋病的传播？": {
     "optionList": [
       {
@@ -10433,6 +10496,27 @@
       {
         "content": "正确",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "传播境外攻击国内政治理论的内容的行为可能构成？": {
+    "optionList": [
+      {
+        "content": "间谍罪",
+        "isCorrect": 2
+      },
+      {
+        "content": "煽动分裂国家罪",
+        "isCorrect": 2
+      },
+      {
+        "content": "危害国家安全罪",
+        "isCorrect": 1
+      },
+      {
+        "content": "故意泄露国家秘密罪",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -12842,6 +12926,27 @@
     ],
     "type": 2
   },
+  "关于“统筹开放与安全”，下面说法正确的是：": {
+    "optionList": [
+      {
+        "content": "因开放可能带来风险而拒绝开放",
+        "isCorrect": 2
+      },
+      {
+        "content": "以开放促发展、在发展中保安全",
+        "isCorrect": 1
+      },
+      {
+        "content": "完全接受开放中的负面影响",
+        "isCorrect": 2
+      },
+      {
+        "content": "保持国家安全底线思维",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "关于“黄金72小时”，下面说法正确的是：": {
     "optionList": [
       {
@@ -14028,6 +14133,27 @@
     ],
     "type": 1
   },
+  "军事侵略对国家安全的影响是？": {
+    "optionList": [
+      {
+        "content": "促进发展",
+        "isCorrect": 2
+      },
+      {
+        "content": "破坏主权与稳定",
+        "isCorrect": 1
+      },
+      {
+        "content": "提升国际地位",
+        "isCorrect": 2
+      },
+      {
+        "content": "无关紧要",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "军事竞争新的制高点指什么？": {
     "optionList": [
       {
@@ -14996,6 +15122,27 @@
     ],
     "type": 1
   },
+  "危害国家安全的“内忧”主要有内战、内乱、分裂、破坏，以及各种形式的极端主义和？": {
+    "optionList": [
+      {
+        "content": "国际恐怖主义",
+        "isCorrect": 2
+      },
+      {
+        "content": "国内恐怖主义",
+        "isCorrect": 1
+      },
+      {
+        "content": "一切恐怖主义",
+        "isCorrect": 2
+      },
+      {
+        "content": "暴力恐怖主义",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "危机意识是指对紧急或困难关头的感知及应变能力。": {
     "optionList": [
       {
@@ -15347,6 +15494,19 @@
       {
         "content": "自行追赶肇事车辆",
         "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "发现高空坠物隐患时，只要自己注意就可以了，不必告知他人。": {
+    "optionList": [
+      {
+        "content": "正确",
+        "isCorrect": 2
+      },
+      {
+        "content": "错误",
+        "isCorrect": 1
       }
     ],
     "type": 1
@@ -16932,6 +17092,27 @@
     ],
     "type": 1
   },
+  "国家安全领域的“外”和“内”包含哪些基本含义？": {
+    "optionList": [
+      {
+        "content": "国家安全本身是外部安全与内部安全的统一",
+        "isCorrect": 2
+      },
+      {
+        "content": "威胁国家安全的因素既有“外患”也有“内忧”",
+        "isCorrect": 2
+      },
+      {
+        "content": "保障安全需统筹“攘外”与“安内”",
+        "isCorrect": 2
+      },
+      {
+        "content": "以上都是",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
   "国家对于维护科技安全的行动有哪些?": {
     "optionList": [
       {
@@ -17689,6 +17870,27 @@
       }
     ],
     "type": 1
+  },
+  "在原有五个统筹基础上，后来又新提出的两个统筹是？": {
+    "optionList": [
+      {
+        "content": "统筹传统安全与非传统安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "统筹发展与安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "统筹维护国家安全与塑造国家安全",
+        "isCorrect": 1
+      },
+      {
+        "content": "统筹开放与安全",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
   },
   "在去学校的火车上，陌生人以问站名的由头跟你搭讪，怎么做比较妥当呢？": {
     "optionList": [
@@ -19986,6 +20188,27 @@
     ],
     "type": 1
   },
+  "大学生日常生活中维护国家安全的途径是？": {
+    "optionList": [
+      {
+        "content": "参与军事行动",
+        "isCorrect": 2
+      },
+      {
+        "content": "提升专业能力",
+        "isCorrect": 1
+      },
+      {
+        "content": "传播极端思想",
+        "isCorrect": 2
+      },
+      {
+        "content": "忽视安全教育",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "大学生李某翻墙浏览境外网站，接触到大量攻击中国政治制度的文章和视频，逐渐对共产主义信仰产生动摇。他开始在社交平台转发相关内容，并与境外账号互动，最终因传播危害国家安全信息被网警查处。大学生李某遭遇的主要策反手段是？": {
     "optionList": [
       {
@@ -22266,6 +22489,27 @@
       {
         "content": "错误",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "威胁国家安全的“内忧”是？": {
+    "optionList": [
+      {
+        "content": "自然灾害",
+        "isCorrect": 2
+      },
+      {
+        "content": "腐败与权力失控脱离群众",
+        "isCorrect": 1
+      },
+      {
+        "content": "国际经济制裁",
+        "isCorrect": 2
+      },
+      {
+        "content": "文化冲突",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -25553,6 +25797,27 @@
       }
     ],
     "type": 2
+  },
+  "当前统筹开放与安全的战略意义在于？": {
+    "optionList": [
+      {
+        "content": "避免国际竞争，确保绝对安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "在开放中提升竞争力，以发展保障安全",
+        "isCorrect": 1
+      },
+      {
+        "content": "放弃部分主权换取经济发展",
+        "isCorrect": 2
+      },
+      {
+        "content": "完全依靠国际合作解决安全问题",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "当发现有人可能正在吸毒或实施涉及毒品的违法犯罪行为时，应该：": {
     "optionList": [
@@ -29581,6 +29846,27 @@
     ],
     "type": 1
   },
+  "新发展格局的核心是？": {
+    "optionList": [
+      {
+        "content": "完全依赖国际市场",
+        "isCorrect": 2
+      },
+      {
+        "content": "国内大循环为主体",
+        "isCorrect": 1
+      },
+      {
+        "content": "放弃国际合作",
+        "isCorrect": 2
+      },
+      {
+        "content": "军事优先",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "新型冠状病毒临床表现为（ ）": {
     "optionList": [
       {
@@ -31003,6 +31289,27 @@
       },
       {
         "content": "心理战",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "某境外组织成员伪装成省政府领导，白天以投资考察为名活动，晚上传递情报。他们打着“温泉资源开发”旗号，非法探测山东蓬莱、海南三亚等敏感地区。该组织的隐蔽策略是？": {
+    "optionList": [
+      {
+        "content": "政商身份切换",
+        "isCorrect": 1
+      },
+      {
+        "content": "地理信息伪装",
+        "isCorrect": 2
+      },
+      {
+        "content": "学术渗透",
+        "isCorrect": 2
+      },
+      {
+        "content": "家庭情感绑架",
         "isCorrect": 2
       }
     ],
@@ -33483,6 +33790,23 @@
       {
         "content": "54",
         "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "湖北省也被称为？": {
+    "optionList": [
+      {
+        "content": "丝绸之府",
+        "isCorrect": 2
+      },
+      {
+        "content": "天府之国",
+        "isCorrect": 2
+      },
+      {
+        "content": "千湖之省",
+        "isCorrect": 1
       }
     ],
     "type": 1
@@ -36493,6 +36817,27 @@
       }
     ],
     "type": 2
+  },
+  "约炮类诈骗的常见话术包括？​": {
+    "optionList": [
+      {
+        "content": "“需验证身份信息”",
+        "isCorrect": 2
+      },
+      {
+        "content": "“完成任务即可获得高额奖励”",
+        "isCorrect": 2
+      },
+      {
+        "content": "“免费服务需先交保证金”",
+        "isCorrect": 1
+      },
+      {
+        "content": "“系统漏洞可稳赚不赔”",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "约炮诈骗中，骗子以“操作失误需解冻账号”为由要求转账，属于诈骗的哪个阶段？": {
     "optionList": [
