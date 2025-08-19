@@ -73,6 +73,27 @@
     ],
     "type": 1
   },
+  "1956年，交通大学西安新校在哪里隆重举行交大迁校后的首次开学典礼？（）": {
+    "optionList": [
+      {
+        "content": "草棚大礼堂",
+        "isCorrect": 2
+      },
+      {
+        "content": "西安人民大厦礼堂",
+        "isCorrect": 1
+      },
+      {
+        "content": "西安人民剧院",
+        "isCorrect": 2
+      },
+      {
+        "content": "西安市委礼堂",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "1982年修改后的宪法即现行宪法，并分别在1988年、1993年、（）、2004年和2018年对其进行了五次部分修正。": {
     "optionList": [
       {
@@ -89,6 +110,27 @@
       },
       {
         "content": "1996年",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "2017年西安交通大学建校121周年校庆前夕，经西安交通大学党委常委会研究决定，将每年公历哪一天设立为“交通大学西迁纪念日”？（）": {
+    "optionList": [
+      {
+        "content": "5月4日",
+        "isCorrect": 2
+      },
+      {
+        "content": "9月10日",
+        "isCorrect": 1
+      },
+      {
+        "content": "4月8日",
+        "isCorrect": 2
+      },
+      {
+        "content": "3月15日",
         "isCorrect": 2
       }
     ],
@@ -120,11 +162,74 @@
     ],
     "type": 2
   },
+  "2020年4月22日，习近平总书记来到西安交通大学考察，他强调，“西迁精神”的核心是______，精髓是听党指挥跟党走，与党和国家、与民族和人民同呼吸、共命运，具有深刻现实意义和历史意义。（）": {
+    "optionList": [
+      {
+        "content": "爱国主义",
+        "isCorrect": 1
+      },
+      {
+        "content": "理想主义",
+        "isCorrect": 2
+      },
+      {
+        "content": "集体主义",
+        "isCorrect": 2
+      },
+      {
+        "content": "英雄主义",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "2020年，连通创新港和兴庆、曲江校区的地铁线路是（）": {
+    "optionList": [
+      {
+        "content": "1号线",
+        "isCorrect": 2
+      },
+      {
+        "content": "5号线",
+        "isCorrect": 1
+      },
+      {
+        "content": "6号线",
+        "isCorrect": 2
+      },
+      {
+        "content": "3号线",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "2021年，中国香港发生了一起电信诈骗案件，受害人被骗2.5亿港币，在这起案件中，骗子不但经常打电话给受害人，甚至还派了一名特派员上门协助转账。请问，这是什么类型的诈骗？": {
     "optionList": [
       {
         "content": "冒充公检法诈骗",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "2025年4月24日，哪位交大人担任了神舟二十号载人飞行任务指令长？（）": {
+    "optionList": [
+      {
+        "content": "陈中瑞",
+        "isCorrect": 2
+      },
+      {
+        "content": "陈冬",
+        "isCorrect": 1
+      },
+      {
+        "content": "王杰",
+        "isCorrect": 2
+      },
+      {
+        "content": "聂海胜",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -456,6 +561,27 @@
     ],
     "type": 2
   },
+  "______，交通大学西安部分定名为西安交通大学，同年被列为全国十六所重点大学之一。（）": {
+    "optionList": [
+      {
+        "content": "1960年",
+        "isCorrect": 2
+      },
+      {
+        "content": "1959年",
+        "isCorrect": 1
+      },
+      {
+        "content": "1958年",
+        "isCorrect": 2
+      },
+      {
+        "content": "1956年",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "“2019新型冠状病毒”是SARS重来（ ）": {
     "optionList": [
       {
@@ -496,6 +622,27 @@
     ],
     "type": 1
   },
+  "“一带一路”是“丝绸之路经济带”和______的简称。（）": {
+    "optionList": [
+      {
+        "content": "海上丝绸之路",
+        "isCorrect": 2
+      },
+      {
+        "content": "21世纪海上丝绸之路",
+        "isCorrect": 1
+      },
+      {
+        "content": "古丝绸之路",
+        "isCorrect": 2
+      },
+      {
+        "content": "海上丝绸之路经济带",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "“三只小猪”的故事说明（）。": {
     "optionList": [
       {
@@ -513,6 +660,27 @@
       },
       {
         "content": "10.1",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "“两个一百年”奋斗目标中，建成富强、民主、文明、和谐、美丽的社会主义现代化国家的时间是：（）": {
+    "optionList": [
+      {
+        "content": "2020年",
+        "isCorrect": 2
+      },
+      {
+        "content": "2021年",
+        "isCorrect": 2
+      },
+      {
+        "content": "2049年",
+        "isCorrect": 1
+      },
+      {
+        "content": "2050年",
         "isCorrect": 2
       }
     ],
@@ -538,6 +706,48 @@
       }
     ],
     "type": 2
+  },
+  "“五位一体”是指：经济建设、政治建设、文化建设、社会建设、______。（）": {
+    "optionList": [
+      {
+        "content": "思想建设",
+        "isCorrect": 2
+      },
+      {
+        "content": "党的建设",
+        "isCorrect": 2
+      },
+      {
+        "content": "公益建设",
+        "isCorrect": 2
+      },
+      {
+        "content": "生态文明建设",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "“五大发展理念”不包括：（）": {
+    "optionList": [
+      {
+        "content": "创新",
+        "isCorrect": 2
+      },
+      {
+        "content": "协调",
+        "isCorrect": 2
+      },
+      {
+        "content": "绿色",
+        "isCorrect": 2
+      },
+      {
+        "content": "改革",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
   },
   "“井无压力不出油，人无压力轻飘飘”是在说明？": {
     "optionList": [
@@ -991,6 +1201,90 @@
       {
         "content": "听你的声音好像是……XX？",
         "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "“四个全面”是指：全面建设社会主义现代化国家、______、全面依法治国、全面从严治党。（）": {
+    "optionList": [
+      {
+        "content": "全面推进高质量发展",
+        "isCorrect": 2
+      },
+      {
+        "content": "全面深化改革",
+        "isCorrect": 1
+      },
+      {
+        "content": "全面打赢脱贫攻坚战",
+        "isCorrect": 2
+      },
+      {
+        "content": "全面扩大开放",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "“四个意识”是指：政治意识、______、核心意识、看齐意识。（）": {
+    "optionList": [
+      {
+        "content": "理论意识",
+        "isCorrect": 2
+      },
+      {
+        "content": "大局意识",
+        "isCorrect": 1
+      },
+      {
+        "content": "全局意识",
+        "isCorrect": 2
+      },
+      {
+        "content": "总体意识",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "“四个自信”是指：______、理论自信、制度自信、文化自信。（）": {
+    "optionList": [
+      {
+        "content": "道路自信",
+        "isCorrect": 1
+      },
+      {
+        "content": "前进自信",
+        "isCorrect": 2
+      },
+      {
+        "content": "国际自信",
+        "isCorrect": 2
+      },
+      {
+        "content": "文明自信",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "“四风”问题不包括以下哪一项？（）": {
+    "optionList": [
+      {
+        "content": "形式主义",
+        "isCorrect": 2
+      },
+      {
+        "content": "官僚主义",
+        "isCorrect": 2
+      },
+      {
+        "content": "享乐主义",
+        "isCorrect": 2
+      },
+      {
+        "content": "个人主义",
+        "isCorrect": 1
       }
     ],
     "type": 1
@@ -1972,6 +2266,27 @@
       }
     ],
     "type": 2
+  },
+  "“饮水思源”是百年交大的光辉传统，“饮水思源”碑是交通大学标志性建筑，兴庆校区的“饮水思源”碑位于哪个校门附近？（）": {
+    "optionList": [
+      {
+        "content": "东南门",
+        "isCorrect": 2
+      },
+      {
+        "content": "南门",
+        "isCorrect": 2
+      },
+      {
+        "content": "西南门",
+        "isCorrect": 2
+      },
+      {
+        "content": "北门",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
   },
   "“鸡尾酒疗法”是指：": {
     "optionList": [
@@ -6191,6 +6506,27 @@
     ],
     "type": 2
   },
+  "中共中央总书记、国家主席、中央军委主席习近平的重要文章《加快建设教育强国》强调，教育是强国建设、民族复兴之基。党的十八大以来，我们坚持把教育作为国之大计、党之大计，全面贯彻党的教育方针，作出深入实施______、加快教育现代化的重大决策，确立到______年建成教育强国的奋斗目标，推动新时代教育事业取得历史性成就、发生格局性变化。（）": {
+    "optionList": [
+      {
+        "content": "人才强国战略 2035",
+        "isCorrect": 2
+      },
+      {
+        "content": "人才强国战略 2040",
+        "isCorrect": 2
+      },
+      {
+        "content": "科教兴国战略 2035",
+        "isCorrect": 1
+      },
+      {
+        "content": "科教兴国战略 2040",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "中华人民共和国根据（   ）与其他国家、地区、国际组织开展反恐怖主义合作。": {
     "optionList": [
       {
@@ -6271,6 +6607,27 @@
     ],
     "type": 1
   },
+  "中国共产党领导人民发展社会主义先进文化，弘扬以爱国主义为核心的民族精神和以______为核心的时代精神。（）": {
+    "optionList": [
+      {
+        "content": "诚信友善",
+        "isCorrect": 2
+      },
+      {
+        "content": "爱岗敬业",
+        "isCorrect": 2
+      },
+      {
+        "content": "改革创新",
+        "isCorrect": 1
+      },
+      {
+        "content": "文明和谐",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "中国将继续高举（   ）的旗帜，始终不渝走和平发展道路、奉行互利共赢的开放战略。": {
     "optionList": [
       {
@@ -6291,6 +6648,27 @@
       }
     ],
     "type": 2
+  },
+  "中国式现代化为人类实现现代化提供了新的选择，中国共产党和中国人民为解决人类面临的共同问题提供中国智慧、中国方案、______。（）": {
+    "optionList": [
+      {
+        "content": "中国答卷",
+        "isCorrect": 2
+      },
+      {
+        "content": "中国力量",
+        "isCorrect": 1
+      },
+      {
+        "content": "中国道路",
+        "isCorrect": 2
+      },
+      {
+        "content": "中国策略",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "中国成为移动通信技术标准的制定者之一最早是在（）时代。": {
     "optionList": [
@@ -6343,6 +6721,27 @@
       {
         "content": "95%以上",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "中国西部科技创新港的“三位一体”不包括：（）": {
+    "optionList": [
+      {
+        "content": "校区",
+        "isCorrect": 2
+      },
+      {
+        "content": "园区",
+        "isCorrect": 2
+      },
+      {
+        "content": "景区",
+        "isCorrect": 1
+      },
+      {
+        "content": "社区",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -7060,6 +7459,27 @@
     ],
     "type": 2
   },
+  "为响应党的号召和国家战略需求，______一千多名交大师生登上专列，开启交通大学的西迁历程？（）": {
+    "optionList": [
+      {
+        "content": "1956年",
+        "isCorrect": 1
+      },
+      {
+        "content": "1955年",
+        "isCorrect": 2
+      },
+      {
+        "content": "1957年",
+        "isCorrect": 2
+      },
+      {
+        "content": "1959年",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "为避免误食毒品，外出时要注意什么？": {
     "optionList": [
       {
@@ -7412,11 +7832,53 @@
     ],
     "type": 2
   },
+  "习近平总书记的重要文章《加快建设文化强国》指出，建设文化强国，事关中国式现代化建设全局，事关中华民族复兴大业，事关提升国际竞争力。我们要锚定______年建成文化强国的战略目标，坚持马克思主义这一根本指导思想，植根博大精深的中华文明，顺应信息技术发展潮流，不断发展具有强大______的新时代中国特色社会主义文化，不断增强人民精神力量，筑牢强国建设、民族复兴的文化根基。（）": {
+    "optionList": [
+      {
+        "content": "2030 思想引领力、精神凝聚力、价值感召力",
+        "isCorrect": 2
+      },
+      {
+        "content": "2035 思想引领力、精神凝聚力、价值感召力",
+        "isCorrect": 2
+      },
+      {
+        "content": "2030 思想引领力、精神凝聚力、价值感召力、国际影响力",
+        "isCorrect": 2
+      },
+      {
+        "content": "2035 思想引领力、精神凝聚力、价值感召力、国际影响力",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
   "习近平总书记针对国际安全问题指出：“既重视自身安全，又重视共同安全，打造（   ），推动各方朝着互利互惠、共同安全的目标相向而行。”": {
     "optionList": [
       {
         "content": "命运共同体",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "习近平新时代中国特色社会主义思想实现了马克思主义______新的飞跃。（）": {
+    "optionList": [
+      {
+        "content": "中国化时代化",
+        "isCorrect": 1
+      },
+      {
+        "content": "中国化大众化",
+        "isCorrect": 2
+      },
+      {
+        "content": "时代化大众化",
+        "isCorrect": 2
+      },
+      {
+        "content": "中国式现代化",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -10318,6 +10780,27 @@
     ],
     "type": 1
   },
+  "以下说法不正确的是？（）": {
+    "optionList": [
+      {
+        "content": "校园内不得传播宗教",
+        "isCorrect": 2
+      },
+      {
+        "content": "校园内可以设立宗教场所",
+        "isCorrect": 1
+      },
+      {
+        "content": "校园内不得举办任何宗教活动",
+        "isCorrect": 2
+      },
+      {
+        "content": "校园不得穿戴宗教服饰标识",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "以下说法正确的是：": {
     "optionList": [
       {
@@ -12191,6 +12674,27 @@
       {
         "content": "正确",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "党的二十大报告深刻提出，教育、科技、人才是全面建设社会主义现代化国家的基础性、战略性支撑。必须坚持______是第一生产力、______是第一资源、______是第一动力，深入实施科教兴国战略、人才强国战略、创新驱动发展战略，开辟发展新领域新赛道，不断塑造发展新动能新优势。（）": {
+    "optionList": [
+      {
+        "content": "科技 人才 创新",
+        "isCorrect": 1
+      },
+      {
+        "content": "科技 创新 人才",
+        "isCorrect": 2
+      },
+      {
+        "content": "人才 科技 创新",
+        "isCorrect": 2
+      },
+      {
+        "content": "创新 人才 科技",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -14707,6 +15211,69 @@
     ],
     "type": 1
   },
+  "创新港校区的5号巨构命名为：（）": {
+    "optionList": [
+      {
+        "content": "力行楼",
+        "isCorrect": 2
+      },
+      {
+        "content": "躬行楼",
+        "isCorrect": 2
+      },
+      {
+        "content": "涵英楼",
+        "isCorrect": 1
+      },
+      {
+        "content": "泓理楼",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "创新港校区的中轴线命名为：（）": {
+    "optionList": [
+      {
+        "content": "南洋大道",
+        "isCorrect": 2
+      },
+      {
+        "content": "梧桐路",
+        "isCorrect": 2
+      },
+      {
+        "content": "西迁大道",
+        "isCorrect": 1
+      },
+      {
+        "content": "思源路",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "创新港的朗清苑、惠风苑等地点的命名，是出自东晋时期著名书法家王羲之所作散文______中的“天朗气清 惠风和畅”。（）": {
+    "optionList": [
+      {
+        "content": "《易经》",
+        "isCorrect": 2
+      },
+      {
+        "content": "《养竹记》",
+        "isCorrect": 2
+      },
+      {
+        "content": "《兰亭集序》",
+        "isCorrect": 1
+      },
+      {
+        "content": "《交通大学一览》",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "创新的含义包括？": {
     "optionList": [
       {
@@ -16474,6 +17041,19 @@
     ],
     "type": 1
   },
+  "吸烟对环境没有影响，这个说法正确吗？": {
+    "optionList": [
+      {
+        "content": "正确",
+        "isCorrect": 2
+      },
+      {
+        "content": "错误",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
   "吸烟除了带来健康问题，还可能引发很多问题。下面哪个不是吸烟可能引发的问题？": {
     "optionList": [
       {
@@ -17378,6 +17958,27 @@
     ],
     "type": 1
   },
+  "在“一带一路”的时代背景下，在全球高等教育呈现出合作发展、相互融合的趋势下，西安交通大学首倡“新丝绸之路学术带”内涵，于2015年1月向海内外高水平大学发出倡议，共同成立______。（）": {
+    "optionList": [
+      {
+        "content": "新丝路教育联盟",
+        "isCorrect": 2
+      },
+      {
+        "content": "丝绸之路学术带",
+        "isCorrect": 2
+      },
+      {
+        "content": "丝绸之路教育联盟",
+        "isCorrect": 2
+      },
+      {
+        "content": "丝绸之路大学联盟",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
   "在一个等级制度中，每个职工趋向于上升到他所不能胜任的地位，这是哪个定律的内容？": {
     "optionList": [
       {
@@ -17824,6 +18425,31 @@
     ],
     "type": 1
   },
+  "在公开发表的学术论文、报告、设计中或在提交的学位论文、课程设计、毕业设计中，存在抄袭、篡改、伪造等学术不端行为，情节较轻且认识态度端正者，给予______处分。（）": {
+    "optionList": [
+      {
+        "content": "警告",
+        "isCorrect": 2
+      },
+      {
+        "content": "严重警告",
+        "isCorrect": 2
+      },
+      {
+        "content": "记过",
+        "isCorrect": 2
+      },
+      {
+        "content": "留校察看",
+        "isCorrect": 1
+      },
+      {
+        "content": "开除学籍",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "在北京，下面哪个场所可以吸烟？": {
     "optionList": [
       {
@@ -18165,6 +18791,27 @@
       },
       {
         "content": "一笑了之",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "在庆祝新中国成立70周年之际，西安交通大学“西迁人”爱国奋斗先进群体荣获______荣誉称号。（）": {
+    "optionList": [
+      {
+        "content": "新中国最美奋斗者",
+        "isCorrect": 1
+      },
+      {
+        "content": "最美科技工作者",
+        "isCorrect": 2
+      },
+      {
+        "content": "共和国勋章",
+        "isCorrect": 2
+      },
+      {
+        "content": "庆祝中华人民共和国成立70周年纪念章",
         "isCorrect": 2
       }
     ],
@@ -19003,6 +19650,69 @@
       {
         "content": "不能随便开门窗",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "在社会主义核心价值观中，个人层面的价值准则包括：（）": {
+    "optionList": [
+      {
+        "content": "富强 民主 文明 和谐",
+        "isCorrect": 2
+      },
+      {
+        "content": "自由 平等 公正 法治",
+        "isCorrect": 2
+      },
+      {
+        "content": "爱国 敬业 诚信 友善",
+        "isCorrect": 1
+      },
+      {
+        "content": "爱国 勤劳 团结 诚实",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "在社会主义核心价值观中，国家层面的价值目标包括：（）": {
+    "optionList": [
+      {
+        "content": "富强 民主 文明 和谐",
+        "isCorrect": 1
+      },
+      {
+        "content": "自由 平等 公正 法治",
+        "isCorrect": 2
+      },
+      {
+        "content": "爱国 敬业 诚信 友善",
+        "isCorrect": 2
+      },
+      {
+        "content": "富强 文明 和谐 美丽",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "在社会主义核心价值观中，社会层面的价值取向包括：（）": {
+    "optionList": [
+      {
+        "content": "富强 民主 文明 和谐",
+        "isCorrect": 2
+      },
+      {
+        "content": "自由 平等 公正 法治",
+        "isCorrect": 1
+      },
+      {
+        "content": "爱国 敬业 诚信 友善",
+        "isCorrect": 2
+      },
+      {
+        "content": "自由 平等 公正 法制",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -20349,6 +21059,27 @@
     ],
     "type": 2
   },
+  "大学阶段，要勤于学习、敏于求知，注重把所学知识内化于心，形成自己的见解，既要专攻博览，又要关心国家、______、关心世界，学会担当社会责任。（）": {
+    "optionList": [
+      {
+        "content": "关心发展",
+        "isCorrect": 2
+      },
+      {
+        "content": "关心集体",
+        "isCorrect": 2
+      },
+      {
+        "content": "关心人民",
+        "isCorrect": 1
+      },
+      {
+        "content": "关心未来",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "大量的性侵案件中都涉及到酒，因此外出聚会一定要控制自己喝酒的量，不可贪杯，和陌生人聚会不要轻易喝酒.": {
     "optionList": [
       {
@@ -21347,6 +22078,27 @@
       }
     ],
     "type": 2
+  },
+  "如发现学生公寓有饲养宠物者，在所就读学院进行通报批评，限______内带离学校；如仍不整改，取消该学生当年各类评奖评优和推荐先进资格；情节严重者，依据《西安交通大学学生违纪处分办法》，给予警告及以上处分。（）": {
+    "optionList": [
+      {
+        "content": "3天",
+        "isCorrect": 2
+      },
+      {
+        "content": "一周",
+        "isCorrect": 1
+      },
+      {
+        "content": "10天",
+        "isCorrect": 2
+      },
+      {
+        "content": "两周",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "如听到门外有婴儿哭泣，应该怎么办？": {
     "optionList": [
@@ -22592,6 +23344,86 @@
     ],
     "type": 1
   },
+  "学校的校庆纪念日是在哪一天，谓之“四通八达”，意喻学校蓬勃发展之意？（）": {
+    "optionList": [
+      {
+        "content": "9月10日",
+        "isCorrect": 2
+      },
+      {
+        "content": "4月8日",
+        "isCorrect": 1
+      },
+      {
+        "content": "5月15日",
+        "isCorrect": 2
+      },
+      {
+        "content": "4月5日",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "学生不得在学校进行宗教活动，违反规定经教育不改者，视情节轻重，给予______以上处分。（）": {
+    "optionList": [
+      {
+        "content": "警告",
+        "isCorrect": 1
+      },
+      {
+        "content": "严重警告",
+        "isCorrect": 2
+      },
+      {
+        "content": "记过",
+        "isCorrect": 2
+      },
+      {
+        "content": "留校察看",
+        "isCorrect": 2
+      },
+      {
+        "content": "开除学籍",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "学生个人对处分决定有异议的，可在接到处分决定书之日起10日内，向学校学生申诉处理委员会提出书面申诉。（）": {
+    "optionList": [
+      {
+        "content": "5",
+        "isCorrect": 2
+      },
+      {
+        "content": "10",
+        "isCorrect": 1
+      },
+      {
+        "content": "15",
+        "isCorrect": 2
+      },
+      {
+        "content": "20",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "学生公寓是否可以使用可能引发火灾、触电、渗水等事故等违规器具？一经发现，将予以没收处理。（）": {
+    "optionList": [
+      {
+        "content": "是",
+        "isCorrect": 2
+      },
+      {
+        "content": "否",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
   "学生在宿舍内，以下哪些行为（    ）将受到校纪校规处分。": {
     "optionList": [
       {
@@ -22636,10 +23468,48 @@
     ],
     "type": 1
   },
+  "学生应当自觉遵守公民道德规范，学生举止行为违反公民道德规范，经教育不改者，给予______以上处分。（）": {
+    "optionList": [
+      {
+        "content": "警告",
+        "isCorrect": 1
+      },
+      {
+        "content": "严重警告",
+        "isCorrect": 2
+      },
+      {
+        "content": "记过",
+        "isCorrect": 2
+      },
+      {
+        "content": "留校察看",
+        "isCorrect": 2
+      },
+      {
+        "content": "开除学籍",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "学生患肺结核病不一定休学隔离。——这句话是正确的吗？": {
     "optionList": [
       {
         "content": "正确。",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "学生是否能出租出借宿舍床位？一经发现，取消该学生当学年住宿资格，同时按照学校宿舍管理规定和违纪处分办法予以处理，并取消当学年各类评奖评优与推荐先进资格。（）": {
+    "optionList": [
+      {
+        "content": "是",
+        "isCorrect": 2
+      },
+      {
+        "content": "否",
         "isCorrect": 1
       }
     ],
@@ -24014,6 +24884,31 @@
     ],
     "type": 1
   },
+  "对有违纪行为的学生，应当给予批评教育，并视情节轻重，给予______纪律处分。（）": {
+    "optionList": [
+      {
+        "content": "警告",
+        "isCorrect": 1
+      },
+      {
+        "content": "严重警告",
+        "isCorrect": 1
+      },
+      {
+        "content": "记过",
+        "isCorrect": 1
+      },
+      {
+        "content": "留校察看",
+        "isCorrect": 1
+      },
+      {
+        "content": "开除学籍",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "对未取得驾驶证驾驶机动车的，追究其法律责任。": {
     "optionList": [
       {
@@ -24970,6 +25865,27 @@
       }
     ],
     "type": 2
+  },
+  "带领交大西迁的校长是？（）": {
+    "optionList": [
+      {
+        "content": "苏庄",
+        "isCorrect": 2
+      },
+      {
+        "content": "彭康",
+        "isCorrect": 1
+      },
+      {
+        "content": "陈大燮",
+        "isCorrect": 2
+      },
+      {
+        "content": "钟兆琳",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "帮信罪的常见方式有：": {
     "optionList": [
@@ -29473,6 +30389,27 @@
     ],
     "type": 2
   },
+  "改革开放和社会主义现代化建设深入推进，实现中华民族伟大复兴进入了______的历史进程。（）": {
+    "optionList": [
+      {
+        "content": "不可倒转",
+        "isCorrect": 2
+      },
+      {
+        "content": "不可颠覆",
+        "isCorrect": 2
+      },
+      {
+        "content": "不可逆转",
+        "isCorrect": 1
+      },
+      {
+        "content": "不可阻碍",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "放弃有时候未必是坏事，否则可能会在一棵树上吊死.": {
     "optionList": [
       {
@@ -30921,10 +31858,48 @@
     ],
     "type": 1
   },
+  "未按规定程序办理出国（境）审批手续者，或未按规定办理报备手续者，给予______以上处分。（）": {
+    "optionList": [
+      {
+        "content": "警告",
+        "isCorrect": 1
+      },
+      {
+        "content": "严重警告",
+        "isCorrect": 2
+      },
+      {
+        "content": "记过",
+        "isCorrect": 2
+      },
+      {
+        "content": "留校察看",
+        "isCorrect": 2
+      },
+      {
+        "content": "开除学籍",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "未满几周岁的儿童，不准在道路上学自行车？": {
     "optionList": [
       {
         "content": "12周岁",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "未经公寓管理部门登记批准，学生是否能在公寓内留宿他人？（）": {
+    "optionList": [
+      {
+        "content": "是",
+        "isCorrect": 2
+      },
+      {
+        "content": "否",
         "isCorrect": 1
       }
     ],
@@ -36114,6 +37089,27 @@
     ],
     "type": 1
   },
+  "目前，西安交通大学共有几个校区？（）": {
+    "optionList": [
+      {
+        "content": "1个",
+        "isCorrect": 2
+      },
+      {
+        "content": "2个",
+        "isCorrect": 2
+      },
+      {
+        "content": "3个",
+        "isCorrect": 2
+      },
+      {
+        "content": "4个",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
   "目标的性质有？": {
     "optionList": [
       {
@@ -37129,6 +38125,27 @@
       }
     ],
     "type": 2
+  },
+  "统揽伟大斗争、伟大工程、伟大事业、______，明确“五位一体”总体布局和“四个全面”战略布局。（）": {
+    "optionList": [
+      {
+        "content": "伟大理想",
+        "isCorrect": 2
+      },
+      {
+        "content": "伟大梦想",
+        "isCorrect": 1
+      },
+      {
+        "content": "伟大征程",
+        "isCorrect": 2
+      },
+      {
+        "content": "伟大复兴",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "维护国土安全，我们应该怎么做？": {
     "optionList": [
@@ -38767,6 +39784,111 @@
     ],
     "type": 2
   },
+  "西安交通大学排名挺进ESI全球前万分之一的学科是：（）": {
+    "optionList": [
+      {
+        "content": "材料科学",
+        "isCorrect": 2
+      },
+      {
+        "content": "工程学",
+        "isCorrect": 1
+      },
+      {
+        "content": "地球科学",
+        "isCorrect": 2
+      },
+      {
+        "content": "计算机科学",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "西安交通大学的前身是哪一年创建于上海的南洋公学？（）": {
+    "optionList": [
+      {
+        "content": "1895年",
+        "isCorrect": 2
+      },
+      {
+        "content": "1896年",
+        "isCorrect": 1
+      },
+      {
+        "content": "1902年",
+        "isCorrect": 2
+      },
+      {
+        "content": "1956年",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "西安交通大学的办学定位是：（）": {
+    "optionList": [
+      {
+        "content": "精勤求学 敦笃励志 果毅力行 忠恕任事",
+        "isCorrect": 2
+      },
+      {
+        "content": "爱国爱校 追求真理 勤奋踏实 艰苦朴素",
+        "isCorrect": 2
+      },
+      {
+        "content": "扎根西部 服务国家 世界一流",
+        "isCorrect": 1
+      },
+      {
+        "content": "胸怀大局 无私奉献 弘扬传统 艰苦创业",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "西安交通大学的校歌是：（）": {
+    "optionList": [
+      {
+        "content": "《向西向远方》",
+        "isCorrect": 2
+      },
+      {
+        "content": "《向西而歌》",
+        "isCorrect": 2
+      },
+      {
+        "content": "《为世界之光》",
+        "isCorrect": 1
+      },
+      {
+        "content": "《兴学强国》",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "西安交通大学的校训是：（）": {
+    "optionList": [
+      {
+        "content": "精勤求学 敦笃励志 果毅力行 忠恕任事",
+        "isCorrect": 1
+      },
+      {
+        "content": "爱国爱校 追求真理 勤奋踏实 艰苦朴素",
+        "isCorrect": 2
+      },
+      {
+        "content": "扎根西部 服务国家 世界一流",
+        "isCorrect": 2
+      },
+      {
+        "content": "胸怀大局 无私奉献 弘扬传统 艰苦创业",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "西方有句谚语说：“上帝给我们一张嘴巴两只耳朵，就是让我们多听少说。”说明了（）在人际沟通中的重要性。": {
     "optionList": [
       {
@@ -39349,6 +40471,31 @@
       }
     ],
     "type": 2
+  },
+  "购买、出售或者组织买卖、由他人代写、替他人代写或组织代写学术论文、学位论文、课程设计、毕业设计者，给予______处分。（）": {
+    "optionList": [
+      {
+        "content": "警告",
+        "isCorrect": 2
+      },
+      {
+        "content": "严重警告",
+        "isCorrect": 2
+      },
+      {
+        "content": "记过",
+        "isCorrect": 2
+      },
+      {
+        "content": "留校察看",
+        "isCorrect": 2
+      },
+      {
+        "content": "开除学籍",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
   },
   "购买赃物是一种违法犯罪行为。": {
     "optionList": [
@@ -40233,6 +41380,31 @@
     ],
     "type": 1
   },
+  "违反实验、实习操作规定，给国家、学校或他人造成损失或不良影响者，给予______以上处分。（）": {
+    "optionList": [
+      {
+        "content": "警告",
+        "isCorrect": 1
+      },
+      {
+        "content": "严重警告",
+        "isCorrect": 2
+      },
+      {
+        "content": "记过",
+        "isCorrect": 2
+      },
+      {
+        "content": "留校察看",
+        "isCorrect": 2
+      },
+      {
+        "content": "开除学籍",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "违规为电动自行车电瓶充电，引起火灾，造成严重后果，构成犯罪的，将会如何？": {
     "optionList": [
       {
@@ -40569,6 +41741,31 @@
       }
     ],
     "type": 2
+  },
+  "造谣、诽谤、侮辱、栽赃、陷害、拐骗、威胁、恐吓他人者，给予______以上处分。（）": {
+    "optionList": [
+      {
+        "content": "警告",
+        "isCorrect": 2
+      },
+      {
+        "content": "严重警告",
+        "isCorrect": 1
+      },
+      {
+        "content": "记过",
+        "isCorrect": 2
+      },
+      {
+        "content": "留校察看",
+        "isCorrect": 2
+      },
+      {
+        "content": "开除学籍",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "遇到“入室抢劫”及“拦路抢劫”时，应把（）安全放在首要位置。": {
     "optionList": [
@@ -41717,6 +42914,27 @@
       },
       {
         "content": "18",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "除开除学籍处分以外，警告、严重警告、记过的处分期限为______个月，留校察看的处分期限为______个月。（）": {
+    "optionList": [
+      {
+        "content": "6,6",
+        "isCorrect": 2
+      },
+      {
+        "content": "6,12",
+        "isCorrect": 1
+      },
+      {
+        "content": "12,12",
+        "isCorrect": 2
+      },
+      {
+        "content": "12,6",
         "isCorrect": 2
       }
     ],
@@ -43420,6 +44638,27 @@
       },
       {
         "content": "地痞流氓",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "齿轮是学校的校徽的一个重要元素，它上面共有______个齿，这寓意着一年24节气、一日24小时，象征继往开来、与日俱进？（）": {
+    "optionList": [
+      {
+        "content": "18",
+        "isCorrect": 2
+      },
+      {
+        "content": "24",
+        "isCorrect": 1
+      },
+      {
+        "content": "16",
+        "isCorrect": 2
+      },
+      {
+        "content": "20",
         "isCorrect": 2
       }
     ],
