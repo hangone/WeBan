@@ -2827,6 +2827,27 @@
     ],
     "type": 1
   },
+  "《森林防火条例》规定，预防和扑灭森林火灾，保护森林资源，是（）。": {
+    "optionList": [
+      {
+        "content": "各级林业部门的事情",
+        "isCorrect": 2
+      },
+      {
+        "content": "每个公民应尽的义务",
+        "isCorrect": 1
+      },
+      {
+        "content": "驻林区各单位的事情",
+        "isCorrect": 2
+      },
+      {
+        "content": "森林所有者的事情",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "《消防法》规定，新闻、广播、电视等有关单位，应当(    )。": {
     "optionList": [
       {
@@ -17040,6 +17061,27 @@
       }
     ],
     "type": 1
+  },
+  "吸烟影响人的哪些方面？": {
+    "optionList": [
+      {
+        "content": "嗅觉",
+        "isCorrect": 1
+      },
+      {
+        "content": "味觉",
+        "isCorrect": 1
+      },
+      {
+        "content": "皮肤状态",
+        "isCorrect": 1
+      },
+      {
+        "content": "生殖能力",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
   },
   "吸烟对环境没有影响，这个说法正确吗？": {
     "optionList": [
