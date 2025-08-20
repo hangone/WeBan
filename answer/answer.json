@@ -2004,6 +2004,27 @@
     ],
     "type": 1
   },
+  "“理想受害者”的特征有哪些？": {
+    "optionList": [
+      {
+        "content": "处在不会引起非议的地点",
+        "isCorrect": 1
+      },
+      {
+        "content": "能建立一定的影响力",
+        "isCorrect": 1
+      },
+      {
+        "content": "相对柔弱的女性",
+        "isCorrect": 1
+      },
+      {
+        "content": "正在做一件有合理目的的行为",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "“破窗效应”中的“第一扇破窗”意指？": {
     "optionList": [
       {
@@ -4481,6 +4502,27 @@
       }
     ],
     "type": 1
+  },
+  "下列特征不属于“理想受害人”的是：": {
+    "optionList": [
+      {
+        "content": "正在偷东西的男子",
+        "isCorrect": 1
+      },
+      {
+        "content": "经常出入色情场所的女子",
+        "isCorrect": 1
+      },
+      {
+        "content": "受害者和犯罪嫌疑人没有任何关系",
+        "isCorrect": 2
+      },
+      {
+        "content": "高大的男性",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
   },
   "下列用电存在安全隐患的是：": {
     "optionList": [
@@ -23803,6 +23845,19 @@
     "optionList": [
       {
         "content": "正规的有安全保障的车。",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "实习的时间很短，还用签协议吗？": {
+    "optionList": [
+      {
+        "content": "实习的时间不长，协议就别签了，还麻烦。",
+        "isCorrect": 2
+      },
+      {
+        "content": "必须得签，这是保证我们基本合法权益的方式。",
         "isCorrect": 1
       }
     ],
