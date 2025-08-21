@@ -240,8 +240,8 @@ class WeBanClient:
                 return
             exam_plans = exam_plans["data"]
             for plan in exam_plans:
-                if project["finished"] == 1:
-                    self.log.success(f"考试项目 {project['projectName']}/{plan['examPlanName']} 已完成，最高成绩 {plan['examScore']} 分。已考试次数 {plan['examFinishNum']} 次，还剩 {plan['examOddNum']} 次。需要重考吗(y/N)？")
+                if plan["examFinishNum"] != 0:
+                    self.log.success(f"考试项目 {project['projectName']}/{plan['examPlanName']} 最高成绩 {plan['examScore']} 分。已考试次数 {plan['examFinishNum']} 次，还剩 {plan['examOddNum']} 次。需要重考吗(y/N)？")
                     if input().strip().lower() != "y":
                         self.log.info(f"不重考项目 {project['projectName']}")
                         continue
@@ -250,13 +250,13 @@ class WeBanClient:
                 # 是否存在完成的考试记录
                 before_paper = self.api.exam_before_paper(plan["id"])
                 if before_paper.get("code", -1) != "0":
-                    self.log.error(f"获取考试记录失败：{before_paper}")
-                before_paper = before_paper.get("data", {})
-                if before_paper.get("isExistedNotSubmit"):
-                    self.log.warning(f"存在未提交的考试数据，继续将清除未提交数据（Y/n）:")
-                    if input().lower() == "n":
-                        self.log.error(f"用户取消")
-                        return
+                    self.log.error(f"考试项目 {project['projectName']}/{plan['examPlanName']} 获取考试记录失败：{before_paper}")
+                # before_paper = before_paper.get("data", {})
+                # if before_paper.get("isExistedNotSubmit"):
+                #     self.log.warning(f"考试项目 {project['projectName']}/{plan['examPlanName']} 存在未提交的考试数据，继续将清除未提交数据（Y/n）:")
+                #     if input().lower() == "n":
+                #         self.log.error(f"用户取消")
+                #         return
 
                 # 预请求
                 prepare_paper = self.api.exam_prepare_paper(user_exam_plan_id)
