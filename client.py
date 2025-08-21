@@ -286,12 +286,12 @@ class WeBanClient:
                     no_answer.append(question)
 
                 self.log.info(f"题目总数：{question_num}，有答案的题目数：{len(have_answer)}，无答案的题目数：{len(no_answer)}")
-                correct_rate = len(have_answer) / question_num
-                if correct_rate < 0.9:
-                    self.log.warning(f"题库正确率 {correct_rate} 少于 90%，是否继续考试？（Y/n）")
-                    if input().lower() == "n":
-                        self.log.error(f"用户取消")
-                        continue
+                # correct_rate = len(have_answer) / question_num
+                # if correct_rate < 0.9:
+                #     self.log.warning(f"题库正确率 {correct_rate} 少于 90%，是否继续考试？（Y/n）")
+                #     if input().lower() == "n":
+                #         self.log.error(f"用户取消")
+                #         continue
 
                 for i, question in enumerate(no_answer):
                     self.log.info(f"[{i}/{len(no_answer)}]题目不在题库中，请手动选择答案")
