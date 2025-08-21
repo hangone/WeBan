@@ -1,4 +1,25 @@
 {
+  "\"西农精神\"是______。": {
+    "optionList": [
+      {
+        "content": "扎根杨凌、胸怀社稷",
+        "isCorrect": 1
+      },
+      {
+        "content": "开发西北、兴农兴学",
+        "isCorrect": 2
+      },
+      {
+        "content": "脚踏黄土、情系三农",
+        "isCorrect": 1
+      },
+      {
+        "content": "甘于吃苦、追求卓越",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "(       )是麻醉诱导常用的药物之一。": {
     "optionList": [
       {
@@ -73,6 +94,27 @@
     ],
     "type": 1
   },
+  "1936年秋，国立西北农林专科学校______基本告竣，成为当时的\"西北第一高楼\"。": {
+    "optionList": [
+      {
+        "content": "北校区二号楼",
+        "isCorrect": 2
+      },
+      {
+        "content": "北校区三号楼",
+        "isCorrect": 1
+      },
+      {
+        "content": "北校区四号楼",
+        "isCorrect": 2
+      },
+      {
+        "content": "北校区九号楼",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "1956年，交通大学西安新校在哪里隆重举行交大迁校后的首次开学典礼？（）": {
     "optionList": [
       {
@@ -110,6 +152,27 @@
       },
       {
         "content": "1996年",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "1999年9月，党中央、国务院为实施西部大开发战略和推进科教体制统筹改革，将同处杨凌的______所科教单位合并组建成立西北农林科技大学。": {
+    "optionList": [
+      {
+        "content": "6",
+        "isCorrect": 2
+      },
+      {
+        "content": "7",
+        "isCorrect": 1
+      },
+      {
+        "content": "8",
+        "isCorrect": 2
+      },
+      {
+        "content": "9",
         "isCorrect": 2
       }
     ],
@@ -209,6 +272,27 @@
       {
         "content": "冒充公检法诈骗",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "2024年9月，在我校工作和生活了31年的校友______院士荣获\"共和国勋章\"。": {
+    "optionList": [
+      {
+        "content": "山仑",
+        "isCorrect": 2
+      },
+      {
+        "content": "李振声",
+        "isCorrect": 1
+      },
+      {
+        "content": "康振生",
+        "isCorrect": 2
+      },
+      {
+        "content": "李振岐",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -561,6 +645,90 @@
     ],
     "type": 2
   },
+  "______年9月，西北农林科技大学入选第二批国家\"双一流\"建设高校。": {
+    "optionList": [
+      {
+        "content": "2019",
+        "isCorrect": 2
+      },
+      {
+        "content": "2020",
+        "isCorrect": 2
+      },
+      {
+        "content": "2021",
+        "isCorrect": 2
+      },
+      {
+        "content": "2022",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "______年，国立西北农学院农田水利研究部成立并开始招收研究生，是当时国内具有研究生招生资格的10所公立院校之一。": {
+    "optionList": [
+      {
+        "content": "1941",
+        "isCorrect": 1
+      },
+      {
+        "content": "1942",
+        "isCorrect": 2
+      },
+      {
+        "content": "1943",
+        "isCorrect": 2
+      },
+      {
+        "content": "1945",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "______年，学校进入国家\"211工程\"建设序列。": {
+    "optionList": [
+      {
+        "content": "2004",
+        "isCorrect": 2
+      },
+      {
+        "content": "2005",
+        "isCorrect": 1
+      },
+      {
+        "content": "2006",
+        "isCorrect": 2
+      },
+      {
+        "content": "2008",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "______年，学校进入国家\"985工程\"建设序列。": {
+    "optionList": [
+      {
+        "content": "2004",
+        "isCorrect": 1
+      },
+      {
+        "content": "2005",
+        "isCorrect": 2
+      },
+      {
+        "content": "2006",
+        "isCorrect": 2
+      },
+      {
+        "content": "2008",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "______，交通大学西安部分定名为西安交通大学，同年被列为全国十六所重点大学之一。（）": {
     "optionList": [
       {
@@ -639,6 +807,27 @@
       {
         "content": "海上丝绸之路经济带",
         "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "“三会一课”制度的内容是______。（ ）": {
+    "optionList": [
+      {
+        "content": "民主生活会，党支部委员会，党小组会，党课",
+        "isCorrect": 2
+      },
+      {
+        "content": "支部党员大会，全体人员会，领导班子会，党课",
+        "isCorrect": 2
+      },
+      {
+        "content": "支部党员大会，党支部委员会，组织生活会，党课",
+        "isCorrect": 2
+      },
+      {
+        "content": "支部党员大会，党支部委员会，党小组会，党课",
+        "isCorrect": 1
       }
     ],
     "type": 1
@@ -3145,6 +3334,48 @@
       {
         "content": "这个图片肯定是假的，不相信，不转账",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "一学年未通过课程学分累计超过该学年所选课程总学分（ ）的应予退学。": {
+    "optionList": [
+      {
+        "content": "40%",
+        "isCorrect": 2
+      },
+      {
+        "content": "50%",
+        "isCorrect": 2
+      },
+      {
+        "content": "60%",
+        "isCorrect": 2
+      },
+      {
+        "content": "70%",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "一学年未通过课程学分超过该学年所选课程总学分（）但不超过（）的（通识类选修课学分不计入，延长学习年限学生除外），应予留级。（ ）": {
+    "optionList": [
+      {
+        "content": "20%,50%",
+        "isCorrect": 2
+      },
+      {
+        "content": "40%,70%",
+        "isCorrect": 1
+      },
+      {
+        "content": "50%,70%",
+        "isCorrect": 2
+      },
+      {
+        "content": "50%,80%",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -5946,7 +6177,7 @@
         "isCorrect": 2
       }
     ],
-    "type": 1
+    "type": 2
   },
   "下面躲避雾霾的方式中错误的是：": {
     "optionList": [
@@ -6479,6 +6710,27 @@
     ],
     "type": 1
   },
+  "严重警告的处分期限为（ ）。": {
+    "optionList": [
+      {
+        "content": "不少于6个月",
+        "isCorrect": 2
+      },
+      {
+        "content": "不少于8个月",
+        "isCorrect": 1
+      },
+      {
+        "content": "不少于10个月",
+        "isCorrect": 2
+      },
+      {
+        "content": "不少于12个月",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "个人不得购买或者持有列入管控清单的重要设备和特殊生物因子，可以设立病原微生物实验室或者从事病原微生物实验活动。": {
     "optionList": [
       {
@@ -6649,6 +6901,69 @@
     ],
     "type": 1
   },
+  "中国共产党人的初心和使命，就是为中国人民______，为中华民族______。这个初心和使命是激励中国共产党人不断前进的根本动力。（ ）": {
+    "optionList": [
+      {
+        "content": "谋幸福，谋未来",
+        "isCorrect": 2
+      },
+      {
+        "content": "谋独立，谋复兴",
+        "isCorrect": 2
+      },
+      {
+        "content": "谋幸福，谋复兴",
+        "isCorrect": 1
+      },
+      {
+        "content": "谋独立，谋未来",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "中国共产党党员的党龄，从______之日算起。（ ）": {
+    "optionList": [
+      {
+        "content": "预备期满转为正式党员",
+        "isCorrect": 1
+      },
+      {
+        "content": "成为预备党员",
+        "isCorrect": 2
+      },
+      {
+        "content": "成为正式党员后一年",
+        "isCorrect": 2
+      },
+      {
+        "content": "递交申请书",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "中国共产党的最高理想和最终目标是（ ）。": {
+    "optionList": [
+      {
+        "content": "实现共产主义",
+        "isCorrect": 1
+      },
+      {
+        "content": "实现共同富裕",
+        "isCorrect": 2
+      },
+      {
+        "content": "实现社会主义现代化",
+        "isCorrect": 2
+      },
+      {
+        "content": "全面建成小康社会",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "中国共产党第十九次全国代表大会，是在全面建成小康社会决胜阶段、中国特色社会主义进入（）的关键时期召开的一次十分重要的大会。": {
     "optionList": [
       {
@@ -6749,6 +7064,23 @@
       },
       {
         "content": "4G",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "中国抗日战争胜利纪念日是（ ）": {
+    "optionList": [
+      {
+        "content": "8月15日",
+        "isCorrect": 2
+      },
+      {
+        "content": "9月2日",
+        "isCorrect": 2
+      },
+      {
+        "content": "9月3日",
         "isCorrect": 1
       }
     ],
@@ -10834,6 +11166,48 @@
     ],
     "type": 2
   },
+  "以下行为符合文明宿舍创建要求的是（ ）。": {
+    "optionList": [
+      {
+        "content": "在阳台堆放垃圾",
+        "isCorrect": 2
+      },
+      {
+        "content": "在公共区域随意放置垃圾",
+        "isCorrect": 2
+      },
+      {
+        "content": "定时清理宿舍地面卫生",
+        "isCorrect": 1
+      },
+      {
+        "content": "饲养和携带宠物",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "以下行为符合文明教室创建要求的是（ ）。": {
+    "optionList": [
+      {
+        "content": "经学校（学院）审批，使用教室开班会",
+        "isCorrect": 1
+      },
+      {
+        "content": "教室里座位不足，将大厅的椅子搬到教室里",
+        "isCorrect": 2
+      },
+      {
+        "content": "午休时间教室内没人，在教室内吃饭",
+        "isCorrect": 2
+      },
+      {
+        "content": "下晚自习将书本放在桌面上占位置",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "以下说法不正确的是：": {
     "optionList": [
       {
@@ -12323,6 +12697,27 @@
     ],
     "type": 2
   },
+  "侵占、诈骗他人钱物者，视情节轻重，给予（ ）以上处分。": {
+    "optionList": [
+      {
+        "content": "警告",
+        "isCorrect": 2
+      },
+      {
+        "content": "严重警告",
+        "isCorrect": 1
+      },
+      {
+        "content": "记过",
+        "isCorrect": 2
+      },
+      {
+        "content": "留校察看",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "俗话说：兵马未动，粮草先行。与这种想法相近的成语是哪个？": {
     "optionList": [
       {
@@ -12613,6 +13008,27 @@
     ],
     "type": 2
   },
+  "偷窥、偷拍、偷录他人隐私或猥亵、性骚扰他人的，性质恶劣或造成严重后果的，给予（ ）处分。": {
+    "optionList": [
+      {
+        "content": "警告",
+        "isCorrect": 2
+      },
+      {
+        "content": "记过",
+        "isCorrect": 2
+      },
+      {
+        "content": "留校察看",
+        "isCorrect": 2
+      },
+      {
+        "content": "开除学籍",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
   "偷窥、偷拍可能面临的后果有：": {
     "optionList": [
       {
@@ -12824,6 +13240,69 @@
       }
     ],
     "type": 2
+  },
+  "党的思想路线是（ ）。": {
+    "optionList": [
+      {
+        "content": "一切从实际出发，理论联系实际，实事求是，在实践中检验真理和发展真理",
+        "isCorrect": 1
+      },
+      {
+        "content": "解放思想，实事求是，与时俱进，求真务实",
+        "isCorrect": 2
+      },
+      {
+        "content": "群众路线",
+        "isCorrect": 2
+      },
+      {
+        "content": "批评与自我批评",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "党的根本宗旨是（ ）。": {
+    "optionList": [
+      {
+        "content": "解放思想、实事求是",
+        "isCorrect": 2
+      },
+      {
+        "content": "全心全意为人民服务",
+        "isCorrect": 1
+      },
+      {
+        "content": "理论联系实际",
+        "isCorrect": 2
+      },
+      {
+        "content": "密切联系群众",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "党章规定，申请入党的同志，必须年满（  ）岁。": {
+    "optionList": [
+      {
+        "content": "16",
+        "isCorrect": 2
+      },
+      {
+        "content": "17",
+        "isCorrect": 2
+      },
+      {
+        "content": "18",
+        "isCorrect": 1
+      },
+      {
+        "content": "20",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "全世界商用喷气运输机飞行事故中，起飞和降落事故约占全部飞行事故的比例是（）。": {
     "optionList": [
@@ -15487,6 +15966,27 @@
     ],
     "type": 2
   },
+  "刻在学校奠基石上的______的16字，出自戴传贤先生亲笔撰写的《国立西北专科学校奠基祝词》。": {
+    "optionList": [
+      {
+        "content": "\"民为国本\"\"食为民天\"\"树基务坚\"\"树德务滋\"",
+        "isCorrect": 2
+      },
+      {
+        "content": "\"民为国本\"\"食为民生\"\"树德务滋\"\"树基务坚\"",
+        "isCorrect": 2
+      },
+      {
+        "content": "\"民为国本\"\"食为民天\"\"树德务滋\"\"树基务坚\"",
+        "isCorrect": 1
+      },
+      {
+        "content": "\"民为国本\"\"食为民生\"\"树德务基\"\"树基务滋\"",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "前往易发洪灾的地区前，应该做好哪些准备？": {
     "optionList": [
       {
@@ -15703,6 +16203,27 @@
       }
     ],
     "type": 2
+  },
+  "北校区五台山东南侧下有一排窑洞，被称为\"院士摇篮\"，窑洞的名称是______。": {
+    "optionList": [
+      {
+        "content": "东南窑",
+        "isCorrect": 1
+      },
+      {
+        "content": "白舍窑",
+        "isCorrect": 2
+      },
+      {
+        "content": "横坡窑洞",
+        "isCorrect": 2
+      },
+      {
+        "content": "郭家沟村",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "十九大的主题是：不忘初心，（），高举中国特色社会主义伟大旗帜，决胜全面建成小康社会，夺取新时代中国特色社会主义伟大胜利，为实现中华民族伟大复兴的中国梦不懈奋斗。": {
     "optionList": [
@@ -17104,6 +17625,19 @@
     ],
     "type": 1
   },
+  "吸烟对环境没有影响，这个说法正确吗？": {
+    "optionList": [
+      {
+        "content": "正确",
+        "isCorrect": 2
+      },
+      {
+        "content": "错误",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
   "吸烟影响人的哪些方面？": {
     "optionList": [
       {
@@ -17124,19 +17658,6 @@
       }
     ],
     "type": 2
-  },
-  "吸烟对环境没有影响，这个说法正确吗？": {
-    "optionList": [
-      {
-        "content": "正确",
-        "isCorrect": 2
-      },
-      {
-        "content": "错误",
-        "isCorrect": 1
-      }
-    ],
-    "type": 1
   },
   "吸烟除了带来健康问题，还可能引发很多问题。下面哪个不是吸烟可能引发的问题？": {
     "optionList": [
@@ -17185,6 +17706,27 @@
       {
         "content": "正确",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "周尧是中国古代昆虫学史研究的拓荒者，也是中国昆虫学史学科的奠基人，被国内外誉为\"亚洲之光\"\"虫坛怪杰\"\"______\"。": {
+    "optionList": [
+      {
+        "content": "蝶神",
+        "isCorrect": 1
+      },
+      {
+        "content": "虫神",
+        "isCorrect": 2
+      },
+      {
+        "content": "麦神",
+        "isCorrect": 2
+      },
+      {
+        "content": "草神",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -18487,6 +19029,27 @@
     ],
     "type": 1
   },
+  "在公众场合看到有人吵架，应当怎么做：": {
+    "optionList": [
+      {
+        "content": "拍照发朋友圈",
+        "isCorrect": 2
+      },
+      {
+        "content": "津津有味地看别人吵架",
+        "isCorrect": 2
+      },
+      {
+        "content": "看紧自己的物品",
+        "isCorrect": 1
+      },
+      {
+        "content": "上前劝架",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "在公共场所中除了交通工具是性骚扰的常发地点外，还有一处高频地点是（）。": {
     "optionList": [
       {
@@ -18657,6 +19220,27 @@
     ],
     "type": 1
   },
+  "在各类评奖评优、考核评价中徇私舞弊、弄虚作假的，给予（ ）以下处分。": {
+    "optionList": [
+      {
+        "content": "警告",
+        "isCorrect": 2
+      },
+      {
+        "content": "严重警告",
+        "isCorrect": 2
+      },
+      {
+        "content": "记过",
+        "isCorrect": 1
+      },
+      {
+        "content": "留校察看",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "在咖啡厅里，发现了免费wifi，但是手机显示安全性未知域的提醒，你会怎么做呢？（）": {
     "optionList": [
       {
@@ -18777,6 +19361,27 @@
       }
     ],
     "type": 2
+  },
+  "在宿舍留宿他人，屡教不改者，给予（ ）以上处分。": {
+    "optionList": [
+      {
+        "content": "留校察看",
+        "isCorrect": 2
+      },
+      {
+        "content": "记过",
+        "isCorrect": 2
+      },
+      {
+        "content": "警告",
+        "isCorrect": 2
+      },
+      {
+        "content": "严重警告",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
   },
   "在宿舍，要想做到预防火灾，应该：": {
     "optionList": [
@@ -19382,6 +19987,27 @@
     ],
     "type": 1
   },
+  "在校内组织宗教活动、传播宗教思想、发展教徒者，视情节轻重，给予（ ）处分。": {
+    "optionList": [
+      {
+        "content": "警告或严重警告",
+        "isCorrect": 2
+      },
+      {
+        "content": "严重警告或记过",
+        "isCorrect": 2
+      },
+      {
+        "content": "记过或留校察看",
+        "isCorrect": 2
+      },
+      {
+        "content": "留校察看或开除学籍",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
   "在校园内购买和使用电器，应选择具有(    )标志的产品。": {
     "optionList": [
       {
@@ -19436,6 +20062,27 @@
       }
     ],
     "type": 2
+  },
+  "在校外违法违纪、败坏学校声誉的，视情节给予（ ）以上处分。": {
+    "optionList": [
+      {
+        "content": "警告",
+        "isCorrect": 2
+      },
+      {
+        "content": "严重警告",
+        "isCorrect": 2
+      },
+      {
+        "content": "记过",
+        "isCorrect": 1
+      },
+      {
+        "content": "留校察看",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "在校大学生庄某利用微信多次为境外间谍情报机关提供国家秘密，需要承担 （   ）。": {
     "optionList": [
@@ -19707,6 +20354,27 @@
     "optionList": [
       {
         "content": "需要注意留学国对勤工俭学年龄、工时、时间等的规定。",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "在留校察看处分期内，再次违纪的，给予（ ）处分。": {
+    "optionList": [
+      {
+        "content": "警告",
+        "isCorrect": 2
+      },
+      {
+        "content": "记过",
+        "isCorrect": 2
+      },
+      {
+        "content": "留校察看",
+        "isCorrect": 2
+      },
+      {
+        "content": "开除学籍",
         "isCorrect": 1
       }
     ],
@@ -21846,6 +22514,23 @@
     ],
     "type": 1
   },
+  "如何远离套现行为？": {
+    "optionList": [
+      {
+        "content": "树立正确的消费观",
+        "isCorrect": 1
+      },
+      {
+        "content": "珍惜个人信用",
+        "isCorrect": 1
+      },
+      {
+        "content": "树立守法意识",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "如何避免汇款时间差带来的风险？": {
     "optionList": [
       {
@@ -23449,6 +24134,90 @@
     ],
     "type": 1
   },
+  "学校历史最早可追溯至创办于______年的国立西北农林专科学校。": {
+    "optionList": [
+      {
+        "content": "1924",
+        "isCorrect": 2
+      },
+      {
+        "content": "1934",
+        "isCorrect": 1
+      },
+      {
+        "content": "1936",
+        "isCorrect": 2
+      },
+      {
+        "content": "1937",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "学校对违反法律法规和学校纪律行为的学生给予的全部纪律处分有（ ）。": {
+    "optionList": [
+      {
+        "content": "警告、记过、留校察看、开除学籍",
+        "isCorrect": 2
+      },
+      {
+        "content": "警告、严重警告、记过、留校察看、开除学籍",
+        "isCorrect": 1
+      },
+      {
+        "content": "通报批评、警告、严重警告、记过、留校察看、开除学籍",
+        "isCorrect": 2
+      },
+      {
+        "content": "通报批评、警告、严重警告、记过、记大过、留校察看、开除学籍",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "学校的办学理念是______。": {
+    "optionList": [
+      {
+        "content": "经国本",
+        "isCorrect": 1
+      },
+      {
+        "content": "解民生",
+        "isCorrect": 1
+      },
+      {
+        "content": "尚科学",
+        "isCorrect": 1
+      },
+      {
+        "content": "促发展",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
+  "学校的奠基日是______；校庆日是______。": {
+    "optionList": [
+      {
+        "content": "4月20日",
+        "isCorrect": 1
+      },
+      {
+        "content": "9月10日",
+        "isCorrect": 1
+      },
+      {
+        "content": "9月20日",
+        "isCorrect": 2
+      },
+      {
+        "content": "9月21日",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
   "学校的校庆纪念日是在哪一天，谓之“四通八达”，意喻学校蓬勃发展之意？（）": {
     "optionList": [
       {
@@ -23469,6 +24238,77 @@
       }
     ],
     "type": 1
+  },
+  "学校的校训是\"______\"。": {
+    "optionList": [
+      {
+        "content": "诚",
+        "isCorrect": 1
+      },
+      {
+        "content": "朴",
+        "isCorrect": 1
+      },
+      {
+        "content": "励",
+        "isCorrect": 2
+      },
+      {
+        "content": "勇",
+        "isCorrect": 1
+      },
+      {
+        "content": "信",
+        "isCorrect": 2
+      },
+      {
+        "content": "毅",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "学校筹委会提出定址张家港（今杨凌）的理由是______。": {
+    "optionList": [
+      {
+        "content": "此地乃古周原余脉，后稷教稼故地，历史意义深远",
+        "isCorrect": 1
+      },
+      {
+        "content": "由北而南三道原便于农作物试验，渭河草滩堪为牧场，深入秦岭可开展森林研究",
+        "isCorrect": 1
+      },
+      {
+        "content": "张家岗气势雄伟，隋文帝、唐太宗之遗迹昭然可考，化物蔚然",
+        "isCorrect": 1
+      },
+      {
+        "content": "陇海铁路将从校前经过，交通较为便利",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "学校自诞生之日起，就与国家和民族的命运休戚相关、荣辱与共，肩负着______的历史重任。": {
+    "optionList": [
+      {
+        "content": "建设西北",
+        "isCorrect": 1
+      },
+      {
+        "content": "复兴西北",
+        "isCorrect": 2
+      },
+      {
+        "content": "兴学兴农",
+        "isCorrect": 1
+      },
+      {
+        "content": "培育英才",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
   },
   "学生不得在学校进行宗教活动，违反规定经教育不改者，视情节轻重，给予______以上处分。（）": {
     "optionList": [
@@ -23511,6 +24351,27 @@
       },
       {
         "content": "20",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "学生休学一般以1年为期（不足1年按1年计），如有需要经学校批准可再次休学，一般情况下累计休学年限不得超过（ ）。": {
+    "optionList": [
+      {
+        "content": "4年",
+        "isCorrect": 2
+      },
+      {
+        "content": "3年",
+        "isCorrect": 2
+      },
+      {
+        "content": "2年",
+        "isCorrect": 1
+      },
+      {
+        "content": "1年",
         "isCorrect": 2
       }
     ],
@@ -23573,6 +24434,27 @@
     ],
     "type": 1
   },
+  "学生对处分决定有异议的，可以在接到学生处分决定书之日起（ ）日内，向学校学生申诉处理委员会提出书面申诉。": {
+    "optionList": [
+      {
+        "content": "3",
+        "isCorrect": 2
+      },
+      {
+        "content": "5",
+        "isCorrect": 2
+      },
+      {
+        "content": "10",
+        "isCorrect": 1
+      },
+      {
+        "content": "15",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "学生应当自觉遵守公民道德规范，学生举止行为违反公民道德规范，经教育不改者，给予______以上处分。（）": {
     "optionList": [
       {
@@ -23593,6 +24475,27 @@
       },
       {
         "content": "开除学籍",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "学生应征入伍参加中国人民解放军，保留学籍至退役后（ ）。": {
+    "optionList": [
+      {
+        "content": "一年",
+        "isCorrect": 2
+      },
+      {
+        "content": "两年",
+        "isCorrect": 1
+      },
+      {
+        "content": "三年",
+        "isCorrect": 2
+      },
+      {
+        "content": "四年",
         "isCorrect": 2
       }
     ],
@@ -31347,6 +32250,27 @@
     ],
     "type": 1
   },
+  "旷课累计达（ ）的，给予记过处分。": {
+    "optionList": [
+      {
+        "content": "25学时",
+        "isCorrect": 2
+      },
+      {
+        "content": "35学时",
+        "isCorrect": 2
+      },
+      {
+        "content": "45学时",
+        "isCorrect": 1
+      },
+      {
+        "content": "50学时以上",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "明知他人有间谍犯罪行为，在国家安全机关向其调查有关情况、收集有关证据时，拒绝提供，情节严重的，处（   ）。": {
     "optionList": [
       {
@@ -32019,6 +32943,27 @@
       {
         "content": "否",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "未经批准私自校外住宿的，给予（ ）处分。": {
+    "optionList": [
+      {
+        "content": "警告",
+        "isCorrect": 2
+      },
+      {
+        "content": "严重警告",
+        "isCorrect": 2
+      },
+      {
+        "content": "警告或严重警告",
+        "isCorrect": 1
+      },
+      {
+        "content": "留校察看",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -35866,6 +36811,23 @@
     ],
     "type": 1
   },
+  "现行党章是（ ）通过的。": {
+    "optionList": [
+      {
+        "content": "党的十九大",
+        "isCorrect": 2
+      },
+      {
+        "content": "党的二十大",
+        "isCorrect": 1
+      },
+      {
+        "content": "党的二十届三中全会",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "现行宪法规定，依法服兵役和参加民兵组织是我国公民的（ ）。": {
     "optionList": [
       {
@@ -36500,6 +37462,27 @@
       }
     ],
     "type": 2
+  },
+  "申请入党的人，要填写入党志愿书，要有______名正式党员作介绍人，要经过支部大会通过和上级党组织批准，并且经过预备期的考察，才能成为正式党员。（ ）": {
+    "optionList": [
+      {
+        "content": "四",
+        "isCorrect": 2
+      },
+      {
+        "content": "三",
+        "isCorrect": 2
+      },
+      {
+        "content": "两",
+        "isCorrect": 1
+      },
+      {
+        "content": "一",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "申请取得剧毒化学品购买许可证，申请人应当向所在地县级人民政府公安机关提交（）材料。": {
     "optionList": [
@@ -37600,6 +38583,27 @@
       {
         "content": "错",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "私拉电（网）线、使用明火、违章安装或使用发热大功率电器，经批评教育不改者，给予（ ）处分。": {
+    "optionList": [
+      {
+        "content": "警告",
+        "isCorrect": 2
+      },
+      {
+        "content": "严重警告",
+        "isCorrect": 2
+      },
+      {
+        "content": "警告或严重警告",
+        "isCorrect": 1
+      },
+      {
+        "content": "留校察看",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -39357,6 +40361,27 @@
     ],
     "type": 1
   },
+  "若在考试过程中有旁窥、交头接耳、互打暗号或者手势的，记如下哪种处分？（ ）": {
+    "optionList": [
+      {
+        "content": "监考人员予以纠正",
+        "isCorrect": 2
+      },
+      {
+        "content": "给予警告或严重警告处分",
+        "isCorrect": 2
+      },
+      {
+        "content": "给予记过或留校观察处分",
+        "isCorrect": 1
+      },
+      {
+        "content": "取消考试资格",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "若山坡上明显出现裂缝，并有加宽、加长的现象，这意味着可能发生滑坡。": {
     "optionList": [
       {
@@ -39881,6 +40906,27 @@
     ],
     "type": 2
   },
+  "被毛主席赞誉\"一个小麦品种挽救了大半个新中国\"的科学家是______。": {
+    "optionList": [
+      {
+        "content": "周尧",
+        "isCorrect": 2
+      },
+      {
+        "content": "辛树帜",
+        "isCorrect": 2
+      },
+      {
+        "content": "赵洪璋",
+        "isCorrect": 1
+      },
+      {
+        "content": "李振岐",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "裸聊诈骗陷阱的套路是：": {
     "optionList": [
       {
@@ -39901,6 +40947,44 @@
       }
     ],
     "type": 2
+  },
+  "西北农林科技大学前身国立西北农林专科学校的首任校长是______。": {
+    "optionList": [
+      {
+        "content": "杨震",
+        "isCorrect": 2
+      },
+      {
+        "content": "辛树帜",
+        "isCorrect": 2
+      },
+      {
+        "content": "于右任",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "西北农林科技大学校徽由大圆环、中文校名、英文校名、内圆环象形图案和学校创建年份\"1934\"构成，______三色套印。": {
+    "optionList": [
+      {
+        "content": "金、白、蓝",
+        "isCorrect": 2
+      },
+      {
+        "content": "金、红、绿",
+        "isCorrect": 2
+      },
+      {
+        "content": "金、白、绿",
+        "isCorrect": 1
+      },
+      {
+        "content": "金、白、红",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "西安交通大学排名挺进ESI全球前万分之一的学科是：（）": {
     "optionList": [
