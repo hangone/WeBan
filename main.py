@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 import threading
 import traceback
@@ -16,6 +17,9 @@ logger = logger.bind(account="系统")
 log_format = "<green>{time:YYYY-MM-DD HH:mm:ss}</green>|<level>{level:<7}</level>|<blue>{extra[account]}</blue>|<cyan>{message}</cyan>"
 logger.add(sink=sys.stdout, colorize=True, format=log_format)
 logger.add("weban.log", encoding="utf-8", format=log_format, retention="1 days")
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+config_path = os.path.join(current_dir, "config.json")
 
 # 同步锁，防止同时读写题库
 sync_lock = threading.Lock()
@@ -99,7 +103,7 @@ def create_initial_config() -> list[dict]:
 
     configs = [{"tenant_name": tenant_name, "account": account, "password": password, "study": True, "user": {"userId": "", "token": ""}, "study_time": 15, "exam": True, "exam_use_time": 250}]
 
-    with open("config.json", "w", encoding="utf-8") as f:
+    with open(config_path, "w", encoding="utf-8") as f:
         f.write(json.dumps(configs, indent=2, ensure_ascii=False))
 
     return configs
@@ -112,7 +116,7 @@ if __name__ == "__main__":
 
         # 加载配置文件
         try:
-            configs = json.load(open("config.json", encoding="utf-8"))
+            configs = json.load(open(config_path, encoding="utf-8"))
         except FileNotFoundError:
             configs = create_initial_config()
         except json.JSONDecodeError:
