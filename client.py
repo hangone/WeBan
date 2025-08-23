@@ -294,9 +294,7 @@ class WeBanClient:
                 failed_questions = []  # 答题失败的题目
 
                 for question in question_list:
-                    title = clean_text(question["title"])
-                    # 检查标题是否存在且所有选项都在答案中
-                    if title in answers_json and all(clean_text(opt["content"]) in answers_json[title] for opt in question["optionList"]):
+                    if clean_text(question["title"]) in answers_json:
                         have_answer.append(question)
                     else:
                         no_answer.append(question)
@@ -323,7 +321,7 @@ class WeBanClient:
                         answer = input("请输入答案序号（多个选项用英文逗号分隔，如 1,2,3,4）：").replace(" ", "").replace("，", ",")
                         candidates = [ans.strip() for ans in answer.split(",") if ans.strip()]
                         if all(ans.isdigit() and 1 <= int(ans) <= opt_count for ans in candidates):
-                            answers_ids = [question["optionList"][int(ans)-1]["id"] for ans in candidates]
+                            answers_ids = [question["optionList"][int(ans) - 1]["id"] for ans in candidates]
                             for ans in candidates:
                                 self.log.info(f"选择答案：{ans}，内容：{question['optionList'][int(ans)-1]['content']}")
                         else:
