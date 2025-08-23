@@ -8,7 +8,7 @@ from loguru import logger
 
 from client import WeBanClient
 
-VERSION = "v3.5.10"
+VERSION = "v3.5.11"
 
 # 日志
 logger.remove()
