@@ -14,20 +14,14 @@
 
 从 [Releases](https://github.com/hangone/WeBan/releases) 下载 WeBan.exe 单文件运行，根据提示输入信息。
 
-如果被浏览器拦截请放行。如果密码输入错误，请删除 config.json 文件后重试。
-
-| 类型                    | 镜像下载地址                                                                                               | Github 下载地址                                                                        |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Windows                 | [镜像下载地址](https://ghfast.top/https://github.com/hangone/WeBan/releases/latest/download/WeBan.exe)     | [Github 下载地址](https://github.com/hangone/WeBan/releases/latest/download/WeBan.exe) |
-| Linux                   | [镜像下载地址](https://ghfast.top/https://github.com/hangone/WeBan/releases/latest/download/WeBan)         | [Github 下载地址](https://github.com/hangone/WeBan/releases/latest/download/WeBan) |
-
-### 部分无法直接登录的学校
-
-有些从迎新系统跳转的可以试试账号密码都是学号，比如北京交通大学
-
-软件使用至少需要 `tenant_code` `userId` `token` 三个参数，可通过浏览器 F12 开发者选项中 Local Storage 的 user 项中获取。
+| 类型    | 镜像下载地址                                                                                           | Github 下载地址                                                                        |
+| ------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| Windows | [镜像下载地址](https://ghfast.top/https://github.com/hangone/WeBan/releases/latest/download/WeBan.exe) | [Github 下载地址](https://github.com/hangone/WeBan/releases/latest/download/WeBan.exe) |
+| Linux   | [镜像下载地址](https://ghfast.top/https://github.com/hangone/WeBan/releases/latest/download/WeBan)     | [Github 下载地址](https://github.com/hangone/WeBan/releases/latest/download/WeBan)     |
 
 ## 配置说明
+
+软件使用至少需要 `tenant_name` `userId` `token` 三个参数，可通过浏览器 F12 开发者选项中 Local Storage 的 user 项中获取。
 
 ```json
 // config.json
@@ -48,7 +42,7 @@
   {
     "tenant_name": "学校名称",
     "account": "账号2",
-    "password": "密码2",
+    "password": "密码2"
   }
 ]
 ```
@@ -57,7 +51,7 @@
 
 1.  安装 Python3([下载地址](https://www.python.org/downloads))（可选使用 [uv](https://github.com/astral-sh/uv)）和 Git([下载地址](https://git-scm.com))
 
-2. 打开终端，克隆本仓库
+2.  打开终端，克隆本仓库
 
 ```bash
 git clone https://github.com/hangone/WeBan
@@ -80,6 +74,28 @@ python main.py
 ## 演示
 
 ![image1](images/image1.png)
+
+## 常见问题
+
+- ### 部分无法直接登录的学校
+
+有些从迎新系统跳转的可以试试账号密码都是学号，比如北京交通大学
+
+其他学校可使用 Token 登录
+
+- ### 下载
+
+如果被浏览器拦截请放行。如果密码输入错误，请删除 config.json 文件后重试
+
+- ### 学习
+
+1. 有腾讯云验证码的还不支持完成
+
+2. 学习进度不更新可能是被风控遇到了需要验证码的课程，请去网页上完成一次后重试
+
+- ### 考试
+
+如果遇到“系统检测到您的行为存在异常”，可以在网页开启一次考试后重新运行，使用 Token 登录
 
 ## 鸣谢
 
