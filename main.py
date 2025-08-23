@@ -8,7 +8,7 @@ from loguru import logger
 
 from client import WeBanClient
 
-VERSION = "v3.5.4"
+VERSION = "v3.5.5"
 
 # 日志
 logger.remove()
@@ -26,20 +26,26 @@ def run_account(config, account_index):
     tenant_name = config.get("tenant_name")
     account = config.get("account")
     password = config.get("password")
+    user = config.get("user")
     study = config.get("study", True)
     study_time = config.get("study_time", 15)
-    exam = config.get("exam", False)
+    exam = config.get("exam", True)
     exam_use_time = config.get("exam_use_time", 250)
 
-    if not all([account, password, tenant_name]):
-        logger.error(f"[账号{account_index+1}] config.json 文件中缺少必要的配置信息 (tenant_name, account, password): {config}")
-        return False
-
     try:
-        log = logger.bind(account=account)
+        log = logger.bind(account=account or user.get("userId"))
         log.info(f"开始执行")
 
-        client = WeBanClient(account, password, tenant_name, log)
+        if all([tenant_name, user.get("userId"), user.get("token")]):
+            log.info(f"使用 Token 登录")
+            client = WeBanClient(tenant_name, user=user, log=log)
+        elif all([tenant_name, account, password]):
+            log.info(f"使用密码登录")
+            client = WeBanClient(tenant_name, account, password, log=log)
+        else:
+            log.error(f"缺少必要的配置信息, (tenant_name, account, password) or (tenant_name, userId, token)")
+            return False
+        
         if not client.login():
             log.error(f"登录失败")
             return False
@@ -62,6 +68,10 @@ def run_account(config, account_index):
 
         log.success(f"执行完成")
         return True
+    
+    except PermissionError as e:
+        logger.error(f"权限错误: {e}")
+        return False
 
     except Exception as e:
         logger.error(f"运行失败: {e}")
@@ -83,7 +93,7 @@ def create_initial_config() -> list[dict]:
     account = input(f"账号{'请输入'+prompt.get('userNamePrompt', '')}：").strip()
     password = input(f"密码{'请输入'+prompt.get('passwordPrompt', '')}：").strip()
 
-    configs = [{"tenant_name": tenant_name, "account": account, "password": password, "study": True, "study_time": 15, "exam": True, "exam_use_time": 250}]
+    configs = [{"tenant_name": tenant_name, "account": account, "password": password, "study": True, "user": {"userId": "", "token": ""}, "study_time": 15, "exam": True, "exam_use_time": 250}]
 
     with open("config.json", "w", encoding="utf-8") as f:
         f.write(json.dumps(configs, indent=2, ensure_ascii=False))

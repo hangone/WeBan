@@ -29,18 +29,36 @@ def create_retry_session(baseurl) -> requests.Session:
     }
     return session
 
-
+def handle_response(response: requests.Response) -> Dict[str, Any]:
+    """
+    处理接口响应
+    :param response: 接口响应
+    :return: 处理后的结果
+    """
+    if response.status_code != 200:
+      if response.status_code == 403:
+          raise PermissionError("Token 无效，不允许同时登录，请重试")
+      if response.status_code == 401:
+          raise PermissionError("Token 无效，请检查账号信息")
+      print(f"请求失败：{response.status_code} {response.text}")
+      return {}
+    try:
+        response_data = response.json()
+    except json.JSONDecodeError:
+        print(f"响应内容不是有效的 JSON：{response.text}")
+        return {}
+    return response_data
 class WeBanAPI:
 
-    def __init__(self, account: str, password: str, tenant_code: str | None = None, baseurl: str = "https://weiban.mycourse.cn", timeout: int | tuple = (9.05, 15), session: requests.Session | None = None):
+    def __init__(self, tenant_code: str | None = None, account: str | None = None, password: str | None = None, user: Dict[str, str] | None = None, timeout: int | tuple = (9.05, 15), session: requests.Session | None = None):
         self.account = account
         self.password = password
         self.tenant_code = tenant_code
-        self.baseurl = baseurl
+        self.baseurl = "https://weiban.mycourse.cn"
         self.timeout = timeout  # 连接超时和读取超时
-        self.session = session or create_retry_session(baseurl)
-        self.user = {"userId": None, "token": ""} # 如果需要，可以在这里设置用户信息（登录后在 LocalStorage 的 user 中）
-        self.session.headers["X-Token"] = self.user.get("token", "")
+        self.session = session or create_retry_session(self.baseurl)
+        self.user = user or {"userId": "", "token": ""}
+        self.session.headers["X-Token"] = self.user["token"]
 
     @staticmethod
     def get_timestamp(int_len: int = 10, frac_len: int = 3) -> str:
@@ -72,22 +90,6 @@ class WeBanAPI:
         """
         self.tenant_code = tenant_code
 
-    def handle_response(self, response: requests.Response) -> Dict[str, Any]:
-        """
-        处理接口响应
-        :param response: 接口响应
-        :return: 处理后的结果
-        """
-        if response.status_code != 200:
-            print(f"请求失败：{response.status_code} {response.text}")
-            return {}
-        try:
-            response_data = response.json()
-        except json.JSONDecodeError:
-            print(f"响应内容不是有效的 JSON：{response.text}")
-            return {}
-        return response_data
-
     def get_tenant_list_with_letter(self) -> Dict[str, Any]:
         """
         获取学校代码和名称列表
@@ -109,7 +111,7 @@ class WeBanAPI:
         url = f"{self.baseurl}/pharos/login/getTenantListWithLetter.do"
         params = {"timestamp": self.get_timestamp()}
         response = self.session.post(url, params=params, timeout=self.timeout)
-        return self.handle_response(response)
+        return handle_response(response)
 
     def get_tenant_config(self, tenant_code: str | None = None) -> Dict[str, Any]:
         """
@@ -138,7 +140,7 @@ class WeBanAPI:
         params = {"timestamp": self.get_timestamp()}
         data = {"tenantCode": tenant_code or self.tenant_code}
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return self.handle_response(response)
+        return handle_response(response)
 
     def get_help(self, tenant_code: str | None = None) -> Dict[str, Any]:
         """
@@ -156,7 +158,7 @@ class WeBanAPI:
         params = {"timestamp": self.get_timestamp()}
         data = {"tenantCode": tenant_code or self.tenant_code}
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return self.handle_response(response)
+        return handle_response(response)
 
     def rand_letter_image(self, verify_time: str | None) -> bytes:
         """
@@ -228,7 +230,7 @@ class WeBanAPI:
             self.user = response.json()["data"]
             self.session.headers["X-Token"] = self.user["token"]
             self.password = None
-        return self.handle_response(response)
+        return handle_response(response)
 
     def list_study_task(self) -> Dict[str, Any]:
         """
@@ -269,7 +271,7 @@ class WeBanAPI:
         params = {"timestamp": self.get_timestamp()}
         data = {"tenantCode": self.tenant_code, "userId": self.user["userId"]}
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return self.handle_response(response)
+        return handle_response(response)
 
     def list_my_project(self, ended: int = 2) -> Dict[str, Any]:
         """
@@ -304,7 +306,7 @@ class WeBanAPI:
         params = {"timestamp": self.get_timestamp()}
         data = {"tenantCode": self.tenant_code, "userId": self.user["userId"], "ended": ended}
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return self.handle_response(response)
+        return handle_response(response)
 
     def show_progress(self, user_project_id: str) -> Dict[str, Any]:
         """
@@ -347,7 +349,7 @@ class WeBanAPI:
             "userProjectId": user_project_id,
         }
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return self.handle_response(response)
+        return handle_response(response)
 
     def list_category(self, user_project_id: str, choose_type: int = 3) -> Dict[str, Any]:
         """
@@ -378,7 +380,7 @@ class WeBanAPI:
             "chooseType": choose_type,
         }
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return self.handle_response(response)
+        return handle_response(response)
 
     def list_course(self, user_project_id: str, category_code: str, choose_type: int = 3) -> Dict[str, Any]:
         """
@@ -417,7 +419,7 @@ class WeBanAPI:
             "categoryCode": category_code,
         }
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return self.handle_response(response)
+        return handle_response(response)
 
     def study(self, course_id: str, user_project_id: str) -> Dict[str, Any]:
         """
@@ -439,7 +441,7 @@ class WeBanAPI:
             "userProjectId": user_project_id,
         }
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return self.handle_response(response)
+        return handle_response(response)
 
     def get_course_url(self, course_id: str, user_project_id: str) -> Dict[str, Any]:
         """
@@ -462,7 +464,7 @@ class WeBanAPI:
             "userProjectId": user_project_id,
         }
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return self.handle_response(response)
+        return handle_response(response)
 
     def invoke_captcha(self, user_course_id: str, user_project_id: str) -> Dict[str, Any]:
         """
@@ -481,12 +483,12 @@ class WeBanAPI:
             "tenantCode": self.tenant_code,
         }
         response = self.session.get(fetch_url, params=params, timeout=self.timeout)  # {"captcha":{"num":3,"questionId":"${uuid}","imageUrl":"${url}"}}
-        params["questionId"] = self.handle_response(response).get("captcha", {}).get("questionId", "")
+        params["questionId"] = handle_response(response).get("captcha", {}).get("questionId", "")
         coordinates = [{"x": x + randint(-5, 5), "y": y + randint(-5, 5)} for x, y in [(207, 436), (67, 424), (141, 427)]]
         data = {"coordinateXYs": json.dumps(coordinates, separators=(",", ":"))}
         time.sleep(3)
         response = self.session.post(check_url, params=params, data=data, timeout=self.timeout)
-        return self.handle_response(response)
+        return handle_response(response)
 
     def finish_by_token(self, user_course_id: str, token: str | None = None, course_type: str | None = "weiban") -> str:
         """
@@ -523,7 +525,7 @@ class WeBanAPI:
         url = f"https://lyra.mycourse.cn/lyraapi/study/course/finish.api"
         data = {"userActivityId": user_activity_id}
         response = self.session.post(url, data=data, timeout=self.timeout)
-        return self.handle_response(response)
+        return handle_response(response)
 
     def exam_list_plan(self, user_project_id: str) -> Dict[str, Any]:
         """
@@ -564,7 +566,7 @@ class WeBanAPI:
             "userProjectId": user_project_id,
         }
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return self.handle_response(response)
+        return handle_response(response)
 
     def exam_before_paper(self, user_exam_plan_id: str) -> Dict[str, Any]:
         """
@@ -587,7 +589,7 @@ class WeBanAPI:
             "userExamPlanId": user_exam_plan_id,
         }
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return self.handle_response(response)
+        return handle_response(response)
 
     def exam_prepare_paper(self, user_exam_plan_id: str) -> Dict[str, Any]:
         """
@@ -614,7 +616,7 @@ class WeBanAPI:
             "userExamPlanId": user_exam_plan_id,
         }
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return self.handle_response(response)
+        return handle_response(response)
 
     def exam_check_verify_code(self, user_exam_plan_id: str, verfy_code: str, verify_time: int | None) -> Dict[str, Any]:
         """
@@ -638,7 +640,7 @@ class WeBanAPI:
             "verifyCode": verfy_code,
         }
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return self.handle_response(response)
+        return handle_response(response)
 
     def exam_start_paper(self, user_exam_plan_id: str) -> Dict[str, Any]:
         """
@@ -707,7 +709,7 @@ class WeBanAPI:
             "userExamPlanId": user_exam_plan_id,
         }
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return self.handle_response(response)
+        return handle_response(response)
 
     def exam_record_question(self, user_exam_plan_id: str, question_id: str, use_time: int, answer_ids: list | None, exam_plan_id: str) -> Dict[str, Any]:
         """
@@ -736,7 +738,7 @@ class WeBanAPI:
         if answer_ids:
             data["answerIds"] = ",".join(answer_ids)
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return self.handle_response(response)
+        return handle_response(response)
 
     def exam_submit_paper(self, user_exam_plan_id: str) -> Dict[str, Any]:
         """
@@ -766,7 +768,7 @@ class WeBanAPI:
             "userExamPlanId": user_exam_plan_id,
         }
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return self.handle_response(response)
+        return handle_response(response)
 
     def exam_fresh_paper(self, user_exam_plan_id: str) -> Dict[str, Any]:
         """
@@ -819,7 +821,7 @@ class WeBanAPI:
             "userExamPlanId": user_exam_plan_id,
         }
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return self.handle_response(response)
+        return handle_response(response)
 
     def exam_review_paper(self, user_exam_id: str, is_retake: int = 2) -> Dict[str, Any]:
         """
@@ -874,7 +876,7 @@ class WeBanAPI:
             "isRetake": is_retake,
         }
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return self.handle_response(response)
+        return handle_response(response)
 
     def exam_list_history(self, exam_plan_id: str, exam_type: int) -> Dict[str, Any]:
         """
@@ -917,7 +919,7 @@ class WeBanAPI:
             "examType": exam_type,
         }
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return self.handle_response(response)
+        return handle_response(response)
 
     def download_answer(self) -> str:
         """

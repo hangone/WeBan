@@ -16,12 +16,17 @@ if TYPE_CHECKING:
 
 class WeBanClient:
 
-    def __init__(self, account: str, password: str, tenant_name: str, log=logger) -> None:
+    def __init__(self, tenant_name: str, account: str | None = None, password: str | None = None, user: Dict[str, str] | None = None, log=logger) -> None:
         self.log = log
         self.tenant_name = tenant_name
         self.study_time = 15
         self.ocr = self.get_ocr_instance()
-        self.api = WeBanAPI(account, password)
+        if user and all([user.get("userId"), user.get("token")]):
+            self.api = WeBanAPI(user=user)
+        elif all([tenant_name, account, password]):
+            self.api = WeBanAPI(account=account, password=password)
+        else:
+            raise ValueError("缺少必要的配置信息, (tenant_name, account, password) or (tenant_name, userId, token)")
         self.api.set_tenant_code(self.get_tenant_code())
 
     @staticmethod
@@ -105,24 +110,29 @@ class WeBanClient:
         return progress
 
     def login(self) -> Dict | None:
+        if self.api.user.get("userId"):
+            return self.api.user
         retry_limit = 3
         for i in range(retry_limit + 2):
             if i > 0:
-                self.log.info(f"登录失败，正在重试 {i}/{retry_limit+2} 次")
+                self.log.warning(f"登录失败，正在重试 {i}/{retry_limit+2} 次")
             verify_time = self.api.get_timestamp(13, 0)
             verify_image = self.api.rand_letter_image(verify_time)
             if i < retry_limit and self.ocr:
                 verify_code = self.ocr.classification(verify_image)
                 self.log.info(f"自动验证码识别结果: {verify_code}")
                 if len(verify_code) != 4:
-                    self.log.info(f"验证码识别失败，正在重试")
+                    self.log.warning(f"验证码识别失败，正在重试")
                     continue
             else:
                 open("verify_code.png", "wb").write(verify_image)
                 webbrowser.open(f"file://{os.path.abspath('verify_code.png')}")
                 verify_code = input(f"请查看 verify_code.png 输入验证码：")
             res = self.api.login(verify_code, int(verify_time))
-            if self.api.user["userId"]:
+            if res.get("detailCode") == "67":
+                self.log.warning(f"验证码识别失败，正在重试")
+                continue
+            if self.api.user.get("userId"):
                 return self.api.user
             self.log.error(f"登录出错，请检查 config.json 内账号密码，或删除文件后重试: {res}")
             break
