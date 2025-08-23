@@ -61,7 +61,7 @@ class WeBanClient:
                 _cache["ocr"] = ddddocr.DdddOcr(show_ad=False)
             except ImportError:
                 ddddocr = None
-                print("ddddocr 库未安装，验证码识别功能将不可用，请运行 'pip install ddddocr' 进行安装以启用自动识别。")
+                # print("ddddocr 库未安装，验证码识别功能将不可用，请运行 'pip install ddddocr' 进行安装以启用自动识别。")
 
         return _cache["ocr"]
 
