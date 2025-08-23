@@ -15,6 +15,10 @@ if TYPE_CHECKING:
     from ddddocr import DdddOcr
 
 
+current_dir = os.path.dirname(os.path.abspath(__file__))
+answer_dir = os.path.join(current_dir, "answer")
+answer_path = os.path.join(answer_dir, "answer.json")
+
 def clean_text(text):
     # 只保留字母、数字和汉字，自动去除所有符号和空格
     return re.sub(r"[^\w\u4e00-\u9fa5]", "", text)
@@ -233,7 +237,7 @@ class WeBanClient:
         # 加载题库
         answers_json = {}
 
-        with open("answer/answer.json", encoding="utf-8") as f:
+        with open(answer_path, encoding="utf-8") as f:
             for title, options in json.load(f).items():
                 title = clean_text(title)
                 if title not in answers_json:
@@ -372,13 +376,13 @@ class WeBanClient:
         同步答案
         :return:
         """
-        os.makedirs("answer", exist_ok=True)
-        if not os.path.exists("answer/answer.json"):
+        os.makedirs(answer_dir, exist_ok=True)
+        if not os.path.exists(answer_path):
             self.log.info(f"题库不存在，正在下载...")
-            with open("answer/answer.json", "w", encoding="utf-8") as f:
+            with open(answer_path, "w", encoding="utf-8") as f:
                 f.write(self.api.download_answer())
         try:
-            with open("answer/answer.json", encoding="utf-8") as f:
+            with open(answer_path, encoding="utf-8") as f:
                 answers_json = json.load(f)
         except Exception as e:
             self.log.error(f"读取题库失败，请重新下载题库：{e}")
@@ -398,5 +402,5 @@ class WeBanClient:
                             "optionList": [{"content": content, "isCorrect": is_correct} for content, is_correct in new_opts.items()],
                         }
 
-        with open("answer/answer.json", "w", encoding="utf-8") as f:
+        with open(answer_path, "w", encoding="utf-8") as f:
             f.write(json.dumps(answers_json, indent=2, ensure_ascii=False, sort_keys=True))
