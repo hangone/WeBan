@@ -25,7 +25,7 @@
 
 有些从迎新系统跳转的可以试试账号密码都是学号，比如北京交通大学
 
-软件使用至少需要 `tenant_code` `userId` `token` 三个参数，可通过浏览器 F12 开发者选项中 Local Storage 的 user 项中获取，下载源码后替换 api.py 第 42 行后正常运行。
+软件使用至少需要 `tenant_code` `userId` `token` 三个参数，可通过浏览器 F12 开发者选项中 Local Storage 的 user 项中获取。
 
 ## 配置说明
 
@@ -36,6 +36,10 @@
     "tenant_name": "学校名称",
     "account": "账号",
     "password": "密码",
+    "user": {
+      "userId": "可以从浏览器F12->存储->Local Storage->user 中找到",
+      "token": "可以从浏览器F12->存储->Local Storage->token 中找到"
+    },
     "study": true, // 是否学习课程
     "study_time": 15, // 每节课学习时间，单位（秒）
     "exam": true, // 是否考试
@@ -45,10 +49,6 @@
     "tenant_name": "学校名称",
     "account": "账号2",
     "password": "密码2",
-    "study": true,
-    "study_time": 15,
-    "exam": true,
-    "exam_use_time": 250
   }
 ]
 ```
