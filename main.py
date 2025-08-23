@@ -26,7 +26,7 @@ def run_account(config, account_index):
     tenant_name = config.get("tenant_name")
     account = config.get("account")
     password = config.get("password")
-    user = config.get("user")
+    user = config.get("user", {})
     study = config.get("study", True)
     study_time = config.get("study_time", 15)
     exam = config.get("exam", True)
