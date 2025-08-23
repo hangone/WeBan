@@ -7,6 +7,12 @@ on:
   workflow_dispatch:
 
 jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
   build:
     name: Build for ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -20,9 +26,9 @@ jobs:
           - os: windows-latest
             pyinstaller-ext: .exe
           - os: ubuntu-latest
-            pyinstaller-ext: ""
+            pyinstaller-ext: "_linux"
           - os: macos-latest
-            pyinstaller-ext: ".pkg"
+            pyinstaller-ext: "_macos"
 
     steps:
       - name: Checkout code
@@ -40,12 +46,13 @@ jobs:
           pip install pyinstaller loguru pycryptodome requests
 
       - name: Build base executable
-        run: pyinstaller -F main.py -n WeBan
+        run: pyinstaller -F main.py -n WeBan${{ matrix.pyinstaller-ext }}
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
+          draft: false
           files: |
             dist/WeBan${{ matrix.pyinstaller-ext }}
           generate_release_notes: true
