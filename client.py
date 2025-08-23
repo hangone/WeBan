@@ -32,7 +32,7 @@ class WeBanClient:
         elif all([tenant_name, account, password]):
             self.api = WeBanAPI(account=account, password=password)
         else:
-            raise ValueError("缺少必要的配置信息, (tenant_name, account, password) or (tenant_name, userId, token)")
+            self.api = WeBanAPI()
         self.api.set_tenant_code(self.get_tenant_code())
 
     @staticmethod
