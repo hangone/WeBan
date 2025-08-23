@@ -12471,6 +12471,27 @@
     ],
     "type": 1
   },
+  "使用干粉灭火器时，应该对准火源的哪个部位喷射？": {
+    "optionList": [
+      {
+        "content": "火源的顶部",
+        "isCorrect": 2
+      },
+      {
+        "content": "火源的中部",
+        "isCorrect": 2
+      },
+      {
+        "content": "火源的底部",
+        "isCorrect": 1
+      },
+      {
+        "content": "火源的任意部位",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "使用平衡车可能有的危险包括？": {
     "optionList": [
       {
