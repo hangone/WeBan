@@ -45,7 +45,7 @@ def run_account(config, account_index):
         else:
             log.error(f"缺少必要的配置信息, (tenant_name, account, password) or (tenant_name, userId, token)")
             return False
-        
+
         if not client.login():
             log.error(f"登录失败")
             return False
@@ -68,7 +68,7 @@ def run_account(config, account_index):
 
         log.success(f"执行完成")
         return True
-    
+
     except PermissionError as e:
         logger.error(f"权限错误: {e}")
         return False
@@ -83,7 +83,7 @@ def create_initial_config() -> list[dict]:
     """创建初始配置文件"""
     logger.error("config.json 文件不存在，请填写信息")
     tenant_name = input("请填写学校名称: ").strip()
-    client = WeBanClient("", "", tenant_name, logger)
+    client = WeBanClient(tenant_name=tenant_name, log=logger)
     tenant_config = client.api.get_tenant_config()
     if tenant_config.get("code", -1) != "0":
         logger.error(f"未找到学校 {tenant_name} 的配置，请检查学校名称是否正确")
