@@ -6177,7 +6177,7 @@
         "isCorrect": 2
       }
     ],
-    "type": 2
+    "type": 1
   },
   "下面躲避雾霾的方式中错误的是：": {
     "optionList": [
@@ -35866,6 +35866,27 @@
     ],
     "type": 1
   },
+  "湖北省是一个多民族省份，现有（ ）个少数民族自治州？": {
+    "optionList": [
+      {
+        "content": "2",
+        "isCorrect": 2
+      },
+      {
+        "content": "3",
+        "isCorrect": 2
+      },
+      {
+        "content": "1",
+        "isCorrect": 1
+      },
+      {
+        "content": "4",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "湖北省的梅雨期一般出现在什么时候？": {
     "optionList": [
       {
@@ -41581,6 +41602,10 @@
       {
         "content": "是",
         "isCorrect": 1
+      },
+      {
+        "content": "不是",
+        "isCorrect": 2
       }
     ],
     "type": 1
