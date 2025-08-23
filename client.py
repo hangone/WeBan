@@ -7,11 +7,17 @@ from typing import Any, Dict, Optional, TYPE_CHECKING, Union
 from urllib.parse import parse_qs, urlparse
 
 from loguru import logger
+import re
 
 from api import WeBanAPI
 
 if TYPE_CHECKING:
     from ddddocr import DdddOcr
+
+
+def clean_text(text):
+    # 只保留字母、数字和汉字，自动去除所有符号和空格
+    return re.sub(r"[^\w\u4e00-\u9fa5]", "", text)
 
 
 class WeBanClient:
@@ -229,9 +235,7 @@ class WeBanClient:
 
         with open("answer/answer.json", encoding="utf-8") as f:
             for title, options in json.load(f).items():
-                correct_answers = [answer["content"] for answer in options.get("optionList", []) if answer["isCorrect"] == 1]
-                if correct_answers:
-                    answers_json[title] = correct_answers
+                answers_json[clean_text(title)] = [clean_text(a["content"]) for a in options.get("optionList", []) if a["isCorrect"]]
 
         # 获取项目
         projects = self.api.list_my_project()
@@ -289,11 +293,13 @@ class WeBanClient:
                 no_answer = []  # 无答案的题目
                 failed_questions = []  # 答题失败的题目
 
-                for i, question in enumerate(question_list):
-                    if question["title"] in answers_json:
+                for question in question_list:
+                    title = clean_text(question["title"])
+                    # 检查标题是否存在且所有选项都在答案中
+                    if title in answers_json and all(clean_text(opt["content"]) in answers_json[title] for opt in question["optionList"]):
                         have_answer.append(question)
-                        continue
-                    no_answer.append(question)
+                    else:
+                        no_answer.append(question)
 
                 self.log.info(f"题目总数：{question_num}，有答案的题目数：{len(have_answer)}，无答案的题目数：{len(no_answer)}")
                 # correct_rate = len(have_answer) / question_num
@@ -304,20 +310,25 @@ class WeBanClient:
                 #         continue
 
                 for i, question in enumerate(no_answer):
-                    self.log.info(f"[{i}/{len(no_answer)}]题目不在题库中，请手动选择答案")
-                    self.log.info(f"题目类型：{question['typeLabel']}，题目标题：{question['title']}")
-                    for j, option in enumerate(question["optionList"]):
-                        self.log.info(f"{j + 1}. {option['content']}")
+                    self.log.info(f"[{i}/{len(no_answer)}]题目不在题库中或选项不同，请手动选择答案")
+                    print(f"题目类型：{question['typeLabel']}，题目标题：{question['title']}")
+                    for j, opt in enumerate(question["optionList"]):
+                        print(f"{j + 1}. {opt['content']}")
+
+                    opt_count = len(question["optionList"])
                     start_time = time.time()
-                    answer = input(f"请输入答案序号（多个选项用英文逗号分隔，如 1,2,3,4）：")
                     answers_ids = []
-                    for ans in answer.strip().split(","):
-                        ans = ans.strip()
-                        if ans.isdigit() and 1 <= int(ans) <= len(question["optionList"]):
-                            self.log.info(f"选择答案：{ans}，内容：{question['optionList'][int(ans) - 1]['content']}")
-                            answers_ids.append(question["optionList"][int(ans) - 1]["id"])
-                            continue
-                        self.log.error(f"无效的答案序号：{ans}，跳过")
+
+                    while not answers_ids:
+                        answer = input("请输入答案序号（多个选项用英文逗号分隔，如 1,2,3,4）：").replace(" ", "").replace("，", ",")
+                        candidates = [ans.strip() for ans in answer.split(",") if ans.strip()]
+                        if all(ans.isdigit() and 1 <= int(ans) <= opt_count for ans in candidates):
+                            answers_ids = [question["optionList"][int(ans)-1]["id"] for ans in candidates]
+                            for ans in candidates:
+                                self.log.info(f"选择答案：{ans}，内容：{question['optionList'][int(ans)-1]['content']}")
+                        else:
+                            self.log.error("输入无效，请重新输入（序号需为数字且在选项范围内）")
+
                     self.log.info(f"正在提交当前答案")
                     end_time = time.time()
                     if not self.record_answer(user_exam_plan_id, question["id"], round(end_time - start_time), answers_ids, exam_plan_id):
@@ -328,10 +339,7 @@ class WeBanClient:
                 for i, question in enumerate(have_answer):
                     self.log.info(f"[{i}/{len(have_answer)}]题目在题库中，开始答题")
                     self.log.info(f"题目类型：{question['typeLabel']}，题目标题：{question['title']}")
-                    for j, option in enumerate(question["optionList"]):
-                        self.log.info(f"{j + 1}. {option['content']}")
-                    answers = answers_json[question["title"]]
-                    self.log.info(f"题库答案：{', '.join(answers)}")
+                    answers = answers_json[clean_text(question["title"])]
                     answers_ids = [option["id"] for option in question["optionList"] if option["content"] in answers]
                     self.log.info(f"等待 {per_time} 秒，模拟答题中...")
                     time.sleep(per_time)
