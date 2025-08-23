@@ -235,7 +235,8 @@ class WeBanClient:
 
         with open("answer/answer.json", encoding="utf-8") as f:
             for title, options in json.load(f).items():
-                answers_json[clean_text(title)] = [clean_text(a["content"]) for a in options.get("optionList", []) if a["isCorrect"] == 1]
+                answers_json[clean_text(title)] = []
+                answers_json[clean_text(title)].extend([clean_text(a["content"]) for a in options.get("optionList", []) if a["isCorrect"] == 1])
 
         # 获取项目
         projects = self.api.list_my_project()
