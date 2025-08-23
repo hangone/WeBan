@@ -943,6 +943,10 @@
       {
         "content": "有时压力也可以激发无穷无尽的动力",
         "isCorrect": 1
+      },
+      {
+        "content": "压力会让人愁苦不堪，抑郁不已",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -5352,6 +5356,10 @@
       {
         "content": "OTC",
         "isCorrect": 1
+      },
+      {
+        "content": "CCC",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -7456,6 +7464,27 @@
     ],
     "type": 1
   },
+  "为了预防传染病，我们应该养成哪些良好的习惯？": {
+    "optionList": [
+      {
+        "content": "勤洗手、多喝热水",
+        "isCorrect": 1
+      },
+      {
+        "content": "合理饮食、多吃蔬菜水果",
+        "isCorrect": 1
+      },
+      {
+        "content": "必要时期、佩戴口罩",
+        "isCorrect": 1
+      },
+      {
+        "content": "规律作息、多锻炼",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "为了预防感染新冠，我们在校园人多的地方排队时，需保持多远的距离？": {
     "optionList": [
       {
@@ -9418,6 +9447,19 @@
       },
       {
         "content": "不脱离官方平台转账",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "以下哪些因素会成为维护社会安全的机遇？": {
+    "optionList": [
+      {
+        "content": "党中央的高度重视",
+        "isCorrect": 1
+      },
+      {
+        "content": "我国人民生活水平和质量的加快提高",
         "isCorrect": 1
       }
     ],
@@ -14027,6 +14069,10 @@
       {
         "content": "超过“黄金72小时”，依然有生存的可能。",
         "isCorrect": 1
+      },
+      {
+        "content": "超过“黄金72小时”，救援人员就会放弃救援。",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -24085,6 +24131,19 @@
     ],
     "type": 1
   },
+  "婴儿心肺复苏的按压频率为15---18秒内完成30次按压。": {
+    "optionList": [
+      {
+        "content": "对",
+        "isCorrect": 1
+      },
+      {
+        "content": "错",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "媒体报道指出，近（）的自杀者其实是可以通过干预挽救的，": {
     "optionList": [
       {
@@ -28358,6 +28417,19 @@
       {
         "content": "正确。",
         "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "得了艾滋病就是死路一条。": {
+    "optionList": [
+      {
+        "content": "对。",
+        "isCorrect": 2
+      },
+      {
+        "content": "错。",
+        "isCorrect": 1
       }
     ],
     "type": 1
@@ -37895,7 +37967,7 @@
         "isCorrect": 1
       }
     ],
-    "type": 2
+    "type": 1
   },
   "电气火灾原因有哪些？": {
     "optionList": [
@@ -46294,6 +46366,27 @@
       {
         "content": "赚钱的能力",
         "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "（）是国家宪法日。": {
+    "optionList": [
+      {
+        "content": "6月14日",
+        "isCorrect": 2
+      },
+      {
+        "content": "8月8日",
+        "isCorrect": 2
+      },
+      {
+        "content": "10月15日",
+        "isCorrect": 2
+      },
+      {
+        "content": "12月4日",
+        "isCorrect": 1
       }
     ],
     "type": 1
