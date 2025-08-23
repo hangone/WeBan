@@ -73,6 +73,10 @@ def run_account(config, account_index):
         logger.error(f"权限错误: {e}")
         return False
 
+    except RuntimeError as e:
+        logger.error(f"运行时错误: {e}")
+        return False
+
     except Exception as e:
         logger.error(f"运行失败: {e}")
         traceback.print_exc(file=sys.stderr)

@@ -235,7 +235,7 @@ class WeBanClient:
 
         with open("answer/answer.json", encoding="utf-8") as f:
             for title, options in json.load(f).items():
-                answers_json[clean_text(title)] = [clean_text(a["content"]) for a in options.get("optionList", []) if a["isCorrect"]]
+                answers_json[clean_text(title)] = [clean_text(a["content"]) for a in options.get("optionList", []) if a["isCorrect"] == 1]
 
         # 获取项目
         projects = self.api.list_my_project()
@@ -291,7 +291,6 @@ class WeBanClient:
                 question_list = exam_paper.get("questionList", [])
                 have_answer = []  # 有答案的题目
                 no_answer = []  # 无答案的题目
-                failed_questions = []  # 答题失败的题目
 
                 for question in question_list:
                     if clean_text(question["title"]) in answers_json:
@@ -330,26 +329,22 @@ class WeBanClient:
                     self.log.info(f"正在提交当前答案")
                     end_time = time.time()
                     if not self.record_answer(user_exam_plan_id, question["id"], round(end_time - start_time), answers_ids, exam_plan_id):
-                        failed_questions.append(question)
-                        continue
+                        raise RuntimeError(f"答题失败，请重新考试：{question}")
 
                 self.log.info(f"手动答题结束，开始答题库中的题目，共 {len(have_answer)} 道题目")
                 for i, question in enumerate(have_answer):
                     self.log.info(f"[{i}/{len(have_answer)}]题目在题库中，开始答题")
                     self.log.info(f"题目类型：{question['typeLabel']}，题目标题：{question['title']}")
                     answers = answers_json[clean_text(question["title"])]
-                    answers_ids = [option["id"] for option in question["optionList"] if option["content"] in answers]
+                    answers_ids = [option["id"] for option in question["optionList"] if clean_text(option["content"]) in answers]
                     self.log.info(f"等待 {per_time} 秒，模拟答题中...")
                     time.sleep(per_time)
-                    if not self.record_answer(user_exam_plan_id, question["id"], per_time, answers_ids, exam_plan_id):
-                        failed_questions.append(question)
-                        continue
-
+                    if not self.record_answer(user_exam_plan_id, question["id"], per_time + 1, answers_ids, exam_plan_id):
+                        raise RuntimeError(f"答题失败，请重新考试：{question}")
                 self.log.info(f"完成考试，正在提交试卷...")
                 submit_res = self.api.exam_submit_paper(user_exam_plan_id)
                 if submit_res.get("code", -1) != "0":
-                    self.log.error(f"提交试卷失败，请重启考试：{submit_res}")
-                    continue
+                    raise RuntimeError(f"提交试卷失败，请重新考试：{submit_res}")
                 self.log.success(f"试卷提交成功，考试完成，成绩：{submit_res['data']['score']} 分")
 
     def record_answer(self, user_exam_plan_id: str, question_id: str, per_time: int, answers_ids: list, exam_plan_id: str) -> bool:
