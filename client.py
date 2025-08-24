@@ -404,3 +404,4 @@ class WeBanClient:
 
         with open(answer_path, "w", encoding="utf-8") as f:
             f.write(json.dumps(answers_json, indent=2, ensure_ascii=False, sort_keys=True))
+            f.write("\n")
