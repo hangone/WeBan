@@ -11,15 +11,16 @@ from client import WeBanClient
 
 VERSION = "v3.5.11"
 
+current_dir = os.path.dirname(os.path.abspath(__file__))
+log_path = os.path.join(current_dir, "weban.log")
+config_path = os.path.join(current_dir, "config.json")
+
 # 日志
 logger.remove()
 logger = logger.bind(account="系统")
 log_format = "<green>{time:YYYY-MM-DD HH:mm:ss}</green>|<level>{level:<7}</level>|<blue>{extra[account]}</blue>|<cyan>{message}</cyan>"
 logger.add(sink=sys.stdout, colorize=True, format=log_format)
-logger.add("weban.log", encoding="utf-8", format=log_format, retention="1 days")
-
-current_dir = os.path.dirname(os.path.abspath(__file__))
-config_path = os.path.join(current_dir, "config.json")
+logger.add(log_path, encoding="utf-8", format=log_format, retention="1 days")
 
 # 同步锁，防止同时读写题库
 sync_lock = threading.Lock()
