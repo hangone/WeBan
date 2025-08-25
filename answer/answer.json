@@ -2141,6 +2141,23 @@
     ],
     "type": 1
   },
+  "“海因里希法则”告诉我们的道理有？": {
+    "optionList": [
+      {
+        "content": "事故的发生是量的积累的结果。",
+        "isCorrect": 1
+      },
+      {
+        "content": "再好的技术，再完美的规章，在实际操作层面，也无法取代人自身的素质和责任心。",
+        "isCorrect": 1
+      },
+      {
+        "content": "事故案件的发生看似偶然，其实是各种因素积累到一定程度的必然结果。",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "“海因里希法则”在我们生活中的应用有？": {
     "optionList": [
       {
@@ -4483,6 +4500,27 @@
     "optionList": [
       {
         "content": "愚蠢",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "下列哪项不是伤口包扎的目的？": {
+    "optionList": [
+      {
+        "content": "使伤口与外界环境隔离",
+        "isCorrect": 2
+      },
+      {
+        "content": "止疼，缓解受伤者紧张情绪",
+        "isCorrect": 2
+      },
+      {
+        "content": "加压包扎可以止血",
+        "isCorrect": 2
+      },
+      {
+        "content": "脱出的内脏纳入伤口，以免内脏暴露在外加重损伤",
         "isCorrect": 1
       }
     ],
@@ -10476,6 +10514,27 @@
     ],
     "type": 2
   },
+  "以下哪些行为是错误的：": {
+    "optionList": [
+      {
+        "content": "超负荷用电",
+        "isCorrect": 1
+      },
+      {
+        "content": "擅自改装和私拉乱接线路",
+        "isCorrect": 1
+      },
+      {
+        "content": "不接插头就将裸头导线直接插入插座中使用",
+        "isCorrect": 1
+      },
+      {
+        "content": "使用获批准使用的电器",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
   "以下哪些行为触犯法律？": {
     "optionList": [
       {
@@ -10645,6 +10704,27 @@
       }
     ],
     "type": 2
+  },
+  "以下哪种理财方式最适合大学生？": {
+    "optionList": [
+      {
+        "content": "银行R1级低风险产品",
+        "isCorrect": 1
+      },
+      {
+        "content": "金店承诺保本的黄金投资",
+        "isCorrect": 2
+      },
+      {
+        "content": "朋友推荐的高回报外汇平台",
+        "isCorrect": 2
+      },
+      {
+        "content": "网络借贷平台的理财产品",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "以下哪种行为不属于性骚扰？": {
     "optionList": [
@@ -16386,6 +16466,27 @@
     ],
     "type": 1
   },
+  "危化品条例规定，申请危险化学品安全使用许可证的化工企业，还应当具备（  ）条件。": {
+    "optionList": [
+      {
+        "content": "有与所使用的危险化学品相适应的专业技术人员",
+        "isCorrect": 1
+      },
+      {
+        "content": "有安全管理机构和专职安全管理人员",
+        "isCorrect": 1
+      },
+      {
+        "content": "有符合国家规定的危险化学品事故应急预案和必要的应急救援器材、设备",
+        "isCorrect": 1
+      },
+      {
+        "content": "依法进行了安全评价",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "危害国家安全的“内忧”主要有内战、内乱、分裂、破坏，以及各种形式的极端主义和？": {
     "optionList": [
       {
@@ -17236,6 +17337,48 @@
     "optionList": [
       {
         "content": "自燃",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "可用于小臂等肢体粗细相等的躯干的包扎方法是（）。": {
+    "optionList": [
+      {
+        "content": "环形包扎法",
+        "isCorrect": 1
+      },
+      {
+        "content": "螺旋包扎法",
+        "isCorrect": 2
+      },
+      {
+        "content": "螺旋反折式包扎法",
+        "isCorrect": 2
+      },
+      {
+        "content": "8字环绕包扎法",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "可用于肘、肩、髋、膝等关节的包扎方法是（）。": {
+    "optionList": [
+      {
+        "content": "环形包扎法",
+        "isCorrect": 2
+      },
+      {
+        "content": "螺旋包扎法",
+        "isCorrect": 2
+      },
+      {
+        "content": "螺旋反折式包扎法",
+        "isCorrect": 2
+      },
+      {
+        "content": "8字环绕包扎法",
         "isCorrect": 1
       }
     ],
@@ -23270,6 +23413,23 @@
     ],
     "type": 1
   },
+  "如果危化品发生泄漏，且泄漏物是有毒的，应该怎么办？": {
+    "optionList": [
+      {
+        "content": "应立即穿好专用防护服、隔绝式空气面具等进行必要的防护。",
+        "isCorrect": 1
+      },
+      {
+        "content": "事态较为严重难以控制时，应立即设置隔离线并通知附近人员撤离。",
+        "isCorrect": 1
+      },
+      {
+        "content": "如果事态严重应报告学校有关部门，由专业人员处理。",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "如果发现有咳嗽、咳痰的症状持续2周以上，应该：": {
     "optionList": [
       {
@@ -25032,6 +25192,23 @@
     ],
     "type": 2
   },
+  "实验室存储柜危险化学品存储量宜按（ ）储存。": {
+    "optionList": [
+      {
+        "content": "最小使用量",
+        "isCorrect": 1
+      },
+      {
+        "content": "最大使用量",
+        "isCorrect": 2
+      },
+      {
+        "content": "一般使用量",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "实验室存储柜危险化学品存储量宜按（）储存": {
     "optionList": [
       {
@@ -26392,6 +26569,23 @@
       {
         "content": "寻衅滋事罪",
         "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "小h在看直播时，被女主播私信指引下载了一个App，若想要“约炮”就得充值成为会员，小h现在应该：": {
+    "optionList": [
+      {
+        "content": "多次充值，直到约炮成功",
+        "isCorrect": 2
+      },
+      {
+        "content": "和女主播商量私下交易",
+        "isCorrect": 2
+      },
+      {
+        "content": "保留相关证据立即报警，并在直播平台上进行举报",
+        "isCorrect": 1
       }
     ],
     "type": 1
@@ -32470,6 +32664,27 @@
     ],
     "type": 2
   },
+  "易制爆化学品通常包括：": {
+    "optionList": [
+      {
+        "content": "强氧化剂",
+        "isCorrect": 1
+      },
+      {
+        "content": "可/易燃物",
+        "isCorrect": 1
+      },
+      {
+        "content": "强还原剂",
+        "isCorrect": 1
+      },
+      {
+        "content": "部分有机物",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "易燃液体火灾的危险性是：": {
     "optionList": [
       {
@@ -36932,6 +37147,19 @@
     ],
     "type": 1
   },
+  "环形包扎法可用于回返式包扎法的开始和结束。": {
+    "optionList": [
+      {
+        "content": "正确",
+        "isCorrect": 1
+      },
+      {
+        "content": "错误",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "环形包扎法可用于回返式包扎法的开始和结束。（）": {
     "optionList": [
       {
@@ -40535,6 +40763,27 @@
       },
       {
         "content": "不知道。",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "艾滋病的三大传播途径是？": {
+    "optionList": [
+      {
+        "content": "空气、水、食物",
+        "isCorrect": 2
+      },
+      {
+        "content": "握手、拥抱、蚊虫叮咬",
+        "isCorrect": 2
+      },
+      {
+        "content": "血液、母婴、性",
+        "isCorrect": 1
+      },
+      {
+        "content": "接吻、共用餐具、咳嗽",
         "isCorrect": 2
       }
     ],
