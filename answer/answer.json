@@ -35696,6 +35696,19 @@
     ],
     "type": 1
   },
+  "洗干净的烧杯（）用来盛水喝。": {
+    "optionList": [
+      {
+        "content": "可以",
+        "isCorrect": 2
+      },
+      {
+        "content": "不可以",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
   "洪水专用的求生包中，应包含哪些用品：": {
     "optionList": [
       {
@@ -36885,6 +36898,23 @@
       },
       {
         "content": "引火源",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "爆炸事故多发生在存放易燃易爆物品和使用高压容器的实验室，酿成这类事故的主要原因有：": {
+    "optionList": [
+      {
+        "content": "违章操作",
+        "isCorrect": 1
+      },
+      {
+        "content": "设备老化",
+        "isCorrect": 1
+      },
+      {
+        "content": "易燃易爆物品泄漏",
         "isCorrect": 1
       }
     ],
