@@ -161,9 +161,11 @@ class WeBanClient:
         for task in study_task.get("studyTaskList", []):
             project_prefix = task["projectName"]
             self.log.info(f"开始处理任务：{project_prefix}")
+            need_capt = []
 
             # 获取学习进度
             self.get_progress(task["userProjectId"], project_prefix)
+
 
             # 聚合类别 1：推送课，2：自选课，3：必修课
             for choose_type in [(3, "必修课", "requiredNum", "requiredFinishedNum"), (1, "推送课", "pushNum", "pushFinishedNum"), (2, "自选课", "optionalNum", "optionalFinishedNum")]:
@@ -218,7 +220,8 @@ class WeBanClient:
                             # 检查是否需要验证码
                             token = None
                             if query.get("csCapt", [None])[0] == "true":
-                                self.log.info(f"课程需要验证码，暂时无法处理...")
+                                self.log.warning(f"课程需要验证码，暂时无法处理...")
+                                need_capt.append(course_prefix)
                                 continue
                                 res = self.api.invoke_captcha(course["userCourseId"], task["userProjectId"])
                                 if res.get("code", -1) != "0":
@@ -230,8 +233,13 @@ class WeBanClient:
                                 self.log.error(f"{course_prefix} 完成失败：{res}")
 
                         self.log.success(f"{course_prefix} 完成")
+                        
+            if need_capt:
+                self.log.warning(f"以下课程需要验证码，请手动完成：")
+                for c in need_capt:
+                    self.log.warning(f" - {c}")
 
-        self.log.success(f"课程学习完成")
+            self.log.success(f"{project_prefix} 课程学习完成")
 
     def run_exam(self, use_time: int = 250):
         # 加载题库
