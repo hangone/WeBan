@@ -28,9 +28,9 @@ sync_lock = threading.Lock()
 
 def run_account(config, account_index):
     """运行单个账号的任务"""
-    tenant_name = config.get("tenant_name")
-    account = config.get("account")
-    password = config.get("password")
+    tenant_name = config.get("tenant_name").strip()
+    account = config.get("account").strip()
+    password = config.get("password").strip()
     user = config.get("user", {})
     study = config.get("study", True)
     study_time = config.get("study_time", 15)
@@ -81,6 +81,10 @@ def run_account(config, account_index):
     except RuntimeError as e:
         logger.error(f"运行时错误: {e}")
         return False
+    
+    except ValueError as e:
+        logger.error(f"参数错误: {e}")
+        return False
 
     except Exception as e:
         logger.error(f"运行失败: {e}")
@@ -99,8 +103,8 @@ def create_initial_config() -> list[dict]:
         exit(1)
     prompt = tenant_config["data"]
     logger.info(prompt.get("popPrompt", ""))
-    account = input(f"账号{'请输入'+prompt.get('userNamePrompt', '')}：").strip()
-    password = input(f"密码{'请输入'+prompt.get('passwordPrompt', '')}：").strip()
+    account = input(f"账号请输入{prompt.get('userNamePrompt', '')}：").strip()
+    password = input(f"密码请输入{prompt.get('passwordPrompt', '')}：").strip()
 
     configs = [{"tenant_name": tenant_name, "account": account, "password": password, "study": True, "user": {"userId": "", "token": ""}, "study_time": 15, "exam": True, "exam_use_time": 250}]
 

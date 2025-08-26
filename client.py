@@ -28,16 +28,20 @@ class WeBanClient:
 
     def __init__(self, tenant_name: str, account: str | None = None, password: str | None = None, user: Dict[str, str] | None = None, log=logger) -> None:
         self.log = log
-        self.tenant_name = tenant_name
+        self.tenant_name = tenant_name.strip()
         self.study_time = 15
         self.ocr = self.get_ocr_instance()
         if user and all([user.get("userId"), user.get("token")]):
             self.api = WeBanAPI(user=user)
-        elif all([tenant_name, account, password]):
+        elif all([self.tenant_name, account, password]):
             self.api = WeBanAPI(account=account, password=password)
         else:
             self.api = WeBanAPI()
-        self.api.set_tenant_code(self.get_tenant_code())
+        self.tenant_code = self.get_tenant_code()
+        if self.tenant_code:
+            self.api.set_tenant_code(self.tenant_code)
+        else:
+            raise ValueError("学校代码获取失败，请检查学校全称是否正确")
 
     @staticmethod
     def get_project_type(project_category: int) -> str:
@@ -81,14 +85,20 @@ class WeBanClient:
         if tenant_list.get("code", -1) == "0":
             self.log.info(f"获取学校列表成功")
         tenant_names = []
+        maybe_names = []
         for item in tenant_list.get("data", []):
             for entry in item.get("list", []):
-                tenant_names.append(entry.get("name", ""))
-                if entry.get("name", "") == self.tenant_name:
+                name = entry.get("name", "")
+                tenant_names.append(name)
+                if self.tenant_name == name.strip():
                     self.log.success(f"找到学校代码: {entry['code']}")
                     return entry["code"]
+                if self.tenant_name in name:
+                    maybe_names.append(name)
         self.log.error(f"{tenant_names}")
         self.log.error(f"没找到你的学校代码，请检查学校全称是否正确（上面是有效的学校名称）: {self.tenant_name}")
+        if maybe_names:
+            self.log.error(f"可能的学校名称: {maybe_names}")
         return ""
 
     def get_progress(self, user_project_id: str, project_prefix: str | None, output: bool = True) -> Dict[str, Any]:
