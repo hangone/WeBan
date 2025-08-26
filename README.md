@@ -39,9 +39,9 @@
   {
     "tenant_name": "学校名称", // 与 user 字段的二选一，优先使用 user 字段的
     "user": {
-      "userId": "可以从浏览器F12->存储->Local Storage->user 中找到",
-      "token": "可以从浏览器F12->存储->Local Storage->token 中找到",
-      "tenantName": "学校名称" // 二选一，会优先使用这个
+      "userId": "可以从浏览器F12->存储->Local Storage->user->userId 中找到",
+      "token": "可以从浏览器F12->存储->Local Storage->user->token 中找到",
+      "tenantName": "" // 二选一，会优先使用这个
     },
   }
 ]
