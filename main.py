@@ -9,7 +9,7 @@ from loguru import logger
 
 from client import WeBanClient
 
-VERSION = "v3.5.11"
+VERSION = "v3.5.13"
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 log_path = os.path.join(current_dir, "weban.log")
