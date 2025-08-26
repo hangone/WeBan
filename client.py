@@ -62,14 +62,18 @@ class WeBanClient:
         """
         检查是否安装 ddddocr 库，多次调用返回同一个 DdddOcr 实例
         """
-        if not _cache["ocr"]:
+        if not _cache.get("ocr"):
             try:
                 import ddddocr
-
-                _cache["ocr"] = ddddocr.DdddOcr(show_ad=False)
-            except ImportError:
+                
+                try:
+                    _cache["ocr"] = ddddocr.DdddOcr(show_ad=False)
+                except TypeError:
+                    _cache["ocr"] = ddddocr.DdddOcr()
+            except Exception:
                 ddddocr = None
-                # print("ddddocr 库未安装，验证码识别功能将不可用，请运行 'pip install ddddocr' 进行安装以启用自动识别。")
+                logger.warning("ddddocr 库未安装，自动验证码识别功能将不可用")
+
 
         return _cache["ocr"]
 
