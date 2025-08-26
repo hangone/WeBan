@@ -37,6 +37,9 @@ def run_account(config, account_index):
     exam = config.get("exam", True)
     exam_use_time = config.get("exam_use_time", 250)
 
+    if user.get("tenantName"):
+        tenant_name = user["tenantName"]
+
     try:
         log = logger.bind(account=account or user.get("userId"))
         log.info(f"开始执行")
