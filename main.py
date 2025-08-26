@@ -28,9 +28,9 @@ sync_lock = threading.Lock()
 
 def run_account(config, account_index):
     """运行单个账号的任务"""
-    tenant_name = config.get("tenant_name").strip()
-    account = config.get("account").strip()
-    password = config.get("password").strip()
+    tenant_name = config.get("tenant_name", "").strip()
+    account = config.get("account", "").strip()
+    password = config.get("password", "").strip()
     user = config.get("user", {})
     study = config.get("study", True)
     study_time = config.get("study_time", 15)
