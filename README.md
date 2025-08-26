@@ -54,7 +54,7 @@
 2.  打开终端，克隆本仓库
 
 ```bash
-git clone https://github.com/hangone/WeBan
+git clone --depth 1 https://github.com/hangone/WeBan # 如果太慢可以执行 git clone --depth 1 https://ghfast.top/https://github.com/hangone/WeBan
 ```
 
 3. 安装依赖
