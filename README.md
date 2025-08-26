@@ -21,7 +21,7 @@
 
 ## 配置说明
 
-软件使用至少需要 `tenant_name` `userId` `token` 三个参数，可通过浏览器 F12 开发者选项中 Local Storage 的 user 项中获取。
+软件使用至少需要 `tenant_name` `userId` `token` 三个参数，可参考[常见问题](#常见问题)获取。
 
 ```json
 // config.json
@@ -30,19 +30,19 @@
     "tenant_name": "学校名称",
     "account": "账号",
     "password": "密码",
+    "study": true, // 是否学习课程，默认开启
+    "study_time": 15, // 每节课学习时间，单位（秒），默认 15 秒
+    "exam": true, // 是否考试，默认开启
+    "exam_use_time": 250 // 考试总时间，单位（秒），会平均到每到题上，默认 250 秒
+  },
+  // 或者
+  {
+    "tenant_name": "学校名称", // 与 user 字段的二选一，优先使用 user 字段的
     "user": {
       "userId": "可以从浏览器F12->存储->Local Storage->user 中找到",
-      "token": "可以从浏览器F12->存储->Local Storage->token 中找到"
+      "token": "可以从浏览器F12->存储->Local Storage->token 中找到",
+      "tenantName": "学校名称" // 二选一，会优先使用这个
     },
-    "study": true, // 是否学习课程
-    "study_time": 15, // 每节课学习时间，单位（秒）
-    "exam": true, // 是否考试
-    "exam_use_time": 250 // 考试总时间，单位（秒），会平均到每到题上
-  },
-  {
-    "tenant_name": "学校名称",
-    "account": "账号2",
-    "password": "密码2"
   }
 ]
 ```
@@ -73,15 +73,20 @@ python main.py
 
 ## 演示
 
-![image1](images/image1.png)
+![study](images/study.png)
+![exam](images/exam.png)
+![old](images/old.png)
 
 ## 常见问题
 
-- ### 部分无法直接登录的学校
+- ### 部分无法直接登录的学校/Token 登录方法
 
 有些从迎新系统跳转的可以试试账号密码都是学号，比如北京交通大学
 
-其他学校可使用 Token 登录
+其他学校可使用 Token 登录，在电脑浏览器登录后按 F12 或者 Ctrl+Shift+I 打开开发者工具，找到本地存储，复制 user 的内容到 config.json 配置文件
+
+![chrome](images/chrome.png)
+![firefox](images/firefox.png)
 
 - ### 下载
 
