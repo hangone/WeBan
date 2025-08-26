@@ -11,9 +11,12 @@ from client import WeBanClient
 
 VERSION = "v3.5.14"
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-log_path = os.path.join(current_dir, "weban.log")
-config_path = os.path.join(current_dir, "config.json")
+if getattr(sys, 'frozen', False):
+    base_path = os.path.dirname(sys.executable)
+else:
+    base_path = os.path.dirname(os.path.abspath(__file__))
+log_path = os.path.join(base_path, "weban.log")
+config_path = os.path.join(base_path, "config.json")
 
 # 日志
 logger.remove()

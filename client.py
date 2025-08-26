@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import time
 import webbrowser
 from random import randint
@@ -14,9 +15,11 @@ from api import WeBanAPI
 if TYPE_CHECKING:
     from ddddocr import DdddOcr
 
-
-current_dir = os.path.dirname(os.path.abspath(__file__))
-answer_dir = os.path.join(current_dir, "answer")
+if getattr(sys, 'frozen', False):
+    base_path = os.path.dirname(sys.executable)
+else:
+    base_path = os.path.dirname(os.path.abspath(__file__))
+answer_dir = os.path.join(base_path, "answer")
 answer_path = os.path.join(answer_dir, "answer.json")
 
 def clean_text(text):
