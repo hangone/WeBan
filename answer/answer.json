@@ -567,6 +567,23 @@
     ],
     "type": 1
   },
+  "In addition to the explosion, how often does it take to control the fire after a fire?": {
+    "optionList": [
+      {
+        "content": "Within the first 2 minutes.",
+        "isCorrect": 1
+      },
+      {
+        "content": "Within the first 3 minutes.",
+        "isCorrect": 2
+      },
+      {
+        "content": "Within the first 5 minutes.",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "K粉呈白色结晶粉末状，易溶于水，可勾兑进饮料和酒水中。": {
     "optionList": [
       {
@@ -9217,6 +9234,22 @@
       {
         "content": "戒毒过程单纯依靠药物脱毒，也是可以顺利戒除毒瘾的。",
         "isCorrect": 1
+      },
+      {
+        "content": "戒除毒瘾需要“脱毒--康复--回归社会”这样一个较长的过程。",
+        "isCorrect": 2
+      },
+      {
+        "content": "用脱毒药物减轻戒断症状，只是戒除毒瘾的开始，即脱毒阶段。",
+        "isCorrect": 2
+      },
+      {
+        "content": "要想康复及回归社会，需要吸毒者远离之前的朋友圈，端正人生态度及生活方式，树立信心和毅力。",
+        "isCorrect": 2
+      },
+      {
+        "content": "所谓“戒毒≠不复吸”，要终生警惕对毒品的心瘾。",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -19156,6 +19189,23 @@
       {
         "content": "网络地址欺骗",
         "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "在候车大厅熟睡时，如何保护手机最安全？": {
+    "optionList": [
+      {
+        "content": "握在手里睡觉",
+        "isCorrect": 2
+      },
+      {
+        "content": "把手机放在外侧衣兜里",
+        "isCorrect": 2
+      },
+      {
+        "content": "把手机放在包里,将包抱在胸前",
+        "isCorrect": 1
       }
     ],
     "type": 1
@@ -32918,6 +32968,10 @@
       {
         "content": "寻求心理医治",
         "isCorrect": 1
+      },
+      {
+        "content": "在对方身上发泄愤恨",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -43012,6 +43066,18 @@
       {
         "content": "方便受灾群众恢复生产和生活的区域",
         "isCorrect": 1
+      },
+      {
+        "content": "全面恢复农业、工业",
+        "isCorrect": 2
+      },
+      {
+        "content": "城镇和乡村的布局",
+        "isCorrect": 2
+      },
+      {
+        "content": "基础设施和公共服务设施的建设",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -45206,6 +45272,18 @@
       {
         "content": "处7年有期徒刑，并处罚金。",
         "isCorrect": 1
+      },
+      {
+        "content": "处3年有期徒刑，并处罚金。",
+        "isCorrect": 2
+      },
+      {
+        "content": "处5年有期徒刑，并处罚金。",
+        "isCorrect": 2
+      },
+      {
+        "content": "处10年有期徒刑，并处罚金。",
+        "isCorrect": 2
       }
     ],
     "type": 1
