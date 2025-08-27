@@ -60,8 +60,7 @@ class WeBanClient:
         else:
             return ""
 
-    @staticmethod
-    def get_ocr_instance(_cache: Dict[str, Any] = {"ocr": None}) -> Optional[Union["DdddOcr", None]]:
+    def get_ocr_instance(self, _cache: Dict[str, Any] = {"ocr": None}) -> Optional[Union["DdddOcr", None]]:
         """
         检查是否安装 ddddocr 库，多次调用返回同一个 DdddOcr 实例
         """
@@ -75,7 +74,7 @@ class WeBanClient:
                     _cache["ocr"] = ddddocr.DdddOcr()
             except Exception:
                 ddddocr = None
-                logger.warning("ddddocr 库未安装，自动验证码识别功能将不可用")
+                self.log.warning("ddddocr 库未安装，自动验证码识别功能将不可用")
 
 
         return _cache["ocr"]
