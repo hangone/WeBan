@@ -66,7 +66,7 @@ pip install -r requirements.txt # 或 uv sync
 4. 运行
 
 ```bash
-python main.py
+uv run main.py
 ```
 
 按提示输入学校和账号密码。每个任务大概需要 15 秒才不会触发限制。
