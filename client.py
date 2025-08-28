@@ -317,6 +317,8 @@ class WeBanClient:
                 exam_paper = self.api.exam_start_paper(user_exam_plan_id)
                 if exam_paper.get("code", -1) != "0":
                     self.log.error(f"获取考试题目失败：{exam_paper}")
+                    if exam_paper.get("detailCode") == "10018":
+                        self.log.warning(f"考试项目 {project['projectName']}/{plan['examPlanName']} 需要手动处理，请在网站上开启一次考试后重试")
                     continue
                 exam_paper = exam_paper.get("data", {})
                 question_list = exam_paper.get("questionList", [])
