@@ -37934,6 +37934,10 @@
       {
         "content": "消化道传播。",
         "isCorrect": 1
+      },
+      {
+        "content": "血液传播。",
+        "isCorrect": 2
       }
     ],
     "type": 1
