@@ -171,10 +171,24 @@ class WeBanClient:
         if study_task.get("code", -1) != "0":
             self.log.error(f"获取任务列表失败：{study_task}")
             return
-        self.log.info(f"获取任务列表成功")
 
-        study_task = study_task.get("data", {})
-        for task in study_task.get("studyTaskList", []):
+        study_task = study_task.get("data", {}).get("studyTaskList", [])
+        if not study_task:
+            self.log.info(f"获取任务列表成功")
+            
+        completion = self.api.list_completion()
+        if completion.get("code", -1) != "0":
+            self.log.error(f"获取模块完成情况失败：{completion}")
+        
+        showable_modules = [d["module"] for d in completion.get("data", []) if d["showable"] == 1]
+        if "labProject" in showable_modules:
+            self.log.info(f"加载实验室课程")
+            lab_project = self.api.lab_index()
+            if lab_project.get("code", -1) != "0":
+                self.log.error(f"获取实验室课程失败：{lab_project}")
+            study_task.append(lab_project.get("data", {}).get("current", {}))
+
+        for task in study_task:
             project_prefix = task["projectName"]
             self.log.info(f"开始处理任务：{project_prefix}")
             need_capt = []
