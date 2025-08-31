@@ -9,7 +9,7 @@ from loguru import logger
 
 from client import WeBanClient
 
-VERSION = "v3.5.15"
+VERSION = "v3.5.16"
 
 if getattr(sys, 'frozen', False):
     base_path = os.path.dirname(sys.executable)
