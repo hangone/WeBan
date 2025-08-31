@@ -12575,6 +12575,14 @@
       {
         "content": "先敲击中间，在敲击四角",
         "isCorrect": 2
+      },
+      {
+        "content": "先敲击四角，再敲击中间",
+        "isCorrect": 1
+      },
+      {
+        "content": "先敲击中间，再敲击四角",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -15931,6 +15939,10 @@
       {
         "content": "错。",
         "isCorrect": 1
+      },
+      {
+        "content": "对。",
+        "isCorrect": 2
       }
     ],
     "type": 1
