@@ -29,6 +29,7 @@ def create_retry_session(baseurl) -> requests.Session:
     }
     return session
 
+
 def handle_response(response: requests.Response) -> Dict[str, Any]:
     """
     处理接口响应
@@ -36,18 +37,20 @@ def handle_response(response: requests.Response) -> Dict[str, Any]:
     :return: 处理后的结果
     """
     if response.status_code != 200:
-      if response.status_code == 403:
-          raise PermissionError("Token 无效，不允许同时登录，请重试")
-      if response.status_code == 401:
-          raise PermissionError("Token 无效，请检查账号信息")
-      print(f"请求失败：{response.status_code} {response.text}")
-      return {}
+        if response.status_code == 403:
+            raise PermissionError("Token 无效，不允许同时登录，请重试")
+        if response.status_code == 401:
+            raise PermissionError("Token 无效，请检查账号信息")
+        print(f"请求失败：{response.status_code} {response.text}")
+        return {}
     try:
         response_data = response.json()
     except json.JSONDecodeError:
         print(f"响应内容不是有效的 JSON：{response.text}")
         return {}
     return response_data
+
+
 class WeBanAPI:
 
     def __init__(self, tenant_code: str | None = None, account: str | None = None, password: str | None = None, user: Dict[str, str] | None = None, timeout: int | tuple = (9.05, 15), session: requests.Session | None = None):
@@ -232,38 +235,129 @@ class WeBanAPI:
             self.password = None
         return handle_response(response)
 
+    def list_completion(self) -> Dict[str, Any]:
+        """
+        获取模块
+        :return:
+        {
+          "code": "0",
+          "data": [
+            {
+              "module": "labProject",
+              "showable": 2
+            },
+            {
+              "module": "fireTrainingProject",
+              "showable": 2
+            },
+            {
+              "module": "trainingActivity",
+              "showable": 2
+            },
+            {
+              "module": "virtualTrainingPlace",
+              "showable": 2
+            },
+            {
+              "module": "notice",
+              "showable": 0,
+              "completion": {
+                "marked": 2,
+                "finished": 2,
+                "grey": 1,
+                "active": 2,
+                "message": "无通知"
+              }
+            },
+            {
+              "module": "forcePassword",
+              "showable": 2
+            }
+          ],
+          "detailCode": "0"
+        }
+        """
+        url = f"{self.baseurl}/pharos/index/listCompletion.do"
+        params = {"timestamp": self.get_timestamp()}
+        data = {"tenantCode": self.tenant_code, "userId": self.user["userId"]}
+        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
+        return handle_response(response)
+
+    def lab_index(self) -> Dict[str, Any]:
+        """
+        获取实验室模块信息
+        :return:
+        {
+          "code": "0",
+          "data": {
+            "current": {
+              "projectName": "2025级硕士生实验室安全教育",
+              "projectImageUrl": "https://weibanstatic.mycourse.cn/pharos/resource/10000024/image/project/20250707/ae93f8d9-80b6-4047-97a6-aa344794d2ee.jpg",
+              "endTime": "2025-10-12",
+              "progressPet": 2,
+              "userProjectId": "${uuid}",
+              "projectCategory": 9,
+              "projectAttribute": 3,
+              "existedCertificate": 2
+            },
+            "projects": [{
+              "projectName": "2025级硕士生实验室安全教育",
+              "projectImageUrl": "https://weibanstatic.mycourse.cn/pharos/resource/10000024/image/project/20250707/ae93f8d9-80b6-4047-97a6-aa344794d2ee.jpg",
+              "endTime": "2025-10-12",
+              "progressPet": 2,
+              "userProjectId": "${uuid}",
+              "projectCategory": 9,
+              "projectAttribute": 3,
+              "existedCertificate": 2
+            }],
+            "ebookState": 1,
+            "labCardState": 2,
+            "ebookIsMust": 2
+          },
+          "detailCode": "0"
+        }
+        """
+        url = f"{self.baseurl}/pharos/lab/index.do"
+        params = {"timestamp": self.get_timestamp(10, 1)}
+        data = {"tenantCode": self.tenant_code, "userId": self.user["userId"]}
+        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
+        return handle_response(response)
+
     def list_study_task(self) -> Dict[str, Any]:
         """
         获取学习任务列表
         :return:
         {
           "code": "0",
-          "data": [
-            {
-              "projectId": "${uuid}",
-              "projectName": "2025年春季安全教育",
-              "projectImageUrl": "",
-              "endTime": "2025-05-31",
-              "finished": 2,
-              "progressPet": 5,
-              "exceedPet": 46,
-              "assessment": "完成进度达到100%视为完成",
-              "userProjectId": "${uuid}",
-              "projectMode": 1,
-              "projectCategory": 9,
-              "projectAttribute": 1,
-              "studyState": 5,
-              "studyStateLabel": "未完成",
-              "certificateAcquired": 2,
-              "completion": {
-                "marked": 1,
+          "data": {
+            "studyTaskList": [
+              {
+                "projectId": "${uuid}",
+                "projectName": "2025年春季安全教育",
+                "projectImageUrl": "",
+                "endTime": "2025-05-31",
                 "finished": 2,
-                "grey": 2,
-                "active": 1,
-                "message": ""
+                "progressPet": 5,
+                "exceedPet": 46,
+                "assessment": "完成进度达到100%视为完成",
+                "userProjectId": "${uuid}",
+                "projectMode": 1,
+                "projectCategory": 9,
+                "projectAttribute": 1,
+                "studyState": 5,
+                "studyStateLabel": "未完成",
+                "certificateAcquired": 2,
+                "completion": {
+                  "marked": 1,
+                  "finished": 2,
+                  "grey": 2,
+                  "active": 1,
+                  "message": ""
+                }
               }
-            }
-          ],
+            ],
+            "indexShowType": 2
+          },
           "detailCode": "0"
         }
         """
