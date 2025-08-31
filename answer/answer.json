@@ -3486,6 +3486,23 @@
     ],
     "type": 1
   },
+  "一般来说，普通实验室的温度控制在（）℃。": {
+    "optionList": [
+      {
+        "content": "20±5",
+        "isCorrect": 2
+      },
+      {
+        "content": "23±5",
+        "isCorrect": 1
+      },
+      {
+        "content": "26±5",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "一般认为只有超过（   ）伏的静电电压才能产生静电放电现象。": {
     "optionList": [
       {
@@ -9293,6 +9310,18 @@
       {
         "content": "重要的国家秘密，泄露会使国家安全和利益遭受严重的损害；",
         "isCorrect": 1
+      },
+      {
+        "content": "一般的国家秘密，泄露会使国家安全和利益遭受损害。",
+        "isCorrect": 2
+      },
+      {
+        "content": "关系到国家安全和利益，依照法定程序确定，在一定时间内只限一定范围人员知悉的事项",
+        "isCorrect": 2
+      },
+      {
+        "content": "最重要的国家秘密，泄露会使国家安全和利益遭受特别严重的损害",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -9573,6 +9602,27 @@
     ],
     "type": 2
   },
+  "以下哪些因素附近不适合存放化学品。": {
+    "optionList": [
+      {
+        "content": "热源",
+        "isCorrect": 1
+      },
+      {
+        "content": "火源",
+        "isCorrect": 1
+      },
+      {
+        "content": "电源",
+        "isCorrect": 1
+      },
+      {
+        "content": "水源",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "以下哪些属于不当存放和使用氢气瓶的后果": {
     "optionList": [
       {
@@ -9657,6 +9707,27 @@
     ],
     "type": 2
   },
+  "以下哪些属于防中毒措施？": {
+    "optionList": [
+      {
+        "content": "以无毒、低毒的化学品或工艺代替有毒或剧毒的化学品或工艺",
+        "isCorrect": 1
+      },
+      {
+        "content": "注意消除二次染毒源",
+        "isCorrect": 1
+      },
+      {
+        "content": "定期检查毒性物质在空气中的浓度",
+        "isCorrect": 1
+      },
+      {
+        "content": "加强个人防护",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "以下哪些属于防护用具（）": {
     "optionList": [
       {
@@ -9700,6 +9771,31 @@
     "type": 2
   },
   "以下哪些属于高速运转类设备可能对实验人员带来机械危险（）": {
+    "optionList": [
+      {
+        "content": "卷绕",
+        "isCorrect": 1
+      },
+      {
+        "content": "挤压",
+        "isCorrect": 1
+      },
+      {
+        "content": "飞出物打击",
+        "isCorrect": 1
+      },
+      {
+        "content": "坠落打击",
+        "isCorrect": 1
+      },
+      {
+        "content": "切割",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "以下哪些属于高速运转类设备可能对实验人员带来机械危险？": {
     "optionList": [
       {
         "content": "卷绕",
@@ -15548,6 +15644,19 @@
     ],
     "type": 1
   },
+  "冷凝装置的胶管一般采用（），且1~2个月更换一次。": {
+    "optionList": [
+      {
+        "content": "厚壁橡胶管",
+        "isCorrect": 1
+      },
+      {
+        "content": "乳胶管",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "冷漠更容易让人联想到自私、消极、难接近等。因此常受人排斥。": {
     "optionList": [
       {
@@ -16378,6 +16487,23 @@
     ],
     "type": 1
   },
+  "化学危险品发生爆炸事故后，如化学危险品发生泄漏，应在爆炸点（）米半径范围内实行戒严，禁止无关人员进入，可以视情况应扩大戒严范围。": {
+    "optionList": [
+      {
+        "content": "50",
+        "isCorrect": 2
+      },
+      {
+        "content": "100",
+        "isCorrect": 1
+      },
+      {
+        "content": "150",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "化工实习时，个人防护要求中不包括以下哪项？": {
     "optionList": [
       {
@@ -16514,6 +16640,36 @@
     "optionList": [
       {
         "content": "去最近的ATM机存取现金并保留凭证。",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "危化品条例规定，任何单位和个人对违反本条例规定的行为，有权向负有危险化学品安全监督管理职责的部门举报。": {
+    "optionList": [
+      {
+        "content": "对",
+        "isCorrect": 1
+      },
+      {
+        "content": "错",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "危化品条例规定，国家实行危险化学品（）制度，为危险化学品安全管理以及危险化学品事故预防和应急救援提供技术、信息支持。": {
+    "optionList": [
+      {
+        "content": "记录",
+        "isCorrect": 2
+      },
+      {
+        "content": "管理",
+        "isCorrect": 2
+      },
+      {
+        "content": "登记",
         "isCorrect": 1
       }
     ],
@@ -20667,6 +20823,23 @@
     ],
     "type": 1
   },
+  "在电路通电情况下，接触高于（）的电压就容易引起触电事故。": {
+    "optionList": [
+      {
+        "content": "30~40V",
+        "isCorrect": 1
+      },
+      {
+        "content": "10~20V",
+        "isCorrect": 2
+      },
+      {
+        "content": "0~5V",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "在留学国想勤工俭学，需要注意什么呢？": {
     "optionList": [
       {
@@ -20922,6 +21095,27 @@
     "type": 2
   },
   "在遇到机械故障时，哪些情况是不能修理的": {
+    "optionList": [
+      {
+        "content": "带电",
+        "isCorrect": 1
+      },
+      {
+        "content": "带压",
+        "isCorrect": 1
+      },
+      {
+        "content": "高温过冷",
+        "isCorrect": 1
+      },
+      {
+        "content": "无专用工具",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "在遇到机械故障时，哪些情况是不能修理的？": {
     "optionList": [
       {
         "content": "带电",
@@ -21532,6 +21726,27 @@
     "type": 2
   },
   "处理严重的冻伤，要把冻伤部位放在（）摄氏度的水中": {
+    "optionList": [
+      {
+        "content": "0~22",
+        "isCorrect": 2
+      },
+      {
+        "content": "20~25",
+        "isCorrect": 2
+      },
+      {
+        "content": "30~42",
+        "isCorrect": 2
+      },
+      {
+        "content": "40~42",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "处理严重的冻伤，要把冻伤部位放在（）摄氏度的水中。": {
     "optionList": [
       {
         "content": "0~22",
@@ -25173,7 +25388,41 @@
     ],
     "type": 2
   },
+  "实验仪器的清洗和维护与仪器的正确使用同样重要。": {
+    "optionList": [
+      {
+        "content": "正确",
+        "isCorrect": 1
+      },
+      {
+        "content": "错误",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "实验前需检查通风系统，确保其正常运行，柜口面风速（）米每秒为宜": {
+    "optionList": [
+      {
+        "content": "0.15~0.5",
+        "isCorrect": 2
+      },
+      {
+        "content": "0.35~0.75",
+        "isCorrect": 1
+      },
+      {
+        "content": "0.5~0.85",
+        "isCorrect": 2
+      },
+      {
+        "content": "0.45~0.65",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "实验前需检查通风系统，确保其正常运行，柜口面风速（）米每秒为宜。": {
     "optionList": [
       {
         "content": "0.15~0.5",
@@ -25341,6 +25590,27 @@
       },
       {
         "content": "火源管理不善",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "实验室气瓶如果储存、使用不当，很容易发生（）事故。": {
+    "optionList": [
+      {
+        "content": "中毒",
+        "isCorrect": 1
+      },
+      {
+        "content": "爆炸（燃烧）",
+        "isCorrect": 1
+      },
+      {
+        "content": "窒息",
+        "isCorrect": 1
+      },
+      {
+        "content": "机械伤害",
         "isCorrect": 1
       }
     ],
@@ -26180,6 +26450,23 @@
     ],
     "type": 2
   },
+  "对危险化学品急性中毒，若为沾染皮肤中毒，应：": {
+    "optionList": [
+      {
+        "content": "迅速脱去受污染的衣物",
+        "isCorrect": 1
+      },
+      {
+        "content": "用大量流动的清水冲洗至少15分钟",
+        "isCorrect": 1
+      },
+      {
+        "content": "头面部受污染时，要首先注意冲洗眼睛",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "对婴儿实施海姆立克的正确操作有？": {
     "optionList": [
       {
@@ -26912,6 +27199,19 @@
     "type": 1
   },
   "小明的同学在外地做实验，着急使用某种危化品,小明是否可以使用快递的方式寄送物品？": {
+    "optionList": [
+      {
+        "content": "可以",
+        "isCorrect": 2
+      },
+      {
+        "content": "不可以",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "小明的同学在外地做实验，着急使用某种危化品，小明是否可以使用快递的方式寄送物品？": {
     "optionList": [
       {
         "content": "可以",
@@ -29316,6 +29616,23 @@
     ],
     "type": 1
   },
+  "恒温水浴锅加的水量不低于（），不能让加热管露出水面，但也不能太多，以免沸腾时水量溢出锅外。": {
+    "optionList": [
+      {
+        "content": "三分之一",
+        "isCorrect": 2
+      },
+      {
+        "content": "二分之一",
+        "isCorrect": 1
+      },
+      {
+        "content": "百分之百",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "恶势力是指以（）等手段，在一定区域内或行业内多次实施违法犯罪活动，严重扰乱经济、社会生活秩序，造成恶劣影响的犯罪组织。": {
     "optionList": [
       {
@@ -31165,6 +31482,23 @@
     ],
     "type": 1
   },
+  "按照瓶内介质分，可将气瓶分为：": {
+    "optionList": [
+      {
+        "content": "永久气体气瓶",
+        "isCorrect": 1
+      },
+      {
+        "content": "液化气体气瓶",
+        "isCorrect": 1
+      },
+      {
+        "content": "溶解乙炔气瓶",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "按照被保护对象的使用性质、火灾危险性、疏散和扑救难度，将火灾自动报警系统分为三级。下列表述错误的是：": {
     "optionList": [
       {
@@ -31173,6 +31507,23 @@
       }
     ],
     "type": 1
+  },
+  "按爆炸发生的原因和性质不同，可分为：": {
+    "optionList": [
+      {
+        "content": "物理爆炸",
+        "isCorrect": 1
+      },
+      {
+        "content": "核爆炸",
+        "isCorrect": 1
+      },
+      {
+        "content": "化学爆炸",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
   },
   "挑选西瓜的方法有哪些？": {
     "optionList": [
@@ -34989,6 +35340,19 @@
     ],
     "type": 1
   },
+  "正常工作时不带电的部位，因某种原因(主要是故障)带上危险电压后被人触及而产生的电击，称为：": {
+    "optionList": [
+      {
+        "content": "直接电击",
+        "isCorrect": 2
+      },
+      {
+        "content": "间接电击",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
   "正当防卫必须满足哪些要点？": {
     "optionList": [
       {
@@ -35549,6 +35913,23 @@
       },
       {
         "content": "嘴唇和皮肤出现青紫色",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "氧化剂按照氧化反应所要求的介质分为：": {
+    "optionList": [
+      {
+        "content": "酸性介质氧化剂",
+        "isCorrect": 1
+      },
+      {
+        "content": "碱性介质氧化剂",
+        "isCorrect": 1
+      },
+      {
+        "content": "中性氧化剂",
         "isCorrect": 1
       }
     ],
@@ -36187,6 +36568,23 @@
       {
         "content": "物理爆炸",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "液氮必须使用专业液氮罐存储，置于阴凉、通风处，环境温度不高于（）℃。": {
+    "optionList": [
+      {
+        "content": "50",
+        "isCorrect": 1
+      },
+      {
+        "content": "55",
+        "isCorrect": 2
+      },
+      {
+        "content": "60",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -37774,6 +38172,23 @@
     ],
     "type": 2
   },
+  "由于光也能加速过氧化氢分解，故常将过氧化氢保存在用黑纸包裹的塑料瓶中，使用时也应存放在（）玻璃瓶内。": {
+    "optionList": [
+      {
+        "content": "棕色",
+        "isCorrect": 1
+      },
+      {
+        "content": "黑色",
+        "isCorrect": 2
+      },
+      {
+        "content": "透明",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "由省、自治区人民政府公安机关消防机构负责调查的火灾包括：": {
     "optionList": [
       {
@@ -37916,6 +38331,23 @@
       {
         "content": "乙夺下甲的刀，并将甲推倒在地上的行为是正当防卫；乙持刀向甲连扎三刀致甲死亡的行为属于故意杀人",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "甲烷的爆炸下限（LEL）为：": {
+    "optionList": [
+      {
+        "content": "5%",
+        "isCorrect": 1
+      },
+      {
+        "content": "15%",
+        "isCorrect": 2
+      },
+      {
+        "content": "20%",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -38430,6 +38862,27 @@
       },
       {
         "content": "下开上关。",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "电热恒温干燥箱如果长期不用，应该：": {
+    "optionList": [
+      {
+        "content": "定期按使用条件运行2-3天",
+        "isCorrect": 1
+      },
+      {
+        "content": "定期按使用条件运行1天",
+        "isCorrect": 2
+      },
+      {
+        "content": "按照最高温度运行1天",
+        "isCorrect": 2
+      },
+      {
+        "content": "按照最高温度运行2-3天",
         "isCorrect": 2
       }
     ],
@@ -41021,6 +41474,23 @@
     ],
     "type": 1
   },
+  "若电石、生石灰颗粒溅入眼内，应当先蘸（）棉签去除颗粒后，再用清水冲洗。": {
+    "optionList": [
+      {
+        "content": "石蜡油",
+        "isCorrect": 1
+      },
+      {
+        "content": "植物油",
+        "isCorrect": 1
+      },
+      {
+        "content": "蒸馏水",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
   "蓝柏格定理告诉我们：没有压力便没有动力。": {
     "optionList": [
       {
@@ -43451,6 +43921,23 @@
     ],
     "type": 2
   },
+  "逃生路线图需标明：": {
+    "optionList": [
+      {
+        "content": "两条及以上逃生路线",
+        "isCorrect": 1
+      },
+      {
+        "content": "消防集结点",
+        "isCorrect": 1
+      },
+      {
+        "content": "事故意外交接点",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "逃避亲密关系是哪种依恋类型的特征？": {
     "optionList": [
       {
@@ -45204,6 +45691,23 @@
     ],
     "type": 2
   },
+  "静电电位可高达数万伏至数十万伏，可能发生放电，产生电气火花，引起爆炸、火灾，也能造成对人体的电击伤害，以下哪些物品容易引发静电？": {
+    "optionList": [
+      {
+        "content": "化学纤维质地的坐垫",
+        "isCorrect": 1
+      },
+      {
+        "content": "家用电器",
+        "isCorrect": 1
+      },
+      {
+        "content": "纯棉衣服",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
   "非本人自愿发生的性行为，都属于强奸（性侵）。——这句话正确吗？": {
     "optionList": [
       {
@@ -45966,6 +46470,27 @@
     ],
     "type": 1
   },
+  "马弗炉和控制器应在（）摄氏度的环境温度下运行。": {
+    "optionList": [
+      {
+        "content": "0~40",
+        "isCorrect": 1
+      },
+      {
+        "content": "40~60",
+        "isCorrect": 2
+      },
+      {
+        "content": "30~50",
+        "isCorrect": 2
+      },
+      {
+        "content": "0~20",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "马蝇效应的提出者是？": {
     "optionList": [
       {
@@ -46343,6 +46868,27 @@
       },
       {
         "content": "疏散走道",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "高校保密工作内容的涉及以下哪方面内容？（）": {
+    "optionList": [
+      {
+        "content": "各学院和专业的名称，老师姓名",
+        "isCorrect": 2
+      },
+      {
+        "content": "国家国防科技项目、国家高技术研究发展计划(简称“863”计划)重大科技项目和重大科技成果",
+        "isCorrect": 1
+      },
+      {
+        "content": "在科研中形成的尚未公开的、具有一定经济价值的新工艺、技术、方法、数据等技术信息",
+        "isCorrect": 1
+      },
+      {
+        "content": "上级下发的涉密文件，科技档案中的内部资料等",
         "isCorrect": 1
       }
     ],
@@ -46846,6 +47392,27 @@
       {
         "content": "BSL-2/ABSL-2",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "（）可以引起化学性肺炎和肺水肿。": {
+    "optionList": [
+      {
+        "content": "光气",
+        "isCorrect": 1
+      },
+      {
+        "content": "一氧化碳",
+        "isCorrect": 2
+      },
+      {
+        "content": "汞",
+        "isCorrect": 2
+      },
+      {
+        "content": "铬",
+        "isCorrect": 2
       }
     ],
     "type": 1
