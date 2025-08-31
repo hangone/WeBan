@@ -289,6 +289,19 @@ class WeBanClient:
             return
 
         projects = projects.get("data", [])
+        
+        completion = self.api.list_completion()
+        if completion.get("code", -1) != "0":
+            self.log.error(f"获取模块完成情况失败：{completion}")
+        
+        showable_modules = [d["module"] for d in completion.get("data", []) if d["showable"] == 1]
+        if "labProject" in showable_modules:
+            self.log.info(f"加载实验室课程")
+            lab_project = self.api.lab_index()
+            if lab_project.get("code", -1) != "0":
+                self.log.error(f"获取实验室课程失败：{lab_project}")
+            projects.append(lab_project.get("data", {}).get("current", {}))
+
         for project in projects:
             self.log.info(f"开始考试项目 {project['projectName']}")
             user_project_id = project["userProjectId"]
@@ -427,8 +440,21 @@ class WeBanClient:
         except Exception as e:
             self.log.error(f"读取题库失败，请重新下载题库：{e}")
             return
-        for project in self.api.list_my_project().get("data", []):
-            for plan in self.api.exam_list_plan(project["userProjectId"]).get("data", []):
+
+        user_project_ids = [p["userProjectId"] for p in self.api.list_my_project().get("data", [])]
+        completion = self.api.list_completion()
+        if completion.get("code", -1) != "0":
+            self.log.error(f"获取模块完成情况失败：{completion}")
+        
+        showable_modules = [d["module"] for d in completion.get("data", []) if d["showable"] == 1]
+        if "labProject" in showable_modules:
+            self.log.info(f"加载实验室课程")
+            lab_project = self.api.lab_index()
+            if lab_project.get("code", -1) != "0":
+                self.log.error(f"获取实验室课程失败：{lab_project}")
+            user_project_ids.append(lab_project.get("data", {}).get("current", {}).get("userProjectId"))
+        for user_project_id in user_project_ids:
+            for plan in self.api.exam_list_plan(user_project_id).get("data", []):
                 for history in self.api.exam_list_history(plan["examPlanId"], plan["examType"]).get("data", []):
                     questions = self.api.exam_review_paper(history["id"], history["isRetake"])["data"].get("questions", [])
                     for answer in questions:
