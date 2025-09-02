@@ -145,10 +145,14 @@ class WeBanClient:
             verify_time = self.api.get_timestamp(13, 0)
             verify_image = self.api.rand_letter_image(verify_time)
             if i < retry_limit and self.ocr:
-                verify_code = self.ocr.classification(verify_image)
-                self.log.info(f"自动验证码识别结果: {verify_code}")
-                if len(verify_code) != 4:
-                    self.log.warning(f"验证码识别失败，正在重试")
+                try:
+                    verify_code = self.ocr.classification(verify_image)
+                    self.log.info(f"自动验证码识别结果: {verify_code}")
+                    if len(verify_code) != 4:
+                        self.log.warning(f"验证码识别失败，正在重试")
+                        continue
+                except Exception as e:
+                    self.log.error(f"验证码识别异常: {e}")
                     continue
             else:
                 open("verify_code.png", "wb").write(verify_image)
@@ -231,7 +235,6 @@ class WeBanClient:
                             continue
 
                         self.api.study(course["resourceId"], task["userProjectId"])
-                        course_url = self.api.get_course_url(course["resourceId"], task["userProjectId"])["data"] + "&weiban=weiban"
                         self.log.info(f"等待 {self.study_time} 秒，模拟学习中...")
                         time.sleep(self.study_time)
 
@@ -239,6 +242,7 @@ class WeBanClient:
                             self.log.success(f"{course_prefix} 完成")
                             continue
 
+                        course_url = self.api.get_course_url(course["resourceId"], task["userProjectId"])["data"] + "&weiban=weiban"
                         query = parse_qs(urlparse(course_url).query)
                         if query.get("lyra", [None])[0] == "lyra":  # 安全实训
                             res = self.api.finish_lyra(query.get("userActivityId", [None])[0])
