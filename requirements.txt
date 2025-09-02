@@ -2,3 +2,4 @@ ddddocr
 loguru
 pycryptodome
 requests
+pillow==11.3.0

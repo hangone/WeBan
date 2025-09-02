@@ -5,6 +5,9 @@ import threading
 import traceback
 from concurrent.futures import as_completed, ThreadPoolExecutor
 
+# 下次记得写类型注解
+# from typing import Dict, Any
+
 from loguru import logger
 
 from client import WeBanClient
@@ -12,11 +15,11 @@ from client import WeBanClient
 VERSION = "v3.5.17"
 
 if getattr(sys, 'frozen', False):
-    base_path = os.path.dirname(sys.executable)
+    base_path: str = os.path.dirname(sys.executable)
 else:
-    base_path = os.path.dirname(os.path.abspath(__file__))
-log_path = os.path.join(base_path, "weban.log")
-config_path = os.path.join(base_path, "config.json")
+    base_path: str = os.path.dirname(os.path.abspath(__file__))
+log_path: str = os.path.join(base_path, "weban.log")
+config_path: str = os.path.join(base_path, "config.json")
 
 # 日志
 logger.remove()
@@ -103,7 +106,7 @@ def create_initial_config() -> list[dict]:
     logger.error("config.json 文件不存在，请填写信息")
     tenant_name = input("请填写学校名称: ").strip()
     client = WeBanClient(tenant_name=tenant_name, log=logger)
-    tenant_config = client.api.get_tenant_config()
+    tenant_config: Dict[str, Any] = client.api.get_tenant_config()
     if tenant_config.get("code", -1) != "0":
         logger.error(f"未找到学校 {tenant_name} 的配置，请检查学校名称是否正确")
         exit(1)
