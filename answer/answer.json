@@ -1191,6 +1191,14 @@
       {
         "content": "人际交往",
         "isCorrect": 1
+      },
+      {
+        "content": "创新",
+        "isCorrect": 2
+      },
+      {
+        "content": "挫折应对",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -9201,6 +9209,27 @@
     ],
     "type": 1
   },
+  "以下什么物质属于第一类易制毒化学品？": {
+    "optionList": [
+      {
+        "content": "邻氨基苯甲酸",
+        "isCorrect": 1
+      },
+      {
+        "content": "苯乙酸",
+        "isCorrect": 2
+      },
+      {
+        "content": "甲苯",
+        "isCorrect": 2
+      },
+      {
+        "content": "高锰酸钾",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "以下使用手机时不存在的泄密问题和隐患是：": {
     "optionList": [
       {
@@ -10467,6 +10496,23 @@
     ],
     "type": 2
   },
+  "以下哪些物质，受热、摩擦、撞击等作用时，极易发生反应放出大量热？": {
+    "optionList": [
+      {
+        "content": "氧化物类(包括有机物)",
+        "isCorrect": 1
+      },
+      {
+        "content": "硝酸盐类",
+        "isCorrect": 1
+      },
+      {
+        "content": "氯酸盐类",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "以下哪些药服用时，最好不要喝牛奶？": {
     "optionList": [
       {
@@ -11552,9 +11598,25 @@
       {
         "content": "被骗概率跟受教育程度没有必然联系",
         "isCorrect": 1
+      },
+      {
+        "content": "禁止无危险废物经营许可证或者不按照经营许可证规定从事废弃危险化学品收集、贮存、利用、处置的经营活动",
+        "isCorrect": 1
+      },
+      {
+        "content": "接收单位应当对接收的废弃危险化学品进行核实；未经核实的，不得处置",
+        "isCorrect": 1
+      },
+      {
+        "content": "禁止将废弃危险化学品提供或者委托给无危险废物经营许可证的单位从事收集、贮存、利用、处置等经营活动",
+        "isCorrect": 1
+      },
+      {
+        "content": "可以根据实际情况，不按规定申报登记废弃危险化学品，或者在申报登记适当调整",
+        "isCorrect": 2
       }
     ],
-    "type": 1
+    "type": 2
   },
   "以下说法错误的是：": {
     "optionList": [
@@ -12674,6 +12736,19 @@
       {
         "content": "18",
         "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "使用危险化学品时，（）直接接触或嗅闻。": {
+    "optionList": [
+      {
+        "content": "可以",
+        "isCorrect": 2
+      },
+      {
+        "content": "不可以",
+        "isCorrect": 1
       }
     ],
     "type": 1
@@ -25425,6 +25500,10 @@
       {
         "content": "正规的有安全保障的车。",
         "isCorrect": 1
+      },
+      {
+        "content": "车站旁边有很多的小“黑”车，便宜而且开的快。可以选择。",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -26560,6 +26639,31 @@
     ],
     "type": 2
   },
+  "对国家秘密载体的管理中，以下哪些行为是不被允许的？": {
+    "optionList": [
+      {
+        "content": "非法获取、持有国家秘密载体",
+        "isCorrect": 1
+      },
+      {
+        "content": "买卖、转送或者私自销毁国家秘密载体",
+        "isCorrect": 1
+      },
+      {
+        "content": "通过普通邮政、快递等无保密措施的渠道传递国家秘密载体",
+        "isCorrect": 1
+      },
+      {
+        "content": "邮寄、托运国家秘密载体出境",
+        "isCorrect": 1
+      },
+      {
+        "content": "未经有关主管部门批准，携带、传递国家秘密载体出境",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "对婴儿实施海姆立克的正确操作有？": {
     "optionList": [
       {
@@ -26763,6 +26867,23 @@
       },
       {
         "content": "错",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "对置于工作台上的样品架, 化学品存储高度建议不高于地面（）米。": {
+    "optionList": [
+      {
+        "content": "1.5",
+        "isCorrect": 2
+      },
+      {
+        "content": "1.6",
+        "isCorrect": 1
+      },
+      {
+        "content": "2",
         "isCorrect": 2
       }
     ],
@@ -27096,6 +27217,23 @@
       {
         "content": "就算他说是校友，但是对于我来说他还是一个陌生人。可以提醒他到学校取钱后再买，自己现在也没有钱。",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "小剂量存放场所是指教学、科研、医疗、测试等单位使用的，所有易制爆危险化学品的总量不超过（）的储存室或储存柜。": {
+    "optionList": [
+      {
+        "content": "20kg",
+        "isCorrect": 2
+      },
+      {
+        "content": "50kg",
+        "isCorrect": 1
+      },
+      {
+        "content": "100kg",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -39265,6 +39403,23 @@
     ],
     "type": 1
   },
+  "目前，艾滋病是一种不可治愈的严重传染病吗？": {
+    "optionList": [
+      {
+        "content": "是。",
+        "isCorrect": 1
+      },
+      {
+        "content": "否。",
+        "isCorrect": 2
+      },
+      {
+        "content": "不知道。",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "目前，西安交通大学共有几个校区？（）": {
     "optionList": [
       {
@@ -42293,6 +42448,18 @@
       {
         "content": "听话的技巧",
         "isCorrect": 1
+      },
+      {
+        "content": "沟通情境",
+        "isCorrect": 2
+      },
+      {
+        "content": "说话的技巧",
+        "isCorrect": 2
+      },
+      {
+        "content": "身体语言",
+        "isCorrect": 2
       }
     ],
     "type": 1
