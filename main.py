@@ -109,8 +109,8 @@ def create_initial_config() -> list[dict]:
         exit(1)
     prompt = tenant_config["data"]
     logger.info(prompt.get("popPrompt", ""))
-    account = input(f"账号请输入{prompt.get('userNamePrompt', '')}：").strip()
-    password = input(f"密码请输入{prompt.get('passwordPrompt', '')}：").strip()
+    account = input(f"账号{prompt.get('userNamePrompt', '请输入')}：").strip()
+    password = input(f"密码{prompt.get('passwordPrompt', '请输入')}：").strip()
 
     configs = [{"tenant_name": tenant_name, "account": account, "password": password, "study": True, "user": {"userId": "", "token": ""}, "study_time": 15, "exam": True, "exam_use_time": 250}]
 
