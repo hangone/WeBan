@@ -9423,6 +9423,14 @@
       {
         "content": "儒家的“仁”。",
         "isCorrect": 1
+      },
+      {
+        "content": "道家的“法”。",
+        "isCorrect": 2
+      },
+      {
+        "content": "墨家的“法”。",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -16353,6 +16361,23 @@
       {
         "content": "错误",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "制定《消防法》的目的是，为了（），加强应急救援工作，保护人身、财产安全，维护公共安全。": {
+    "optionList": [
+      {
+        "content": "预防火灾",
+        "isCorrect": 2
+      },
+      {
+        "content": "预防火灾和减少火灾危害",
+        "isCorrect": 1
+      },
+      {
+        "content": "减少火灾危害",
+        "isCorrect": 2
       }
     ],
     "type": 1
