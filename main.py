@@ -11,7 +11,7 @@ from client import WeBanClient
 
 VERSION = "v3.5.17"
 
-if getattr(sys, 'frozen', False):
+if getattr(sys, "frozen", False):
     base_path = os.path.dirname(sys.executable)
 else:
     base_path = os.path.dirname(os.path.abspath(__file__))
@@ -36,9 +36,10 @@ def run_account(config, account_index):
     password = config.get("password", "").strip()
     user = config.get("user", {})
     study = config.get("study", True)
-    study_time = config.get("study_time", 15)
+    study_time = int(config.get("study_time", 15))
+    restudy_time = int(config.get("restudy_time", 0))
     exam = config.get("exam", True)
-    exam_use_time = config.get("exam_use_time", 250)
+    exam_use_time = int(config.get("exam_use_time", 250))
 
     if user.get("tenantName"):
         tenant_name = user["tenantName"]
@@ -67,7 +68,7 @@ def run_account(config, account_index):
 
         if study:
             log.info(f"开始学习 (每个任务时长: {study_time}秒)")
-            client.run_study(study_time)
+            client.run_study(study_time, restudy_time)
 
         if exam:
             log.info(f"开始考试 (总时长: {exam_use_time}秒)")
@@ -87,7 +88,7 @@ def run_account(config, account_index):
     except RuntimeError as e:
         logger.error(f"运行时错误: {e}")
         return False
-    
+
     except ValueError as e:
         logger.error(f"参数错误: {e}")
         return False
@@ -112,7 +113,7 @@ def create_initial_config() -> list[dict]:
     account = input(f"账号{prompt.get('userNamePrompt', '请输入')}：").strip()
     password = input(f"密码{prompt.get('passwordPrompt', '请输入')}：").strip()
 
-    configs = [{"tenant_name": tenant_name, "account": account, "password": password, "study": True, "user": {"userId": "", "token": ""}, "study_time": 15, "exam": True, "exam_use_time": 250}]
+    configs = [{"tenant_name": tenant_name, "account": account, "password": password, "study": True, "user": {"userId": "", "token": ""}, "study_time": 15, "restudy_time": 0, "exam": True, "exam_use_time": 250}]
 
     with open(config_path, "w", encoding="utf-8") as f:
         f.write(json.dumps(configs, indent=2, ensure_ascii=False))
