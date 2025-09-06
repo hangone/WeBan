@@ -15,12 +15,13 @@ from api import WeBanAPI
 if TYPE_CHECKING:
     from ddddocr import DdddOcr
 
-if getattr(sys, 'frozen', False):
+if getattr(sys, "frozen", False):
     base_path = os.path.dirname(sys.executable)
 else:
     base_path = os.path.dirname(os.path.abspath(__file__))
 answer_dir = os.path.join(base_path, "answer")
 answer_path = os.path.join(answer_dir, "answer.json")
+
 
 def clean_text(text):
     # 只保留字母、数字和汉字，自动去除所有符号和空格
@@ -67,7 +68,7 @@ class WeBanClient:
         if not _cache.get("ocr"):
             try:
                 import ddddocr
-                
+
                 try:
                     _cache["ocr"] = ddddocr.DdddOcr(show_ad=False)
                 except TypeError:
@@ -75,7 +76,6 @@ class WeBanClient:
             except Exception:
                 ddddocr = None
                 self.log.warning("ddddocr 库未安装，自动验证码识别功能将不可用")
-
 
         return _cache["ocr"]
 
@@ -168,9 +168,14 @@ class WeBanClient:
             break
         return None
 
-    def run_study(self, study_time: int | None) -> None:
+    def run_study(self, study_time: int = 15, restudy_time: int = 0) -> None:
         if study_time:
             self.study_time = study_time
+
+        if restudy_time:
+            self.study_time = restudy_time
+            self.log.info(f"重新学习模式已开启，所有课程将重新学习，每门课程学习 {self.study_time} 秒")
+
         study_task = self.api.list_study_task()
         if study_task.get("code", -1) != "0":
             self.log.error(f"获取任务列表失败：{study_task}")
@@ -179,11 +184,11 @@ class WeBanClient:
         study_task = study_task.get("data", {}).get("studyTaskList", [])
         if not study_task:
             self.log.info(f"获取任务列表成功")
-            
+
         completion = self.api.list_completion()
         if completion.get("code", -1) != "0":
             self.log.error(f"获取模块完成情况失败：{completion}")
-        
+
         showable_modules = [d["module"] for d in completion.get("data", []) if d["showable"] == 1]
         if "labProject" in showable_modules:
             self.log.info(f"加载实验室课程")
@@ -200,7 +205,6 @@ class WeBanClient:
             # 获取学习进度
             self.get_progress(task["userProjectId"], project_prefix)
 
-
             # 聚合类别 1：推送课，2：自选课，3：必修课
             for choose_type in [(3, "必修课", "requiredNum", "requiredFinishedNum"), (1, "推送课", "pushNum", "pushFinishedNum"), (2, "自选课", "optionalNum", "optionalFinishedNum")]:
                 categories = self.api.list_category(task["userProjectId"], choose_type[0])
@@ -210,13 +214,13 @@ class WeBanClient:
                 for category in categories.get("data", []):
                     category_prefix = f"{choose_type[1]} {project_prefix}/{category['categoryName']}"
                     self.log.info(f"开始处理 {category_prefix}")
-                    if category["finishedNum"] >= category["totalNum"]:
+                    if not restudy_time and category["finishedNum"] >= category["totalNum"]:
                         self.log.success(f"{category_prefix} 已完成")
                         continue
 
                     # 获取学习进度
                     progress = self.get_progress(task["userProjectId"], project_prefix, False)
-                    if progress[choose_type[3]] >= progress[choose_type[2]]:
+                    if not restudy_time and progress[choose_type[3]] >= progress[choose_type[2]]:
                         self.log.info(f"{category_prefix} 已达到要求，跳过")
                         break
 
@@ -225,18 +229,16 @@ class WeBanClient:
                         course_prefix = f"{category_prefix}/{course['resourceName']}"
                         # 获取学习进度
                         progress = self.get_progress(task["userProjectId"], category_prefix)
-                        if progress[choose_type[3]] >= progress[choose_type[2]]:
+                        if not restudy_time and progress[choose_type[3]] >= progress[choose_type[2]]:
                             self.log.info(f"{category_prefix} 已达到要求，跳过")
                             break
 
                         self.log.info(f"开始处理课程：{course_prefix}")
-                        if course["finished"] == 1:
+                        if not restudy_time and course["finished"] == 1:
                             self.log.success(f"{course_prefix} 已完成")
                             continue
 
                         self.api.study(course["resourceId"], task["userProjectId"])
-                        self.log.info(f"等待 {self.study_time} 秒，模拟学习中...")
-                        time.sleep(self.study_time)
 
                         if "userCourseId" not in course:
                             self.log.success(f"{course_prefix} 完成")
@@ -244,6 +246,18 @@ class WeBanClient:
 
                         course_url = self.api.get_course_url(course["resourceId"], task["userProjectId"])["data"] + "&weiban=weiban"
                         query = parse_qs(urlparse(course_url).query)
+                        if query.get("csCapt", [None])[0] == "true":
+                            self.log.warning(f"课程需要验证码，暂时无法处理...")
+                            need_capt.append(course_prefix)
+                            continue
+
+                        sleep = 0
+                        while sleep < self.study_time:
+                            if sleep % 60 == 0:
+                                self.log.info(f"{course_prefix} 等待 {self.study_time - sleep} 秒，模拟学习中...")
+                            time.sleep(1)
+                            sleep += 1
+
                         if query.get("lyra", [None])[0] == "lyra":  # 安全实训
                             res = self.api.finish_lyra(query.get("userActivityId", [None])[0])
                         elif query.get("weiban", [None])[0] != "weiban":
@@ -267,11 +281,12 @@ class WeBanClient:
                                 self.log.error(f"{course_prefix} 完成失败：{res}")
 
                         self.log.success(f"{course_prefix} 完成")
-                        
+
             if need_capt:
                 self.log.warning(f"以下课程需要验证码，请手动完成：")
                 for c in need_capt:
                     self.log.warning(f" - {c}")
+                    raise Warning(f"课程需要验证码，无法继续")
 
             self.log.success(f"{project_prefix} 课程学习完成")
 
@@ -293,11 +308,11 @@ class WeBanClient:
             return
 
         projects = projects.get("data", [])
-        
+
         completion = self.api.list_completion()
         if completion.get("code", -1) != "0":
             self.log.error(f"获取模块完成情况失败：{completion}")
-        
+
         showable_modules = [d["module"] for d in completion.get("data", []) if d["showable"] == 1]
         if "labProject" in showable_modules:
             self.log.info(f"加载实验室课程")
@@ -449,7 +464,7 @@ class WeBanClient:
         completion = self.api.list_completion()
         if completion.get("code", -1) != "0":
             self.log.error(f"获取模块完成情况失败：{completion}")
-        
+
         showable_modules = [d["module"] for d in completion.get("data", []) if d["showable"] == 1]
         if "labProject" in showable_modules:
             self.log.info(f"加载实验室课程")
