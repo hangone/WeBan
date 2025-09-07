@@ -636,6 +636,27 @@
     ],
     "type": 1
   },
+  "What Documents do you need to submit when applying for a motor vehicle driver`s license?": {
+    "optionList": [
+      {
+        "content": "Application form.",
+        "isCorrect": 1
+      },
+      {
+        "content": "Passport.",
+        "isCorrect": 1
+      },
+      {
+        "content": "Original driving license and Chinese transcript.",
+        "isCorrect": 1
+      },
+      {
+        "content": "One-inch photo with white background.",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "When you put out the fire, remember the word PASS, what does it mean?": {
     "optionList": [
       {
@@ -40477,6 +40498,10 @@
       {
         "content": "正确。",
         "isCorrect": 1
+      },
+      {
+        "content": "错误。",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -43300,6 +43325,18 @@
       {
         "content": "处7年以上有期徒刑，并处罚金。",
         "isCorrect": 1
+      },
+      {
+        "content": "处1年以上有期徒刑，并处罚金。",
+        "isCorrect": 2
+      },
+      {
+        "content": "处3年以上有期徒刑，并处罚金。",
+        "isCorrect": 2
+      },
+      {
+        "content": "处5年以上有期徒刑，并处罚金。",
+        "isCorrect": 2
       }
     ],
     "type": 1
