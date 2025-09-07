@@ -286,7 +286,6 @@ class WeBanClient:
                 self.log.warning(f"以下课程需要验证码，请手动完成：")
                 for c in need_capt:
                     self.log.warning(f" - {c}")
-                    raise Warning(f"课程需要验证码，无法继续")
 
             self.log.success(f"{project_prefix} 课程学习完成")
 
