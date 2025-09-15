@@ -5807,6 +5807,14 @@
       {
         "content": "朋友请你尝试他从药物公司“搞到”的可卡因。",
         "isCorrect": 1
+      },
+      {
+        "content": "医生为缓解病患痛苦开的杜冷丁。",
+        "isCorrect": 2
+      },
+      {
+        "content": "某医疗机构研制出的新型镇痛药。",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -17729,6 +17737,23 @@
     "optionList": [
       {
         "content": "阴燃",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "可燃性气体与助燃气体气瓶、与明火的距离都应大于（    ）米（确实难达到时，可采取隔离等措施）。": {
+    "optionList": [
+      {
+        "content": "3",
+        "isCorrect": 2
+      },
+      {
+        "content": "5",
+        "isCorrect": 2
+      },
+      {
+        "content": "10",
         "isCorrect": 1
       }
     ],
@@ -33805,6 +33830,22 @@
       {
         "content": "长度较短，不到两个关节。",
         "isCorrect": 2
+      },
+      {
+        "content": "木板，长度较短，不到两个关节。",
+        "isCorrect": 2
+      },
+      {
+        "content": "木板，长度较长，超过两个关节。",
+        "isCorrect": 1
+      },
+      {
+        "content": "纸板，长度较短，不到两个关节。",
+        "isCorrect": 2
+      },
+      {
+        "content": "纸板，长度较长，超过两个关节。",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -35346,6 +35387,23 @@
       },
       {
         "content": "口头批评",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "根据《电动自行车安全技术规范》（GB\r\n17761-2024）国家标准规定：电动自行车的最高时速为多少？空车质量最高为多少？": {
+    "optionList": [
+      {
+        "content": "25公里/小时；63公斤",
+        "isCorrect": 1
+      },
+      {
+        "content": "40公里/小时；20公斤",
+        "isCorrect": 2
+      },
+      {
+        "content": "20公里/小时；40公斤",
         "isCorrect": 2
       }
     ],
