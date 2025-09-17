@@ -6310,7 +6310,7 @@
         "isCorrect": 2
       }
     ],
-    "type": 2
+    "type": 1
   },
   "下面躲避雾霾的方式中错误的是：": {
     "optionList": [
@@ -16918,6 +16918,27 @@
     ],
     "type": 1
   },
+  "危害国家安全的社会因素可以分为国内因素和国外因素两个方面，概括起来就是中国人常说的？": {
+    "optionList": [
+      {
+        "content": "天灾人祸",
+        "isCorrect": 2
+      },
+      {
+        "content": "不测风云",
+        "isCorrect": 2
+      },
+      {
+        "content": "内忧外患",
+        "isCorrect": 1
+      },
+      {
+        "content": "多灾多难",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "危机意识是指对紧急或困难关头的感知及应变能力。": {
     "optionList": [
       {
@@ -22451,6 +22472,27 @@
       {
         "content": "不随意透露和公开个人信息",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "大学生日常生活中维护国家安全的途径不包括：": {
+    "optionList": [
+      {
+        "content": "努力学习专业知识",
+        "isCorrect": 2
+      },
+      {
+        "content": "参与反恐军事行动",
+        "isCorrect": 1
+      },
+      {
+        "content": "遵守法律法规",
+        "isCorrect": 2
+      },
+      {
+        "content": "提升文化传承意识",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -28295,6 +28337,27 @@
     ],
     "type": 2
   },
+  "应对文化威胁的正确做法是？": {
+    "optionList": [
+      {
+        "content": "完全封闭",
+        "isCorrect": 2
+      },
+      {
+        "content": "全盘吸收",
+        "isCorrect": 2
+      },
+      {
+        "content": "批判继承与创新",
+        "isCorrect": 1
+      },
+      {
+        "content": "忽视文化差异",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "应急广播系统会受到停电的影响、不能工作吗？": {
     "optionList": [
       {
@@ -29793,6 +29856,27 @@
       },
       {
         "content": "2000年",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "总体国家安全观与传统国家安全观的主要区别是？": {
+    "optionList": [
+      {
+        "content": "仅关注军事安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "强调国家安全范围的广泛性和人民性",
+        "isCorrect": 1
+      },
+      {
+        "content": "仅重视政治安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "忽略经济安全",
         "isCorrect": 2
       }
     ],
@@ -40670,6 +40754,27 @@
     ],
     "type": 1
   },
+  "统筹国土安全与国民安全的核心在于？": {
+    "optionList": [
+      {
+        "content": "完全放弃物的安全，专注人的安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "在物的安全与人的安全之间建立平衡，突出人的安全",
+        "isCorrect": 1
+      },
+      {
+        "content": "延续传统安全观，以国土安全优先",
+        "isCorrect": 2
+      },
+      {
+        "content": "仅关注非传统安全领域",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "维护国土安全，我们应该怎么做？": {
     "optionList": [
       {
@@ -45898,6 +46003,27 @@
       },
       {
         "content": "否",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "隐蔽行动不包括？": {
+    "optionList": [
+      {
+        "content": "军事入侵",
+        "isCorrect": 1
+      },
+      {
+        "content": "间谍活动",
+        "isCorrect": 2
+      },
+      {
+        "content": "网络攻击",
+        "isCorrect": 2
+      },
+      {
+        "content": "情报窃取",
         "isCorrect": 2
       }
     ],
