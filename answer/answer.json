@@ -17008,6 +17008,23 @@
     ],
     "type": 2
   },
+  "厌学了怎么办？": {
+    "optionList": [
+      {
+        "content": "寻求心理辅导老师的帮助。",
+        "isCorrect": 2
+      },
+      {
+        "content": "自己想办法找方法克服。",
+        "isCorrect": 2
+      },
+      {
+        "content": "其他两个选项皆是。",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
   "厌学的原因通常有：": {
     "optionList": [
       {
