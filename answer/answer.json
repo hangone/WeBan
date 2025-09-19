@@ -5743,6 +5743,27 @@
     ],
     "type": 2
   },
+  "下面哪些情况属于自我意识的偏差？": {
+    "optionList": [
+      {
+        "content": "自卑",
+        "isCorrect": 1
+      },
+      {
+        "content": "自信",
+        "isCorrect": 2
+      },
+      {
+        "content": "自负",
+        "isCorrect": 1
+      },
+      {
+        "content": "自我中心",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "下面哪些想法容易导致实验室事故？": {
     "optionList": [
       {
@@ -5860,6 +5881,23 @@
       },
       {
         "content": "如果嫌麻烦，可以直接升级为高级会员啊！不仅可以跳过培训，直接工作，佣金还会比普通会员增加20%！",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "下面哪些是自卑的表现？": {
+    "optionList": [
+      {
+        "content": "情不自禁地过分夸大自己的缺陷",
+        "isCorrect": 1
+      },
+      {
+        "content": "喜欢拿自己的短处和别人的长处相比",
+        "isCorrect": 1
+      },
+      {
+        "content": "把所有的挫折都归结自己的无能",
         "isCorrect": 1
       }
     ],
@@ -6310,7 +6348,7 @@
         "isCorrect": 2
       }
     ],
-    "type": 1
+    "type": 2
   },
   "下面躲避雾霾的方式中错误的是：": {
     "optionList": [
@@ -35625,6 +35663,27 @@
       },
       {
         "content": "无风险",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
+  "根据我们学到的“止损线”思维模型，当有朋友跟你借钱时，你应该：": {
+    "optionList": [
+      {
+        "content": "按照朋友的要求，要多少给多少",
+        "isCorrect": 2
+      },
+      {
+        "content": "确认朋友为真后，要考虑对方不还的风险；借出金额，应以你能承受的损失为上限",
+        "isCorrect": 1
+      },
+      {
+        "content": "要先确认朋友的真实性，别被诈骗了",
+        "isCorrect": 1
+      },
+      {
+        "content": "不问缘由，直接拒绝",
         "isCorrect": 2
       }
     ],
