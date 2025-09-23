@@ -3728,6 +3728,27 @@
         "isCorrect": 2
       },
       {
+        "content": "看到非常气人的报道直接转发",
+        "isCorrect": 2
+      },
+      {
+        "content": "家人发来的“养生科普”先查看来源",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "下列做法正确的是？": {
+    "optionList": [
+      {
+        "content": "有空就翻看“色色”网站，我与赌毒不共戴天",
+        "isCorrect": 2
+      },
+      {
+        "content": "看对方评论不顺眼，直接留言教训他一顿，来两句“国骂”",
+        "isCorrect": 2
+      },
+      {
         "content": "看到非常气人的报道直接转发，一定要表明反对态度",
         "isCorrect": 2
       },
