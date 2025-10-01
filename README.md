@@ -25,25 +25,34 @@
 
 ```json
 // config.json
+// json文件是不允许使用 // 形式的注释的，所以需要把注释全部删除才可用，建议交给AI处理
 [
   {
-    "tenant_name": "学校名称",
-    "account": "账号",
+    "tenant_name": "学校名称", //学校名称需与微伴登录时给出的学校名称一致
+    "account": "用户名", //用户名密码登录或token登录二选一即可，推荐使用token登录（即仅填写下方user字段参数）
     "password": "密码",
+    "user": {
+      "userId": "可以从浏览器F12->存储->Local Storage->user 中找到",
+      "token": "可以从浏览器F12->存储->Local Storage->token 中找到"
+    },
     "study": true, // 是否学习课程，默认开启
     "study_time": 15, // 每节课学习时间，单位（秒），默认 15 秒
-    "restudy_time": 0, // 每节课重新学习时间，单位（秒），默认不开启，有学习时长的要求可以设置
     "exam": true, // 是否考试，默认开启
     "exam_use_time": 250 // 考试总时间，单位（秒），会平均到每到题上，默认 250 秒
   },
-  // 或者
+  //第二个账号配置,可不填
   {
-    "tenant_name": "学校名称", // 与 user 字段的二选一，优先使用 user 字段的
+    "tenant_name": "学校名称",
+    "account": "用户名",
+    "password": "密码",
     "user": {
-      "userId": "可以从浏览器F12->存储->Local Storage->user->userId 中找到",
-      "token": "可以从浏览器F12->存储->Local Storage->user->token 中找到",
-      "tenantName": "" // 二选一，会优先使用这个
-    }
+      "userId": "可以从浏览器F12->存储->Local Storage->user 中找到",
+      "token": "可以从浏览器F12->存储->Local Storage->token 中找到"
+    },
+    "study": true, // 是否学习课程，默认开启
+    "study_time": 15, // 每节课学习时间，单位（秒），默认 15 秒
+    "exam": true, // 是否考试，默认开启
+    "exam_use_time": 250 // 考试总时间，单位（秒），会平均到每到题上，默认 250 秒
   }
 ]
 ```
@@ -100,9 +109,13 @@ python main.py # 或 uv run main.py
 
 2. 学习进度不更新可能是被风控遇到了需要验证码的课程，请去网页上完成一次后重试
 
+3. 手动点两个课程后再使用本脚本不容易被检测到
+
 - ### 考试
 
-如果遇到“系统检测到您的行为存在异常”，可以在网页开启一次考试后重新运行，使用 Token 登录
+1. 如果遇到“系统检测到您的行为存在异常”，可以在网页开启一次考试后重新运行，使用 Token 登录。
+2. 据观察，考试未提交是不会消耗考试次数的
+3. 若通过源码运行，配置 config.json 的方式开启多线程模式，第一个账号考试完成出现“执行完成”后需手动回车才可进行第二个账号的考试
 
 ## 鸣谢
 
