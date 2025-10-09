@@ -20,15 +20,6 @@
     ],
     "type": 2
   },
-  "网络上有人发偷拍的情侣亲热视频，关于这一情况，下面说法错误的是：": {
-    "optionList": [
-      {
-        "content": "看到网络上有人发偷拍的情侣亲热视频，赶紧下载下来，并且大量发给朋友同学。——这不是违法行为。",
-        "isCorrect": 1
-      }
-    ],
-    "type": 1
-  },
   "(       )是麻醉诱导常用的药物之一。": {
     "optionList": [
       {
@@ -4241,6 +4232,22 @@
       {
         "content": "56℃条件下30分钟后。",
         "isCorrect": 1
+      },
+      {
+        "content": "在人体外的干燥环境中暴露2小时",
+        "isCorrect": 1
+      },
+      {
+        "content": "所处环境完全干涸后",
+        "isCorrect": 1
+      },
+      {
+        "content": "56℃以上条件下30分钟后",
+        "isCorrect": 1
+      },
+      {
+        "content": "在空气中暴露30分钟",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -5277,6 +5284,22 @@
       },
       {
         "content": "防护装备必须经处理后再保丢或弃存；防护装备不得和日常服装保存在一起。",
+        "isCorrect": 1
+      },
+      {
+        "content": "进入实验室时必须穿戴防护装备",
+        "isCorrect": 1
+      },
+      {
+        "content": "不能穿着防护装备离开实验室",
+        "isCorrect": 1
+      },
+      {
+        "content": "不同实验室、不同工作性质和特点，对应不同的装备组合，不能通用",
+        "isCorrect": 1
+      },
+      {
+        "content": "应定期将防护服拿回去清洗干净",
         "isCorrect": 1
       }
     ],
@@ -6357,7 +6380,7 @@
         "isCorrect": 2
       }
     ],
-    "type": 2
+    "type": 1
   },
   "下面躲避雾霾的方式中错误的是：": {
     "optionList": [
@@ -13113,6 +13136,23 @@
     ],
     "type": 2
   },
+  "使用钢瓶中的气体时，不可将钢瓶内的气体全部用完，一定要保留（）MPa以上的残留压力（减压阀表压）。": {
+    "optionList": [
+      {
+        "content": "0.01",
+        "isCorrect": 2
+      },
+      {
+        "content": "0.05",
+        "isCorrect": 1
+      },
+      {
+        "content": "0.1",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "依恋和信任的类型可分为哪几种？": {
     "optionList": [
       {
@@ -15933,6 +15973,10 @@
       {
         "content": "正确",
         "isCorrect": 1
+      },
+      {
+        "content": "错误",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -17021,6 +17065,23 @@
     ],
     "type": 1
   },
+  "危险化学品的领用、发放及保管等必须严格按照（）规定执行，不得私自存放或带出实验室。": {
+    "optionList": [
+      {
+        "content": "五双",
+        "isCorrect": 1
+      },
+      {
+        "content": "四双",
+        "isCorrect": 2
+      },
+      {
+        "content": "三双",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "压力是把双刃剑。": {
     "optionList": [
       {
@@ -18059,6 +18120,10 @@
       },
       {
         "content": "让同学喝一些果汁。",
+        "isCorrect": 1
+      },
+      {
+        "content": "给同学少量多次补充水分。",
         "isCorrect": 1
       }
     ],
@@ -21332,6 +21397,10 @@
       {
         "content": "明天去银行柜台操作",
         "isCorrect": 1
+      },
+      {
+        "content": "在网吧登录个人银行操作还款",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -28474,6 +28543,19 @@
     ],
     "type": 2
   },
+  "延迟满足属于（）。": {
+    "optionList": [
+      {
+        "content": "心理学",
+        "isCorrect": 1
+      },
+      {
+        "content": "生理学",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "延迟满足是指一种甘愿为更有价值的长远结果而放弃即时满足的抉择取向， 以及在等待期中展示的（）。": {
     "optionList": [
       {
@@ -28647,6 +28729,18 @@
       {
         "content": "两年，最长可以延长至三年。",
         "isCorrect": 1
+      },
+      {
+        "content": "一年，最长可以延长至三年。",
+        "isCorrect": 2
+      },
+      {
+        "content": "两年，最长可以延长至五年。",
+        "isCorrect": 2
+      },
+      {
+        "content": "三年，最长可以延长至五年。",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -28984,6 +29078,19 @@
     "type": 1
   },
   "当在网络上遇到需要进行现金交易，并要求不断增加数额时，你应该：": {
+    "optionList": [
+      {
+        "content": "按照指示进行转账交易",
+        "isCorrect": 2
+      },
+      {
+        "content": "想到课中讲的“止损线”，停下来，立刻寻求辅导员或警察的帮助",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "当在网络上遇到需要进行金钱交易，并要求不断增加数额时，你应该：": {
     "optionList": [
       {
         "content": "按照指示进行转账交易",
@@ -30325,6 +30432,27 @@
       },
       {
         "content": "《全唐文·谏太宗十思疏》",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "成语“曲突徙薪”出自何处？": {
+    "optionList": [
+      {
+        "content": "《史记·司马相如列传》",
+        "isCorrect": 2
+      },
+      {
+        "content": "《汉书•霍光传》",
+        "isCorrect": 1
+      },
+      {
+        "content": "《三国志》",
+        "isCorrect": 2
+      },
+      {
+        "content": "《后汉书》",
         "isCorrect": 2
       }
     ],
@@ -33518,6 +33646,18 @@
       {
         "content": "包庇毒品犯罪分子罪，最高处10年有期徒刑。",
         "isCorrect": 1
+      },
+      {
+        "content": "包庇毒品犯罪分子罪，最高处7年有期徒刑。",
+        "isCorrect": 2
+      },
+      {
+        "content": "非法持有毒品罪，最高处10年有期徒刑。",
+        "isCorrect": 2
+      },
+      {
+        "content": "非法持有毒品罪，最高处7年有期徒刑。",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -33677,6 +33817,19 @@
     "type": 2
   },
   "晚上准备离开实验室了，但是实验还没有做完的情况下，仪器设备（）开机过夜": {
+    "optionList": [
+      {
+        "content": "应该",
+        "isCorrect": 2
+      },
+      {
+        "content": "不应该",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "晚上准备离开实验室了，但是实验还没有做完的情况下，仪器设备（）开机过夜。": {
     "optionList": [
       {
         "content": "应该",
@@ -35949,6 +36102,31 @@
       },
       {
         "content": "通过社会实践认识自我",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "正负电极之间放电产生的静电火花，静电类型包括：": {
+    "optionList": [
+      {
+        "content": "固体静电",
+        "isCorrect": 1
+      },
+      {
+        "content": "人体静电",
+        "isCorrect": 1
+      },
+      {
+        "content": "粉体静电",
+        "isCorrect": 1
+      },
+      {
+        "content": "液体静电",
+        "isCorrect": 1
+      },
+      {
+        "content": "气体静电",
         "isCorrect": 1
       }
     ],
@@ -40037,6 +40215,22 @@
       {
         "content": "48小时。",
         "isCorrect": 1
+      },
+      {
+        "content": "72小时",
+        "isCorrect": 2
+      },
+      {
+        "content": "48小时",
+        "isCorrect": 1
+      },
+      {
+        "content": "24小时",
+        "isCorrect": 2
+      },
+      {
+        "content": "12小时",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -40115,6 +40309,10 @@
       {
         "content": "错",
         "isCorrect": 1
+      },
+      {
+        "content": "对",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -40476,6 +40674,27 @@
       },
       {
         "content": "提升信用",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "约炮类诈骗的典型特征是？": {
+    "optionList": [
+      {
+        "content": "要求提前支付“服务费”或“体检费”",
+        "isCorrect": 1
+      },
+      {
+        "content": "承诺“无抵押、低息贷款”",
+        "isCorrect": 2
+      },
+      {
+        "content": "以“中奖”名义索要手续费",
+        "isCorrect": 2
+      },
+      {
+        "content": "冒充公检法要求转账",
         "isCorrect": 2
       }
     ],
@@ -41079,6 +41298,19 @@
     ],
     "type": 2
   },
+  "维护资源安全的重要意义有哪些？": {
+    "optionList": [
+      {
+        "content": "资源安全是国家安全的重要支撑",
+        "isCorrect": 1
+      },
+      {
+        "content": "资源安全是其他领域安全的依托",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "维护资源安全，我们需要注意什么？": {
     "optionList": [
       {
@@ -41143,6 +41375,15 @@
     "optionList": [
       {
         "content": "不理会，屏蔽骗子信息，适时举报",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "网络上有人发偷拍的情侣亲热视频，关于这一情况，下面说法错误的是：": {
+    "optionList": [
+      {
+        "content": "看到网络上有人发偷拍的情侣亲热视频，赶紧下载下来，并且大量发给朋友同学。——这不是违法行为。",
         "isCorrect": 1
       }
     ],
@@ -43812,6 +44053,10 @@
       {
         "content": "不能吃，废弃的化工桶里残留着很多对身体有害的化学物质。",
         "isCorrect": 1
+      },
+      {
+        "content": "能吃。红薯经过高温的烤，细菌都被杀死了，吃着肯定就没问题了。",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -48454,6 +48699,18 @@
       {
         "content": "任何单位和个人",
         "isCorrect": 1
+      },
+      {
+        "content": "单位负责人",
+        "isCorrect": 2
+      },
+      {
+        "content": "任何单位主要负责人",
+        "isCorrect": 2
+      },
+      {
+        "content": "成年人",
+        "isCorrect": 2
       }
     ],
     "type": 1
