@@ -4421,6 +4421,10 @@
       {
         "content": "电器使用完毕要随手切断电源",
         "isCorrect": 1
+      },
+      {
+        "content": "湿手摸电线",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -16178,6 +16182,19 @@
     ],
     "type": 1
   },
+  "凡标明（）类的病毒和相关样本均按UN3373的要求包装和空运。": {
+    "optionList": [
+      {
+        "content": "A",
+        "isCorrect": 2
+      },
+      {
+        "content": "B",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
   "凡许诺“高回报”的都需要谨慎。": {
     "optionList": [
       {
@@ -16907,6 +16924,23 @@
       }
     ],
     "type": 1
+  },
+  "动物实验结束后，使用的生物材料在送往中转站或收集点之前，必须要经过（），防止病原微生物泄露。": {
+    "optionList": [
+      {
+        "content": "高压灭菌",
+        "isCorrect": 1
+      },
+      {
+        "content": "灭活处理",
+        "isCorrect": 1
+      },
+      {
+        "content": "整体清洗",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
   },
   "劳动者连续工作（）年以上，就可以享受一定时间的带薪年假。": {
     "optionList": [
@@ -21738,6 +21772,23 @@
     ],
     "type": 1
   },
+  "在进行动物实验设计时应遵守（）原则，避免对实验动物造成不必要的伤害，防止虐待动物。": {
+    "optionList": [
+      {
+        "content": "替代",
+        "isCorrect": 1
+      },
+      {
+        "content": "减少",
+        "isCorrect": 1
+      },
+      {
+        "content": "优化",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "在进行网上银行支付时，应注意的事项不包括：": {
     "optionList": [
       {
@@ -25441,6 +25492,27 @@
       },
       {
         "content": "通报批评、警告、严重警告、记过、记大过、留校察看、开除学籍",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "学校应与有资质的单位签约处理生物废弃物，对于运送处理的生物废弃物来源、种类、重量或数量、时间、处置方法等有记录，且记录至少保留（）年。": {
+    "optionList": [
+      {
+        "content": "1",
+        "isCorrect": 2
+      },
+      {
+        "content": "2",
+        "isCorrect": 2
+      },
+      {
+        "content": "3",
+        "isCorrect": 1
+      },
+      {
+        "content": "4",
         "isCorrect": 2
       }
     ],
@@ -38367,6 +38439,27 @@
     ],
     "type": 1
   },
+  "涉及高致病性病原微生物的活动必须在（）实验室进行。": {
+    "optionList": [
+      {
+        "content": "BSL-1",
+        "isCorrect": 2
+      },
+      {
+        "content": "BSL-2",
+        "isCorrect": 2
+      },
+      {
+        "content": "BSL-3",
+        "isCorrect": 1
+      },
+      {
+        "content": "BSL-4",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "涉及（   ）的商用密码产品，应当依法列入网络关键设备和网络安全专用产品目录，由具备资格的机构检测认证合格后，方可销售或者提供。": {
     "optionList": [
       {
@@ -44784,6 +44877,27 @@
       {
         "content": "一旦犯错应立即自救",
         "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "误服强碱、强酸等腐蚀性强的物品，催吐反使食道、咽喉再次受到严重损伤，这时可服：": {
+    "optionList": [
+      {
+        "content": "牛奶",
+        "isCorrect": 1
+      },
+      {
+        "content": "蛋清",
+        "isCorrect": 1
+      },
+      {
+        "content": "豆浆",
+        "isCorrect": 1
+      },
+      {
+        "content": "碳酸氢钠",
+        "isCorrect": 2
       }
     ],
     "type": 2
