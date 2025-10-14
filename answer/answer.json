@@ -4066,6 +4066,10 @@
       {
         "content": "性接触时戴上两个品牌安全套。",
         "isCorrect": 1
+      },
+      {
+        "content": "从一开始要性接触就戴上品牌安全套。",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -8136,6 +8140,27 @@
     ],
     "type": 2
   },
+  "为什么说个人吸毒祸及家庭、危害社会？": {
+    "optionList": [
+      {
+        "content": "毒品不仅从肉体上、精神上毁灭吸毒者，而且祸及家庭、危害社会。",
+        "isCorrect": 1
+      },
+      {
+        "content": "吸毒者为购买毒品耗尽正当收入，于是变卖家产、四处借债，导致家庭破裂。",
+        "isCorrect": 1
+      },
+      {
+        "content": "吸毒者为购买毒品甚至卖儿卖女、逼迫妻女卖淫，走上犯罪的道路。",
+        "isCorrect": 1
+      },
+      {
+        "content": "吸毒者为获毒资偷骗抢掠、甚至杀人，严重危害人民生命安全和社会治安。",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "为什么酒后更容易发生交通事故呢？": {
     "optionList": [
       {
@@ -8780,6 +8805,10 @@
       {
         "content": "酒驾",
         "isCorrect": 1
+      },
+      {
+        "content": "无证驾驶",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -9287,6 +9316,10 @@
       {
         "content": "九成",
         "isCorrect": 1
+      },
+      {
+        "content": "五成",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -15011,6 +15044,10 @@
       {
         "content": "吸食大麻后，会口干舌燥、呼吸系统损害、多疑、幻觉、恐慌、焦虑，思维出现困难。",
         "isCorrect": 1
+      },
+      {
+        "content": "大麻属于软性毒品，少量吸食对身体没有损害。",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -21498,6 +21535,10 @@
       {
         "content": "正确",
         "isCorrect": 1
+      },
+      {
+        "content": "错误",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -31507,6 +31548,19 @@
     ],
     "type": 1
   },
+  "我国历史中出现过的明显的冒进现象有哪些？": {
+    "optionList": [
+      {
+        "content": "大跃进运动",
+        "isCorrect": 1
+      },
+      {
+        "content": "城市化冒进",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "我国受沙尘天气影响的地区主要分布在哪里？": {
     "optionList": [
       {
@@ -32141,6 +32195,10 @@
       {
         "content": "正确",
         "isCorrect": 1
+      },
+      {
+        "content": "错误",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -32150,6 +32208,10 @@
       {
         "content": "正确",
         "isCorrect": 1
+      },
+      {
+        "content": "错误",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -41259,6 +41321,10 @@
       {
         "content": "正确",
         "isCorrect": 1
+      },
+      {
+        "content": "错误",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -41940,6 +42006,10 @@
       {
         "content": "接触传播。",
         "isCorrect": 1
+      },
+      {
+        "content": "空气传播。",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -42254,6 +42324,10 @@
       {
         "content": "呼吸道传染。",
         "isCorrect": 1
+      },
+      {
+        "content": "消化道传染。",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -47606,6 +47680,10 @@
       {
         "content": "培养该领域的学习兴趣",
         "isCorrect": 1
+      },
+      {
+        "content": "无论是什么都努力学习",
+        "isCorrect": 2
       }
     ],
     "type": 1
