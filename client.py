@@ -176,14 +176,14 @@ class WeBanClient:
             self.study_time = restudy_time
             self.log.info(f"重新学习模式已开启，所有课程将重新学习，每门课程学习 {self.study_time} 秒")
 
-        study_task = self.api.list_study_task()
-        if study_task.get("code", -1) != "0":
-            self.log.error(f"获取任务列表失败：{study_task}")
+        my_project = self.api.list_my_project()
+        if my_project.get("code", -1) != "0":
+            self.log.error(f"获取任务列表失败：{my_project}")
             return
 
-        study_task = study_task.get("data", {}).get("studyTaskList", [])
-        if not study_task:
-            self.log.info(f"获取任务列表成功")
+        my_project = my_project.get("data", [])
+        if not my_project:
+            self.log.error(f"获取任务列表失败")
 
         completion = self.api.list_completion()
         if completion.get("code", -1) != "0":
@@ -195,9 +195,9 @@ class WeBanClient:
             lab_project = self.api.lab_index()
             if lab_project.get("code", -1) != "0":
                 self.log.error(f"获取实验室课程失败：{lab_project}")
-            study_task.append(lab_project.get("data", {}).get("current", {}))
+            my_project.append(lab_project.get("data", {}).get("current", {}))
 
-        for task in study_task:
+        for task in my_project:
             project_prefix = task["projectName"]
             self.log.info(f"开始处理任务：{project_prefix}")
             need_capt = []
