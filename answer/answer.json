@@ -6476,7 +6476,7 @@
         "isCorrect": 2
       }
     ],
-    "type": 1
+    "type": 2
   },
   "下面躲避雾霾的方式中错误的是：": {
     "optionList": [
@@ -15757,6 +15757,27 @@
     ],
     "type": 2
   },
+  "关于鸦片，以下说法正确的是：": {
+    "optionList": [
+      {
+        "content": "是从罂粟中提炼的天然制品。",
+        "isCorrect": 1
+      },
+      {
+        "content": "吸食后产生梦幻现象，导致高度心理及生理依赖。",
+        "isCorrect": 1
+      },
+      {
+        "content": "过量使用会造成急性中毒。",
+        "isCorrect": 1
+      },
+      {
+        "content": "可能引起呼吸抑止致人死亡。",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "关系欺凌只发生在同辈之间，这种说法正确吗？": {
     "optionList": [
       {
@@ -19598,6 +19619,18 @@
       {
         "content": "生存和发展",
         "isCorrect": 1
+      },
+      {
+        "content": "建设和壮大",
+        "isCorrect": 2
+      },
+      {
+        "content": "生存和建设",
+        "isCorrect": 2
+      },
+      {
+        "content": "发展和壮大",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -33026,6 +33059,23 @@
     ],
     "type": 1
   },
+  "接到 “某银行信贷员” 电话：“您符合我行低息贷款资格，需先缴纳 2000 元手续费即可放款”，正确的做法是：": {
+    "optionList": [
+      {
+        "content": "按要求转账，等待放款",
+        "isCorrect": 2
+      },
+      {
+        "content": "要求对方减免手续费后再办理",
+        "isCorrect": 2
+      },
+      {
+        "content": "到银行柜台或官方 APP 申请贷款",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
   "接到“子女出车祸，已经在医院了，要求转账”的电话时，正确的做法是？": {
     "optionList": [
       {
@@ -39308,6 +39358,19 @@
       {
         "content": "脱冲泡送盖",
         "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "煤气火焰颜色呈红色时，说明？": {
+    "optionList": [
+      {
+        "content": "完全燃烧",
+        "isCorrect": 2
+      },
+      {
+        "content": "未完全燃烧",
+        "isCorrect": 1
       }
     ],
     "type": 1
