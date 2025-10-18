@@ -280,6 +280,14 @@
       {
         "content": "第十四条第八款: 伪造、变造、冒领、冒用、转让各种证件或证明文件者，给予警告以上处分",
         "isCorrect": 2
+      },
+      {
+        "content": "第二十六条第四款：以募捐为名骗取钱财者，给予严重警告以上处分",
+        "isCorrect": 1
+      },
+      {
+        "content": "第十七条第六款: 伪造、变造、冒领、冒用、转让各种证件或证明文件者，给予严重警告以上处分",
+        "isCorrect": 1
       }
     ],
     "type": 2
@@ -9184,6 +9192,10 @@
       {
         "content": "出血热不是鼠疫，是肾综合征出血热，又称流行性出血热，是以鼠类为主要传染源的一种传染病。",
         "isCorrect": 1
+      },
+      {
+        "content": "出血热就是鼠疫。",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -25910,6 +25922,10 @@
       },
       {
         "content": "30",
+        "isCorrect": 2
+      },
+      {
+        "content": "20",
         "isCorrect": 1
       }
     ],
@@ -31119,6 +31135,23 @@
       }
     ],
     "type": 1
+  },
+  "想要有效的控制自我，需要做到？": {
+    "optionList": [
+      {
+        "content": "培养顽强的意志力",
+        "isCorrect": 1
+      },
+      {
+        "content": "培养自信心",
+        "isCorrect": 1
+      },
+      {
+        "content": "树立比较对象",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
   },
   "想要获得别人的尊重，必须要尊重别人。": {
     "optionList": [
@@ -41277,6 +41310,10 @@
       {
         "content": "16000",
         "isCorrect": 1
+      },
+      {
+        "content": "20000",
+        "isCorrect": 1
       }
     ],
     "type": 1
@@ -42400,6 +42437,10 @@
       {
         "content": "15-35岁。",
         "isCorrect": 1
+      },
+      {
+        "content": "30-40岁。",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -48667,6 +48708,23 @@
       },
       {
         "content": "多休息",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "预防出血热的主要方法有哪些？": {
+    "optionList": [
+      {
+        "content": "注射疫苗。",
+        "isCorrect": 1
+      },
+      {
+        "content": "防鼠、灭鼠。",
+        "isCorrect": 1
+      },
+      {
+        "content": "注意食品卫生和个人卫生。",
         "isCorrect": 1
       }
     ],
