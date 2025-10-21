@@ -5858,6 +5858,27 @@
     ],
     "type": 2
   },
+  "下面哪些应当作为火场逃生装备，在家中常备？": {
+    "optionList": [
+      {
+        "content": "防烟面罩（过滤式消防自救呼吸器的俗称）",
+        "isCorrect": 1
+      },
+      {
+        "content": "灭火器",
+        "isCorrect": 2
+      },
+      {
+        "content": "灭火毯",
+        "isCorrect": 1
+      },
+      {
+        "content": "喷漆专用防毒面具",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
   "下面哪些情况属于自我意识的偏差？": {
     "optionList": [
       {
