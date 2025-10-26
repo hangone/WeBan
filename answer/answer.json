@@ -1667,6 +1667,27 @@
     ],
     "type": 2
   },
+  "“套现”可能会涉嫌的罪名有哪些？": {
+    "optionList": [
+      {
+        "content": "信用卡诈骗罪",
+        "isCorrect": 1
+      },
+      {
+        "content": "骗取贷款罪",
+        "isCorrect": 1
+      },
+      {
+        "content": "非法经营罪",
+        "isCorrect": 1
+      },
+      {
+        "content": "侵占罪",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
   "“套现”是一种违法犯罪的行为。": {
     "optionList": [
       {
@@ -2054,6 +2075,23 @@
       {
         "content": "国务院公安部门",
         "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "“文化”的意义启示我们的道理有？": {
+    "optionList": [
+      {
+        "content": "无论是学习什么“文化”都不单单是为了增加知识的储备，还是促进意识的改变",
+        "isCorrect": 1
+      },
+      {
+        "content": "只有“文”的意识发生了“化”的质变，“文化”才真正有了意义",
+        "isCorrect": 1
+      },
+      {
+        "content": "“文化”注重的是量的积累",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -23923,6 +23961,19 @@
       }
     ],
     "type": 1
+  },
+  "如何远离“套现”行为？": {
+    "optionList": [
+      {
+        "content": "树立正确的消费观",
+        "isCorrect": 1
+      },
+      {
+        "content": "珍惜个人信用",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
   },
   "如何远离套现行为？": {
     "optionList": [
