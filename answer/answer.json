@@ -6543,7 +6543,7 @@
         "isCorrect": 2
       }
     ],
-    "type": 2
+    "type": 1
   },
   "下面躲避雾霾的方式中错误的是：": {
     "optionList": [
@@ -10874,6 +10874,27 @@
       },
       {
         "content": "使用杜冷丁",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
+  "以下哪些法律法规涉及反邪教的内容？": {
+    "optionList": [
+      {
+        "content": "《邮政法》",
+        "isCorrect": 1
+      },
+      {
+        "content": "《电信条例》",
+        "isCorrect": 1
+      },
+      {
+        "content": "《中国共产党纪律处分条例》",
+        "isCorrect": 1
+      },
+      {
+        "content": "《道路交通法》",
         "isCorrect": 2
       }
     ],
@@ -19246,6 +19267,23 @@
       }
     ],
     "type": 2
+  },
+  "喝醉酒的人，最好采用什么姿势睡觉?": {
+    "optionList": [
+      {
+        "content": "平躺",
+        "isCorrect": 2
+      },
+      {
+        "content": "侧卧",
+        "isCorrect": 1
+      },
+      {
+        "content": "趴着",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "因一时贪心而出卖国家机密的，应当（）。": {
     "optionList": [
@@ -46859,6 +46897,23 @@
     ],
     "type": 1
   },
+  "遇到身边人喝醉酒了，应当怎么办？": {
+    "optionList": [
+      {
+        "content": "留意观察喝醉酒的人的状态",
+        "isCorrect": 1
+      },
+      {
+        "content": "将其安全送到家人身边",
+        "isCorrect": 1
+      },
+      {
+        "content": "主动照顾，并劝其他人不要再喝酒了",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "遇到重金求子的广告，正确的做法是？": {
     "optionList": [
       {
@@ -47093,6 +47148,27 @@
       }
     ],
     "type": 2
+  },
+  "邪教 “全能神” 属于以下哪一类邪教？": {
+    "optionList": [
+      {
+        "content": "冒用基督教名义的邪教",
+        "isCorrect": 1
+      },
+      {
+        "content": "以歪曲佛教道教教义为主的邪教",
+        "isCorrect": 2
+      },
+      {
+        "content": "以杂合气功手法歪曲宗教教义的邪教",
+        "isCorrect": 2
+      },
+      {
+        "content": "冒用伊斯兰教名义的邪教",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "邪教会参照哪些宗教的教义去编造自己的教义呢？": {
     "optionList": [
