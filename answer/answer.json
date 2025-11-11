@@ -11060,6 +11060,10 @@
       {
         "content": "安全通道门上锁",
         "isCorrect": 1
+      },
+      {
+        "content": "学生宿舍楼安装无逃生出口的防盗窗网",
+        "isCorrect": 1
       }
     ],
     "type": 2
@@ -21121,6 +21125,14 @@
       },
       {
         "content": "捂住口鼻，抓紧时间，直接打开门逃跑。",
+        "isCorrect": 2
+      },
+      {
+        "content": "用手背轻触门板和把手，根据温度判断火势大小",
+        "isCorrect": 1
+      },
+      {
+        "content": "捂住口鼻，抓紧时间，直接打开门逃跑",
         "isCorrect": 2
       }
     ],
@@ -45509,6 +45521,18 @@
       {
         "content": "50克以上",
         "isCorrect": 1
+      },
+      {
+        "content": "100克以上",
+        "isCorrect": 2
+      },
+      {
+        "content": "10克以上",
+        "isCorrect": 2
+      },
+      {
+        "content": "80克以上",
+        "isCorrect": 2
       }
     ],
     "type": 1
