@@ -16565,6 +16565,27 @@
     ],
     "type": 2
   },
+  "出血热的三痛指的是哪三痛？": {
+    "optionList": [
+      {
+        "content": "头痛",
+        "isCorrect": 1
+      },
+      {
+        "content": "腰疼",
+        "isCorrect": 1
+      },
+      {
+        "content": "浑身疼",
+        "isCorrect": 2
+      },
+      {
+        "content": "眼眶疼",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "出血热的五期指的是哪五期？": {
     "optionList": [
       {
@@ -19691,6 +19712,10 @@
       },
       {
         "content": "深化改革，建立完善国家科技安全机制体制",
+        "isCorrect": 1
+      },
+      {
+        "content": "深化改革，建立完善国家科技安全体制机制",
         "isCorrect": 1
       }
     ],
