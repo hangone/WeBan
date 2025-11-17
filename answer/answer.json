@@ -3783,6 +3783,10 @@
       {
         "content": "缺乏专业相关经验",
         "isCorrect": 1
+      },
+      {
+        "content": "缺乏专业相关学科知识",
+        "isCorrect": 1
       }
     ],
     "type": 1
@@ -6564,7 +6568,7 @@
         "isCorrect": 2
       }
     ],
-    "type": 1
+    "type": 2
   },
   "下面躲避雾霾的方式中错误的是：": {
     "optionList": [
@@ -9713,6 +9717,27 @@
     ],
     "type": 1
   },
+  "以下关于邪教的说法，正确的是？": {
+    "optionList": [
+      {
+        "content": "邪教是合法的宗教组织",
+        "isCorrect": 2
+      },
+      {
+        "content": "邪教对社会没有危害",
+        "isCorrect": 2
+      },
+      {
+        "content": "邪教本质是反社会、反人类、反科学、反政府的",
+        "isCorrect": 1
+      },
+      {
+        "content": "邪教与宗教没有区别",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "以下内容属于国家秘密的机密级的描述的是（）。": {
     "optionList": [
       {
@@ -10975,6 +11000,27 @@
       },
       {
         "content": "醉酒驾驶营运机动车",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "以下哪些行为会让你“陷入官司”？": {
+    "optionList": [
+      {
+        "content": "聚会时你知道可能是毒品，但好奇尝试了一口。",
+        "isCorrect": 1
+      },
+      {
+        "content": "在酒吧，你买了邻座人推荐你的一种让人嗨的“小糖豆”。",
+        "isCorrect": 1
+      },
+      {
+        "content": "你的同学来找你玩时吸食“白面儿”，你劝阻无效，只好视而不见。",
+        "isCorrect": 1
+      },
+      {
+        "content": "你在旅游回国时接受了别人拜托你帮他带回来的一大包行李，结果没想到内有毒品。",
         "isCorrect": 1
       }
     ],
@@ -13925,6 +13971,10 @@
       },
       {
         "content": "被提起刑事诉讼",
+        "isCorrect": 1
+      },
+      {
+        "content": "行为曝光后“社会性死亡”，被社会舆论谴责",
         "isCorrect": 1
       }
     ],
@@ -21540,6 +21590,27 @@
     ],
     "type": 1
   },
+  "在校大学生庄某利用微信多次为境外间谍情报机关提供国家秘密，需要承担（   ）。": {
+    "optionList": [
+      {
+        "content": "刑事责任",
+        "isCorrect": 1
+      },
+      {
+        "content": "民事责任",
+        "isCorrect": 2
+      },
+      {
+        "content": "行政责任",
+        "isCorrect": 2
+      },
+      {
+        "content": "违宪责任",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "在楼房里遭遇地震，下面哪些地方较为安全？": {
     "optionList": [
       {
@@ -24243,6 +24314,31 @@
       },
       {
         "content": "不轻信陌生人",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "如何降低沙尘天气带来的伤害？": {
+    "optionList": [
+      {
+        "content": "关注天气预报、尽量减少外出",
+        "isCorrect": 1
+      },
+      {
+        "content": "外出时做好防护",
+        "isCorrect": 1
+      },
+      {
+        "content": "尽量乘坐公共交通出行",
+        "isCorrect": 1
+      },
+      {
+        "content": "勤洗衣、勤洗澡",
+        "isCorrect": 1
+      },
+      {
+        "content": "关好门窗",
         "isCorrect": 1
       }
     ],
@@ -28338,6 +28434,23 @@
     ],
     "type": 1
   },
+  "将喝醉酒的人独自留在房间内，可能会发生什么严重后果？": {
+    "optionList": [
+      {
+        "content": "闷头大睡，不会有什么严重后果",
+        "isCorrect": 2
+      },
+      {
+        "content": "喝醉酒的人可能会被呕吐物堵塞气道，窒息死亡",
+        "isCorrect": 1
+      },
+      {
+        "content": "喝醉酒的人起来活动，可能会引发坠楼危险",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "小A在网络上认识了一位未成年人，见未成年人对性不了解，骗对方给自己拍私密照片，并视频聊天自慰。你认为小A：": {
     "optionList": [
       {
@@ -30515,6 +30628,27 @@
     ],
     "type": 1
   },
+  "得了抑郁症该怎么办？": {
+    "optionList": [
+      {
+        "content": "接受自己生病了",
+        "isCorrect": 1
+      },
+      {
+        "content": "积极去医院寻求治疗",
+        "isCorrect": 1
+      },
+      {
+        "content": "配合治疗",
+        "isCorrect": 1
+      },
+      {
+        "content": "防止复发",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "得了抑郁症该怎么？": {
     "optionList": [
       {
@@ -31955,6 +32089,19 @@
       },
       {
         "content": "综合治理，积极消灭",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "我国沙尘天气一般在集中在哪些季节？": {
+    "optionList": [
+      {
+        "content": "冬春",
+        "isCorrect": 1
+      },
+      {
+        "content": "夏秋",
         "isCorrect": 2
       }
     ],
@@ -36928,6 +37075,27 @@
     ],
     "type": 1
   },
+  "根据《中国共产党纪律处分条例》，一名党员组织参与邪教并且是骨干分子，会面临什么处罚？": {
+    "optionList": [
+      {
+        "content": "劝其退党",
+        "isCorrect": 2
+      },
+      {
+        "content": "予以除名",
+        "isCorrect": 2
+      },
+      {
+        "content": "开除党籍",
+        "isCorrect": 1
+      },
+      {
+        "content": "思想教育",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "根据《兰州大学后勤保障部学生公寓中心相关制度》规定，以下不属于可以调整宿舍的情况的是（  ）。": {
     "optionList": [
       {
@@ -38254,6 +38422,19 @@
       }
     ],
     "type": 2
+  },
+  "沙尘天气为什么建议尽量乘公共交通出行？": {
+    "optionList": [
+      {
+        "content": "因为能见度低、公共交通相对安全",
+        "isCorrect": 1
+      },
+      {
+        "content": "发展公共交通事业",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "沟通是听与说的艺术。": {
     "optionList": [
@@ -42073,6 +42254,10 @@
       {
         "content": "俸禄制。",
         "isCorrect": 2
+      },
+      {
+        "content": "分封制。",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -42537,6 +42722,19 @@
       }
     ],
     "type": 2
+  },
+  "组织、利用邪教组织破坏国家法律、行政法规实施，但行为人能够真诚悔罪，明确表示退出邪教组织、不再从事邪教活动的，可以不起诉或者免予刑事处罚。这种说法正确吗？": {
+    "optionList": [
+      {
+        "content": "正确",
+        "isCorrect": 1
+      },
+      {
+        "content": "不正确",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "组织作弊犯罪，最长会被判刑多久？": {
     "optionList": [
@@ -43278,6 +43476,10 @@
       },
       {
         "content": "骗取银行卡验证码等信息",
+        "isCorrect": 1
+      },
+      {
+        "content": "通过质押合同骗钱",
         "isCorrect": 1
       }
     ],
@@ -44069,6 +44271,27 @@
       }
     ],
     "type": 2
+  },
+  "虽然听过毒品宣传，但B同学觉得自己意志力强于他人，肯定不会上瘾。B同学的表现是什么心理（根据课中定义）？": {
+    "optionList": [
+      {
+        "content": "好奇心理",
+        "isCorrect": 2
+      },
+      {
+        "content": "冒险心理",
+        "isCorrect": 1
+      },
+      {
+        "content": "认同心理",
+        "isCorrect": 2
+      },
+      {
+        "content": "侥幸心理",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "虽然听过毒品宣传，但B同学觉得自己意志力强于他人，肯定不会上瘾。B同学的表现是什么心理？": {
     "optionList": [
@@ -47277,6 +47500,31 @@
       },
       {
         "content": "伊斯兰教。",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "邪教的基本特征有以下哪些？": {
+    "optionList": [
+      {
+        "content": "教主崇拜",
+        "isCorrect": 1
+      },
+      {
+        "content": "编造邪说",
+        "isCorrect": 1
+      },
+      {
+        "content": "精神控制",
+        "isCorrect": 1
+      },
+      {
+        "content": "聚敛钱财",
+        "isCorrect": 1
+      },
+      {
+        "content": "秘密结社",
         "isCorrect": 1
       }
     ],
