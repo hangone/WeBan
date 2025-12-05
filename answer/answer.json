@@ -37620,6 +37620,18 @@
       {
         "content": "安全第一、预防为主、综合治理",
         "isCorrect": 1
+      },
+      {
+        "content": "以人为本、安全第一、持续发展",
+        "isCorrect": 2
+      },
+      {
+        "content": "以人为本、生命至上、安全发展",
+        "isCorrect": 2
+      },
+      {
+        "content": "政府监管、行业自律、社会监督",
+        "isCorrect": 2
       }
     ],
     "type": 1
