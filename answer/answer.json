@@ -3182,6 +3182,27 @@
     ],
     "type": 1
   },
+  "《安全生产法》规定，（  ）应急管理部门牵头建立全国统一的生产安全事故应急救援信息系统。": {
+    "optionList": [
+      {
+        "content": "各级人民政府",
+        "isCorrect": 2
+      },
+      {
+        "content": "国务院",
+        "isCorrect": 1
+      },
+      {
+        "content": "生产经营单位",
+        "isCorrect": 2
+      },
+      {
+        "content": "各单位主要负责人",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "《宪法》规定，中华人民共和国的一切权力属于（）。": {
     "optionList": [
       {
@@ -5237,6 +5258,19 @@
     ],
     "type": 1
   },
+  "下列选项中属于直接接触传播的是：": {
+    "optionList": [
+      {
+        "content": "接吻、性交",
+        "isCorrect": 1
+      },
+      {
+        "content": "接触被患者污染的毛巾",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "下列选项中，不属于个人隐私信息的是：": {
     "optionList": [
       {
@@ -6588,7 +6622,7 @@
         "isCorrect": 2
       }
     ],
-    "type": 2
+    "type": 1
   },
   "下面躲避雾霾的方式中错误的是：": {
     "optionList": [
@@ -8700,6 +8734,31 @@
     ],
     "type": 1
   },
+  "习近平总书记在2014年4月15日首次提出总体国家安全观时，系统阐述了哪五个\"既重视又重视\"的关系？": {
+    "optionList": [
+      {
+        "content": "内部安全与外部安全",
+        "isCorrect": 1
+      },
+      {
+        "content": "国土安全与国民安全",
+        "isCorrect": 1
+      },
+      {
+        "content": "传统安全与非传统安全",
+        "isCorrect": 1
+      },
+      {
+        "content": "自身安全与共同安全",
+        "isCorrect": 1
+      },
+      {
+        "content": "发展问题与安全问题",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "习近平总书记在《共同构建人类命运共同体》一文中指出，大国要尊重彼此核心利益和重大关切，管控矛盾分歧，努力构建新型的大国关系。下列选项中对这一新型关系表述正确的有：": {
     "optionList": [
       {
@@ -9493,6 +9552,19 @@
       },
       {
         "content": "五成",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "从事生物技术研究、开发与应用活动，应当符合（     ）原则。": {
+    "optionList": [
+      {
+        "content": "伦理",
+        "isCorrect": 1
+      },
+      {
+        "content": "适度",
         "isCorrect": 2
       }
     ],
@@ -11024,6 +11096,27 @@
     ],
     "type": 2
   },
+  "以下哪些是间谍常用的隐蔽掩护手段？": {
+    "optionList": [
+      {
+        "content": "伪装成游客进行军事测绘",
+        "isCorrect": 1
+      },
+      {
+        "content": "利用投资考察刺探敏感地区",
+        "isCorrect": 1
+      },
+      {
+        "content": "长期潜伏并建立合法身份",
+        "isCorrect": 1
+      },
+      {
+        "content": "公开高价收购国家秘密",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
   "以下哪些毒品会导致性病、艾滋病的传播？": {
     "optionList": [
       {
@@ -11688,6 +11781,27 @@
     ],
     "type": 1
   },
+  "以下哪项不属于总体国家安全观的 “五对关系”？": {
+    "optionList": [
+      {
+        "content": "传统安全与非传统安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "发展问题与安全问题",
+        "isCorrect": 2
+      },
+      {
+        "content": "自身安全与共同安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "军事安全与文化安全",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
   "以下哪项不属于扑救初起火灾的原则？": {
     "optionList": [
       {
@@ -11980,6 +12094,14 @@
       {
         "content": "在科研中形成的尚未公开的、具有一定经济价值的新工艺、技术、方法、数据等技术信息",
         "isCorrect": 1
+      },
+      {
+        "content": "维护国家安全活动和追查刑事犯罪中的秘密事项",
+        "isCorrect": 2
+      },
+      {
+        "content": "学校学院名称、专业名称、教师姓名",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -12115,6 +12237,27 @@
       },
       {
         "content": "国防建设和武装力量活动中的秘密事项；",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
+  "以下行为属于间谍行为的有：": {
+    "optionList": [
+      {
+        "content": "间谍组织及其代理人实施或者指使、资助他人实施，或者境内外机构、组织、个人与其相勾结实施的危害中华人民共和国国家安全的活动",
+        "isCorrect": 1
+      },
+      {
+        "content": "参加间谍组织或者接受间谍组织及其代理人的任务的",
+        "isCorrect": 1
+      },
+      {
+        "content": "为敌人指示攻击目标的",
+        "isCorrect": 1
+      },
+      {
+        "content": "国防建设和武装力量活动中的秘密事项",
         "isCorrect": 2
       }
     ],
@@ -19945,6 +20088,23 @@
     ],
     "type": 2
   },
+  "国家对我国人类遗传资源和生物资源享有（     ）。": {
+    "optionList": [
+      {
+        "content": "所有权",
+        "isCorrect": 2
+      },
+      {
+        "content": "使用权",
+        "isCorrect": 2
+      },
+      {
+        "content": "主权",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
   "国家对机动车实行(   )制度。机动车经公安机关交通管理部门登记后，方可上道路行驶。": {
     "optionList": [
       {
@@ -22810,6 +22970,18 @@
       {
         "content": "宗旨，根本，基础，保障",
         "isCorrect": 1
+      },
+      {
+        "content": "根本，基础，宗旨，保障",
+        "isCorrect": 2
+      },
+      {
+        "content": "宗旨，基础，根本，保障",
+        "isCorrect": 2
+      },
+      {
+        "content": "根本，宗旨，保障，基础",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -24433,6 +24605,14 @@
       },
       {
         "content": "添加好友要谨慎",
+        "isCorrect": 1
+      },
+      {
+        "content": "提到借钱、代付款就警惕，要确认身份",
+        "isCorrect": 1
+      },
+      {
+        "content": "借钱的事要当面确认",
         "isCorrect": 1
       }
     ],
@@ -31446,6 +31626,48 @@
       }
     ],
     "type": 2
+  },
+  "总体国家安全观的 “非传统安全” 领域不包括？": {
+    "optionList": [
+      {
+        "content": "网络安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "生态安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "核安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "军事安全",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "总体国家安全观的“宗旨”是？": {
+    "optionList": [
+      {
+        "content": "政治安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "人民安全",
+        "isCorrect": 1
+      },
+      {
+        "content": "经济安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "军事安全",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "总体国家安全观的思想基础有哪些？": {
     "optionList": [
@@ -40761,7 +40983,7 @@
     "optionList": [
       {
         "content": "主要负责人",
-        "isCorrect": 0
+        "isCorrect": 2
       },
       {
         "content": "从业人员",
@@ -40769,11 +40991,11 @@
       },
       {
         "content": "行政人员",
-        "isCorrect": 0
+        "isCorrect": 2
       },
       {
         "content": "监管人员",
-        "isCorrect": 0
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -40783,6 +41005,18 @@
       {
         "content": "从业人员",
         "isCorrect": 1
+      },
+      {
+        "content": "主要负责人",
+        "isCorrect": 2
+      },
+      {
+        "content": "监管人员",
+        "isCorrect": 2
+      },
+      {
+        "content": "行政人员",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -46067,6 +46301,10 @@
       {
         "content": "《反分裂法》",
         "isCorrect": 1
+      },
+      {
+        "content": "《反分裂国家法》",
+        "isCorrect": 1
       }
     ],
     "type": 2
@@ -51091,6 +51329,18 @@
       {
         "content": "单位负责人",
         "isCorrect": 1
+      },
+      {
+        "content": "主要负责人",
+        "isCorrect": 2
+      },
+      {
+        "content": "行政主管人员",
+        "isCorrect": 2
+      },
+      {
+        "content": "从业人员",
+        "isCorrect": 2
       }
     ],
     "type": 1
