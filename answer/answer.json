@@ -6588,7 +6588,7 @@
         "isCorrect": 2
       }
     ],
-    "type": 1
+    "type": 2
   },
   "下面躲避雾霾的方式中错误的是：": {
     "optionList": [
@@ -10414,6 +10414,27 @@
       },
       {
         "content": "切割",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "以下哪些情况可能会引发与酒有关的事故？": {
+    "optionList": [
+      {
+        "content": "短时间内饮用大量白酒",
+        "isCorrect": 1
+      },
+      {
+        "content": "去海边，点了很多海鲜和啤酒",
+        "isCorrect": 1
+      },
+      {
+        "content": "喝酒后，找代驾来开车",
+        "isCorrect": 2
+      },
+      {
+        "content": "朋友喝醉了，你将其一个人留在房间内走了",
         "isCorrect": 1
       }
     ],
@@ -38775,6 +38796,44 @@
       }
     ],
     "type": 1
+  },
+  "沙尘天气出门时，可以如何进行防护？": {
+    "optionList": [
+      {
+        "content": "戴帽子",
+        "isCorrect": 1
+      },
+      {
+        "content": "戴眼镜",
+        "isCorrect": 1
+      },
+      {
+        "content": "戴口罩",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "沙尘天气带来的危害有哪些？": {
+    "optionList": [
+      {
+        "content": "房屋倒塌",
+        "isCorrect": 1
+      },
+      {
+        "content": "供电受阻",
+        "isCorrect": 1
+      },
+      {
+        "content": "污染环境",
+        "isCorrect": 1
+      },
+      {
+        "content": "危害健康",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
   },
   "沟通是听与说的艺术。": {
     "optionList": [
