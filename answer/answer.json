@@ -3674,6 +3674,23 @@
     ],
     "type": 1
   },
+  "一般可用肥皂液检漏，如有气泡发生，则说明有漏气现象。但（）不能用肥皂液检漏。": {
+    "optionList": [
+      {
+        "content": "二氧化碳瓶",
+        "isCorrect": 2
+      },
+      {
+        "content": "氮气瓶",
+        "isCorrect": 2
+      },
+      {
+        "content": "氧气瓶",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
   "一般来说，普通实验室的温度控制在（）℃。": {
     "optionList": [
       {
@@ -6622,7 +6639,7 @@
         "isCorrect": 2
       }
     ],
-    "type": 1
+    "type": 2
   },
   "下面躲避雾霾的方式中错误的是：": {
     "optionList": [
@@ -10176,6 +10193,10 @@
       {
         "content": "拔了插头后放在床上",
         "isCorrect": 2
+      },
+      {
+        "content": "关闭断电后放在吹风机架上",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -11667,6 +11688,10 @@
       },
       {
         "content": "给恋人讲了个荤段子，对方笑着锤了我一拳",
+        "isCorrect": 1
+      },
+      {
+        "content": "给恋人讲了个荤段子，对方笑着锤了我一拳（双方均无任何不适）",
         "isCorrect": 1
       }
     ],
@@ -17687,6 +17712,19 @@
     ],
     "type": 1
   },
+  "半途效应告诉我们人的目标行为的中止期多发生在“半途”附近。": {
+    "optionList": [
+      {
+        "content": "正确",
+        "isCorrect": 1
+      },
+      {
+        "content": "错误",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "单位或家庭维修中使用溶剂和油漆时除了杜绝一切火种，还应该注意(    )。": {
     "optionList": [
       {
@@ -22263,6 +22301,23 @@
       {
         "content": "不能随便开门窗",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "在石墨炉运行期间，为了安全和健康起见，应至少离开石墨炉（）米远，以免身上的手表、传呼机、手机等带金属部件的物品被强磁场磁化及损坏。": {
+    "optionList": [
+      {
+        "content": "0.5",
+        "isCorrect": 2
+      },
+      {
+        "content": "1",
+        "isCorrect": 1
+      },
+      {
+        "content": "1.5",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -29933,6 +29988,23 @@
       }
     ],
     "type": 2
+  },
+  "应定期检查和维护设备，尤其是紧急洗眼器应至少每（）启用1次，避免管路中产生水垢。": {
+    "optionList": [
+      {
+        "content": "周",
+        "isCorrect": 1
+      },
+      {
+        "content": "月",
+        "isCorrect": 2
+      },
+      {
+        "content": "年",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "应对公车地铁色狼的正确方法有？": {
     "optionList": [
@@ -38358,7 +38430,7 @@
         "isCorrect": 2
       }
     ],
-    "type": 2
+    "type": 1
   },
   "正确救人的原则是什么？": {
     "optionList": [
@@ -45096,6 +45168,10 @@
       {
         "content": "不能。",
         "isCorrect": 1
+      },
+      {
+        "content": "能。",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -47021,6 +47097,23 @@
     ],
     "type": 1
   },
+  "轨迹交叉原理给管理者带来的启示有哪些？": {
+    "optionList": [
+      {
+        "content": "强调工种考核",
+        "isCorrect": 1
+      },
+      {
+        "content": "加强安全教育和技术培训",
+        "isCorrect": 1
+      },
+      {
+        "content": "进行科学的安全管理",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "转专业需要注意什么？": {
     "optionList": [
       {
@@ -47593,6 +47686,23 @@
       {
         "content": "3C",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "选用合格的三孔插座和活动插座板，一定要选用经过国家质量认证的合格产品。最好选用带（）认证的正厂产品。": {
+    "optionList": [
+      {
+        "content": "3C",
+        "isCorrect": 1
+      },
+      {
+        "content": "5C",
+        "isCorrect": 2
+      },
+      {
+        "content": "3A",
+        "isCorrect": 2
       }
     ],
     "type": 1
