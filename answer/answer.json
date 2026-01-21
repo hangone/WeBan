@@ -6639,7 +6639,7 @@
         "isCorrect": 2
       }
     ],
-    "type": 2
+    "type": 1
   },
   "下面躲避雾霾的方式中错误的是：": {
     "optionList": [
@@ -7102,6 +7102,10 @@
       {
         "content": "不会。",
         "isCorrect": 1
+      },
+      {
+        "content": "会。",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -43130,6 +43134,18 @@
       {
         "content": "感染艾滋病病毒，传染性很强，但又无法检测出已感染的一段时间",
         "isCorrect": 1
+      },
+      {
+        "content": "感染艾滋病病毒后没有症状的一段时间。",
+        "isCorrect": 2
+      },
+      {
+        "content": "感染艾滋病病毒后没什么传染性的一段时间。",
+        "isCorrect": 2
+      },
+      {
+        "content": "感染艾滋病病毒后，传染性很强，但是又无法检测出已感染的一段时间。",
+        "isCorrect": 1
       }
     ],
     "type": 1
@@ -44862,6 +44878,48 @@
       }
     ],
     "type": 2
+  },
+  "艾滋病病毒主要攻击人体的哪种细胞？": {
+    "optionList": [
+      {
+        "content": "CD4+T淋巴细胞",
+        "isCorrect": 1
+      },
+      {
+        "content": "肝细胞",
+        "isCorrect": 2
+      },
+      {
+        "content": "肾细胞",
+        "isCorrect": 2
+      },
+      {
+        "content": "脑细胞",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "艾滋病病毒在以下哪种体液中浓度最高？": {
+    "optionList": [
+      {
+        "content": "唾液",
+        "isCorrect": 2
+      },
+      {
+        "content": "血液",
+        "isCorrect": 1
+      },
+      {
+        "content": "泪液",
+        "isCorrect": 2
+      },
+      {
+        "content": "汗液",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "艾滋病病毒在何种环境下最脆弱？": {
     "optionList": [
