@@ -6686,7 +6686,7 @@
         "isCorrect": 2
       }
     ],
-    "type": 2
+    "type": 1
   },
   "下面躲避雾霾的方式中错误的是：": {
     "optionList": [
@@ -44963,6 +44963,27 @@
       },
       {
         "content": "脑细胞",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "艾滋病病毒在以下哪种体液中浓度最高？": {
+    "optionList": [
+      {
+        "content": "唾液",
+        "isCorrect": 2
+      },
+      {
+        "content": "血液",
+        "isCorrect": 1
+      },
+      {
+        "content": "泪液",
+        "isCorrect": 2
+      },
+      {
+        "content": "汗液",
         "isCorrect": 2
       }
     ],
