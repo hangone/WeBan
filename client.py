@@ -234,6 +234,8 @@ class WeBanClient:
                             continue
 
                         self.api.study(course["resourceId"], task["userProjectId"])
+                        if self.api.get_simple_config().get("data", {}).get("isControlSource") == 1:
+                            self.log.warning(f"检测到课程需网页端处理（isControlSource=1），建议前往网页版登录处理一下")
 
                         if "userCourseId" not in course:
                             self.log.success(f"{course_prefix} 完成")
