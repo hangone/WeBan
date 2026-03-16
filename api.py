@@ -145,6 +145,18 @@ class WeBanAPI:
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
         return handle_response(response)
 
+    def get_simple_config(self, tenant_code: str | None = None) -> Dict[str, Any]:
+        """
+        获取简单配置
+        :param tenant_code: 学校代码
+        :return:
+        """
+        url = f"{self.baseurl}/pharos/tenantconfig/getSimpleConfig.do"
+        params = {"timestamp": self.get_timestamp()}
+        data = {"tenantCode": tenant_code or self.tenant_code, "userId": self.user["userId"]}
+        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
+        return handle_response(response)
+
     def get_help(self, tenant_code: str | None = None) -> Dict[str, Any]:
         """
         获取帮助文件
