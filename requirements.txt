@@ -1,4 +1,4 @@
-ddddocr==1.6.0
+ddddocr==1.6.1
 loguru==0.7.3
 pycryptodome==3.23.0
 requests==2.32.5

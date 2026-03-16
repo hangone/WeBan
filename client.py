@@ -33,7 +33,7 @@ class WeBanClient:
     def __init__(self, tenant_name: str, account: str | None = None, password: str | None = None, user: Dict[str, str] | None = None, log=logger) -> None:
         self.log = log
         self.tenant_name = tenant_name.strip()
-        self.study_time = 15
+        self.study_time = 20
         self.ocr = self.get_ocr_instance()
         if user and all([user.get("userId"), user.get("token")]):
             self.api = WeBanAPI(user=user)
@@ -68,13 +68,8 @@ class WeBanClient:
         if not _cache.get("ocr"):
             try:
                 import ddddocr
-
-                try:
-                    _cache["ocr"] = ddddocr.DdddOcr(show_ad=False)
-                except TypeError:
-                    _cache["ocr"] = ddddocr.DdddOcr()
+                _cache["ocr"] = ddddocr.DdddOcr(show_ad=False)
             except Exception:
-                ddddocr = None
                 self.log.warning("ddddocr 库未安装，自动验证码识别功能将不可用")
 
         return _cache["ocr"]
@@ -168,7 +163,7 @@ class WeBanClient:
             break
         return None
 
-    def run_study(self, study_time: int = 15, restudy_time: int = 0) -> None:
+    def run_study(self, study_time: int = 20, restudy_time: int = 0) -> None:
         if study_time:
             self.study_time = study_time
 

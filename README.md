@@ -36,7 +36,7 @@
       "token": "可以从浏览器F12->存储->Local Storage->token 中找到"
     },
     "study": true, // 是否学习课程，默认开启
-    "study_time": 15, // 每节课学习时间，单位（秒），默认 15 秒
+    "study_time": 20, // 每节课学习时间，单位（秒），默认 20 秒
     "exam": true, // 是否考试，默认开启
     "exam_use_time": 250 // 考试总时间，单位（秒），会平均到每到题上，默认 250 秒
   },
@@ -50,7 +50,7 @@
       "token": "可以从浏览器F12->存储->Local Storage->token 中找到"
     },
     "study": true, // 是否学习课程，默认开启
-    "study_time": 15, // 每节课学习时间，单位（秒），默认 15 秒
+    "study_time": 20, // 每节课学习时间，单位（秒），默认 20 秒
     "exam": true, // 是否考试，默认开启
     "exam_use_time": 250 // 考试总时间，单位（秒），会平均到每到题上，默认 250 秒
   }
@@ -79,7 +79,7 @@ pip install -r requirements.txt # 或 uv sync
 python main.py # 或 uv run main.py
 ```
 
-按提示输入学校和账号密码。每个任务大概需要 15 秒才不会触发限制。
+按提示输入学校和账号密码。每个任务大概需要 20 秒才不会触发限制。
 
 ## 演示
 
