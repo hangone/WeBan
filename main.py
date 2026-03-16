@@ -9,7 +9,7 @@ from loguru import logger
 
 from client import WeBanClient
 
-VERSION = "v3.5.17"
+VERSION = "v3.6.0"
 
 if getattr(sys, "frozen", False):
     base_path = os.path.dirname(sys.executable)
@@ -36,7 +36,7 @@ def run_account(config, account_index):
     password = config.get("password", "").strip()
     user = config.get("user", {})
     study = config.get("study", True)
-    study_time = int(config.get("study_time", 15))
+    study_time = int(config.get("study_time", 20))
     restudy_time = int(config.get("restudy_time", 0))
     exam = config.get("exam", True)
     exam_use_time = int(config.get("exam_use_time", 250))
@@ -113,7 +113,7 @@ def create_initial_config() -> list[dict]:
     account = input(f"账号{prompt.get('userNamePrompt', '请输入')}：").strip()
     password = input(f"密码{prompt.get('passwordPrompt', '请输入')}：").strip()
 
-    configs = [{"tenant_name": tenant_name, "account": account, "password": password, "study": True, "user": {"userId": "", "token": ""}, "study_time": 15, "restudy_time": 0, "exam": True, "exam_use_time": 250}]
+    configs = [{"tenant_name": tenant_name, "account": account, "password": password, "study": True, "user": {"userId": "", "token": ""}, "study_time": 20, "restudy_time": 0, "exam": True, "exam_use_time": 250}]
 
     with open(config_path, "w", encoding="utf-8") as f:
         f.write(json.dumps(configs, indent=2, ensure_ascii=False))
