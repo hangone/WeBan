@@ -9,6 +9,7 @@ from urllib.parse import parse_qs, urlparse
 
 from loguru import logger
 import re
+import threading
 
 from api import WeBanAPI
 
@@ -29,6 +30,7 @@ def clean_text(text):
 
 
 class WeBanClient:
+    _stdin_lock = threading.Lock()
 
     def __init__(self, tenant_name: str, account: str | None = None, password: str | None = None, user: Dict[str, str] | None = None, log=logger) -> None:
         self.log = log
@@ -150,9 +152,18 @@ class WeBanClient:
                     self.log.error(f"验证码识别异常: {e}")
                     continue
             else:
-                open("verify_code.png", "wb").write(verify_image)
-                webbrowser.open(f"file://{os.path.abspath('verify_code.png')}")
-                verify_code = input(f"请查看 verify_code.png 输入验证码：")
+                account_id = self.api.account or self.api.user.get("userId") or "unknown"
+                captcha_filename = f"verify_code_{account_id}.png"
+                captcha_path = os.path.abspath(captcha_filename)
+                with self._stdin_lock:
+                    open(captcha_path, "wb").write(verify_image)
+                    webbrowser.open(f"file://{captcha_path}")
+                    verify_code = input(f"[{account_id}] 请查看 {captcha_filename} 输入验证码：")
+                # 尝试删除临时验证码图片
+                try:
+                    os.remove(captcha_path)
+                except Exception:
+                    pass
             res = self.api.login(verify_code, int(verify_time))
             if res.get("detailCode") == "67":
                 self.log.warning(f"验证码识别失败，正在重试")
@@ -328,8 +339,10 @@ class WeBanClient:
             exam_plans = exam_plans["data"]
             for plan in exam_plans:
                 if plan["examFinishNum"] != 0:
-                    self.log.success(f"考试项目 {project['projectName']}/{plan['examPlanName']} 最高成绩 {plan['examScore']} 分。已考试次数 {plan['examFinishNum']} 次，还剩 {plan['examOddNum']} 次。需要重考吗(y/N)？")
-                    if input().strip().lower() != "y":
+                    with self._stdin_lock:
+                        self.log.success(f"考试项目 {project['projectName']}/{plan['examPlanName']} 最高成绩 {plan['examScore']} 分。已考试次数 {plan['examFinishNum']} 次，还剩 {plan['examOddNum']} 次。需要重考吗(y/N)？")
+                        choice = input().strip().lower()
+                    if choice != "y":
                         self.log.info(f"不重考项目 {project['projectName']}")
                         continue
                 user_exam_plan_id = plan["id"]
@@ -392,7 +405,8 @@ class WeBanClient:
                     answers_ids = []
 
                     while not answers_ids:
-                        answer = input("请输入答案序号（多个选项用英文逗号分隔，如 1,2,3,4）：").replace(" ", "").replace("，", ",")
+                        with self._stdin_lock:
+                            answer = input(f"[{self.api.user.get('realName', '未知')}] 请输入答案序号（多个选项用英文逗号分隔，如 1,2,3,4）：").replace(" ", "").replace("，", ",")
                         candidates = [ans.strip() for ans in answer.split(",") if ans.strip()]
                         if all(ans.isdigit() and 1 <= int(ans) <= opt_count for ans in candidates):
                             answers_ids = [question["optionList"][int(ans) - 1]["id"] for ans in candidates]
