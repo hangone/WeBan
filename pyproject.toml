@@ -8,5 +8,5 @@ dependencies = [
     "ddddocr==1.6.1",
     "loguru==0.7.3",
     "pycryptodome==3.23.0",
-    "requests==2.32.5",
+    "requests==2.33.0",
 ]
