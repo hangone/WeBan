@@ -1,0 +1,128 @@
+# WeBan 完整配置文件示例 (config.example.toml)
+# 首次运行时，如果程序目录下不存在 config.toml，程序会自动按默认模板生成。
+# 你也可以手动复制本文件为 config.toml 后按需修改。
+
+[settings]
+# 学习模式：
+# false = 不学习，跳过所有学习任务
+# true  = 正常学习，默认跳过已完成内容
+# force = 强制学习，已完成内容也会重新学习，全部学完后继续循环
+study_mode = "true"
+
+# 考试模式：
+# false = 不考试，跳过所有考试任务
+# true  = 正常考试，已及格/已完成的考试默认跳过
+# force = 强制考试，即使已及格也继续参加考试
+exam_mode = "true"
+
+# 遇到题库中没有的题目时是否随机作答：
+# true  = 单选默认选第一个，多选默认全选
+# false = 在终端中等待手动输入答案
+random_answer = false
+
+# 浏览器是否以无头模式运行：
+# true  = 后台静默运行，不显示浏览器窗口
+# false = 显示浏览器窗口，便于观察登录、学习和验证码处理过程
+browser_headless = false
+
+# 每个学习任务的最少停留时长（秒）
+# 数值越大越稳妥，但整体耗时也会越长
+study_time = 20
+
+# 每道考试题的基础答题等待时长（秒）
+exam_question_time = 5
+
+# 每道题额外增加的随机等待上限（秒）
+# 实际等待时间 = exam_question_time + 0~exam_question_time_offset 的随机值
+exam_question_time_offset = 3
+
+# 允许提交试卷的最低题库匹配率（百分比）
+# 当匹配率低于此值且 random_answer = false 时，程序会放弃交卷
+exam_submit_match_rate = 90
+
+# 多账号并发时允许的最大线程数
+# 实际并发数 = min(账号数, max_workers)
+max_workers = 5
+
+# Playwright 页面加载 / 元素等待的默认超时时间（毫秒）
+browser_timeout_ms = 30000
+
+# 首次手动登录时允许等待的最长时间（秒）
+# 适用于你手动选学校、输密码、过验证码的场景
+manual_login_timeout_sec = 300
+
+# 任务完成后是否自动关闭浏览器
+# false 常用于调试，需要保留现场时使用
+close_browser_on_finish = true
+
+# 当配置了 token 但 token 已失效时，是否自动回退为账号密码登录
+continue_on_invalid_token = true
+
+# 是否启用调试日志
+# 开启后会输出更多日志，并在 logs/<账号>/ 下保存验证码相关截图
+debug = false
+
+
+# ================= 第一个账号 =================
+[[account]]
+# 【建议填写】
+# 学校完整名称。填写后，程序会尝试在登录页自动搜索并选择学校。
+# 如果留空，首次运行时你可以手动选择，成功登录后程序会自动回填。
+tenant_name = "学校名称"
+
+# 【建议填写】
+# 学号 / 工号 / 平台账号。若留空，首次运行时可手动输入，成功后会自动回填。
+username = "你的学号或账号"
+
+# 【建议填写】
+# 平台登录密码
+password = "你的密码"
+
+# 【可选：高级用法】
+# 如果你已经通过抓包等方式拿到了平台登录态，可以直接填写 userId 和 token，
+# 程序会优先尝试注入 token 登录，避免手动输入账号密码。
+# userId = "12345678"
+# token = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+# 【可选：单账号覆盖全局设置】
+# 下面这些字段如果写在某个 [[account]] 里，会覆盖上面的 [settings] 全局配置。
+# 适用于不同账号采取不同策略的场景。
+
+# study_mode = "false"              # 当前账号不学习
+# study_mode = "force"              # 当前账号强制学习
+# exam_mode = "false"               # 当前账号不考试
+# exam_mode = "force"               # 当前账号强制考试
+# random_answer = true              # 当前账号未知题随机作答
+# browser_headless = true           # 当前账号后台运行浏览器
+# study_time = 25                   # 当前账号学习停留时长
+# exam_question_time = 8            # 当前账号每题基础答题时长
+# exam_question_time_offset = 5     # 当前账号每题随机附加等待
+# exam_submit_match_rate = 95       # 当前账号最低交卷匹配率
+# browser_timeout_ms = 45000        # 当前账号浏览器超时
+# manual_login_timeout_sec = 600    # 当前账号手动登录等待上限
+# close_browser_on_finish = false   # 当前账号任务结束后不关浏览器
+# continue_on_invalid_token = false # 当前账号 token 失效后不回退密码登录
+
+
+# ================= 第二个账号（示例） =================
+# 多账号并发时，直接继续追加 [[account]] 配置块即可。
+# [[account]]
+# tenant_name = "另一所学校"
+# username = "第二个账号"
+# password = "第二个密码"
+
+
+# ================= 使用说明 =================
+# 1. 将本文件复制为 config.toml
+# 2. 按需填写 [settings] 和一个或多个 [[account]]
+# 3. 运行程序
+#
+# 推荐做法：
+# - 不确定 tenant_name、username 怎么填时，可先保留为空
+# - 首次运行时按程序提示手动登录一次
+# - 登录成功后，程序会把识别到的学校和账号回填到 config.toml
+#
+# 注意：
+# - token 登录优先级高于账号密码登录
+# - 如果既没有 username/password，也没有 token，程序会自动显示浏览器，方便你手动登录
+# - 多账号同时运行时，请合理设置 max_workers，避免本机资源占用过高
