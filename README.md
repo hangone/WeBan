@@ -2,6 +2,8 @@
 
 > 面向安全微课 / 安全微伴平台的浏览器自动化学习与考试工具。
 
+如果本项目帮到了你，可以在右上角点亮 Star，谢谢你！
+
 本项目基于 Playwright 模拟真实浏览器操作，支持自动学习、自动考试、多账号并发运行、本地题库合并，以及登录页文字验证码与学习/考试过程中的点选验证码自动处理。
 
 ## 功能特性
@@ -28,7 +30,7 @@
 
 ### 方式一：直接使用发行版
 
-如果你只是想直接运行，优先使用 Releases 中的打包版本。
+如果你只是想直接运行，优先使用 [Releases](https://github.com/hangone/WeBan/releases) 中的打包版本。
 
 下载对应系统压缩包，解压后直接运行即可。打包版通常已内置 Chromium 与相关模型，更适合普通用户。
 
@@ -37,7 +39,7 @@
 ### 1. 克隆项目
 
 ```bash
-git clone --depth 1 https://github.com/hangone/WeBan.git
+git clone --depth 1 -b v4 https://github.com/hangone/WeBan.git
 cd WeBan
 ```
 
@@ -308,14 +310,19 @@ continue_on_invalid_token = true
 │       └── captcha.py       # 验证码处理
 ```
 
-## 免责声明
-
-1. 本项目仅供学习与技术交流使用
-2. 请自行承担使用本项目带来的后果与风险
-3. 请勿用于商业用途或违反校方、平台规则的场景
-
 ## 鸣谢
 
 - [Coaixy/weiban-tool](https://github.com/Coaixy/weiban-tool)
 - [pooneyy/WeibanQuestionsBank](https://github.com/pooneyy/WeibanQuestionsBank)
 - [AmethystDev-Labs/TenVision](https://github.com/AmethystDev-Labs/TenVision)
+
+## 免责声明
+
+1. 本项目仅供学习与技术交流使用
+2. 请自行承担使用本项目带来的后果与风险
+3. 请勿用于商业用途或违反校方、平台规则的场景
+4. **如果看不懂上面说的也可以直接扫码备注学校和账号密码（建议留言微信号），乐意效劳。**
+
+   |             微信             |            支付宝            |
+   | :--------------------------: | :--------------------------: |
+   | ![wechat](images/wechat.png) | ![alipay](images/alipay.png) |
