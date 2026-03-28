@@ -1,12 +1,20 @@
 [project]
 name = "weban"
-version = "3.6.0"
-description = "auto finish weiban"
+version = "4.0.0"
+description = ""
 readme = "README.md"
-requires-python = ">=3.12,<3.13"
+requires-python = "==3.12.*"
 dependencies = [
-    "ddddocr==1.6.1",
-    "loguru==0.7.3",
-    "pycryptodome==3.23.0",
-    "requests==2.32.5",
+    "ddddocr>=1.6.1",
+    "numpy>=2.4.3",
+    "tomlkit>=0.14.0",
+    "opencv-python-headless>=4.13.0.92",
+    "playwright>=1.58.0",
+]
+
+[dependency-groups]
+dev = [
+    "pyinstaller>=6.19.0",
+    "pyright>=1.1.408",
+    "ruff>=0.15.7",
 ]

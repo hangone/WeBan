@@ -293,13 +293,10 @@ poetry.toml
 # LSP config files
 pyrightconfig.json
 
-# verify code files
-verify_code.png
-
 # config
-config.json
+config.toml
+pw-browsers
+src/
 
-# answer
-answer/*
-!answer/answer.py
-!answer/answer.json
+# debug log output directory
+logs/

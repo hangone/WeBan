@@ -16,42 +16,97 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           draft: true
+
   build:
     name: Build for ${{ matrix.os }}
+    needs: create-release
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
-        include:
-          - os: windows-latest
-            pyinstaller-ext: .exe
-          - os: ubuntu-latest
-            pyinstaller-ext: "_linux"
-          - os: macos-latest
-            pyinstaller-ext: "_macos"
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
         with:
           python-version: "3.12"
-          cache: "pip"
 
       - name: Install dependencies
+        run: uv sync
+
+      - name: Install Playwright Chromium
+        run: uv run playwright install chromium
+
+      - name: Build executable
         run: |
-          pip install pyinstaller loguru pycryptodome requests
+          DDDDOCR_PATH=$(uv run python -c "import ddddocr, os; print(os.path.dirname(ddddocr.__file__))")
+          PLAYWRIGHT_DRIVER_PATH=$(uv run python -c "import playwright, os; print(os.path.dirname(playwright.__file__))")/driver
 
-      - name: Build base executable
-        run: pyinstaller -F main.py -n WeBan${{ matrix.pyinstaller-ext }}
+          if [ "$RUNNER_OS" == "Windows" ]; then SEP=";"; else SEP=":"; fi
 
-      - name: Upload release assets
-        uses: softprops/action-gh-release@v2
+          uv run pyinstaller --noconfirm --onedir \
+            --add-data "${DDDDOCR_PATH}${SEP}ddddocr" \
+            --add-data "${PLAYWRIGHT_DRIVER_PATH}${SEP}playwright/driver" \
+            --add-data "answer${SEP}answer" \
+            --hidden-import playwright \
+            --hidden-import ddddocr \
+            --hidden-import tomlkit \
+            --hidden-import cv2 \
+            --hidden-import numpy \
+            -n WeBan \
+            main.py
+
+          cp -R answer dist/WeBan/
+
+          cd dist
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            7z a WeBan_${{ matrix.os }}.zip WeBan
+          else
+            tar -czvf WeBan_${{ matrix.os }}.tar.gz WeBan
+          fi
+
+      - name: Upload to release
         if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
         with:
-          draft: false
           files: |
-            dist/WeBan${{ matrix.pyinstaller-ext }}
-          generate_release_notes: true
+            dist/WeBan_${{ matrix.os }}.zip
+            dist/WeBan_${{ matrix.os }}.tar.gz
+
+  docker:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    needs: create-release
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ vars.DOCKERHUB_USERNAME }}/weban:latest
+            ${{ vars.DOCKERHUB_USERNAME }}/weban:${{ github.ref_name }}
+          platforms: linux/amd64,linux/arm64
