@@ -20,7 +20,10 @@ from typing import TYPE_CHECKING, Any, List
 
 import logging
 
-from .captcha import has_captcha as _has_captcha, handle_click_captcha as _handle_click_captcha
+from .captcha import (
+    has_captcha as _has_captcha,
+    handle_click_captcha as _handle_click_captcha,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -39,18 +42,19 @@ _PROJECT_CATEGORY_NAMES = {
 # 课程 Tab 顺序：subjectType 3=必修 2=选修 1=匹配
 # CourseIndex.vue initProject 中按 projectType 组装 subjectList
 _PROJECT_STUDY_TABS = {
-    "pre":      [3, 2],      # 新生安全：必修 + 选修
-    "normal":   [3, 1, 2],   # 安全课程：必修 + 匹配 + 选修
-    "special":  [3, 2],      # 专题学习：必修 + 选修
-    "military": [3],         # 军事理论：必修
-    "lab":      [3],         # 实验室安全：必修
-    "foods":    [3],         # 食品安全：必修
+    "pre": [3, 2],  # 新生安全：必修 + 选修
+    "normal": [3, 1, 2],  # 安全课程：必修 + 匹配 + 选修
+    "special": [3, 2],  # 专题学习：必修 + 选修
+    "military": [3],  # 军事理论：必修
+    "lab": [3],  # 实验室安全：必修
+    "foods": [3],  # 食品安全：必修
 }
 
 
 # ---------------------------------------------------------------------------
 # 运行状态数据类（取代原闭包中的 nonlocal 变量）
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class _StudyRunState:
@@ -61,6 +65,7 @@ class _StudyRunState:
       active_tab_index    当前正在学习的 Tab 在 study_tabs 中的下标
       current_project_title  当前学习项目标题，完成时计入 completed_projects
     """
+
     study_tabs: List[int] = field(default_factory=list)
     active_tab_index: int = 0
     current_project_title: str = ""
@@ -69,6 +74,7 @@ class _StudyRunState:
 # ---------------------------------------------------------------------------
 # StudyMixin
 # ---------------------------------------------------------------------------
+
 
 class StudyMixin:
     """自动学习流程 Mixin，通过多重继承供 WeBanClient 使用。"""
@@ -150,7 +156,9 @@ class StudyMixin:
             blocks = self._page.locator(".task-block, .img-text-block")
             if blocks.count() == 0:
                 return False
-            self.log.info(f"[专题/实验室] 检测到中间列表页，共 {blocks.count()} 个子项目")
+            self.log.info(
+                f"[专题/实验室] 检测到中间列表页，共 {blocks.count()} 个子项目"
+            )
             # 优先点击未完成的子项目
             for i in range(blocks.count()):
                 blk = blocks.nth(i)
@@ -180,9 +188,12 @@ class StudyMixin:
             time.sleep(1)
 
             # 已在课程列表页，直接返回
-            if self._page.locator(
-                ".van-collapse-item, .img-texts-item, .fchl-item"
-            ).count() > 0:
+            if (
+                self._page.locator(
+                    ".van-collapse-item, .img-texts-item, .fchl-item"
+                ).count()
+                > 0
+            ):
                 return
 
             if self._handle_protocol_page():
@@ -256,7 +267,9 @@ class StudyMixin:
         except Exception:
             return ""
 
-    def _find_fchl_target(self, study_mode: str, failed_courses: set, completed_courses: set):
+    def _find_fchl_target(
+        self, study_mode: str, failed_courses: set, completed_courses: set
+    ):
         """在 fchl 页面（.fchl-item 结构）中查找下一个未完成的课程项。
 
         force 模式：从全部项目中查找（含已通过）。
@@ -265,14 +278,21 @@ class StudyMixin:
         selectors = (
             [".fchl-item:visible", ".fchl-item"]
             if study_mode == "force"
-            else [".fchl-item:not(.fchl-item-active):visible", ".fchl-item:not(.fchl-item-active)"]
+            else [
+                ".fchl-item:not(.fchl-item-active):visible",
+                ".fchl-item:not(.fchl-item-active)",
+            ]
         )
         for sel in selectors:
             items = self._page.locator(sel)
             for i in range(items.count()):
                 item = items.nth(i)
                 title = self._extract_item_title(item)
-                if title and title not in failed_courses and title not in completed_courses:
+                if (
+                    title
+                    and title not in failed_courses
+                    and title not in completed_courses
+                ):
                     return item
         return None
 
@@ -302,7 +322,9 @@ class StudyMixin:
                 finished += f
         return total, finished
 
-    def _log_round_start(self, current_round: int, all_tasks: int, study_time: int) -> None:
+    def _log_round_start(
+        self, current_round: int, all_tasks: int, study_time: int
+    ) -> None:
         """输出新一轮强制学习开始的日志（含课程数和预计用时）。"""
         round_seconds = all_tasks * study_time
         m, s = divmod(round_seconds, 60)
@@ -440,7 +462,9 @@ class StudyMixin:
             # 读取项目状态文本用于日志展示
             try:
                 cat_el = proj.locator(".task-block-state, [class*='state']")
-                state_txt = cat_el.first.inner_text().strip() if cat_el.count() > 0 else ""
+                state_txt = (
+                    cat_el.first.inner_text().strip() if cat_el.count() > 0 else ""
+                )
             except Exception:
                 state_txt = ""
 
@@ -482,7 +506,8 @@ class StudyMixin:
                 has_content = (
                     self._page.locator(
                         ".img-texts-item, .van-collapse-item, .fchl-item"
-                    ).count() > 0
+                    ).count()
+                    > 0
                     and self._page.locator(".img-texts-item:not(.passed)").count() > 0
                 )
                 if has_content:
@@ -540,9 +565,8 @@ class StudyMixin:
                 self.log.info(f"强制模式：每轮预计用时 {rm}分{rs}秒")
             if remaining > 0:
                 em, es = divmod(remaining * study_time, 60)
-                finish_time = (
-                    datetime.datetime.now()
-                    + datetime.timedelta(seconds=remaining * study_time)
+                finish_time = datetime.datetime.now() + datetime.timedelta(
+                    seconds=remaining * study_time
                 )
                 self.log.info(
                     f"预计剩余用时：{em}分{es}秒，"
@@ -613,7 +637,9 @@ class StudyMixin:
                     else ".img-texts-item:not(.passed):visible"
                 )
                 img_items = self._page.locator(img_sel)
-                target = self._find_course_target(img_items, failed_courses, completed_courses)
+                target = self._find_course_target(
+                    img_items, failed_courses, completed_courses
+                )
 
                 if target is not None:
                     title = self._extract_item_title(target)
@@ -632,7 +658,9 @@ class StudyMixin:
 
                     # 返回章节列表
                     if not self._return_to_chapter_list():
-                        self.log.warning(f"[img-texts] 无法返回章节列表，标记失败：{title}")
+                        self.log.warning(
+                            f"[img-texts] 无法返回章节列表，标记失败：{title}"
+                        )
                         failed_courses.add(title)
                     time.sleep(1)
                     continue
@@ -640,7 +668,9 @@ class StudyMixin:
                 # ----------------------------------------------------------
                 # 当前章节无课程：尝试展开下一个折叠章节
                 # ----------------------------------------------------------
-                if self._expand_next_section(study_mode, completed_courses, failed_courses):
+                if self._expand_next_section(
+                    study_mode, completed_courses, failed_courses
+                ):
                     time.sleep(1)
                     continue
 
@@ -694,5 +724,3 @@ class StudyMixin:
             except Exception as e:
                 self.log.error(f"学习主循环异常：{e}", exc_info=True)
                 time.sleep(3)
-
-

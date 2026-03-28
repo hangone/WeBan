@@ -143,7 +143,9 @@ class TaskEngine:
             f"所有账号执行完成！成功: {success_count}，失败: {failed_count}"
         )
 
-    def _run_single_account(self, account_cfg: dict[str, Any], account_index: int) -> bool:
+    def _run_single_account(
+        self, account_cfg: dict[str, Any], account_index: int
+    ) -> bool:
         """执行单个账号的完整登录、学习和考试流程。"""
         account = account_cfg.get("username", account_cfg.get("account", ""))
         log_name = account or f"账号{account_index + 1}"
@@ -175,9 +177,7 @@ class TaskEngine:
                     logger.error(f"登录失败：{login_result}")
                     return False
 
-                self.config.update_account_state(
-                    account_index, login_info=login_result
-                )
+                self.config.update_account_state(account_index, login_info=login_result)
 
                 if task_settings.study_mode != "false":
                     logger.info(

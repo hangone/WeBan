@@ -1,0 +1,11 @@
+#!/usr/bin/env sh
+set -e
+
+echo "Running Ruff formatter..."
+uv run ruff format .
+
+echo "Running Ruff checks..."
+uv run ruff check .
+
+echo "Running Pyright..."
+uv run pyright

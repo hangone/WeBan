@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 _SEL_TASK_BLOCK = ".task-block"
 _SEL_TASK_BLOCK_TITLE = ".task-block-title"
-_SEL_COURSE_READY = '.van-tab, .van-collapse-item, .img-texts-item, .fchl-item'
+_SEL_COURSE_READY = ".van-tab, .van-collapse-item, .img-texts-item, .fchl-item"
 _SEL_EXAM_TAB = '.van-tab:has-text("在线考试")'
 _SEL_EXAM_BUTTON = "button.exam-button"
 _SEL_EXAM_RECORD_BTN = 'button.exam-button:has-text("考试记录")'
@@ -106,7 +106,9 @@ class AnswerMixin:
                         for title, item in data.items():
                             old_opts = {
                                 o["content"]: o["isCorrect"]
-                                for o in self.answers.get(title, {}).get("optionList", [])
+                                for o in self.answers.get(title, {}).get(
+                                    "optionList", []
+                                )
                             }
                             new_opts = old_opts | {
                                 o["content"]: o["isCorrect"]
@@ -190,7 +192,11 @@ class AnswerMixin:
                     proj_title = (
                         title_el.first.inner_text().strip()
                         if title_el.count() > 0
-                        else projects.nth(proj_idx).inner_text().strip().split("\n")[0].strip()
+                        else projects.nth(proj_idx)
+                        .inner_text()
+                        .strip()
+                        .split("\n")[0]
+                        .strip()
                     )
                 except Exception:
                     proj_title = f"项目{proj_idx + 1}"
@@ -231,7 +237,9 @@ class AnswerMixin:
                     self.log.info(f"[历史记录] [{proj_title}] 无考试记录入口")
                     continue
 
-                self.log.info(f"[历史记录] [{proj_title}] 有 {record_count} 个考试记录入口")
+                self.log.info(
+                    f"[历史记录] [{proj_title}] 有 {record_count} 个考试记录入口"
+                )
 
                 for exam_idx in range(record_count):
                     # 每个考试计划都重新定位一次，避免页面跳转导致引用失效
@@ -388,7 +396,9 @@ class AnswerMixin:
                         old_opts = {
                             o["content"]: o["isCorrect"]
                             for o in self.answers.get(title, {}).get("optionList", [])
-                            if isinstance(o, dict) and "content" in o and "isCorrect" in o
+                            if isinstance(o, dict)
+                            and "content" in o
+                            and "isCorrect" in o
                         }
                         new_opts = old_opts | {
                             o.get("content", ""): o.get("isCorrect", 0)

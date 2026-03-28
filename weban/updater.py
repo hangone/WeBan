@@ -36,7 +36,9 @@ def _check_update(current_version: str, logger: logging.Logger) -> None:
         latest_tuple = _parse_version(latest_tag)
 
         if latest_tuple > current_tuple:
-            html_url: str = data.get("html_url", "https://github.com/hangone/WeBan/releases")
+            html_url: str = data.get(
+                "html_url", "https://github.com/hangone/WeBan/releases"
+            )
             logger.warning(
                 f"发现新版本 {latest_tag}（当前 {current_version}），"
                 f"请前往更新：{html_url}"

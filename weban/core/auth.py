@@ -30,8 +30,8 @@ _FATAL_ERROR_PATTERNS = (
     "已被冻结",
     "不存在该用户",
     "学校不存在",
-    "该学校",          # e.g. "该学校暂未开放"
-    "信息无效",        # detailCode=4: "信息无效，请联系在线课服"
+    "该学校",  # e.g. "该学校暂未开放"
+    "信息无效",  # detailCode=4: "信息无效，请联系在线课服"
     "无效账号",
     "未找到用户",
     "未注册",
@@ -223,7 +223,9 @@ class AuthMixin:
                         ocr = _get_ocr()
                         code = _ocr_captcha_with_retry(capt_img, ocr, self.log)
                         if code is None:
-                            self.log.warning("[文字验证码] 识别失败，跳过自动填写，等待手动输入")
+                            self.log.warning(
+                                "[文字验证码] 识别失败，跳过自动填写，等待手动输入"
+                            )
                         else:
                             self.log.debug(f"[文字验证码] ddddocr 识别结果: {code}")
                             capt_input = self._page.locator(
@@ -251,7 +253,7 @@ class AuthMixin:
 
         # --- 轮询等待登录成功 ---
         deadline = time.time() + self.browser_config.manual_login_timeout_sec
-        _last_reported: set = set()   # 已上报过的 toast，避免重复刷屏
+        _last_reported: set = set()  # 已上报过的 toast，避免重复刷屏
 
         while time.time() < deadline:
             # ---- 点选验证码 ----
@@ -289,7 +291,9 @@ class AuthMixin:
                             self.log.warning(f"登录提示：{msg}")
 
                     # 验证码识别错误 → 自动刷新重试
-                    if "验证码" in msg and any(k in msg for k in ("错", "误", "效", "不正确")):
+                    if "验证码" in msg and any(
+                        k in msg for k in ("错", "误", "效", "不正确")
+                    ):
                         capt_img = self._page.locator(
                             "img.loginp-label-verify, img[src*='randLetterImage']"
                         ).first
@@ -297,7 +301,9 @@ class AuthMixin:
                             ocr = _get_ocr()
                             code = _ocr_captcha_with_retry(capt_img, ocr, self.log)
                             if code is None:
-                                self.log.warning("[文字验证码] 重新识别失败，继续等待手动处理")
+                                self.log.warning(
+                                    "[文字验证码] 重新识别失败，继续等待手动处理"
+                                )
                             else:
                                 self.log.info(f"[文字验证码] 重新识别结果: {code}")
                                 capt_input = self._page.locator(

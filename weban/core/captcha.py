@@ -25,6 +25,7 @@ captcha.py —— 验证码识别与处理模块
      _fetch_element_image / _click_captcha_point
      负责从页面/iframe 中提取验证码背景图、前景字图，以及模拟点击验证码坐标。
 """
+
 import os
 import re
 import time
@@ -97,6 +98,7 @@ def _get_ocr():
         with _ocr_lock:
             if _ocr_instance is None:
                 import ddddocr
+
                 _ocr_instance = ddddocr.DdddOcr(show_ad=False)
     return _ocr_instance
 
@@ -133,7 +135,9 @@ def _ocr_captcha_with_retry(capt_img, ocr, log, max_retries: int = 6) -> Optiona
     for attempt in range(max_retries):
         if len(code) == 4:
             return code
-        log.warning(f"[文字验证码] 识别结果 '{code}' 长度不为4，尝试刷新（{attempt + 1}/{max_retries}）...")
+        log.warning(
+            f"[文字验证码] 识别结果 '{code}' 长度不为4，尝试刷新（{attempt + 1}/{max_retries}）..."
+        )
         try:
             old_src = capt_img.get_attribute("src") or ""
             # 点击图片本身触发刷新
@@ -163,6 +167,7 @@ def _ocr_captcha_with_retry(capt_img, ocr, log, max_retries: int = 6) -> Optiona
 # 点选验证码图像识别工具函数
 # ---------------------------------------------------------------------------
 
+
 def normalize_mask(
     binary_mask: np.ndarray, canvas_size: int = 48, symbol_size: int = 34
 ) -> Optional[np.ndarray]:
@@ -181,7 +186,7 @@ def normalize_mask(
     canvas = np.zeros((canvas_size, canvas_size), dtype=np.uint8)
     oy = (canvas_size - new_h) // 2
     ox = (canvas_size - new_w) // 2
-    canvas[oy: oy + new_h, ox: ox + new_w] = resized
+    canvas[oy : oy + new_h, ox : ox + new_w] = resized
     return canvas
 
 
@@ -278,7 +283,9 @@ def _binarize_main(gray: np.ndarray) -> List[np.ndarray]:
     for threshold in (60, 80, 100, 120):
         global_bw = (gray < threshold).astype(np.uint8) * 255
         combined = cv2.bitwise_and(adaptive, global_bw)
-        combined = cv2.morphologyEx(combined, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
+        combined = cv2.morphologyEx(
+            combined, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8)
+        )
         combined = cv2.morphologyEx(combined, cv2.MORPH_OPEN, np.ones((2, 2), np.uint8))
         results.append(combined)
 
@@ -310,17 +317,19 @@ def _extract_candidates(symbol_bw: np.ndarray) -> List[dict]:
             continue
         if w / max(h, 1) > 5.0 or h / max(w, 1) > 5.0:
             continue
-        component_mask = np.where(
-            labels[y: y + h, x: x + w] == i, 255, 0
-        ).astype(np.uint8)
+        component_mask = np.where(labels[y : y + h, x : x + w] == i, 255, 0).astype(
+            np.uint8
+        )
         normalized = normalize_mask(component_mask)
         if normalized is not None:
-            candidates.append({
-                "center": (int(centroids[i][0]), int(centroids[i][1])),
-                "norm": normalized,
-                "raw": component_mask,
-                "box": (x, y, w, h),
-            })
+            candidates.append(
+                {
+                    "center": (int(centroids[i][0]), int(centroids[i][1])),
+                    "norm": normalized,
+                    "raw": component_mask,
+                    "box": (x, y, w, h),
+                }
+            )
     return candidates
 
 
@@ -359,9 +368,7 @@ def detect_captcha(
     prompt_img = cv2.imdecode(
         np.frombuffer(prompt_img_bytes, np.uint8), cv2.IMREAD_COLOR
     )
-    main_img = cv2.imdecode(
-        np.frombuffer(main_img_bytes, np.uint8), cv2.IMREAD_COLOR
-    )
+    main_img = cv2.imdecode(np.frombuffer(main_img_bytes, np.uint8), cv2.IMREAD_COLOR)
     if prompt_img is None or main_img is None:
         return []
 
@@ -374,7 +381,9 @@ def detect_captcha(
     # 用灰度范围掩码定位提示条区域（提示图背景通常为中等灰度区域）
     gray_mask = ((top_gray > 90) & (top_gray < 230)).astype(np.uint8) * 255
     gray_mask = cv2.morphologyEx(gray_mask, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
-    num_labels, _, stats, _ = cv2.connectedComponentsWithStats(gray_mask, connectivity=8)
+    num_labels, _, stats, _ = cv2.connectedComponentsWithStats(
+        gray_mask, connectivity=8
+    )
     strip_box = None
     best_area = -1
     for i in range(1, num_labels):
@@ -388,7 +397,7 @@ def detect_captcha(
         strip_box = (0, 0, top_w, top_h)
 
     sx, sy, sw, sh = strip_box
-    strip_roi = prompt_img[sy: sy + sh, sx: sx + sw]
+    strip_roi = prompt_img[sy : sy + sh, sx : sx + sw]
     strip_roi_gray = cv2.cvtColor(strip_roi, cv2.COLOR_BGR2GRAY)
     _debug_save("strip_roi", strip_roi)
 
@@ -511,7 +520,9 @@ def detect_captcha(
         for j, point in enumerate(ordered_points):
             if j == i or point is None:
                 continue
-            if ((point[0] - new_point[0]) ** 2 + (point[1] - new_point[1]) ** 2) ** 0.5 < 20:
+            if (
+                (point[0] - new_point[0]) ** 2 + (point[1] - new_point[1]) ** 2
+            ) ** 0.5 < 20:
                 too_close = True
                 break
         if not too_close:
@@ -523,8 +534,15 @@ def detect_captcha(
         debug_result = main_img.copy()
         for idx, p in enumerate(result):
             cv2.circle(debug_result, p, 12, (0, 255, 0), 2)
-            cv2.putText(debug_result, str(idx + 1), (p[0] - 5, p[1] + 5),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+            cv2.putText(
+                debug_result,
+                str(idx + 1),
+                (p[0] - 5, p[1] + 5),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (0, 0, 255),
+                2,
+            )
         _debug_save("result", debug_result)
 
     return result
@@ -533,6 +551,7 @@ def detect_captcha(
 # ---------------------------------------------------------------------------
 # 验证码页面处理（Playwright 浏览器操作层）
 # ---------------------------------------------------------------------------
+
 
 def _captcha_visible(frame) -> bool:
     """检查验证码核心元素在 frame 内是否真正可见。
@@ -634,10 +653,14 @@ def handle_click_captcha(page, log) -> bool:
             if derived_url:
                 log.debug(f"[点选验证码] 主图从提示图 URL 推导: {derived_url[:80]}...")
                 try:
-                    req = urllib.request.Request(derived_url, headers={"User-Agent": "Mozilla/5.0"})
+                    req = urllib.request.Request(
+                        derived_url, headers={"User-Agent": "Mozilla/5.0"}
+                    )
                     with urllib.request.urlopen(req, timeout=10) as resp:
                         main_bytes = resp.read()
-                        log.debug(f"[点选验证码] 主图推导下载成功，{len(main_bytes or b'')} B")
+                        log.debug(
+                            f"[点选验证码] 主图推导下载成功，{len(main_bytes or b'')} B"
+                        )
                 except Exception as e:
                     log.warning(f"[点选验证码] 主图推导下载失败: {e}")
 
@@ -672,13 +695,17 @@ def handle_click_captcha(page, log) -> bool:
         # 若渲染尺寸与图片像素尺寸不一致，按比例缩放坐标
         if main_render_size and points:
             try:
-                img_arr = cv2.imdecode(np.frombuffer(main_bytes, np.uint8), cv2.IMREAD_COLOR)
+                img_arr = cv2.imdecode(
+                    np.frombuffer(main_bytes, np.uint8), cv2.IMREAD_COLOR
+                )
                 if img_arr is not None:
                     img_h, img_w = img_arr.shape[:2]
                     scale_x = main_render_size[0] / img_w
                     scale_y = main_render_size[1] / img_h
                     if abs(scale_x - 1.0) > 0.05 or abs(scale_y - 1.0) > 0.05:
-                        points = [(int(x * scale_x), int(y * scale_y)) for x, y in points]
+                        points = [
+                            (int(x * scale_x), int(y * scale_y)) for x, y in points
+                        ]
                         log.debug(
                             f"[点选验证码] 坐标缩放比例: x={scale_x:.3f}, y={scale_y:.3f}，"
                             f"缩放后坐标: {points}"
@@ -694,7 +721,9 @@ def handle_click_captcha(page, log) -> bool:
                 f"[点选验证码] 坐标识别不足 3 个（识别到 {len(points)} 个），仍尝试点击"
             )
 
-        log.info(f"[点选验证码] 识别到 {len(points)} 个坐标: {points[:3]}，开始模拟点击")
+        log.info(
+            f"[点选验证码] 识别到 {len(points)} 个坐标: {points[:3]}，开始模拟点击"
+        )
         for idx, p in enumerate(points[:3]):
             try:
                 _click_captcha_point(ctx, main_el, p, log, idx)
@@ -752,10 +781,10 @@ def _derive_main_url(prompt_url: str) -> Optional[str]:
     if "img_index=0" in prompt_url:
         return prompt_url.replace("img_index=0", "img_index=1")
     # 兜底：尝试通用索引模式
-    m = re.search(r'img_index=(\d+)', prompt_url)
+    m = re.search(r"img_index=(\d+)", prompt_url)
     if m:
         idx = int(m.group(1))
-        return prompt_url[:m.start(1)] + str(idx + 1) + prompt_url[m.end(1):]
+        return prompt_url[: m.start(1)] + str(idx + 1) + prompt_url[m.end(1) :]
     return None
 
 
@@ -765,7 +794,9 @@ def _get_main_render_size(ctx, main_el, log) -> Optional[Tuple[float, float]]:
     try:
         bb = main_el.bounding_box()
         if bb and bb["width"] > 0 and bb["height"] > 0:
-            log.debug(f"[点选验证码] 主图渲染尺寸(bounding_box): {bb['width']:.0f}x{bb['height']:.0f}")
+            log.debug(
+                f"[点选验证码] 主图渲染尺寸(bounding_box): {bb['width']:.0f}x{bb['height']:.0f}"
+            )
             return (bb["width"], bb["height"])
     except Exception:
         pass
@@ -790,7 +821,9 @@ def _get_main_render_size(ctx, main_el, log) -> Optional[Tuple[float, float]]:
             return null;
         }""")
         if size and len(size) == 2 and size[0] > 0 and size[1] > 0:
-            log.debug(f"[点选验证码] 主图渲染尺寸(evaluate fallback): {size[0]:.0f}x{size[1]:.0f}")
+            log.debug(
+                f"[点选验证码] 主图渲染尺寸(evaluate fallback): {size[0]:.0f}x{size[1]:.0f}"
+            )
             return (float(size[0]), float(size[1]))
     except Exception:
         pass
@@ -838,7 +871,9 @@ def _fetch_frame_bg_image(ctx, log) -> Optional[bytes]:
         return None
 
 
-def _fetch_element_image(ctx, el, log, label: str) -> Tuple[Optional[bytes], Optional[str]]:
+def _fetch_element_image(
+    ctx, el, log, label: str
+) -> Tuple[Optional[bytes], Optional[str]]:
     """从元素提取图片 URL 并通过 HTTP 下载，返回 (bytes, url)。
 
     按优先级依次尝试：
@@ -863,7 +898,8 @@ def _fetch_element_image(ctx, el, log, label: str) -> Tuple[Optional[bytes], Opt
         try:
             style = el.get_attribute("style") or ""
             m = re.search(
-                r'background-image\s*:\s*url\(["\']?(https?://[^"\')\s]+)["\']?\)', style
+                r'background-image\s*:\s*url\(["\']?(https?://[^"\')\s]+)["\']?\)',
+                style,
             )
             if m:
                 url = m.group(1)
@@ -1019,4 +1055,6 @@ def _click_captcha_point(ctx, main_el, point, log, idx: int) -> None:
             )
             return
     except Exception as e:
-        log.warning(f"[点选验证码] 点击第 {idx + 1} 个坐标 ({x:.0f}, {y:.0f}) 全部方式均失败: {e}")
+        log.warning(
+            f"[点选验证码] 点击第 {idx + 1} 个坐标 ({x:.0f}, {y:.0f}) 全部方式均失败: {e}"
+        )

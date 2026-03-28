@@ -21,7 +21,9 @@ _SEL_EXAM_TAB = '.van-tab:has-text("在线考试")'
 _SEL_JOIN_BTN = 'button.exam-button:has-text("参加考试")'
 _SEL_START_BTN = 'a.popup-btn:has-text("开始考试")'
 _SEL_DIALOG = ".van-dialog, .van-toast, .van-dialog__message"
-_SEL_CONFIRM_BTN = '.van-dialog__confirm, button:has-text("确认"), button:has-text("确定")'
+_SEL_CONFIRM_BTN = (
+    '.van-dialog__confirm, button:has-text("确认"), button:has-text("确定")'
+)
 _SEL_QUESTION_TITLE = ".quest-stem"
 _SEL_OPTIONS = ".quest-option-item"
 _SEL_NEXT_BTN = (
@@ -116,7 +118,9 @@ class ExamMixin:
 
         return "continue"
 
-    def _extract_question_list_from_response(self, payload: Any) -> list[dict[str, Any]]:
+    def _extract_question_list_from_response(
+        self, payload: Any
+    ) -> list[dict[str, Any]]:
         """从 startPaper / refreshPaper 响应中提取完整试题列表。"""
         if not isinstance(payload, dict):
             return []
@@ -276,7 +280,12 @@ class ExamMixin:
             # 已在课程页——有考试 Tab 或课程内容
             if self._page.locator(_SEL_EXAM_TAB).count() > 0:
                 return True
-            if self._page.locator(".van-collapse-item, .img-texts-item, .fchl-item").count() > 0:
+            if (
+                self._page.locator(
+                    ".van-collapse-item, .img-texts-item, .fchl-item"
+                ).count()
+                > 0
+            ):
                 return True
 
             # 承诺书/协议签署页（ProtocolPageWk.vue / ProtocolPage.vue）
@@ -536,10 +545,7 @@ class ExamMixin:
                     f"预计可匹配 {matched_questions_expected} 题，"
                     f"预估匹配率 {expected_match_rate:.2f}%"
                 )
-                if (
-                    expected_match_rate < exam_submit_match_rate
-                    and not random_answer
-                ):
+                if expected_match_rate < exam_submit_match_rate and not random_answer:
                     self.log.warning(
                         f"预估匹配率 {expected_match_rate:.2f}% 低于要求 "
                         f"{exam_submit_match_rate}% ，未开启随机答题，放弃本次考试"
@@ -638,9 +644,10 @@ class ExamMixin:
                         except Exception:
                             pass
                 if not clicked_next:
-                    self.log.info("未找到可用的'下一题'按钮，已到最后一题，退出答题循环")
+                    self.log.info(
+                        "未找到可用的'下一题'按钮，已到最后一题，退出答题循环"
+                    )
                     break
-
 
             # --- 6. 提交 ---
             match_rate = (matched_questions / max(1, total_questions)) * 100

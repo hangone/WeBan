@@ -13,12 +13,13 @@ if TYPE_CHECKING:
 @dataclass
 class BrowserConfig:
     """浏览器启动与超时相关配置项。"""
-    enabled: bool = False                    # 是否启用浏览器模式
-    headless: bool = False                   # 是否无头（后台静默）运行
-    channel: str = "chromium"               # 浏览器引擎：chromium / firefox / webkit
-    slow_mo: int = 0                         # 每步操作间隔（毫秒），调试时可适当调大
-    timeout_ms: int = 30000                  # 页面元素等待全局超时（毫秒）
-    manual_login_timeout_sec: int = 300      # 人工扫码/输入验证码的最长等待时间（秒）
+
+    enabled: bool = False  # 是否启用浏览器模式
+    headless: bool = False  # 是否无头（后台静默）运行
+    channel: str = "chromium"  # 浏览器引擎：chromium / firefox / webkit
+    slow_mo: int = 0  # 每步操作间隔（毫秒），调试时可适当调大
+    timeout_ms: int = 30000  # 页面元素等待全局超时（毫秒）
+    manual_login_timeout_sec: int = 300  # 人工扫码/输入验证码的最长等待时间（秒）
 
 
 logger = logging.getLogger(__name__)
@@ -56,6 +57,7 @@ class BrowserMixin:
 
     if TYPE_CHECKING:
         from typing import Union as _Union
+
         _page: "Page"
         _context: "BrowserContext"
         _browser: "Browser"
@@ -111,9 +113,9 @@ class BrowserMixin:
             headless=self.browser_config.headless,
             slow_mo=self.browser_config.slow_mo,
             args=[
-                "--mute-audio",                              # 静音，避免视频声音干扰
+                "--mute-audio",  # 静音，避免视频声音干扰
                 "--disable-blink-features=AutomationControlled",  # 禁用自动化标识
-                "--disable-infobars",                        # 隐藏"Chrome 正受到自动化软件控制"信息栏
+                "--disable-infobars",  # 隐藏"Chrome 正受到自动化软件控制"信息栏
             ],
         )
 
