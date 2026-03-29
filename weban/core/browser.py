@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict
 import logging
+from .base import BaseMixin
 
 from playwright.sync_api import sync_playwright
 from playwright._impl._errors import TargetClosedError
@@ -52,7 +53,7 @@ window.navigator.permissions.query = (parameters) => (
 """
 
 
-class BrowserMixin:
+class BrowserMixin(BaseMixin):
     """封装 Playwright 浏览器的启动、注入与关闭逻辑。"""
 
     if TYPE_CHECKING:

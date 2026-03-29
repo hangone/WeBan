@@ -12,6 +12,8 @@ from .captcha import (
     _ocr_captcha_with_retry,
 )
 
+from .base import BaseMixin
+
 logger = logging.getLogger(__name__)
 
 
@@ -62,13 +64,44 @@ def _classify_toast(msg: str) -> str:
         if pat in msg:
             return "retryable"
     # Any other non-empty server message is worth showing but we keep waiting
-    # (the user might be able to fix it manually in the browser).
     if msg.strip():
         return "retryable"
     return "ignore"
 
 
-class AuthMixin:
+# ---------------------------------------------------------------------------
+# DOM 元素选择器常量定义
+# ---------------------------------------------------------------------------
+_SEL_LOGIN_FORM_INPUTS = (
+    "input[placeholder*='选择学校'], "
+    "input[placeholder*='搜索关键词'], "
+    "input[placeholder*='账号'], "
+    "input[placeholder*='学号'], "
+    "input[type='password'], "
+    "a.loginp-submit, button[type='submit'], button:has-text('登录')"
+)
+_SEL_POST_LOGIN_MARKERS = (
+    ".task-block, .van-tab, .van-collapse-item, .img-texts-item, "
+    ".fchl-item, .broadcast-modal, .img-text-block, #agree"
+)
+_SEL_INPUT_TENANT = "input[placeholder*='选择学校']"
+_SEL_INPUT_TENANT_SEARCH = "input[placeholder*='搜索关键词']"
+_SEL_MODAL_OVERLAY = ".v-modal, .van-overlay"
+_SEL_INPUT_ACCOUNT = "input[type='text']:not([readonly]), input[placeholder*='账号'], input[placeholder*='学号']"
+_SEL_INPUT_PASSWORD = "input[type='password']"
+_SEL_CAPTCHA_IMG = "img.loginp-label-verify, img[src*='randLetterImage']"
+_SEL_CAPTCHA_INPUT = "input[maxlength='6'][autocomplete='off'], input[maxlength='6']"
+_SEL_LOGIN_SUBMIT_BTN = (
+    "a.loginp-submit, button[type='submit'], button:has-text('登录'):not([disabled])"
+)
+_SEL_TOAST_MESSAGE = (
+    ".van-toast__text, .van-toast, "
+    ".mint-toast, .mint-toast-text, "
+    ".van-dialog__message, .el-message__content"
+)
+
+
+class AuthMixin(BaseMixin):
     if TYPE_CHECKING:
         from typing import Union as _Union
         from playwright.sync_api import Page, BrowserContext, Browser, Playwright
@@ -109,15 +142,7 @@ class AuthMixin:
         if not self._page:
             return False
         try:
-            selectors = (
-                "input[placeholder*='选择学校'], "
-                "input[placeholder*='搜索关键词'], "
-                "input[placeholder*='账号'], "
-                "input[placeholder*='学号'], "
-                "input[type='password'], "
-                "a.loginp-submit, button[type='submit'], button:has-text('登录')"
-            )
-            loc = self._page.locator(selectors)
+            loc = self._page.locator(_SEL_LOGIN_FORM_INPUTS)
             if loc.count() == 0:
                 return False
             for i in range(min(loc.count(), 8)):
@@ -135,11 +160,7 @@ class AuthMixin:
         if not self._page:
             return False
         try:
-            selectors = (
-                ".task-block, .van-tab, .van-collapse-item, .img-texts-item, "
-                ".fchl-item, .broadcast-modal, .img-text-block, #agree"
-            )
-            return self._page.locator(selectors).count() > 0
+            return self._page.locator(_SEL_POST_LOGIN_MARKERS).count() > 0
         except Exception:
             return False
 
@@ -247,13 +268,11 @@ class AuthMixin:
         # --- 选择学校 ---
         if self.tenant_name:
             try:
-                tenant_input = self._page.locator("input[placeholder*='选择学校']")
+                tenant_input = self._page.locator(_SEL_INPUT_TENANT)
                 tenant_input.wait_for(state="visible", timeout=5000)
                 tenant_input.click()
                 time.sleep(0.5)
-                self._page.locator("input[placeholder*='搜索关键词']").fill(
-                    self.tenant_name
-                )
+                self._page.locator(_SEL_INPUT_TENANT_SEARCH).fill(self.tenant_name)
                 time.sleep(0.5)
                 self._page.locator(
                     f".van-cell__title span:text-is('{self.tenant_name}')"
@@ -261,7 +280,7 @@ class AuthMixin:
                 time.sleep(0.5)
                 # 等待学校选择的遮罩层或弹窗消失，避免阻挡后续点击
                 try:
-                    self._page.locator(".v-modal, .van-overlay").wait_for(
+                    self._page.locator(_SEL_MODAL_OVERLAY).wait_for(
                         state="hidden", timeout=3000
                     )
                 except Exception:
@@ -272,20 +291,16 @@ class AuthMixin:
         # --- 填写账号密码 ---
         if self.account and self.password:
             try:
-                acc_input = self._page.locator(
-                    "input[type='text']:not([readonly]), input[placeholder*='账号'], input[placeholder*='学号']"
-                ).first
+                acc_input = self._page.locator(_SEL_INPUT_ACCOUNT).first
                 acc_input.wait_for(state="visible", timeout=5000)
                 acc_input.fill(self.account)
 
-                pwd_input = self._page.locator("input[type='password']").first
+                pwd_input = self._page.locator(_SEL_INPUT_PASSWORD).first
                 pwd_input.wait_for(state="visible", timeout=5000)
                 pwd_input.fill(self.password)
 
                 # 图片验证码
-                capt_img = self._page.locator(
-                    "img.loginp-label-verify, img[src*='randLetterImage']"
-                ).first
+                capt_img = self._page.locator(_SEL_CAPTCHA_IMG).first
                 try:
                     capt_img.wait_for(state="visible", timeout=5000)
                 except Exception:
@@ -301,9 +316,7 @@ class AuthMixin:
                             )
                         else:
                             self.log.debug(f"[文字验证码] ddddocr 识别结果: {code}")
-                            capt_input = self._page.locator(
-                                "input[maxlength='6'][autocomplete='off'], input[maxlength='6']"
-                            ).first
+                            capt_input = self._page.locator(_SEL_CAPTCHA_INPUT).first
                             capt_input.wait_for(state="visible", timeout=2000)
                             capt_input.fill(code)
                     except Exception as e:
@@ -311,9 +324,7 @@ class AuthMixin:
 
                 # 点击登录按钮（a.loginp-submit 是 Login.vue 中唯一的提交按钮）
                 try:
-                    submit_loc = self._page.locator(
-                        "a.loginp-submit, button[type='submit'], button:has-text('登录'):not([disabled])"
-                    )
+                    submit_loc = self._page.locator(_SEL_LOGIN_SUBMIT_BTN)
                     if submit_loc.count() > 0:
                         submit_loc.first.click(force=True)
                     else:
@@ -363,11 +374,7 @@ class AuthMixin:
 
             # ---- 检测页面 Toast / Dialog 错误提示 ----
             try:
-                raw_msgs = self._page.locator(
-                    ".van-toast__text, .van-toast, "
-                    ".mint-toast, .mint-toast-text, "
-                    ".van-dialog__message, .el-message__content"
-                ).all_inner_texts()
+                raw_msgs = self._page.locator(_SEL_TOAST_MESSAGE).all_inner_texts()
                 msgs = [m.strip() for m in raw_msgs if m.strip()]
 
                 for msg in msgs:
@@ -391,9 +398,7 @@ class AuthMixin:
                     if "验证码" in msg and any(
                         k in msg for k in ("错", "误", "效", "不正确")
                     ):
-                        capt_img = self._page.locator(
-                            "img.loginp-label-verify, img[src*='randLetterImage']"
-                        ).first
+                        capt_img = self._page.locator(_SEL_CAPTCHA_IMG).first
                         if capt_img.is_visible():
                             ocr = _get_ocr()
                             code = _ocr_captcha_with_retry(capt_img, ocr, self.log)
@@ -404,14 +409,13 @@ class AuthMixin:
                             else:
                                 self.log.info(f"[文字验证码] 重新识别结果: {code}")
                                 capt_input = self._page.locator(
-                                    "input[maxlength='6'][autocomplete='off'], input[maxlength='6']"
+                                    _SEL_CAPTCHA_INPUT
                                 ).first
                                 if capt_input.is_visible():
                                     capt_input.fill(code)
                                     try:
                                         submit_loc = self._page.locator(
-                                            "a.loginp-submit, button[type='submit'], "
-                                            "button:has-text('登录'):not([disabled])"
+                                            _SEL_LOGIN_SUBMIT_BTN
                                         )
                                         if submit_loc.count() > 0:
                                             submit_loc.first.click(force=True)

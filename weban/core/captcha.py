@@ -43,6 +43,30 @@ _DEBUG_LOG_DIR = "logs"
 # 线程本地存储，用于记录当前账号名（用于分目录保存）
 _thread_local = threading.local()
 
+# ---------------------------------------------------------------------------
+# DOM 元素选择器常量定义
+# ---------------------------------------------------------------------------
+_SEL_CAPTCHA_BG = (
+    ".tencent-captcha-dy__verify-bg-img, .tencent-captcha-dy__verify-bg, "
+    ".tencent-captcha-dy__verify-img-area, .tencent-captcha-dy__verify"
+)
+_SEL_CAPTCHA_PROMPT = (
+    ".tencent-captcha-dy__header-answer img, .tencent-captcha-dy__header-answer"
+)
+_SEL_CAPTCHA_CONFIRM_BTN = (
+    ".tencent-captcha-dy__verify-confirm-btn:not("
+    ".tencent-captcha-dy__verify-confirm-btn--disabled), "
+    ".tencent-captcha-dy__verify-confirm-btn"
+)
+_SEL_CAPTCHA_ERROR_TIP = (
+    ".tencent-captcha-dy__verify-error-text, .tencent-captcha-dy__verify-error-tip"
+)
+_SEL_CAPTCHA_VISIBILITY_MARKERS = (
+    ".tencent-captcha-dy__verify-bg-img, "
+    "#tCaptchaDyContent, "
+    ".tencent-captcha-dy__header-answer"
+)
+
 
 def set_debug(enabled: bool, log_dir: str = "logs") -> None:
     """由外部配置调用，开启/关闭验证码截图调试保存。"""
@@ -559,11 +583,7 @@ def _captcha_visible(frame) -> bool:
     用 Playwright 原生 is_visible() 检测，避免脚本注入。
     验证码弹出时核心容器必然可见，隐藏预加载时则不可见。
     """
-    for sel in (
-        ".tencent-captcha-dy__verify-bg-img",
-        "#tCaptchaDyContent",
-        ".tencent-captcha-dy__header-answer",
-    ):
+    for sel in _SEL_CAPTCHA_VISIBILITY_MARKERS:
         try:
             el = frame.locator(sel)
             if el.count() > 0 and el.first.is_visible():
@@ -615,13 +635,8 @@ def handle_click_captcha(page, log) -> bool:
         log.info("[点选验证码] 开始自动识别...")
 
         # 定位提示图和主背景图元素
-        prompt_el = ctx.locator(
-            ".tencent-captcha-dy__header-answer img, .tencent-captcha-dy__header-answer"
-        )
-        main_el = ctx.locator(
-            ".tencent-captcha-dy__verify-bg-img, .tencent-captcha-dy__verify-bg, "
-            ".tencent-captcha-dy__verify-img-area, .tencent-captcha-dy__verify"
-        )
+        prompt_el = ctx.locator(_SEL_CAPTCHA_PROMPT)
+        main_el = ctx.locator(_SEL_CAPTCHA_BG)
 
         if prompt_el.count() == 0:
             log.warning("[点选验证码] 未找到提示图元素，无法自动识别")
@@ -726,7 +741,8 @@ def handle_click_captcha(page, log) -> bool:
         )
         for idx, p in enumerate(points[:3]):
             try:
-                _click_captcha_point(ctx, main_el, p, log, idx)
+                # 修复：传入 page 实例以支持 page.mouse 操作
+                _click_captcha_point(page, ctx, main_el, p, log, idx)
                 time.sleep(0.5)
             except Exception as e:
                 log.warning(f"[点选验证码] 点击第 {idx + 1} 个坐标 {p} 失败: {e}")
@@ -736,11 +752,7 @@ def handle_click_captcha(page, log) -> bool:
 
         # 点击确认按钮（优先匹配非禁用态）
         try:
-            confirm_btn = ctx.locator(
-                ".tencent-captcha-dy__verify-confirm-btn:not("
-                ".tencent-captcha-dy__verify-confirm-btn--disabled), "
-                ".tencent-captcha-dy__verify-confirm-btn"
-            )
+            confirm_btn = ctx.locator(_SEL_CAPTCHA_CONFIRM_BTN)
             if confirm_btn.count() > 0:
                 confirm_btn.first.click(force=True)
                 log.debug("[点选验证码] 已点击确认按钮")
@@ -753,10 +765,7 @@ def handle_click_captcha(page, log) -> bool:
 
         # 检查是否出现错误提示（验证失败）
         try:
-            error_tip = ctx.locator(
-                ".tencent-captcha-dy__verify-error-text, "
-                ".tencent-captcha-dy__verify-error-tip"
-            )
+            error_tip = ctx.locator(_SEL_CAPTCHA_ERROR_TIP)
             if error_tip.count() > 0 and error_tip.first.is_visible():
                 err_text = ""
                 try:
@@ -801,7 +810,7 @@ def _get_main_render_size(ctx, main_el, log) -> Optional[Tuple[float, float]]:
     except Exception:
         pass
 
-    # bounding_box 返回 0 时，遍历父容器选择器兜底（evaluate 不可避免）
+    # bounding_box 返回 0 时，遍历父容器选择器兜底
     try:
         size = ctx.evaluate("""() => {
             const sels = [
@@ -962,7 +971,7 @@ def _fetch_element_image(
         return None, None
 
 
-def _human_mouse_move(ctx, x1: float, y1: float, x2: float, y2: float, log) -> None:
+def _human_mouse_move(page, x1: float, y1: float, x2: float, y2: float, log) -> None:
     """用三次贝塞尔曲线模拟人类鼠标从 (x1,y1) 移动到 (x2,y2)。
 
     控制点在起止点附近随机偏移，步数根据距离自适应，每步间随机微延迟。
@@ -992,7 +1001,8 @@ def _human_mouse_move(ctx, x1: float, y1: float, x2: float, y2: float, log) -> N
 
             # 只在坐标变化超过 1px 时才实际移动，减少 IPC 调用
             if abs(px - prev_px) >= 1 or abs(py - prev_py) >= 1:
-                ctx.mouse.move(px, py)
+                # 修复：使用传入的 page.mouse 而非 Frame.mouse
+                page.mouse.move(px, py)
                 prev_px, prev_py = px, py
 
             # 每步随机延迟 5~18ms，模拟人类手速
@@ -1001,7 +1011,7 @@ def _human_mouse_move(ctx, x1: float, y1: float, x2: float, y2: float, log) -> N
         log.debug(f"[鼠标移动] 贝塞尔移动中出错（忽略）: {e}")
 
 
-def _click_captcha_point(ctx, main_el, point, log, idx: int) -> None:
+def _click_captcha_point(page, ctx, main_el, point, log, idx: int) -> None:
     """在主图上的指定相对坐标处模拟人类鼠标移动后点击。
 
     流程：
@@ -1020,16 +1030,15 @@ def _click_captcha_point(ctx, main_el, point, log, idx: int) -> None:
             abs_y = bb["y"] + y
 
             # 从当前鼠标位置移动到目标点（贝塞尔曲线）
-            # 先读取当前位置——Playwright 没有直接 API，用上一次目标点近似
             # 起点：元素左上角附近（模拟从图片边缘移入）
             start_x = bb["x"] + bb["width"] * random.uniform(0.05, 0.2)
             start_y = bb["y"] + bb["height"] * random.uniform(0.05, 0.2)
-            _human_mouse_move(ctx, start_x, start_y, abs_x, abs_y, log)
+            _human_mouse_move(page, start_x, start_y, abs_x, abs_y, log)
 
             # 落点随机微抖动（±2px），模拟手部轻微抖动
             jitter_x = abs_x + random.uniform(-2, 2)
             jitter_y = abs_y + random.uniform(-2, 2)
-            ctx.mouse.move(jitter_x, jitter_y)
+            page.mouse.move(jitter_x, jitter_y)
             time.sleep(random.uniform(0.05, 0.15))  # 落点停顿
     except Exception as e:
         log.debug(f"[点选验证码] 贝塞尔移动失败（忽略）: {e}")
@@ -1042,13 +1051,13 @@ def _click_captcha_point(ctx, main_el, point, log, idx: int) -> None:
     except Exception as e:
         log.debug(f"[点选验证码] locator.click 失败，尝试 mouse.click 兜底: {e}")
 
-    # 兜底：通过 bounding_box 计算绝对坐标，使用 frame 的 mouse 对象点击
+    # 兜底：通过 bounding_box 计算绝对坐标，使用 Page 的 mouse 对象点击
     try:
         bb = main_el.bounding_box()
         if bb:
             abs_x = bb["x"] + x
             abs_y = bb["y"] + y
-            ctx.mouse.click(abs_x, abs_y)
+            page.mouse.click(abs_x, abs_y)
             log.debug(
                 f"[点选验证码] mouse.click 第 {idx + 1} 个坐标 "
                 f"({x:.0f}, {y:.0f}) → 绝对 ({abs_x:.0f}, {abs_y:.0f})"

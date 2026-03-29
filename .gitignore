@@ -293,10 +293,15 @@ poetry.toml
 # LSP config files
 pyrightconfig.json
 
-# config
+# Config
 config.toml
 pw-browsers
+
+# SRC
 src/
 
-# debug log output directory
+# Debug log output directory
 logs/
+
+# Agent
+.agents

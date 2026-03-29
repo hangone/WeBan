@@ -86,3 +86,14 @@ def get_bool_value(value: Any, default: bool = False) -> bool:
             return False
 
     return default
+
+
+def clean_text(text: str) -> str:
+    """归一化辅助函数。"""
+    import re
+
+    text = text or ""
+    # 去除题号（如 "1. " 或 "12、"）
+    text = re.sub(r"^\s*[A-Z0-9]+[\.、\s]+", "", text)
+    # 仅保留中文和字母数字，去除空格和符号
+    return re.sub(r"[^\w\u4e00-\u9fa5]", "", text)

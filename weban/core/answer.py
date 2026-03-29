@@ -13,12 +13,14 @@ import logging
 import time
 
 from typing import TYPE_CHECKING, Any, Dict
+from weban.app.runtime import clean_text
+from .base import BaseMixin
 
 logger = logging.getLogger(__name__)
 
 _SEL_TASK_BLOCK = ".task-block"
 _SEL_TASK_BLOCK_TITLE = ".task-block-title"
-_SEL_COURSE_READY = ".van-tab, .van-collapse-item, .img-texts-item, .fchl-item"
+_SEL_COURSE_READY = ".van-tab, .van-collapse-item, .fchl-item"
 _SEL_EXAM_TAB = '.van-tab:has-text("在线考试")'
 _SEL_EXAM_BUTTON = "button.exam-button"
 _SEL_EXAM_RECORD_BTN = 'button.exam-button:has-text("考试记录")'
@@ -28,7 +30,7 @@ _SEL_REVIEW_RESULT_READY = ".quest-stem, .quest-option-item"
 _SEL_REVIEW_BACK_BTN = "button:has-text('返回'), .van-nav-bar__left, .back-btn"
 
 
-class AnswerMixin:
+class AnswerMixin(BaseMixin):
     if TYPE_CHECKING:
         from typing import Union as _Union
         from playwright.sync_api import Page, BrowserContext, Browser, Playwright
@@ -46,34 +48,24 @@ class AnswerMixin:
         tenant_name: str
         account: str
         password: str
-        continue_on_invalid_token: bool
-        browser_config: BrowserConfig
         answers: Dict[str, Any]
 
-    # ------------------------------------------------------------------
-    # 工具方法：等待页面选择器出现，失败时静默返回 False
-    # ------------------------------------------------------------------
-
     def _wait_for(self, selector: str, timeout: int = 8000) -> bool:
-        """等待页面中指定选择器出现，在 timeout 毫秒内未出现则返回 False。"""
+        """等待选择器。"""
         try:
             self._page.wait_for_selector(selector, state="attached", timeout=timeout)
             return True
         except Exception:
             return False
 
-    # ------------------------------------------------------------------
-    # 本地题库
-    # ------------------------------------------------------------------
-
     def _load_answers(self) -> Dict[str, Any]:
-        """从项目根目录的 answer/answer.json 加载本地题库；文件不存在或损坏时返回空字典。"""
+        """加载本地题库。"""
         from weban.app.runtime import get_base_path
 
         base_path = get_base_path()
         answer_path = os.path.join(base_path, "answer", "answer.json")
         if not os.path.exists(answer_path):
-            self.log.warning("题库文件不存在，考试将默认按兜底策略作答")
+            self.log.warning("题库文件不存在")
             return {}
         try:
             with open(answer_path, "r", encoding="utf-8") as f:
@@ -82,14 +74,8 @@ class AnswerMixin:
             self.log.warning(f"读取题库失败: {e}")
         return {}
 
-    # ------------------------------------------------------------------
-    # 云端题库合并
-    # ------------------------------------------------------------------
-
     def _merge_cloud_answers(self) -> None:
-        """从 GitHub / CDN 镜像拉取最新 answer/answer.json，与本地题库合并（新答案优先）。
-        依次尝试多个 URL，任意一个成功即停止。
-        """
+        """从云端合并题库。"""
         import urllib.request
 
         urls = [
@@ -117,8 +103,8 @@ class AnswerMixin:
                             self.answers[title] = {
                                 "type": item.get("type", ""),
                                 "optionList": [
-                                    {"content": content, "isCorrect": is_correct}
-                                    for content, is_correct in new_opts.items()
+                                    {"content": c, "isCorrect": ic}
+                                    for c, ic in new_opts.items()
                                 ],
                             }
                         self.log.info("成功从云端合并最新题库")
@@ -127,298 +113,151 @@ class AnswerMixin:
                 pass
         self.log.info("未能从云端合并题库")
 
-    # ------------------------------------------------------------------
-    # 历史考试答案合并
-    # ------------------------------------------------------------------
-
     def _merge_history_answers(self) -> None:
-        """通过点击页面历史考试记录捕获 reviewPaper 接口响应，将答案合并到本地题库。
-
-        实际页面流程（依据前端源码）：
-          1. CourseIndex.vue 在线考试 Tab 中，ExamList.vue 渲染考试列表
-             - 已考过的考试计划显示 button.exam-button 文案“考试记录”
-             - 点击后 navToExamReviewList() 路由跳转到 /#/exam/review/list
-          2. ExamReviewList.vue 列出历史作答记录
-             - 仅当 query.displayState === "1" 时显示 div.examPeviewListp-item-color（“作答明细>”）
-             - 点击后跳转到 /#/courses/exam-result?examId=...&isRetake=...
-          3. ExamResult.vue created 时 dispatch courseExam/getExplain
-             - services.getExplain() 实际调用 POST /exam/reviewPaper.do
-             - 响应中 data.questions 包含题目、选项、正确答案标记
-        """
+        """通过点击历史记录合并答案。"""
         try:
             self.log.info("开始通过页面点击合并历史考试答案...")
             merged_count = 0
             responses: list[dict] = []
 
-            def handle_response(response: Any) -> None:
-                """拦截 /exam/reviewPaper.do 响应并缓存 JSON 数据。"""
+            def _handle_response(response: Any) -> None:
                 try:
-                    if "reviewPaper.do" not in response.url or response.status != 200:
-                        return
-                    payload = response.json()
-                    if isinstance(payload, dict):
-                        responses.append(payload)
+                    if "reviewPaper.do" in response.url and response.status == 200:
+                        responses.append(response.json())
                 except Exception:
                     pass
 
-            self._page.on("response", handle_response)
-
-            # 先进入任务列表
-            self._page.goto(
-                f"{self.base_url}/#/learning-task-list",
-                wait_until="domcontentloaded",
-            )
-            self._wait_for(_SEL_TASK_BLOCK, timeout=10000)
-
-            project_count = self._page.locator(_SEL_TASK_BLOCK).count()
-            self.log.info(f"[历史记录] 共发现 {project_count} 个学习项目")
-
-            for proj_idx in range(project_count):
-                # 每轮重新回到任务列表，避免 DOM 失效
-                self._page.goto(
-                    f"{self.base_url}/#/learning-task-list",
-                    wait_until="domcontentloaded",
-                )
-                if not self._wait_for(_SEL_TASK_BLOCK, timeout=10000):
-                    self.log.info("[历史记录] 未加载到任务列表，结束历史记录合并")
-                    break
-
-                projects = self._page.locator(_SEL_TASK_BLOCK)
-                if proj_idx >= projects.count():
-                    break
-
-                try:
-                    title_el = projects.nth(proj_idx).locator(_SEL_TASK_BLOCK_TITLE)
-                    proj_title = (
-                        title_el.first.inner_text().strip()
-                        if title_el.count() > 0
-                        else projects.nth(proj_idx)
-                        .inner_text()
-                        .strip()
-                        .split("\n")[0]
-                        .strip()
-                    )
-                except Exception:
-                    proj_title = f"项目{proj_idx + 1}"
-
-                self.log.info(f"[历史记录] 进入项目：{proj_title}")
-                try:
-                    projects.nth(proj_idx).click(force=True)
-                except Exception:
-                    continue
-
-                # 进入课程页后等待在线考试 Tab 或课程内容
-                if not self._wait_for(
-                    _SEL_COURSE_READY,
-                    timeout=8000,
-                ):
-                    self.log.info(f"[历史记录] [{proj_title}] 未进入课程页，跳过")
-                    continue
-
-                # 切到在线考试 Tab
-                exam_tab = self._page.locator(_SEL_EXAM_TAB)
-                if exam_tab.count() == 0:
-                    self.log.info(f"[历史记录] [{proj_title}] 未找到在线考试 Tab，跳过")
-                    continue
-
-                try:
-                    exam_tab.first.click(force=True)
-                except Exception:
-                    continue
-
-                if not self._wait_for(_SEL_EXAM_BUTTON, timeout=8000):
-                    self.log.info(f"[历史记录] [{proj_title}] 在线考试区域未渲染，跳过")
-                    continue
-
-                # ExamList.vue：已考过的考试计划会出现“考试记录”按钮
-                record_btns = self._page.locator(_SEL_EXAM_RECORD_BTN)
-                record_count = record_btns.count()
-                if record_count == 0:
-                    self.log.info(f"[历史记录] [{proj_title}] 无考试记录入口")
-                    continue
-
-                self.log.info(
-                    f"[历史记录] [{proj_title}] 有 {record_count} 个考试记录入口"
-                )
-
-                for exam_idx in range(record_count):
-                    # 每个考试计划都重新定位一次，避免页面跳转导致引用失效
-                    self._page.goto(
-                        f"{self.base_url}/#/learning-task-list",
-                        wait_until="domcontentloaded",
-                    )
-                    if not self._wait_for(_SEL_TASK_BLOCK, timeout=10000):
-                        break
-
-                    projects = self._page.locator(_SEL_TASK_BLOCK)
-                    if proj_idx >= projects.count():
-                        break
-
-                    try:
-                        projects.nth(proj_idx).click(force=True)
-                    except Exception:
-                        break
-
-                    if not self._wait_for(_SEL_EXAM_TAB, timeout=8000):
-                        break
-
-                    exam_tab = self._page.locator(_SEL_EXAM_TAB)
-                    if exam_tab.count() == 0:
-                        break
-
-                    try:
-                        exam_tab.first.click(force=True)
-                    except Exception:
-                        break
-
-                    if not self._wait_for(_SEL_EXAM_BUTTON, timeout=8000):
-                        break
-
-                    record_btns = self._page.locator(_SEL_EXAM_RECORD_BTN)
-                    if exam_idx >= record_btns.count():
-                        break
-
-                    # 点击“考试记录”进入 ExamReviewList
-                    try:
-                        record_btns.nth(exam_idx).click(force=True)
-                    except Exception:
-                        continue
-
-                    # ExamReviewList.vue 列表项
-                    if not self._wait_for(_SEL_REVIEW_LIST_ITEM, timeout=8000):
-                        self.log.info(
-                            f"[历史记录] [{proj_title}] 第 {exam_idx + 1} 个考试记录未加载成功"
-                        )
-                        try:
-                            self._page.go_back(wait_until="domcontentloaded")
-                        except Exception:
-                            pass
-                        continue
-
-                    # 只有 displayState=1 才有“作答明细>”
-                    detail_links = self._page.locator(_SEL_REVIEW_DETAIL_LINK)
-                    detail_count = detail_links.count()
-                    if detail_count == 0:
-                        self.log.info(
-                            f"[历史记录] [{proj_title}] 第 {exam_idx + 1} 个考试记录无作答明细入口"
-                        )
-                        try:
-                            self._page.go_back(wait_until="domcontentloaded")
-                        except Exception:
-                            pass
-                        continue
-
-                    self.log.info(
-                        f"[历史记录] [{proj_title}] 第 {exam_idx + 1} 个考试记录有 {detail_count} 条作答明细"
-                    )
-
-                    for review_idx in range(detail_count):
-                        # 重新定位详情入口，避免 go_back 之后 DOM 更新
-                        detail_links = self._page.locator(_SEL_REVIEW_DETAIL_LINK)
-                        if review_idx >= detail_links.count():
-                            break
-
-                        prev_resp_count = len(responses)
-
-                        try:
-                            detail_links.nth(review_idx).click(force=True)
-                        except Exception:
-                            continue
-
-                        # ExamResult.vue
-                        self._wait_for(_SEL_REVIEW_RESULT_READY, timeout=8000)
-
-                        # 等待 reviewPaper.do 响应进入 responses
-                        for _ in range(16):
-                            time.sleep(0.5)
-                            if len(responses) > prev_resp_count:
-                                break
-
-                        got_count = len(responses) - prev_resp_count
-                        self.log.info(
-                            f"[历史记录] [{proj_title}] 第 {exam_idx + 1} 个考试记录 "
-                            f"第 {review_idx + 1} 次作答，捕获 {got_count} 条 reviewPaper 响应"
-                        )
-
-                        # 返回 ExamReviewList
-                        back_btn = self._page.locator(_SEL_REVIEW_BACK_BTN)
-                        try:
-                            if back_btn.count() > 0 and back_btn.first.is_visible():
-                                back_btn.first.click(force=True)
-                            else:
-                                self._page.go_back(wait_until="domcontentloaded")
-                        except Exception:
-                            try:
-                                self._page.go_back(wait_until="domcontentloaded")
-                            except Exception:
-                                pass
-
-                        self._wait_for(_SEL_REVIEW_LIST_ITEM, timeout=6000)
-
-            # 移除监听
+            self._page.on("response", _handle_response)
             try:
-                self._page.remove_listener("response", handle_response)
-            except Exception:
-                pass
+                # 遍历分类 Tab：1-学习项目, 2-结束项目
+                tab_names = ["学习项目", "结束项目"]
+                for tab_name in tab_names:
+                    self.log.info(f"[历史记录] 正在搜集 [{tab_name}] 的历史答案...")
+                    self._page.goto(f"{self.base_url}/#/learning-task-list")
+                    time.sleep(2)
 
-            # 解析并合并捕获到的所有 reviewPaper 数据
-            seen_exam_keys = set()
-            for rev_data in responses:
-                try:
-                    if not isinstance(rev_data, dict):
-                        continue
-                    if str(rev_data.get("code")) != "0":
+                    tab_el = self._page.locator(
+                        f'.van-tab:has-text("{tab_name}")'
+                    ).first
+                    if tab_el.is_visible():
+                        tab_el.click(force=True)
+                        time.sleep(1.5)
+
+                    if not self._wait_for(_SEL_TASK_BLOCK, timeout=8000):
                         continue
 
-                    data = rev_data.get("data") or {}
-                    questions = data.get("questions") or []
-                    if not isinstance(questions, list):
-                        continue
+                    for proj_idx in range(self._page.locator(_SEL_TASK_BLOCK).count()):
+                        # 每轮重回列表并切 Tab
+                        self._page.goto(f"{self.base_url}/#/learning-task-list")
+                        time.sleep(1)
+                        tab_el = self._page.locator(
+                            f'.van-tab:has-text("{tab_name}")'
+                        ).first
+                        if tab_el.is_visible():
+                            tab_el.click(force=True)
+                        time.sleep(1)
 
-                    # 尽量构造一个去重 key，避免同一试卷重复合并太多次
-                    exam_key = (
-                        data.get("examId"),
-                        data.get("userExamId"),
-                        len(questions),
-                    )
-                    if exam_key in seen_exam_keys:
-                        continue
-                    seen_exam_keys.add(exam_key)
+                        proj = self._page.locator(_SEL_TASK_BLOCK).nth(proj_idx)
+                        proj_title = (
+                            proj.locator(_SEL_TASK_BLOCK_TITLE).inner_text().strip()
+                        )
+                        self.log.info(f"[历史记录] 进入项目：{proj_title}")
 
-                    for q in questions:
-                        if not isinstance(q, dict):
+                        proj.click(force=True)
+                        self._wait_for(_SEL_COURSE_READY, timeout=8000)
+
+                        # 切换到“在线考试”Tab
+                        exam_tab = self._page.locator(_SEL_EXAM_TAB).first
+                        if not exam_tab.is_visible():
+                            self.log.info(f"[历史记录] [{proj_title}] 无在线考试 Tab")
                             continue
+                        exam_tab.click(force=True)
+                        time.sleep(1.5)
 
-                        title = q.get("title", "")
-                        if not title:
-                            continue
+                        r_btns = self._page.locator(_SEL_EXAM_RECORD_BTN)
+                        self.log.info(
+                            f"[历史记录] - 项目 [{proj_title}] 找到 {r_btns.count()} 个考试记录入口"
+                        )
+                        for exam_idx in range(r_btns.count()):
+                            # 重新定位记录按钮
+                            self._page.goto(self._page.url)
+                            self._page.locator(_SEL_EXAM_TAB).first.click()
+                            time.sleep(1.5)
 
-                        old_opts = {
-                            o["content"]: o["isCorrect"]
-                            for o in self.answers.get(title, {}).get("optionList", [])
-                            if isinstance(o, dict)
-                            and "content" in o
-                            and "isCorrect" in o
-                        }
-                        new_opts = old_opts | {
-                            o.get("content", ""): o.get("isCorrect", 0)
-                            for o in q.get("optionList", [])
-                            if isinstance(o, dict) and o.get("content", "")
-                        }
+                            btn = self._page.locator(_SEL_EXAM_RECORD_BTN).nth(exam_idx)
+                            btn.scroll_into_view_if_needed()
+                            btn.click(force=True)
 
-                        for content in new_opts.keys() - old_opts.keys():
-                            self.log.info(f"发现题目：{title} 新选项：{content}")
-                            merged_count += 1
+                            # 在记录列表页提取明细
+                            if self._wait_for(_SEL_REVIEW_LIST_ITEM, timeout=8000):
+                                d_links = self._page.locator(_SEL_REVIEW_DETAIL_LINK)
+                                for review_idx in range(d_links.count()):
+                                    pc = len(responses)
+                                    d_links.nth(review_idx).click(force=True)
+                                    self._wait_for(
+                                        _SEL_REVIEW_RESULT_READY, timeout=8000
+                                    )
+                                    # 等待拦截
+                                    for _ in range(10):
+                                        if len(responses) > pc:
+                                            break
+                                        time.sleep(0.5)
+                                    self._page.go_back()
+                                    self._wait_for(_SEL_REVIEW_LIST_ITEM, timeout=6000)
+                            self._page.go_back()
+                            self._wait_for(_SEL_EXAM_TAB, timeout=6000)
+            finally:
+                self._page.remove_listener("response", _handle_response)
 
+            merged_count = 0
+            seen_keys = set()
+            for rev in responses:
+                if not isinstance(rev, dict) or str(rev.get("code")) != "0":
+                    continue
+                data = rev.get("data") or {}
+                qs = data.get("questions") or []
+                match_id = data.get("examId") or data.get("paperId")
+                match_key = (match_id, len(qs))
+                if match_key in seen_keys:
+                    continue
+                seen_keys.add(match_key)
+
+                for q in qs:
+                    raw_title = q.get("title", "")
+                    if not raw_title:
+                        continue
+                    # 归一化处理标题，避免因题号前缀导致重复
+                    title = clean_text(raw_title)
+
+                    new_opts = {
+                        clean_text(o.get("content", "")): o.get("isCorrect", 0)
+                        for o in q.get("optionList", [])
+                        if o.get("content")
+                    }
+
+                    if title not in self.answers:
                         self.answers[title] = {
                             "type": q.get("type", ""),
-                            "optionList": [
-                                {"content": content, "isCorrect": is_correct}
-                                for content, is_correct in new_opts.items()
-                            ],
+                            "optionList": [],
                         }
-                except Exception:
-                    pass
+                        merged_count += 1
+
+                    # 合并选项逻辑：保留老选项，合并新选项，isCorrect 取最大值
+                    current_opts = {
+                        clean_text(o["content"]): o
+                        for o in self.answers[title]["optionList"]
+                    }
+                    updated = False
+                    for c_opt, is_c in new_opts.items():
+                        if c_opt not in current_opts:
+                            current_opts[c_opt] = {"content": c_opt, "isCorrect": is_c}
+                            updated = True
+                        elif is_c > current_opts[c_opt]["isCorrect"]:
+                            current_opts[c_opt]["isCorrect"] = is_c
+                            updated = True
+
+                    if updated:
+                        self.answers[title]["optionList"] = list(current_opts.values())
 
             if merged_count > 0:
                 self.log.info(f"成功从历史考试记录中合并 {merged_count} 道题目答案")
@@ -426,8 +265,4 @@ class AnswerMixin:
                 self.log.info("历史记录中没有发现新的题目答案")
 
         except Exception as e:
-            self.log.warning(f"通过点击获取历史记录时出错: {e}")
-            try:
-                self._page.remove_listener("response", handle_response)  # type: ignore[name-defined]
-            except Exception:
-                pass
+            self.log.warning(f"历史记录合并过程中断: {e}")

@@ -77,7 +77,8 @@ class TaskEngine:
             headless=headless,
             timeout_ms=get_int("browser_timeout_ms", 30000),
             manual_timeout=get_int("manual_login_timeout_sec", 300),
-            close_browser=get_bool("close_browser_on_finish", True),
+            # 调试模式下默认不关闭浏览器
+            close_browser=get_bool("close_browser_on_finish", not self._debug_enabled),
             continue_on_invalid_token=get_bool("continue_on_invalid_token", True),
         )
 
