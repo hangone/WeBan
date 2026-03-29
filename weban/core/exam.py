@@ -526,15 +526,28 @@ class ExamMixin:
                     break
 
             if total_questions_expected == 0:
+                # 优先通过 Vue 实例获取实际题目总数
                 try:
-                    indicator = self._page.locator(".quest-indicator")
-                    if indicator.count() > 0:
-                        ind_text = indicator.first.inner_text().strip()
-                        parts = ind_text.split("/")
-                        if len(parts) == 2 and parts[1].strip().isdigit():
-                            total_questions_expected = int(parts[1].strip())
+                    q_len = self._page.evaluate(
+                        "() => { const p = document.querySelector('.page'); return (p && p.__vue__ && p.__vue__.questionLength) || 0; }"
+                    )
+                    if q_len:
+                        total_questions_expected = int(q_len)
+                        self.log.debug(f"[Vue解析] 从 Vue 中获取考试总题数: {q_len}")
                 except Exception:
                     pass
+
+                # 失败则回退 DOM 解析
+                if total_questions_expected == 0:
+                    try:
+                        indicator = self._page.locator(".quest-indicator")
+                        if indicator.count() > 0:
+                            ind_text = indicator.first.inner_text().strip()
+                            parts = ind_text.split("/")
+                            if len(parts) == 2 and parts[1].strip().isdigit():
+                                total_questions_expected = int(parts[1].strip())
+                    except Exception:
+                        pass
 
             if total_questions_expected > 0:
                 expected_match_rate = (

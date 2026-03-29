@@ -91,32 +91,105 @@ class AuthMixin:
 
         def _start(self) -> None: ...
 
+    def _storage_has_auth(self) -> bool:
+        """检查 localStorage 中是否已写入登录态。"""
+        if not self._page:
+            return False
+        try:
+            token = self._page.evaluate("localStorage.getItem('token')")
+            user_data = self._page.evaluate("localStorage.getItem('user')")
+            return bool(token and str(token).strip()) and bool(
+                user_data and str(user_data).strip()
+            )
+        except Exception:
+            return False
+
+    def _has_login_form(self) -> bool:
+        """检查当前页面是否仍停留在登录表单。"""
+        if not self._page:
+            return False
+        try:
+            selectors = (
+                "input[placeholder*='选择学校'], "
+                "input[placeholder*='搜索关键词'], "
+                "input[placeholder*='账号'], "
+                "input[placeholder*='学号'], "
+                "input[type='password'], "
+                "a.loginp-submit, button[type='submit'], button:has-text('登录')"
+            )
+            loc = self._page.locator(selectors)
+            if loc.count() == 0:
+                return False
+            for i in range(min(loc.count(), 8)):
+                try:
+                    if loc.nth(i).is_visible():
+                        return True
+                except Exception:
+                    continue
+            return False
+        except Exception:
+            return False
+
+    def _has_post_login_markers(self) -> bool:
+        """检查登录后首页/任务页的关键元素是否已出现。"""
+        if not self._page:
+            return False
+        try:
+            selectors = (
+                ".task-block, .van-tab, .van-collapse-item, .img-texts-item, "
+                ".fchl-item, .broadcast-modal, .img-text-block, #agree"
+            )
+            return self._page.locator(selectors).count() > 0
+        except Exception:
+            return False
+
     def _is_logged_in(self) -> bool:
-        """检查当前页面是否已登录（不主动跳转，只检查当前 URL）"""
+        """检查当前页面是否已登录。综合 URL、localStorage 和页面结构判断。"""
         if not self._page:
             return False
         try:
             url = self._page.url.lower()
-            # 未导航到任何页面时不视为已登录
             if not url or url == "about:blank":
                 return False
-            # 在登录页或 403 页则未登录
-            if "#/login" in url or "#/403" in url or "/login" in url.split("#")[0]:
-                return False
-            # 必须在目标域名下
             if "weiban.mycourse.cn" not in url:
                 return False
-            return True
+            if "#/403" in url:
+                return False
+
+            has_auth = self._storage_has_auth()
+            has_login_form = self._has_login_form()
+            has_post_login_markers = self._has_post_login_markers()
+
+            # 登录页且表单仍可见，认为尚未登录成功
+            if ("#/login" in url or "/login" in url.split("#")[0]) and has_login_form:
+                return False
+
+            # 出现登录后页面特征，直接视为成功
+            if has_post_login_markers:
+                return True
+
+            # 某些单页应用场景下 URL 还没切走，但 localStorage 已写入且表单消失
+            if has_auth and not has_login_form:
+                return True
+
+            # 不在登录页、且 localStorage 已有登录态，也视为成功
+            if "#/login" not in url and "/login" not in url.split("#")[0] and has_auth:
+                return True
+
+            return False
         except Exception:
             return False
 
     def _navigate_and_check_login(self) -> bool:
-        """导航到首页后检查是否已登录"""
+        """导航到任务页后检查是否已登录。"""
         if not self._page:
             return False
         try:
-            self._page.goto(f"{self.base_url}/#/", wait_until="domcontentloaded")
-            time.sleep(1)
+            self._page.goto(
+                f"{self.base_url}/#/learning-task-list",
+                wait_until="domcontentloaded",
+            )
+            time.sleep(2)
             return self._is_logged_in()
         except Exception:
             return False
@@ -254,8 +327,32 @@ class AuthMixin:
         # --- 轮询等待登录成功 ---
         deadline = time.time() + self.browser_config.manual_login_timeout_sec
         _last_reported: set = set()  # 已上报过的 toast，避免重复刷屏
+        _auth_detected_at: float | None = None
 
         while time.time() < deadline:
+            # 优先直接判断是否已经登录成功
+            if self._is_logged_in():
+                self.log.info("登录成功")
+                return _extract_user_result()
+
+            # 某些手动登录场景下会先写入 localStorage，再异步跳转页面
+            try:
+                has_auth = self._storage_has_auth()
+                has_login_form = self._has_login_form()
+
+                if has_auth and not has_login_form:
+                    if _auth_detected_at is None:
+                        _auth_detected_at = time.time()
+                        self.log.info("检测到登录态已写入，等待页面完成跳转...")
+                    elif time.time() - _auth_detected_at >= 2:
+                        if self._navigate_and_check_login():
+                            self.log.info("登录成功")
+                            return _extract_user_result()
+                else:
+                    _auth_detected_at = None
+            except Exception:
+                pass
+
             # ---- 点选验证码 ----
             try:
                 if has_captcha(self._page):

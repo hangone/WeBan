@@ -299,10 +299,34 @@ class StudyMixin:
     def _count_page_tasks(self) -> tuple:
         """统计当前页面的课程总数和已完成数，返回 (total, finished)。
 
-        支持两种页面结构：
+        优先利用 Vue 实例对象直接读取数据，失败则回退到 DOM 解析：
           - .fchl-item 结构（Foods/实验课）
           - .van-collapse-item 折叠章节（普通课程，从进度文本解析）
         """
+        try:
+            # 尝试直接从 Vue 实例读取分类数据 (匹配 StudyPage.vue)
+            stats = self._page.evaluate(
+                """() => {
+                    const page = document.querySelector('.page');
+                    if (page && page.__vue__ && page.__vue__.categoryList) {
+                        let total = 0, finished = 0;
+                        page.__vue__.categoryList.forEach(c => {
+                            total += c.totalNum || 0;
+                            finished += c.finishedNum || 0;
+                        });
+                        return {total, finished};
+                    }
+                    return null;
+                }"""
+            )
+            if stats and stats.get("total", 0) > 0:
+                self.log.debug(
+                    f"[Vue解析] 成功获取课程进度: {stats['finished']}/{stats['total']}"
+                )
+                return stats["total"], stats["finished"]
+        except Exception:
+            pass
+
         fchl_items = self._page.locator(".fchl-item")
         if fchl_items.count() > 0:
             finished = self._page.locator(".fchl-item.fchl-item-active").count()
@@ -390,23 +414,497 @@ class StudyMixin:
         except Exception:
             pass
 
-    def _return_to_chapter_list(self) -> bool:
-        """从课程详情页返回章节列表。
+    def _get_course_runtime_frame(self):
+        """获取课程详情页内承载 mcwk 课件运行时的 iframe。"""
+        try:
+            for frame in self._page.frames:
+                if frame == self._page.main_frame:
+                    continue
 
-        优先点击「返回」按钮，其次点击导航栏左箭头，均不存在则返回 False。
-        """
-        return_btn = self._page.locator('.comment-footer-button:has-text("返回")')
-        if return_btn.count() > 0:
-            return_btn.first.click(force=True)
-        else:
-            back = self._page.locator(".van-nav-bar__left")
-            if back.count() > 0:
-                back.first.click(force=True)
-            else:
+                try:
+                    frame_url = (frame.url or "").lower()
+                except Exception:
+                    frame_url = ""
+
+                if "qidian.qq.com" in frame_url or "chatv3" in frame_url:
+                    self.log.debug(f"[img-texts] 跳过无关 iframe: url={frame_url}")
+                    continue
+
+                try:
+                    has_runtime = frame.evaluate(
+                        "typeof finishWxCourse === 'function' || typeof backToList === 'function' || typeof callApinext === 'function'"
+                    )
+                except Exception:
+                    has_runtime = False
+
+                try:
+                    has_course_markers = (
+                        frame.locator(
+                            ".back-list, .btn-start, .btn-next, .btn-prev, .btn-at, .btn-af, .page-WH"
+                        ).count()
+                        > 0
+                    )
+                except Exception:
+                    has_course_markers = False
+
+                is_mcwk_host = "mcwk.mycourse.cn" in frame_url
+                is_blank_course_frame = (not frame_url) and has_runtime
+
+                self.log.debug(
+                    f"[img-texts] 检查 iframe: url={frame_url}, has_runtime={has_runtime}, has_course_markers={has_course_markers}, is_mcwk_host={is_mcwk_host}"
+                )
+
+                if has_runtime or is_mcwk_host or is_blank_course_frame:
+                    self.log.debug(f"[img-texts] 命中课程 iframe: url={frame_url}")
+                    return frame
+
+                if has_course_markers and not frame_url:
+                    self.log.debug("[img-texts] 命中匿名课程 iframe: url=<blank>")
+                    return frame
+        except Exception as e:
+            self.log.debug(f"[img-texts] 枚举 iframe 异常: error={e}")
+
+        return None
+
+    def _is_mcwk_course_page(self) -> bool:
+        """判断当前是否处于 mcwk 课件页或其 iframe 已加载。"""
+        try:
+            if "mcwk.mycourse.cn" in self._page.url.lower():
+                return True
+        except Exception:
+            pass
+        return self._get_course_runtime_frame() is not None
+
+    def _wait_for_mcwk_runtime(self, timeout_sec: float = 8) -> bool:
+        """等待 mcwk 课件运行时加载完成。"""
+        deadline = time.time() + timeout_sec
+        while time.time() < deadline:
+            course_frame = self._get_course_runtime_frame()
+            if course_frame is None:
+                time.sleep(0.5)
+                continue
+
+            try:
+                ready = course_frame.evaluate(
+                    "typeof finishWxCourse === 'function' || typeof backToList === 'function' || typeof callApinext === 'function'"
+                )
+                if ready:
+                    self.log.debug("[img-texts] mcwk iframe 运行时已加载完成")
+                    return True
+            except Exception:
+                pass
+
+            try:
+                if (
+                    course_frame.locator(
+                        ".page-container, .page-item, .btn-next, .back-list"
+                    ).count()
+                    > 0
+                ):
+                    self.log.debug(
+                        "[img-texts] 课程 iframe 页面骨架已出现，继续等待运行时"
+                    )
+            except Exception:
+                pass
+
+            time.sleep(0.5)
+        return False
+
+    def _wait_for_post_course_state(self, timeout_sec: float = 8) -> bool:
+        """等待课程页稳定就绪或回到列表/评论状态。"""
+        list_markers = (
+            ".van-collapse-item, .img-texts-item, .fchl-item, "
+            ".task-block, .img-text-block"
+        )
+        deadline = time.time() + timeout_sec
+
+        while time.time() < deadline:
+            try:
+                if self._page.locator(list_markers).count() > 0:
+                    return True
+            except Exception:
+                pass
+
+            course_frame = self._get_course_runtime_frame()
+            if course_frame is not None:
+                try:
+                    if (
+                        course_frame.locator(
+                            ".back-list, .btn-start, .btn-next, .btn-prev, .btn-at, .btn-af, .page-WH, .pop-jsv, .pop-jsv-prev"
+                        ).count()
+                        > 0
+                    ):
+                        return True
+                except Exception:
+                    pass
+
+                try:
+                    has_course_api = course_frame.evaluate(
+                        "typeof callApinext === 'function' || typeof backToList === 'function' || typeof finishWxCourse === 'function'"
+                    )
+                    if has_course_api:
+                        return True
+                except Exception:
+                    pass
+
+            try:
+                return_btn = self._page.locator(
+                    '.comment-footer-button:has-text("返回")'
+                )
+                if return_btn.count() > 0 and return_btn.first.is_visible():
+                    return True
+            except Exception:
+                pass
+
+            try:
+                url = self._page.url.lower()
+                if "comment" in url or "rating" in url:
+                    return True
+            except Exception:
+                pass
+
+            time.sleep(0.5)
+
+        return False
+
+    def _trigger_img_text_completion(self, course_frame, title: str) -> bool:
+        """只触发课程完成动作，不立即返回列表。"""
+        if course_frame is not None:
+            try:
+                action = course_frame.evaluate(
+                    """() => {
+                        let acted = [];
+                        if (typeof finishWxCourse === 'function') {
+                            finishWxCourse();
+                            acted.push('finishWxCourse');
+                        }
+                        if (typeof callApinext === 'function') {
+                            callApinext('next', 1);
+                            acted.push('callApinext');
+                        }
+                        return acted.join(',');
+                    }"""
+                )
+                if action:
+                    self.log.debug(
+                        f"[img-texts] iframe 已执行完成动作: title={title}, action={action}"
+                    )
+                    return True
+                self.log.debug(f"[img-texts] iframe 未命中完成动作: title={title}")
                 return False
-        time.sleep(3)
-        url = self._page.url.lower()
-        return "detail" not in url and "video" not in url and "play" not in url
+            except Exception as e:
+                self.log.warning(f"[img-texts] 课程完成流程异常，第 1 次：{title}")
+                self.log.debug(
+                    f"[img-texts] iframe 完成动作异常: title={title}, error={e}"
+                )
+                return False
+
+        try:
+            has_finish_func = self._page.evaluate(
+                "typeof finishWxCourse === 'function'"
+            )
+        except Exception:
+            has_finish_func = False
+
+        self.log.debug(
+            f"[img-texts] 顶层页完成函数检测: title={title}, has_finish_func={has_finish_func}"
+        )
+
+        if not has_finish_func:
+            return False
+
+        try:
+            self._page.evaluate("finishWxCourse()")
+            self.log.debug(f"[img-texts] 已调用顶层 finishWxCourse(): title={title}")
+            return True
+        except Exception as e:
+            self.log.warning(f"[img-texts] 课程完成流程异常，第 1 次：{title}")
+            self.log.debug(
+                f"[img-texts] 顶层页发送完成标记异常: title={title}, error={e}"
+            )
+            return False
+
+    def _wait_for_img_text_completion_result(self, timeout_sec: float = 12) -> str:
+        """等待真实完成结果，不在发送完成后立刻返回。"""
+        list_markers = (
+            ".van-collapse-item, .img-texts-item, .fchl-item, "
+            ".task-block, .img-text-block"
+        )
+        deadline = time.time() + timeout_sec
+
+        while time.time() < deadline:
+            try:
+                if self._page.locator(list_markers).count() > 0:
+                    return "list"
+            except Exception:
+                pass
+
+            try:
+                url = self._page.url.lower()
+                if "comment" in url or "rating" in url:
+                    return "comment"
+            except Exception:
+                pass
+
+            try:
+                return_btn = self._page.locator(
+                    '.comment-footer-button:has-text("返回")'
+                )
+                if return_btn.count() > 0 and return_btn.first.is_visible():
+                    return "return"
+            except Exception:
+                pass
+
+            course_frame = self._get_course_runtime_frame()
+            if course_frame is not None:
+                try:
+                    if course_frame.locator(".pop-jsv, .pop-jsv-prev").count() > 0:
+                        return "dialog"
+                except Exception:
+                    pass
+
+            time.sleep(0.5)
+
+        return ""
+
+    def _find_img_text_item_by_title(self, title: str):
+        """按标题在章节列表中查找图文课程项。"""
+        selectors = [
+            ".img-texts-item:not(.passed):visible",
+            ".img-texts-item:visible",
+            ".img-texts-item:not(.passed)",
+            ".img-texts-item",
+        ]
+        for sel in selectors:
+            items = self._page.locator(sel)
+            self.log.debug(
+                f"[img-texts] 按标题查找课程项: selector={sel}, count={items.count()}, title={title}"
+            )
+            for i in range(items.count()):
+                item = items.nth(i)
+                current_title = self._extract_item_title(item)
+                self.log.debug(
+                    f"[img-texts] 检查课程项: selector={sel}, index={i}, extracted_title={current_title}"
+                )
+                if current_title == title:
+                    self.log.debug(
+                        f"[img-texts] 命中课程项: selector={sel}, index={i}, title={title}"
+                    )
+                    return item
+        self.log.debug(f"[img-texts] 未找到课程项: title={title}")
+        return None
+
+    def _is_img_text_course_passed(self, title: str) -> bool:
+        """通过 Vue 数据或列表项 css class 确认图文课程是否真正完成。"""
+        # 优先通过 Vue 组件读取数据
+        try:
+            is_passed = self._page.evaluate(
+                """(title) => {
+                    const page = document.querySelector('.page');
+                    if (page && page.__vue__ && page.__vue__.courseList) {
+                        const course = page.__vue__.courseList.find(c => c.resourceName === title);
+                        if (course) return Number(course.finished) === 1;
+                    }
+                    return null;
+                }""",
+                title,
+            )
+            if is_passed is not None:
+                self.log.debug(
+                    f"[Vue解析] 课程完成状态: title={title}, passed={is_passed}"
+                )
+                return bool(is_passed)
+        except Exception:
+            pass
+
+        item = self._find_img_text_item_by_title(title)
+        if item is None:
+            return False
+        try:
+            klass = item.get_attribute("class") or ""
+            return "passed" in klass
+        except Exception:
+            return False
+
+    def _finish_img_text_course(
+        self, title: str, study_time: int, max_attempts: int = 3
+    ) -> bool:
+        """完成图文课并以列表 passed 状态为准校验，失败时重试整门课程。"""
+        for attempt in range(1, max_attempts + 1):
+            current_url = ""
+            try:
+                current_url = self._page.url
+            except Exception:
+                pass
+            self.log.debug(
+                f"[img-texts] 开始完成校验: title={title}, attempt={attempt}/{max_attempts}, url={current_url}"
+            )
+
+            course_frame = self._get_course_runtime_frame()
+            if course_frame is not None:
+                runtime_ready = self._wait_for_mcwk_runtime(timeout_sec=8)
+                self.log.debug(
+                    f"[img-texts] iframe 运行时检测结果: title={title}, ready={runtime_ready}"
+                )
+                if not runtime_ready:
+                    if attempt < max_attempts:
+                        self.log.warning(
+                            f"[img-texts] 课程完成动作未就绪，第 {attempt}/{max_attempts} 次：{title}"
+                        )
+                    continue
+
+            triggered = self._trigger_img_text_completion(course_frame, title)
+            self.log.debug(
+                f"[img-texts] 完成动作触发结果: title={title}, attempt={attempt}/{max_attempts}, triggered={triggered}"
+            )
+            if not triggered:
+                if attempt < max_attempts:
+                    self.log.warning(
+                        f"[img-texts] 课程完成动作未就绪，第 {attempt}/{max_attempts} 次：{title}"
+                    )
+                continue
+
+            completion_state = self._wait_for_img_text_completion_result(timeout_sec=12)
+            self.log.debug(
+                f"[img-texts] 完成结果状态: title={title}, attempt={attempt}/{max_attempts}, state={completion_state}"
+            )
+
+            if not completion_state:
+                if attempt < max_attempts:
+                    self.log.warning(
+                        f"[img-texts] 未等待到真实完成结果，准备重试整门课程，第 {attempt + 1}/{max_attempts} 次：{title}"
+                    )
+                continue
+
+            returned = completion_state == "list"
+            if not returned:
+                if not self._return_to_chapter_list():
+                    if attempt < max_attempts:
+                        self.log.warning(
+                            f"[img-texts] 完成后返回章节列表失败，准备重试整门课程，第 {attempt + 1}/{max_attempts} 次：{title}"
+                        )
+                    self.log.debug(
+                        f"[img-texts] 返回章节列表失败: title={title}, attempt={attempt}/{max_attempts}, state={completion_state}"
+                    )
+                    continue
+
+            time.sleep(1)
+
+            if self._is_img_text_course_passed(title):
+                self.log.info(f"[img-texts] 已确认课程完成：{title}")
+                return True
+
+            if attempt < max_attempts:
+                self.log.warning(
+                    f"[img-texts] 返回列表后课程仍未完成，准备重试整门课程，第 {attempt + 1}/{max_attempts} 次：{title}"
+                )
+                retry_item = self._find_img_text_item_by_title(title)
+                if retry_item is None:
+                    self.log.warning(f"[img-texts] 未找到可重试的课程项：{title}")
+                    continue
+                retry_item.click(force=True)
+                self._wait_for_post_course_state(timeout_sec=4)
+                time.sleep(study_time)
+
+        return False
+
+    def _return_to_chapter_list(self) -> bool:
+        """从课程详情页、评论页或 mcwk 课件页返回章节列表。"""
+        list_markers = (
+            ".van-collapse-item, .img-texts-item, .fchl-item, "
+            ".task-block, .img-text-block"
+        )
+
+        try:
+            if self._page.locator(list_markers).count() > 0:
+                return True
+        except Exception:
+            pass
+
+        course_frame = self._get_course_runtime_frame()
+        if course_frame is not None:
+            try:
+                acted = course_frame.evaluate(
+                    """() => {
+                        const okBtn = document.querySelector('.pop-jsv-prev');
+                        if (okBtn) {
+                            okBtn.click();
+                            return 'dialog';
+                        }
+                        if (typeof backToList === 'function') {
+                            backToList();
+                            return 'backToList';
+                        }
+                        const back = document.querySelector('.back-list');
+                        if (back) {
+                            back.click();
+                            return 'back-list';
+                        }
+                        return '';
+                    }"""
+                )
+                self.log.debug(f"[img-texts] iframe 返回动作结果: {acted}")
+            except Exception:
+                acted = ""
+
+            if not acted:
+                try:
+                    return_btn = self._page.locator(
+                        '.comment-footer-button:has-text("返回")'
+                    )
+                    if return_btn.count() > 0:
+                        return_btn.first.click(force=True)
+                        acted = "comment-return"
+                except Exception:
+                    acted = ""
+
+                if not acted:
+                    back = self._page.locator(".van-nav-bar__left")
+                    if back.count() > 0:
+                        back.first.click(force=True)
+                        acted = "top-back"
+
+            if not acted:
+                return False
+        else:
+            return_btn = self._page.locator('.comment-footer-button:has-text("返回")')
+            if return_btn.count() > 0:
+                return_btn.first.click(force=True)
+            else:
+                back = self._page.locator(".van-nav-bar__left")
+                if back.count() > 0:
+                    back.first.click(force=True)
+                else:
+                    return False
+
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            try:
+                if self._page.locator(list_markers).count() > 0:
+                    return True
+            except Exception:
+                pass
+
+            try:
+                url = self._page.url.lower()
+                if (
+                    "detail" not in url
+                    and "video" not in url
+                    and "play" not in url
+                    and "course" not in url
+                    and "comment" not in url
+                    and "rating" not in url
+                ):
+                    return True
+            except Exception:
+                pass
+
+            time.sleep(0.5)
+
+        try:
+            return self._page.locator(list_markers).count() > 0
+        except Exception:
+            return False
 
     def _find_course_target(self, locator, failed_courses: set, completed_courses: set):
         """从 locator 中找到第一个不在已失败/已完成集合中的课程项。"""
@@ -644,24 +1142,27 @@ class StudyMixin:
                 if target is not None:
                     title = self._extract_item_title(target)
                     self.log.info(f"[img-texts] 开始学习：{title}")
+                    self.log.debug(f"[img-texts] 准备点击课程项：{title}")
                     target.click(force=True)
-                    time.sleep(study_time)
-
-                    # 调用 JS 接口标记完成
                     try:
-                        self._page.evaluate("finishWxCourse()")
+                        self.log.debug(
+                            f"[img-texts] 课程项点击后 URL: {self._page.url}"
+                        )
                     except Exception:
                         pass
+                    time.sleep(study_time)
+
+                    # 以章节列表中的 passed 状态为准校验是否真正完成，失败则重试整门课程
+                    if not self._finish_img_text_course(title, study_time):
+                        self.log.warning(
+                            f"[img-texts] 完成校验失败，已放弃本次课程：{title}"
+                        )
+                        failed_courses.add(title)
+                        time.sleep(1)
+                        continue
 
                     completed_courses.add(title)
                     round_completed += 1
-
-                    # 返回章节列表
-                    if not self._return_to_chapter_list():
-                        self.log.warning(
-                            f"[img-texts] 无法返回章节列表，标记失败：{title}"
-                        )
-                        failed_courses.add(title)
                     time.sleep(1)
                     continue
 

@@ -119,14 +119,8 @@ class BrowserMixin:
             ],
         )
 
-        # 创建浏览器上下文，设置分辨率和 UA
-        # 视口：站点使用 Vant 移动端 UI 库，以 iPhone 14 Pro Max 分辨率为准（430×932）
-        # UA：iOS Safari，与 Vant 移动端适配匹配，避免 1920×1080 桌面宽度导致布局错乱
+        # 创建浏览器上下文，保留原始默认视口行为，仅设置 UA
         self._context = self._browser.new_context(
-            viewport={"width": 430, "height": 932},
-            device_scale_factor=3,
-            is_mobile=True,
-            has_touch=True,
             user_agent=(
                 "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) "
                 "AppleWebKit/605.1.15 (KHTML, like Gecko) "
