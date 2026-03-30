@@ -42,7 +42,7 @@ def ensure_playwright_browsers(logger: LoggerLike) -> None:
         get_driver_env = getattr(driver_module, "get_driver_env")
     except Exception as exc:
         logger.warning(
-            f"无法加载 Playwright 驱动安装器，可能需要手动运行 `playwright install chromium`: {exc}"
+            f"无法加载 Playwright 驱动安装器，可能需要手动运行 `uv run playwright install chromium`: {exc}"
         )
         return
 
@@ -88,12 +88,30 @@ def get_bool_value(value: Any, default: bool = False) -> bool:
     return default
 
 
-def clean_text(text: str) -> str:
-    """归一化辅助函数。"""
+def strip_side_symbols(text: str) -> str:
+    """仅删除题目或答案结尾的括号和空格，保留开头的符号。"""
+    if not text:
+        return ""
     import re
 
-    text = text or ""
-    # 去除题号（如 "1. " 或 "12、"）
-    text = re.sub(r"^\s*[A-Z0-9]+[\.、\s]+", "", text)
-    # 仅保留中文和字母数字，去除空格和符号
-    return re.sub(r"[^\w\u4e00-\u9fa5]", "", text)
+    text = re.sub(r"^\s*\d+[\.、\s]+", "", text)
+    # 仅删除题目或答案结尾的 [括号+空格] 以及 [紧跟在括号后的句号]
+    # 如果结尾只有单个句号（且前面不是括号或空格），则不予处理
+    text = re.sub(r"([()\[\]{}（）【】｛｝\s]+[.。]?)(\s*)$", "", text)
+    return text
+
+
+def clean_text(text: str) -> str:
+    """归一化辅助函数：全系统统一使用最新的语义去燥逻辑。"""
+    return ignore_symbols(text)
+
+
+def ignore_symbols(text: str) -> str:
+    """逻辑合并的核心：彻底去噪。"""
+    import re
+
+    if not text:
+        return ""
+    # 剥除一切非文字、非数字、非字母内容（包含空格和标点）
+    text = re.sub(r"[^\w\u4e00-\u9fa5]", "", text)
+    return text.lower()

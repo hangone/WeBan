@@ -119,7 +119,6 @@ class AuthMixin(BaseMixin):
         tenant_name: str
         account: str
         password: str
-        continue_on_invalid_token: bool
         browser_config: BrowserConfig
 
         def _start(self) -> None: ...
@@ -252,11 +251,7 @@ class AuthMixin(BaseMixin):
                 self.log.info("使用配置的 Token 登录成功")
                 return _extract_user_result()
             else:
-                self.log.warning("提供的 Token 无效或已过期")
-                if not self.continue_on_invalid_token:
-                    self.log.error("已配置 token 无效时不继续使用账号密码登录")
-                    return {"ok": False}
-                self.log.info("尝试回退到正常登录流程...")
+                self.log.warning("提供的 Token 无效或已过期，自动尝试账号密码登录...")
 
         if not injected:
             # 直接导航到首页，让它跳转到登录页

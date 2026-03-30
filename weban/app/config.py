@@ -42,7 +42,7 @@ exam_question_time = 5
 exam_question_time_offset = 3
 
 # 允许提交试卷的最低题库匹配率（百分比）
-exam_submit_match_rate = 90
+exam_submit_match_rate = 80
 
 # 多账号并发最大线程数
 max_workers = 5
@@ -56,9 +56,6 @@ manual_login_timeout_sec = 300
 # 任务结束后是否自动关闭浏览器
 close_browser_on_finish = true
 
-# token 失效时是否自动回退账号密码登录
-continue_on_invalid_token = true
-
 # 是否启用调试日志
 debug = false
 
@@ -68,7 +65,6 @@ username = ""
 password = ""
 # userId = ""
 # token = ""
-# continue_on_invalid_token = true
 """
 
 
@@ -144,3 +140,32 @@ class AppConfig:
                     tomlkit.dump(document, file)
             except Exception as exc:
                 self.logger.error(f"保存账号登录信息到 config.toml 失败: {exc}")
+
+    def clear_account(self, account_index: int) -> None:
+        """从配置文件中清除指定账号的信息。"""
+        with self._lock:
+            try:
+                tomlkit = importlib.import_module("tomlkit")
+                if not os.path.exists(self.config_path):
+                    return
+                with open(self.config_path, "r", encoding="utf-8") as file:
+                    document = tomlkit.load(file)
+
+                accounts = document.get("account", [])
+                if 0 <= account_index < len(accounts):
+                    account = accounts[account_index]
+                    account["tenant_name"] = ""
+                    account["username"] = ""
+                    account["password"] = ""
+                    # 额外清除可选标识字段
+                    for key in ["userId", "token", "account"]:
+                        if key in account:
+                            account[key] = ""
+
+                with open(self.config_path, "w", encoding="utf-8") as file:
+                    tomlkit.dump(document, file)
+
+                # 同步加载清除后的配置到内存
+                self.load()
+            except Exception as exc:
+                self.logger.error(f"清除账号信息失败: {exc}")

@@ -23,7 +23,6 @@ class BaseMixin:
         tenant_name: str
         account: str
         password: str
-        continue_on_invalid_token: bool
         browser_config: "BrowserConfig"
         answers: Dict[str, Any]
 

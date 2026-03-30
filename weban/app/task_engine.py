@@ -31,7 +31,6 @@ class TaskSettings:
     timeout_ms: int
     manual_timeout: int
     close_browser: bool
-    continue_on_invalid_token: bool
 
 
 class TaskEngine:
@@ -73,13 +72,12 @@ class TaskEngine:
             exam_question_time=get_int("exam_question_time", 5),
             exam_question_time_offset=get_int("exam_question_time_offset", 3),
             random_answer=get_bool("random_answer", False),
-            exam_submit_match_rate=get_int("exam_submit_match_rate", 90),
+            exam_submit_match_rate=get_int("exam_submit_match_rate", 80),
             headless=headless,
             timeout_ms=get_int("browser_timeout_ms", 30000),
             manual_timeout=get_int("manual_login_timeout_sec", 300),
             # 调试模式下默认不关闭浏览器
             close_browser=get_bool("close_browser_on_finish", not self._debug_enabled),
-            continue_on_invalid_token=get_bool("continue_on_invalid_token", True),
         )
 
     def _build_browser_config(self, task_settings: TaskSettings) -> dict[str, Any]:
@@ -168,7 +166,6 @@ class TaskEngine:
                     account_cfg.get("userid", account_cfg.get("userId", ""))
                 ).strip(),
                 token=str(account_cfg.get("token", "")).strip(),
-                continue_on_invalid_token=task_settings.continue_on_invalid_token,
                 user={},
                 browser=browser_cfg,
                 log=logger,

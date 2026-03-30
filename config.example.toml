@@ -38,7 +38,7 @@ exam_question_time_offset = 3
 
 # 允许提交试卷的最低题库匹配率（百分比）
 # 当匹配率低于此值且 random_answer = false 时，程序会放弃交卷
-exam_submit_match_rate = 90
+exam_submit_match_rate = 80
 
 # 多账号并发时允许的最大线程数
 # 实际并发数 = min(账号数, max_workers)
@@ -54,9 +54,6 @@ manual_login_timeout_sec = 300
 # 任务完成后是否自动关闭浏览器
 # false 常用于调试，需要保留现场时使用
 close_browser_on_finish = true
-
-# 当配置了 token 但 token 已失效时，是否自动回退为账号密码登录
-continue_on_invalid_token = true
 
 # 是否启用调试日志
 # 开启后会输出更多日志，并在 logs/<账号>/ 下保存验证码相关截图
@@ -97,12 +94,10 @@ password = "你的密码"
 # study_time = 25                   # 当前账号学习停留时长
 # exam_question_time = 8            # 当前账号每题基础答题时长
 # exam_question_time_offset = 5     # 当前账号每题随机附加等待
-# exam_submit_match_rate = 95       # 当前账号最低交卷匹配率
+# exam_submit_match_rate = 80       # 当前账号最低交卷匹配率
 # browser_timeout_ms = 45000        # 当前账号浏览器超时
 # manual_login_timeout_sec = 600    # 当前账号手动登录等待上限
 # close_browser_on_finish = false   # 当前账号任务结束后不关浏览器
-# continue_on_invalid_token = false # 当前账号 token 失效后不回退密码登录
-
 
 # ================= 第二个账号（示例） =================
 # 多账号并发时，直接继续追加 [[account]] 配置块即可。
