@@ -471,6 +471,7 @@ class WeBanClient:
             return
 
         user_project_ids = [p["userProjectId"] for p in self.api.list_my_project().get("data", [])]
+        user_project_ids.extend([p["userProjectId"] for p in self.api.list_my_project(ended=1).get("data", [])])
         completion = self.api.list_completion()
         if completion.get("code", -1) != "0":
             self.log.error(f"获取模块完成情况失败：{completion}")
