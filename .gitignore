@@ -299,6 +299,7 @@ pw-browsers
 
 # SRC
 src/
+.zed/
 
 # Debug log output directory
 logs/

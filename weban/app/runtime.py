@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib
 import os
+import re
 import subprocess
 import sys
 from typing import Any, Protocol
@@ -89,16 +90,11 @@ def get_bool_value(value: Any, default: bool = False) -> bool:
 
 
 def strip_side_symbols(text: str) -> str:
-    """仅删除题目或答案结尾的括号和空格，保留开头的符号。"""
+    """仅删除题目或答案结尾的括号、空格和标点，严格保留开头的所有内容（含序号前缀）。"""
     if not text:
         return ""
-    import re
-
-    text = re.sub(r"^\s*\d+[\.、\s]+", "", text)
-    # 仅删除题目或答案结尾的 [括号+空格] 以及 [紧跟在括号后的句号]
-    # 如果结尾只有单个句号（且前面不是括号或空格），则不予处理
-    text = re.sub(r"([()\[\]{}（）【】｛｝\s]+[.。]?)(\s*)$", "", text)
-    return text
+    # 仅清理尾部噪声：匹配末尾的括号类符号、空白及紧随的句号
+    return re.sub(r"([()\[\]{}（）【】｛｝\s]+[.。]?)(\s*)$", "", text)
 
 
 def clean_text(text: str) -> str:
@@ -108,10 +104,7 @@ def clean_text(text: str) -> str:
 
 def ignore_symbols(text: str) -> str:
     """逻辑合并的核心：彻底去噪。"""
-    import re
-
     if not text:
         return ""
     # 剥除一切非文字、非数字、非字母内容（包含空格和标点）
-    text = re.sub(r"[^\w\u4e00-\u9fa5]", "", text)
-    return text.lower()
+    return re.sub(r"[^\w\u4e00-\u9fa5]", "", text).lower()

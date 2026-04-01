@@ -59,10 +59,10 @@ class BrowserMixin(BaseMixin):
     if TYPE_CHECKING:
         from typing import Union as _Union
 
-        _page: "Page"
-        _context: "BrowserContext"
-        _browser: "Browser"
-        _playwright: "Playwright"
+        _page: Page | None
+        _context: BrowserContext | None
+        _browser: Browser | None
+        _playwright: Playwright | None
         log: "_Union[_logging.Logger, _logging.LoggerAdapter]"
         base_url: str
         token: str
@@ -104,6 +104,10 @@ class BrowserMixin(BaseMixin):
         # 启动 Playwright 并选择浏览器引擎
         if sync_playwright:
             self._playwright = sync_playwright().start()
+
+        if not self._playwright:
+            raise RuntimeError("Failed to initialize playwright")
+
         launcher = getattr(self._playwright, self.browser_config.channel, None)
         if not launcher:
             raise RuntimeError("Browser channel not found")
@@ -120,33 +124,52 @@ class BrowserMixin(BaseMixin):
         )
 
         # 创建浏览器上下文，保留原始默认视口行为，仅设置 UA
-        self._context = self._browser.new_context(
-            user_agent=(
-                "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) "
-                "AppleWebKit/605.1.15 (KHTML, like Gecko) "
-                "Version/17.4 Mobile/15E148 Safari/604.1"
-            ),
-        )
+        if self._browser:
+            self._context = self._browser.new_context(
+                user_agent=(
+                    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) "
+                    "AppleWebKit/605.1.15 (KHTML, like Gecko) "
+                    "Version/17.4 Mobile/15E148 Safari/604.1"
+                ),
+            )
+        else:
+            raise RuntimeError("Failed to initialize browser")
 
         # 在每个新页面创建前注入反检测脚本
         self._context.add_init_script(_STEALTH_JS)
 
         # 设置全局超时并打开新页面
-        self._context.set_default_timeout(self.browser_config.timeout_ms)
-        self._page = self._context.new_page()
+        if self._context:
+            self._context.set_default_timeout(self.browser_config.timeout_ms)
+            self._page = self._context.new_page()
+        else:
+            raise RuntimeError("Failed to initialize browser context")
 
     def _stop(self) -> None:
         """按顺序关闭页面上下文、浏览器和 Playwright 实例，忽略所有关闭异常。"""
-        for obj in [self._context, self._browser, self._playwright]:
-            if obj:
-                try:
-                    obj.close() if hasattr(obj, "close") else obj.stop()
-                except Exception:
-                    pass
+        # 关闭页面上下文
+        if self._context:
+            try:
+                self._context.close()
+            except Exception:
+                pass
+
+        # 关闭浏览器
+        if self._browser:
+            try:
+                self._browser.close()
+            except Exception:
+                pass
+
+        # 关闭 Playwright
+        if self._playwright:
+            try:
+                self._playwright.stop()
+            except Exception:
+                pass
+
         # 将所有引用重置为 None，便于 _start 判断状态
-        self._playwright, self._browser, self._context, self._page = (  # type: ignore[assignment]
-            None,
-            None,
-            None,
-            None,
-        )
+        self._playwright = None
+        self._browser = None
+        self._context = None
+        self._page = None

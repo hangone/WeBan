@@ -11,6 +11,12 @@ SEL_BROADCAST_CLOSE_BTN = ".broadcast-modal button"
 SEL_JOIN_BTN = 'button.exam-button:has-text("参加考试")'
 SEL_START_BTN = 'a.popup-btn:has-text("开始考试")'
 SEL_SUBMIT_BTN = (
+    ".sheet .bottom-ctrls .mint-button:has-text('交卷'), "
+    ".sheet .bottom-ctrls button:has-text('交卷'), "
+    ".sheet .bottom-ctrls a:has-text('交卷'), "
+    ".confirm-sheet .bottom-ctrls .mint-button:has-text('交卷'), "
+    ".confirm-sheet .bottom-ctrls button:has-text('交卷'), "
+    ".confirm-sheet .bottom-ctrls a:has-text('交卷'), "
     ".sheet .bottom-ctrls button:text-matches('^\\s*交\\s*卷\\s*$', 'i'), "
     ".confirm-sheet .bottom-ctrls button:text-matches('^\\s*交\\s*卷\\s*$', 'i'), "
     "button:text-matches('^\\s*交\\s*卷\\s*$', 'i'), "
@@ -62,17 +68,23 @@ SEL_INTERMEDIATE_WAIT_TARGETS = (
 SEL_COURSE_LIST_MARKERS = ".van-collapse-item, .img-texts-item, .fchl-item"
 
 SEL_NEXT_BTN = (
+    ".bottom-ctrls .mint-button:has-text('下一题'), "
+    ".bottom-ctrls button:has-text('下一题'), "
+    ".bottom-ctrls a:has-text('下一题'), "
     ".bottom-ctrls button:text-matches('^\\s*下\\s*一\\s*题\\s*$', 'i'), "
-    "button:text-matches('^\\s*下\\s*一\\s*题\\s*$', 'i'), "
-    "span:text-matches('^\\s*下\\s*一\\s*题\\s*$', 'i'), "
-    "div:text-matches('^\\s*下\\s*一\\s*题\\s*$', 'i'), "
-    "a:text-matches('^\\s*下\\s*一\\s*题\\s*$', 'i'), "
+    ".bottom-ctrls span:text-matches('^\\s*下\\s*一\\s*题\\s*$', 'i'), "
+    ".bottom-ctrls div:text-matches('^\\s*下\\s*一\\s*题\\s*$', 'i'), "
+    "button:has-text('下一题'), a:has-text('下一题'), "
     ".btn-next, .btn-primary-next"
 )
 
 SEL_ANSWER_CARD_BTN = (
+    ".bottom-ctrls .mint-button:has-text('答题卡'), "
+    ".bottom-ctrls button:has-text('答题卡'), "
+    ".bottom-ctrls a:has-text('答题卡'), "
     ".bottom-ctrls button:text-matches('^\\s*答\\s*题\\s*卡\\s*$', 'i'), "
-    ".bottom-ctrls .mint-button:text-matches('^\\s*答\\s*题\\s*卡\\s*$', 'i')"
+    ".bottom-ctrls span:text-matches('^\\s*答\\s*题\\s*卡\\s*$', 'i'), "
+    ".bottom-ctrls div:text-matches('^\\s*答\\s*题\\s*卡\\s*$', 'i')"
 )
 
 SEL_BTN_SUBMIT_SIGN = "button:has-text('提交'), button:has-text('确认提交')"
@@ -84,6 +96,7 @@ SEL_TASK_DONE_LABEL = ".task-block-done"
 SEL_EXAM_TAB = '.van-tab:has-text("在线考试")'
 SEL_QUESTION_TITLE = ".quest-stem"
 SEL_OPTIONS = ".quest-option-item"
+SEL_QUEST_CATEGORY = ".quest-category"
 SEL_QUEST_INDICATOR = ".quest-indicator"
 
 # ---------------------------------------------------------------------------

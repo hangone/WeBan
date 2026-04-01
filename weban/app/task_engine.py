@@ -7,7 +7,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Any
 
-from weban.core import WeBanClient
 from weban.core.captcha import (
     set_debug as set_captcha_debug,
     set_debug_account as set_captcha_debug_account,
@@ -146,6 +145,8 @@ class TaskEngine:
         self, account_cfg: dict[str, Any], account_index: int
     ) -> bool:
         """执行单个账号的完整登录、学习和考试流程。"""
+        from weban.core import WeBanClient
+
         account = account_cfg.get("username", account_cfg.get("account", ""))
         log_name = account or f"账号{account_index + 1}"
         set_captcha_debug_account(log_name)

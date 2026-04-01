@@ -39,10 +39,10 @@ class AnswerMixin(BaseMixin):
         from .browser import BrowserConfig
         import logging as _logging
 
-        _page: Page
-        _context: BrowserContext
-        _browser: Browser
-        _playwright: Playwright
+        _page: Page | None
+        _context: BrowserContext | None
+        _browser: Browser | None
+        _playwright: Playwright | None
         log: "_Union[_logging.Logger, _logging.LoggerAdapter]"
         base_url: str
         token: str
@@ -55,6 +55,8 @@ class AnswerMixin(BaseMixin):
     def _wait_for(self, selector: str, timeout: int = 8000) -> bool:
         """等待选择器。"""
         try:
+            if not self._page:
+                return False
             self._page.wait_for_selector(selector, state="attached", timeout=timeout)
             return True
         except Exception:
@@ -68,6 +70,109 @@ class AnswerMixin(BaseMixin):
         """
         score = {1: 3, 2: 2, 0: 1}
         return score.get(new_val, 0) >= score.get(old_val, 0)
+
+    def _normalize_option_text(self, text: str) -> str:
+        """规范化选项文本用于比较。"""
+        return clean_text(text or "")
+
+    def _merge_option_lists(
+        self,
+        old_options: list[Dict[str, Any]],
+        new_options: list[Dict[str, Any]],
+    ) -> list[Dict[str, Any]]:
+        """按旧顺序补全选项，并将全新选项追加到末尾。
+
+        规则：
+        1. 旧选项顺序保持不变；
+        2. 新选项若是旧选项的补充版本，则覆盖旧文本但保留原位置；
+        3. 全新选项追加到末尾。
+        """
+        merged: list[Dict[str, Any]] = []
+        used_new = [False] * len(new_options)
+
+        def _make_option(opt: Dict[str, Any]) -> Dict[str, Any]:
+            return {
+                "content": opt.get("content", ""),
+                "isCorrect": opt.get("isCorrect", 2),
+            }
+
+        def _is_related_option(old_text: str, new_text: str) -> bool:
+            old_norm = self._normalize_option_text(old_text)
+            new_norm = self._normalize_option_text(new_text)
+            if not old_norm or not new_norm:
+                return False
+
+            # 短选项（如“会/不会”“是/不是”）禁止包含匹配，避免子串误关联
+            if min(len(old_norm), len(new_norm)) <= 6:
+                return old_norm == new_norm
+
+            # 否定前缀不一致时，避免用包含关系硬匹配（例如“会…” vs “不会…”）
+            if (old_norm.startswith("不")) != (new_norm.startswith("不")):
+                return old_norm == new_norm
+
+            if old_norm == new_norm:
+                return True
+
+            # 长文本允许包含匹配（用于“补全选项文本”），但要求相似度足够高
+            shorter, longer = (
+                (old_norm, new_norm)
+                if len(old_norm) <= len(new_norm)
+                else (new_norm, old_norm)
+            )
+            if len(shorter) < 10:
+                return False
+            return shorter in longer and (len(shorter) / max(1, len(longer))) >= 0.8
+
+        for old_opt in old_options:
+            current = _make_option(old_opt)
+            best_idx = -1
+            best_new = None
+
+            for idx, new_opt in enumerate(new_options):
+                if used_new[idx]:
+                    continue
+                if not _is_related_option(
+                    current["content"], new_opt.get("content", "")
+                ):
+                    continue
+
+                candidate = _make_option(new_opt)
+                if best_new is None:
+                    best_idx = idx
+                    best_new = candidate
+                    continue
+
+                if len(candidate["content"]) > len(best_new["content"]):
+                    best_idx = idx
+                    best_new = candidate
+
+            if best_new is not None:
+                used_new[best_idx] = True
+
+                # 仅在选项语义键完全一致时才继承 isCorrect，避免“会/不会”等子串误覆盖
+                try:
+                    old_norm = self._normalize_option_text(current["content"])
+                    new_norm = self._normalize_option_text(best_new["content"])
+                    is_exact = bool(old_norm) and old_norm == new_norm
+                except Exception:
+                    is_exact = False
+
+                if is_exact and self._is_better(
+                    best_new["isCorrect"], current["isCorrect"]
+                ):
+                    current["isCorrect"] = best_new["isCorrect"]
+
+                if len(best_new["content"]) >= len(current["content"]):
+                    current["content"] = best_new["content"]
+
+            merged.append(current)
+
+        for idx, new_opt in enumerate(new_options):
+            if used_new[idx]:
+                continue
+            merged.append(_make_option(new_opt))
+
+        return merged
 
     def _load_answers(self) -> Dict[str, Any]:
         """加载本地题库。"""
@@ -116,31 +221,13 @@ class AnswerMixin(BaseMixin):
                                         "optionList": [],
                                     }
 
-                                cur_opts_map = {
-                                    clean_text(o["content"]): o
-                                    for o in self.answers[target_title].get(
-                                        "optionList", []
+                                self.answers[target_title]["optionList"] = (
+                                    self._merge_option_lists(
+                                        self.answers[target_title].get(
+                                            "optionList", []
+                                        ),
+                                        item.get("optionList", []),
                                     )
-                                }
-                                for new_o in item.get("optionList", []):
-                                    raw_new_o = new_o["content"]
-                                    c_new = clean_text(raw_new_o)
-                                    if c_new not in cur_opts_map:
-                                        cur_opts_map[c_new] = {
-                                            "content": raw_new_o,
-                                            "isCorrect": new_o["isCorrect"],
-                                        }
-                                    elif self._is_better(
-                                        new_o["isCorrect"],
-                                        cur_opts_map[c_new]["isCorrect"],
-                                    ):
-                                        cur_opts_map[c_new]["isCorrect"] = new_o[
-                                            "isCorrect"
-                                        ]
-                                        cur_opts_map[c_new]["content"] = raw_new_o
-
-                                self.answers[target_title]["optionList"] = list(
-                                    cur_opts_map.values()
                                 )
 
                         self.log.info("成功从云端合并最新题库")
@@ -154,7 +241,11 @@ class AnswerMixin(BaseMixin):
 
     def _save_answers(self) -> None:
         """持久化合并后的题库，并执行深度清理与去重（最短文本优先）。"""
-        from weban.app.runtime import ignore_symbols, strip_side_symbols
+        from weban.app.runtime import ignore_symbols
+
+        def _keep_text(text: str) -> str:
+            """尽量原样保留文本：仅去除两端空白，不做符号裁剪。"""
+            return (text or "").strip()
 
         ans_file = os.path.join(get_base_path(), "answer", "answer.json")
         os.makedirs(os.path.dirname(ans_file), exist_ok=True)
@@ -176,50 +267,32 @@ class AnswerMixin(BaseMixin):
                 cluster_pool = {}
 
                 def _merge_into_pool(raw: str, item: Dict):
-                    # 两端去噪：删除空格和末尾符号，但保留中间
-                    t_stripped = strip_side_symbols(raw)
-                    sem_key = ignore_symbols(t_stripped)
+                    # 按“去除符号后的语义键”聚合，但正文尽量原样保留。
+                    raw_keep = _keep_text(raw)
+                    sem_key = ignore_symbols(raw_keep)
                     if not sem_key:
                         return
 
-                    if sem_key not in cluster_pool:
-                        cluster_pool[sem_key] = {"raw": t_stripped, "item": item}
-                    else:
-                        target = cluster_pool[sem_key]
-                        # 规则：题目文本按长度更短的来
-                        if len(t_stripped) < len(target["raw"]):
-                            target["raw"] = t_stripped
+                    opt_list = []
+                    for o in item.get("optionList", []) or []:
+                        c = _keep_text(o.get("content", ""))
+                        if not c:
+                            continue
+                        opt_list.append(
+                            {
+                                "content": c,
+                                "isCorrect": o.get("isCorrect", 2),
+                            }
+                        )
 
-                        # 合并选项
-                        opt_clusters = {}  # key 为语义键
-
-                        def _fill_opts(pool_dict, opt_list):
-                            for o in opt_list:
-                                raw_o = strip_side_symbols(o.get("content", ""))
-                                s_key = ignore_symbols(raw_o)
-                                if not s_key:
-                                    continue
-                                if s_key not in pool_dict:
-                                    pool_dict[s_key] = {
-                                        "content": raw_o,
-                                        "isCorrect": o.get("isCorrect", 2),
-                                    }
-                                else:
-                                    # 选项文本也按长度更短的来
-                                    if len(raw_o) < len(pool_dict[s_key]["content"]):
-                                        pool_dict[s_key]["content"] = raw_o
-                                    # 合并正确性
-                                    if self._is_better(
-                                        o.get("isCorrect", 2),
-                                        pool_dict[s_key]["isCorrect"],
-                                    ):
-                                        pool_dict[s_key]["isCorrect"] = o.get(
-                                            "isCorrect", 2
-                                        )
-
-                        _fill_opts(opt_clusters, target["item"].get("optionList", []))
-                        _fill_opts(opt_clusters, item.get("optionList", []))
-                        target["item"]["optionList"] = list(opt_clusters.values())
+                    # 新的覆盖旧的：磁盘数据先入池，内存数据（含历史最新）后覆盖。
+                    cluster_pool[sem_key] = {
+                        "raw": raw_keep,
+                        "item": {
+                            "type": item.get("type", ""),
+                            "optionList": opt_list,
+                        },
+                    }
 
                 # 全量归集
                 for k, v in disk_data.items():
@@ -249,6 +322,11 @@ class AnswerMixin(BaseMixin):
 
     def _merge_history_answers(self) -> None:
         """通过点击历史记录合并答案。"""
+        # 检查 _page 是否已初始化
+        if not self._page:
+            self.log.warning("Page is not initialized, cannot merge history answers")
+            return
+
         # 定义兼容不同拼写的选择器（针对 WeBan 前端常见的 Peview/Preview 拼写错误）
         _SEL_REVIEW_ITEM = ".examPreviewListp-item, .examPeviewListp-item"
         _SEL_REVIEW_LINK = ".examPreviewListp-item-color, .examPeviewListp-item-color"
@@ -285,84 +363,46 @@ class AnswerMixin(BaseMixin):
                             if not raw_title:
                                 continue
 
+                            # 历史考试数据为准：完整保留题干与选项内容，并保留接口给出的正误标记。
                             new_opts_data = [
                                 {
-                                    "content": o.get("content", ""),
-                                    "isCorrect": o.get("isCorrect", 0),
+                                    "content": (o.get("content", "") or "").strip(),
+                                    "isCorrect": o.get("isCorrect", 2),
                                 }
-                                for o in q.get("optionList", [])
-                                if o.get("content")
+                                for o in (q.get("optionList", []) or [])
+                                if (o.get("content", "") or "").strip()
                             ]
 
                             from weban.app.runtime import ignore_symbols
 
                             c_title = ignore_symbols(raw_title)
 
-                            target_key = None
-                            for existing_raw in list(self.answers.items()):
-                                if ignore_symbols(existing_raw[0]) == c_title:
-                                    target_key = existing_raw[0]
+                            existing_key = None
+                            for k in list(self.answers.keys()):
+                                if ignore_symbols(k) == c_title:
+                                    existing_key = k
                                     break
 
-                            is_new_q = False
-                            if not target_key:
-                                self.answers[raw_title] = {
-                                    "optionList": [],
-                                    "type": q.get("type", ""),
-                                }
-                                target_key = raw_title
+                            is_new_q = existing_key is None
+                            if is_new_q:
                                 report_added += 1
                                 self._live_added_qs += 1
-                                is_new_q = True
                                 new_titles.append(raw_title)
+                            else:
+                                report_updated += 1
+                                self._live_updated_qs += 1
 
-                            current_opts = {
-                                ignore_symbols(o["content"]): o
-                                for o in self.answers[target_key]["optionList"]
+                            # 以历史考试为准：同语义题目直接覆盖（新合并旧）
+                            if existing_key is not None and existing_key != raw_title:
+                                try:
+                                    self.answers.pop(existing_key, None)
+                                except Exception:
+                                    pass
+
+                            self.answers[raw_title] = {
+                                "optionList": new_opts_data,
+                                "type": q.get("type", ""),
                             }
-
-                            q_updated_str = []
-                            updated_this_q = False
-
-                            # 正确性评分函数
-                            score_map = {1: 3, 2: 2, 0: 1}
-
-                            for o_data in new_opts_data:
-                                raw_o = o_data["content"]
-                                is_c = o_data["isCorrect"]
-                                osk = ignore_symbols(raw_o)
-
-                                if osk not in current_opts:
-                                    current_opts[osk] = {
-                                        "content": raw_o,
-                                        "isCorrect": is_c,
-                                    }
-                                    updated_this_q = True
-                                    q_updated_str.append(f"[新增选项] {raw_o}")
-                                else:
-                                    old_is_c = current_opts[osk]["isCorrect"]
-                                    # 只有质量严格提升才视为更新
-                                    if score_map.get(is_c, 0) > score_map.get(
-                                        old_is_c, 0
-                                    ):
-                                        current_opts[osk]["isCorrect"] = is_c
-                                        current_opts[osk]["content"] = raw_o
-                                        updated_this_q = True
-                                        q_updated_str.append(
-                                            f"[答案更正] {raw_o} ({old_is_c} -> {is_c})"
-                                        )
-
-                            if updated_this_q:
-                                self.answers[target_key]["optionList"] = list(
-                                    current_opts.values()
-                                )
-                                if not is_new_q:
-                                    report_updated += 1
-                                    self._live_updated_qs += 1
-                                    update_details.append(
-                                        f"  题干: {target_key}\n      "
-                                        + "\n      ".join(q_updated_str)
-                                    )
 
                         self.log.info(
                             f"   -> 报告解析完成: 获取 {report_total} 题, 新增 {report_added} 题, 补全 {report_updated} 题答案"
@@ -386,8 +426,8 @@ class AnswerMixin(BaseMixin):
                                 self.log.debug(
                                     f"      ... (其余 {len(update_details) - 3} 处答案补全已静默处理)"
                                 )
-                except Exception:
-                    pass
+                except Exception as e:
+                    self.log.warning(f"[历史记录] 解析 reviewPaper 响应异常: {e}")
 
             self._page.on("response", _handle_response)
             try:
@@ -450,7 +490,9 @@ class AnswerMixin(BaseMixin):
                                         f"[历史记录] -> 发现 {link_count} 份考试报告，准备解析..."
                                     )
 
-                                for review_idx in range(link_count):
+                                # ExamReviewList.vue 列表通常为“最新在前”，这里按时间顺序“旧 -> 新”处理，
+                                # 使得新的历史考试数据覆盖旧数据。
+                                for review_idx in range(link_count - 1, -1, -1):
                                     link = self._page.locator(_SEL_REVIEW_LINK).nth(
                                         review_idx
                                     )

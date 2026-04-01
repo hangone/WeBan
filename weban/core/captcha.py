@@ -593,20 +593,152 @@ def _captcha_visible(frame) -> bool:
     return False
 
 
-def _find_captcha_context(page):
-    """在 URL 含 csCapt=true 的子 frame 中查找验证码，返回 (frame, vendor_hint)。
+def _get_captcha_url_state(ctx) -> dict:
+    """提取 iframe URL 的验证码状态，供判定与诊断共用。"""
+    try:
+        ctx_url = (ctx.url or "").strip()
+    except Exception:
+        ctx_url = ""
 
-    验证码只在课程 iframe（csCapt=true）内触发，不检查主页面。
+    ctx_url_lower = ctx_url.lower()
+    has_url = bool(ctx_url)
+    is_mcwk = "mcwk.mycourse.cn" in ctx_url_lower
+    has_cscapt = "cscapt=" in ctx_url_lower
+    has_cscapt_true = "cscapt=true" in ctx_url_lower
+
+    if has_cscapt_true:
+        cscapt_state = "true"
+    elif has_cscapt:
+        cscapt_state = "false"
+    else:
+        cscapt_state = "missing"
+
+    return {
+        "url": ctx_url,
+        "url_lower": ctx_url_lower,
+        "has_url": has_url,
+        "is_mcwk": is_mcwk,
+        "has_cscapt": has_cscapt,
+        "has_cscapt_true": has_cscapt_true,
+        "cscapt": cscapt_state,
+    }
+
+
+def _log_captcha_contexts(page, log) -> None:
+    """输出验证码 iframe 诊断信息。
+
+    仅记录真正存在 URL 的 iframe，并仅保留验证码判定所需信息：
+    - mcwk 页面状态；
+    - cscapt 状态；
+    - 验证码核心元素可见性。
     """
-    for frame in page.frames:
+    try:
         try:
-            if frame == page.main_frame:
+            contexts = list(page.frames)
+        except Exception:
+            contexts = []
+
+        seen = set()
+        for idx, ctx in enumerate(contexts):
+            try:
+                if ctx == page.main_frame:
+                    continue
+
+                ctx_id = id(ctx)
+                if ctx_id in seen:
+                    continue
+                seen.add(ctx_id)
+
+                state = _get_captcha_url_state(ctx)
+                if not state["has_url"]:
+                    continue
+                if "mycourse.cn" not in state["url_lower"]:
+                    continue
+
+                visible = _captcha_visible(ctx)
+                if not (state["is_mcwk"] or state["has_cscapt"] or visible):
+                    continue
+
+                prompt_visible = False
+                bg_visible = False
+                confirm_visible = False
+
+                try:
+                    prompt_loc = ctx.locator(_SEL_CAPTCHA_PROMPT)
+                    prompt_visible = (
+                        prompt_loc.count() > 0 and prompt_loc.first.is_visible()
+                    )
+                except Exception:
+                    pass
+
+                try:
+                    bg_loc = ctx.locator(_SEL_CAPTCHA_BG)
+                    bg_visible = bg_loc.count() > 0 and bg_loc.first.is_visible()
+                except Exception:
+                    pass
+
+                try:
+                    confirm_loc = ctx.locator(_SEL_CAPTCHA_CONFIRM_BTN)
+                    confirm_visible = (
+                        confirm_loc.count() > 0 and confirm_loc.first.is_visible()
+                    )
+                except Exception:
+                    pass
+
+                log.debug(
+                    f"[点选验证码][诊断] frame[{idx}] "
+                    f"url={state['url']} | mcwk={str(state['is_mcwk']).lower()} | "
+                    f"cscapt={state['cscapt']} | visible={str(visible).lower()} | "
+                    f"prompt={str(prompt_visible).lower()} | "
+                    f"bg={str(bg_visible).lower()} | "
+                    f"confirm={str(confirm_visible).lower()}"
+                )
+            except Exception as e:
+                log.debug(f"[点选验证码][诊断] frame[{idx}] 枚举异常: {e}")
+    except Exception as e:
+        log.debug(f"[点选验证码][诊断] 输出上下文信息失败: {e}")
+
+
+def _find_captcha_context(page):
+    """仅在 mcwk 完成课程链路对应的 iframe 中查找验证码，返回 (ctx, vendor_hint)。
+
+    判定条件：
+    - 必须是子 iframe；
+    - iframe 必须存在真实 URL；
+    - iframe URL 必须同时包含 mcwk.mycourse.cn 与 cscapt=true；
+    - 且验证码核心元素必须真实可见。
+    """
+    try:
+        contexts = list(page.frames)
+    except Exception:
+        contexts = []
+
+    seen = set()
+
+    for ctx in contexts:
+        try:
+            if ctx == page.main_frame:
                 continue
-            # 只检查 URL 含 csCapt=true 的课程 iframe
-            if "csCapt=true" in (frame.url or "") and _captcha_visible(frame):
-                return frame, "点选验证码"
+
+            ctx_id = id(ctx)
+            if ctx_id in seen:
+                continue
+            seen.add(ctx_id)
+
+            state = _get_captcha_url_state(ctx)
+            if not state["has_url"]:
+                continue
+            if not state["is_mcwk"]:
+                continue
+            if not state["has_cscapt_true"]:
+                continue
+            if not _captcha_visible(ctx):
+                continue
+
+            return ctx, f"点选验证码(cscapt={state['cscapt']})"
         except Exception:
             pass
+
     return None, None
 
 
@@ -628,11 +760,18 @@ def handle_click_captcha(page, log) -> bool:
     返回 True 表示验证通过，False 表示失败或未检测到验证码。
     """
     try:
-        ctx, _ = _find_captcha_context(page)
+        ctx, vendor_hint = _find_captcha_context(page)
         if ctx is None:
+            log.debug("[点选验证码] 未检测到有效验证码上下文")
+            _log_captcha_contexts(page, log)
             return False
 
-        log.info("[点选验证码] 开始自动识别...")
+        state = _get_captcha_url_state(ctx)
+        log.info(f"[{vendor_hint or '点选验证码'}] 开始自动识别...")
+        log.debug(
+            f"[点选验证码] 验证码上下文: url={state['url']} | "
+            f"mcwk={str(state['is_mcwk']).lower()} | cscapt={state['cscapt']}"
+        )
 
         # 定位提示图和主背景图元素
         prompt_el = ctx.locator(_SEL_CAPTCHA_PROMPT)
@@ -640,9 +779,11 @@ def handle_click_captcha(page, log) -> bool:
 
         if prompt_el.count() == 0:
             log.warning("[点选验证码] 未找到提示图元素，无法自动识别")
+            _log_captcha_contexts(page, log)
             return False
         if main_el.count() == 0:
             log.warning("[点选验证码] 未找到主背景图元素，无法自动识别")
+            _log_captcha_contexts(page, log)
             return False
 
         prompt_el = prompt_el.first

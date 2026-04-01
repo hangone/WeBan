@@ -3,7 +3,7 @@ import time
 import random
 import threading
 import logging
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Dict, cast
 
 from .const import (
     SEL_EXAM_TAB,
@@ -23,6 +23,7 @@ from .const import (
 )
 from .captcha import handle_click_captcha, has_captcha
 from .base import BaseMixin
+from playwright._impl._errors import TargetClosedError
 
 # 提前导入工具函数
 from weban.app.runtime import clean_text, ignore_symbols
@@ -34,9 +35,31 @@ logger = logging.getLogger(__name__)
 class ExamMixin(BaseMixin):
     """在线考试流程 Mixin。"""
 
+    if TYPE_CHECKING:
+        from typing import Union as _Union
+        from playwright.sync_api import Page, BrowserContext, Browser, Playwright
+        from .browser import BrowserConfig
+        import logging as _logging
+
+        _page: Page | None
+        _context: BrowserContext | None
+        _browser: Browser | None
+        _playwright: Playwright | None
+        log: "_Union[_logging.Logger, _logging.LoggerAdapter]"
+        base_url: str
+        token: str
+        user_id: str
+        tenant_name: str
+        account: str
+        password: str
+        browser_config: "BrowserConfig"
+        answers: Dict[str, Any]
+
     def _handle_exam_dialog(self, exam_mode: str) -> str:
         """根据弹窗内容直接决策业务流程。"""
         time.sleep(2)
+        if not self._page:
+            raise RuntimeError("Page is not initialized")
         dialogs = self._page.locator(SEL_DIALOG)
 
         for i in range(dialogs.count()):
@@ -82,6 +105,54 @@ class ExamMixin(BaseMixin):
 
         return "continue"
 
+    def _get_exam_page_context(self) -> str:
+        """基于统一页面状态识别考试流程所在上下文。"""
+        if not self._page:
+            return "unknown"
+
+        page_state = self._ensure_page_state()
+        try:
+            if (
+                self._page.locator(
+                    ".score-num, .score, .exam-score, .result-score, .score-text"
+                ).count()
+                > 0
+            ):
+                return "result"
+            if (
+                self._page.locator(SEL_QUESTION_TITLE).count() > 0
+                and self._page.locator(SEL_OPTIONS).count() > 0
+            ):
+                return "question"
+            if self._page.locator(".exam-item").count() > 0:
+                return "exam-list"
+            if self._page.locator(SEL_EXAM_TAB).count() > 0:
+                return "course"
+        except Exception:
+            pass
+
+        state = str(page_state.get("state", "unknown"))
+        if state == "exam_question":
+            return "question"
+        if state == "exam_result":
+            return "result"
+        if state == "exam":
+            return "exam"
+
+        return "unknown"
+
+    def _wait_for_exam_context(
+        self, expected_contexts: set[str], timeout_sec: float = 10
+    ) -> bool:
+        """等待考试页面进入预期上下文，避免 SPA 切页中途误判。"""
+        deadline = time.time() + timeout_sec
+        while time.time() < deadline:
+            exam_context = self._get_exam_page_context()
+            if exam_context in expected_contexts:
+                return True
+            time.sleep(0.5)
+        return False
+
     def _interactive_answering(
         self, title: str, options: Any, options_count: int, opt_texts: list[str]
     ) -> bool:
@@ -101,30 +172,46 @@ class ExamMixin(BaseMixin):
                 print(f"    {i + 1}. {display_text}")
             print("-" * 64)
             print(
-                "   (请输入选项编号，多选可用逗号分隔，如 '1,3'；直接 Enter 跳过此题)"
+                "   (请输入选项编号，多选可用逗号分隔，如 '1,3'；"
+                "直接 Enter 表示你将改为在网页上手动勾选，勾选完后再按 Enter 继续)"
             )
 
             try:
-                raw_choice = input("   👉 请选择: ").strip()
-                if not raw_choice:
-                    return False
+                raw_choice = input("   请选择: ").strip()
 
-                # 解析输入
-                nums = re.split(r"[,\s，]+", raw_choice)
                 indices = []
-                for n in nums:
-                    if n.isdigit():
-                        idx = int(n) - 1
-                        if 0 <= idx < options_count:
-                            indices.append(idx)
 
-                if not indices:
-                    print("   ⚠️ 无效输入，已忽略。")
-                    return False
+                # A) 终端输入：自动点击并记录
+                if raw_choice:
+                    nums = re.split(r"[,\s，]+", raw_choice)
+                    for n in nums:
+                        if n.isdigit():
+                            idx = int(n) - 1
+                            if 0 <= idx < options_count:
+                                indices.append(idx)
 
-                # 1. 自动执行点击
-                for idx in indices:
-                    options.nth(idx).click(force=True, timeout=5000)
+                    if not indices:
+                        print("   ⚠️ 无效输入，已忽略。")
+                        return False
+
+                    for idx in indices:
+                        options.nth(idx).click(force=True, timeout=5000)
+
+                # B) 网页手动：等待用户勾选后读取 selected class 并记录
+                else:
+                    input("   请在网页上手动勾选答案后按 Enter 继续: ")
+
+                    for i in range(options_count):
+                        try:
+                            cls = (options.nth(i).get_attribute("class") or "").lower()
+                            if "selected" in cls:
+                                indices.append(i)
+                        except Exception:
+                            pass
+
+                    if not indices:
+                        print("   ⚠️ 未检测到任何已选选项，本题未记录。")
+                        return False
 
                 # 2. 将此正确答案记入题库（内存 + 持久化）
                 new_item = {
@@ -161,6 +248,10 @@ class ExamMixin(BaseMixin):
 
     def _submit_exam(self) -> str:
         """交卷并确认，返回抓取到的得分信息。"""
+        # 检查 _page 是否已初始化
+        if not self._page:
+            raise RuntimeError("Page is not initialized")
+
         # 0. 预检查：是否已经在结算页（看到分数即视为已完成）
         try:
             score_el = self._page.locator(
@@ -174,36 +265,88 @@ class ExamMixin(BaseMixin):
         except Exception:
             pass
 
-        # 1. 寻找通往结算的关键路径按钮
-        # 优先看有没有“交卷”或“提交”按钮（有些系统不用进答题卡也能看到）
-        submit_btn = self._page.locator(SEL_SUBMIT_BTN).last
-        if not submit_btn.is_visible():
-            # 需要点击答题卡才能看到交卷按钮的情况
-            for _ in range(3):
+        # 1. 进入“答题卡/交卷”路径（参考前端 ExamPage.vue：.sheet / .confirm-sheet）
+        # - 交卷按钮可能只出现在答题卡(sheet)里
+        # - 点击交卷后，可能进入 confirm-sheet 再次交卷
+        # - 也可能弹出 dialog 需要最终确认
+        result_text = ""
+
+        # 1.1 尝试打开答题卡(sheet)，确保交卷按钮出现
+        for _ in range(3):
+            try:
+                sheet = self._page.locator(".sheet").first
+                if sheet.count() > 0 and sheet.is_visible():
+                    break
+            except Exception:
+                pass
+
+            try:
                 card_btn = self._page.locator(SEL_ANSWER_CARD_BTN).last
-                if card_btn.is_visible():
+                if card_btn.count() > 0 and card_btn.is_visible():
                     self.log.debug("[提交流程] 点击答题卡")
                     card_btn.click(force=True, timeout=5000)
-                    time.sleep(1.5)
-                    break
-                time.sleep(1)
+                    time.sleep(1.2)
+                    continue
+            except Exception:
+                pass
 
-        # 2. 点击“交卷”按钮进入二级确认
+            break
+
+        # 1.2 点击 sheet 内的“交卷”（优先使用 SEL_SUBMIT_BTN，其次用 src 路径兜底）
+        clicked_submit = False
         for _ in range(3):
-            submit_btn = self._page.locator(SEL_SUBMIT_BTN).last
-            if submit_btn.is_visible():
-                btn_text = submit_btn.inner_text().strip()
-                self.log.debug(f"[提交流程] 点击主要按钮: {btn_text}")
-                submit_btn.click(force=True, timeout=5000)
-                time.sleep(1.5)
-                break
+            try:
+                submit_btn = self._page.locator(SEL_SUBMIT_BTN).last
+                if submit_btn.count() > 0 and submit_btn.is_visible():
+                    btn_text = submit_btn.inner_text().strip()
+                    self.log.debug(f"[提交流程] 点击主要按钮: {btn_text}")
+                    submit_btn.click(force=True, timeout=5000)
+                    time.sleep(1.5)
+                    clicked_submit = True
+                    break
+            except Exception:
+                pass
+
+            # src 兜底：.sheet .bottom-ctrls 里的“交卷”
+            try:
+                sheet_submit = (
+                    self._page.locator(".sheet .bottom-ctrls").locator("text=交卷").last
+                )
+                if sheet_submit.count() > 0 and sheet_submit.is_visible():
+                    self.log.debug("[提交流程] 点击答题卡内交卷")
+                    sheet_submit.click(force=True, timeout=5000)
+                    time.sleep(1.5)
+                    clicked_submit = True
+                    break
+            except Exception:
+                pass
+
             time.sleep(1)
 
-        # 3. 点击最终业务确认按钮（针对“确定交卷吗？”等弹窗）
-        result_text = ""
-        # 优先点击满足“确认”文本的选择器
+        # 1.3 若进入 confirm-sheet，再次点击 confirm-sheet 内的“交卷”
+        if clicked_submit:
+            for _ in range(3):
+                try:
+                    confirm_sheet_submit = (
+                        self._page.locator(".confirm-sheet .bottom-ctrls")
+                        .locator("text=交卷")
+                        .last
+                    )
+                    if (
+                        confirm_sheet_submit.count() > 0
+                        and confirm_sheet_submit.is_visible()
+                    ):
+                        self.log.debug("[提交流程] 点击确认页交卷")
+                        confirm_sheet_submit.click(force=True, timeout=5000)
+                        time.sleep(2)
+                        break
+                except Exception:
+                    pass
+                time.sleep(1)
+
+        # 2. 点击最终业务确认按钮（针对“确定交卷吗？”等弹窗）
         confirm_btn = self._page.locator(SEL_SUBMIT_CONFIRM).last
-        if confirm_btn.is_visible():
+        if confirm_btn.count() > 0 and confirm_btn.is_visible():
             try:
                 # 获取弹窗背景文字内容（如果有）
                 dialog_box = (
@@ -246,6 +389,10 @@ class ExamMixin(BaseMixin):
 
     def _handle_exam_intermediate_pages(self) -> bool:
         """处理进入考试前的中间页面。"""
+        # 检查 _page 是否已初始化
+        if not self._page:
+            return False
+
         for _ in range(6):
             time.sleep(2)
             if self._page.locator(SEL_EXAM_TAB).count() > 0:
@@ -304,6 +451,10 @@ class ExamMixin(BaseMixin):
         _self._merge_history_answers()
         if exam_mode == "false":
             return
+
+        # 检查 _page 是否已初始化
+        if not self._page:
+            raise RuntimeError("Page is not initialized")
 
         self.log.info("开始执行考试流程...")
         self._page.goto(f"{self.base_url}/#/learning-task-list")
@@ -381,13 +532,15 @@ class ExamMixin(BaseMixin):
                             handle_click_captcha(self._page, self.log)
                             time.sleep(2)
 
-                    # 等待进入正式答题页
-                    try:
-                        self._page.wait_for_selector(
-                            SEL_QUESTION_TITLE, state="visible", timeout=10000
+                    # 等待进入正式答题页或结果页，避免 SPA 尚未切换完成就开始按题目逻辑执行
+                    if not self._wait_for_exam_context(
+                        {"question", "result"}, timeout_sec=10
+                    ):
+                        page_state = self._ensure_page_state()
+                        self.log.warning(
+                            f"答题页加载超时，当前 state={page_state['state']} "
+                            f"url={page_state['url'] or '<blank>'}，尝试继续探测..."
                         )
-                    except Exception:
-                        self.log.warning("答题页加载超时，尝试继续探测...")
 
                     # --- 执行题目搜索与勾选 ---
                     should_submit = self._do_answering(
@@ -468,34 +621,67 @@ class ExamMixin(BaseMixin):
 
     def _do_answering(self, q_time, q_offset, rand, rate_limit):
         """具体答题执行。"""
+        # 检查 _page 是否已初始化
+        if not self._page:
+            raise RuntimeError("Page is not initialized")
+        page = self._page
+
         matched, total = 0, 0
         last_title = ""
         same_count = 0
+        force_advance_attempts = 0
 
         for _ in range(500):
             time.sleep(1.2)
 
+            page_state = self._ensure_page_state()
+            exam_context = self._get_exam_page_context()
+
+            if exam_context == "result":
+                self.log.info("检测到已进入考试结果页，结束答题循环。")
+                break
+
+            if exam_context not in {"question", "exam", "unknown"}:
+                self.log.debug(
+                    f"[答题] 当前页面上下文为 {exam_context}，"
+                    f"state={page_state['state']} url={page_state['url'] or '<blank>'}"
+                )
+                time.sleep(1)
+                continue
+
             # 1. 检测弹窗
-            popups = self._page.locator(
-                ".van-popup, .mint-popup, .confirm-sheet, .sheet, .mint-msgbox"
-            )
-            found_popup = False
-            for k in range(popups.count()):
-                p = popups.nth(k)
-                if p.is_visible():
-                    txt = p.inner_text()
-                    if any(x in txt for x in ["未作答", "共", "道题", "完成", "交卷"]):
-                        self.log.info(
-                            f"探测到结算/交卷层: {txt.replace('\\n', ' ')[:50]}..."
-                        )
-                        found_popup = True
-                        break
-            if found_popup:
+            try:
+                popups = page.locator(
+                    ".van-popup, .mint-popup, .confirm-sheet, .sheet, .mint-msgbox"
+                )
+                found_popup = False
+                for k in range(popups.count()):
+                    p = popups.nth(k)
+                    if p.is_visible():
+                        txt = p.inner_text()
+                        if any(
+                            x in txt for x in ["未作答", "共", "道题", "完成", "交卷"]
+                        ):
+                            self.log.info(
+                                f"探测到结算/交卷层: {txt.replace('\\n', ' ')[:50]}..."
+                            )
+                            found_popup = True
+                            break
+                if found_popup:
+                    break
+            except TargetClosedError:
+                # 页面/浏览器被关闭时，直接退出答题循环，避免抛栈导致任务失败
+                self.log.warning("检测到页面已关闭，提前结束答题循环。")
                 break
 
             # 2. 定位题目并提取纯净题干（尽量避开题号节点）
             stem = self._page.locator(SEL_QUESTION_TITLE).first
             if not stem.is_visible():
+                exam_context = self._get_exam_page_context()
+                if exam_context == "result":
+                    self.log.info("题目区域不可见，且已切换到结果页，准备结束。")
+                    break
+
                 # 如果找不到题目且没弹窗，尝试找一遍交卷按钮（可能在最后一题底部）
                 submit_area = self._page.locator(
                     "button:has-text('交卷'), button:has-text('完成')"
@@ -505,7 +691,13 @@ class ExamMixin(BaseMixin):
                         "题目区域由于页面滚动不可见，但探测到交卷按钮，准备结束。"
                     )
                     break
-                break
+
+                page_state = self._ensure_page_state()
+                self.log.debug(
+                    f"[答题] 题目区域暂不可见，当前 context={exam_context} "
+                    f"state={page_state['state']} url={page_state['url'] or '<blank>'}"
+                )
+                continue
 
             # 尝试从子节点获取纯文本（避开 .index 等）
             raw_title = ""
@@ -527,11 +719,131 @@ class ExamMixin(BaseMixin):
             if title == last_title:
                 same_count += 1
                 if same_count > 6:
-                    self.log.warning("持续探测到同一题目，尝试强制点击下一题...")
-                    next_btn = self._page.locator(SEL_NEXT_BTN).first
-                    if next_btn.is_visible():
-                        next_btn.click(force=True)
+                    force_advance_attempts += 1
+                    if force_advance_attempts >= 20:
+                        self.log.warning("持续无法推进到下一题，提前结束答题循环。")
+                        break
+
+                    self.log.warning("持续探测到同一题目，尝试强制推进到下一题...")
+                    advanced = False
+
+                    # 用题号指示器/题干变化来判断是否真正推进成功
+                    prev_title = title
+                    prev_indicator = ""
+                    try:
+                        ind0 = page.locator(SEL_QUEST_INDICATOR).first
+                        if ind0.count() > 0 and ind0.is_visible():
+                            prev_indicator = ind0.inner_text().strip()
+                    except Exception:
+                        pass
+
+                    def _title_now_quick() -> str:
+                        try:
+                            stem_now = page.locator(SEL_QUESTION_TITLE).first
+                            if stem_now.count() == 0 or not stem_now.is_visible():
+                                return ""
+                            raw = stem_now.inner_text().strip()
+                            return re.sub(r"^\s*\d+[\.、\s]+", "", raw).strip()
+                        except Exception:
+                            return ""
+
+                    def _indicator_now_quick() -> str:
+                        try:
+                            ind_now = page.locator(SEL_QUEST_INDICATOR).first
+                            if ind_now.count() == 0 or not ind_now.is_visible():
+                                return ""
+                            return ind_now.inner_text().strip()
+                        except Exception:
+                            return ""
+
+                    def _wait_any_change(timeout_sec: float = 5) -> bool:
+                        deadline2 = time.time() + timeout_sec
+                        while time.time() < deadline2:
+                            cur_t = _title_now_quick()
+                            if cur_t and cur_t != prev_title:
+                                return True
+                            if prev_indicator:
+                                cur_i = _indicator_now_quick()
+                                if cur_i and cur_i != prev_indicator:
+                                    return True
+                            time.sleep(0.25)
+                        return False
+
+                    # 1) 优先尝试点击【下一题】（先用既有选择器，再用 src 对应的 bottom-ctrls 文本兜底）
+                    try:
+                        next_btn = page.locator(SEL_NEXT_BTN).first
+                        if next_btn.count() > 0:
+                            next_btn.scroll_into_view_if_needed()
+                            if next_btn.is_visible():
+                                next_btn.click(force=True, timeout=8000)
+                                advanced = _wait_any_change()
+
+                        if not advanced:
+                            next_btn2 = (
+                                page.locator(".bottom-ctrls")
+                                .locator("text=下一题")
+                                .first
+                            )
+                            if next_btn2.count() > 0 and next_btn2.is_visible():
+                                next_btn2.scroll_into_view_if_needed()
+                                next_btn2.click(force=True, timeout=8000)
+                                advanced = _wait_any_change()
+                    except TargetClosedError:
+                        self.log.warning("检测到页面已关闭，提前结束答题循环。")
+                        break
+                    except Exception:
+                        pass
+
+                    # 2) 若找不到/点不动，则用【答题卡】跳转兜底（src ExamPage.vue: .sheet .quest-indexs-list li > span 为题号）
+                    if not advanced:
+                        try:
+                            indicator = page.locator(SEL_QUEST_INDICATOR).first
+                            current_idx = 0
+                            if indicator.count() > 0 and indicator.is_visible():
+                                m = re.search(
+                                    r"(\d+)\s*/\s*(\d+)", indicator.inner_text()
+                                )
+                                if m:
+                                    current_idx = int(m.group(1))
+
+                            card_btn = page.locator(SEL_ANSWER_CARD_BTN).last
+                            if not (card_btn.count() > 0 and card_btn.is_visible()):
+                                card_btn = (
+                                    page.locator(".bottom-ctrls")
+                                    .locator("text=答题卡")
+                                    .first
+                                )
+
+                            if card_btn.count() > 0 and card_btn.is_visible():
+                                card_btn.scroll_into_view_if_needed()
+                                card_btn.click(force=True, timeout=5000)
+                                time.sleep(1.2)
+
+                                target_nums = [
+                                    str(current_idx + 1),
+                                    f"{current_idx + 1:02d}",
+                                ]
+                                for next_q_num in target_nums:
+                                    jump_target = page.locator(
+                                        f".sheet .quest-indexs-list li:has(span:text-is('{next_q_num}')), "
+                                        f".sheet .quest-indexs-list li:has-text('{next_q_num}')"
+                                    ).first
+                                    if (
+                                        jump_target.count() > 0
+                                        and jump_target.is_visible()
+                                    ):
+                                        jump_target.click(force=True, timeout=5000)
+                                        advanced = _wait_any_change()
+                                        break
+                        except TargetClosedError:
+                            self.log.warning("检测到页面已关闭，提前结束答题循环。")
+                            break
+                        except Exception:
+                            pass
+
                     same_count = 0
+                    if advanced:
+                        time.sleep(0.8)
                 continue
 
             same_count = 0
@@ -581,15 +893,40 @@ class ExamMixin(BaseMixin):
                             is_correct = True
                             break
 
-                marker = "[✓] " if is_correct else "[ ] "
-                # 恢复并规范展现题目字母：chr(65) = 'A'
-                label = f"{chr(65 + i)}."
-                opt_texts.append(f"{marker}{label} {cur_text_plain}")
+                label = f"{chr(65 + i)}. {cur_text_plain}"
+                opt_texts.append(f"✓ {label}" if is_correct else label)
 
-            status = "[匹配]" if ans_opts else "[随机]"
-            self.log.info(f"{status} 第 {total} 题: {title}")
+            # ---- 输出题目类型与答题进度（参考前端 ExamPage.vue：.quest-category / .quest-indicator）----
+            q_type = ""
+            progress = ""
+            q_no = total
+            try:
+                q_type = page.locator(".quest-category").first.inner_text().strip()
+            except Exception:
+                q_type = ""
+
+            try:
+                progress = page.locator(SEL_QUEST_INDICATOR).first.inner_text().strip()
+                m = re.search(r"(\d+)\s*/\s*(\d+)", progress)
+                if m:
+                    q_no = int(m.group(1))
+            except Exception:
+                progress = ""
+
+            head_parts = []
+            if q_type:
+                head_parts.append(q_type)
+            if progress:
+                head_parts.append(progress)
+            head = " ".join(head_parts).strip()
+
+            if head:
+                self.log.info(f"{head} {q_no}. {title}")
+            else:
+                self.log.info(f"{q_no}. {title}")
+
             for ot in opt_texts:
-                self.log.debug(f"      - {ot}")
+                self.log.debug(ot)
 
             found = False
             if ans_opts:
@@ -599,34 +936,162 @@ class ExamMixin(BaseMixin):
                     for a in ans_opts:
                         c_a = ignore_symbols(a)
                         if c_a and octext and (c_a in octext or octext in c_a):
-                            self.log.debug(
-                                f"   [点击选项] {chr(65 + i)}. {all_opt_texts[i]}"
-                            )
                             opt.click(force=True, timeout=5000)
+                            # 确保点击生效：ExamPage.vue 中选中态会给 quest-option-item 增加 selected class
+                            try:
+                                for _ in range(15):
+                                    cls = (opt.get_attribute("class") or "").lower()
+                                    if "selected" in cls:
+                                        break
+                                    time.sleep(0.1)
+                            except Exception:
+                                pass
                             found = True
 
                 if found:
                     matched += 1
-                    # 作答后点击下一步
                     time.sleep(random.randint(q_time, q_time + q_offset))
 
-                    next_btn = self._page.locator(SEL_NEXT_BTN).first
-                    if not next_btn.is_visible():
-                        # 为了应对部分页面的动态加载，给按钮 2 秒的重试机会
-                        time.sleep(2)
-                        next_btn = self._page.locator(SEL_NEXT_BTN).first
+                    # 记录推进前的题目/指示器，用于判断是否真正切到下一题
+                    prev_title = title
+                    prev_indicator = ""
+                    try:
+                        ind0 = page.locator(SEL_QUEST_INDICATOR).first
+                        if ind0.count() > 0 and ind0.is_visible():
+                            prev_indicator = ind0.inner_text().strip()
+                    except Exception:
+                        pass
 
-                    if next_btn.is_visible():
-                        next_btn.click(force=True, timeout=8000)
-                        # 为了确保页面刷新，给 1 秒稳定时间
-                        time.sleep(1)
-                    else:
-                        # 既找不到下一题，也没有弹窗，判断为单页考试或最后一小题
-                        self.log.info(
-                            "未发现更多【下一题】按钮，判定本轮作答已达环节末端。"
-                        )
+                    def _title_now() -> str:
+                        try:
+                            stem_now = page.locator(SEL_QUESTION_TITLE).first
+                            if stem_now.count() == 0 or not stem_now.is_visible():
+                                return ""
+                            raw = stem_now.inner_text().strip()
+                            return re.sub(r"^\s*\d+[\.、\s]+", "", raw).strip()
+                        except Exception:
+                            return ""
+
+                    def _wait_changed(
+                        prev_t: str, prev_ind: str, timeout_sec: float = 6
+                    ) -> bool:
+                        deadline2 = time.time() + timeout_sec
+                        while time.time() < deadline2:
+                            cur_t = _title_now()
+                            if cur_t and cur_t != prev_t:
+                                return True
+                            if prev_ind:
+                                try:
+                                    ind2 = page.locator(SEL_QUEST_INDICATOR).first
+                                    if ind2.count() > 0 and ind2.is_visible():
+                                        cur_ind = ind2.inner_text().strip()
+                                        if cur_ind and cur_ind != prev_ind:
+                                            return True
+                                except Exception:
+                                    pass
+                            time.sleep(0.25)
+                        return False
+
+                    advanced = False
+
+                    # 1) 尝试点击【下一题】（有些页面按钮存在但点击无效，因此必须等待题目变化）
+                    try:
+                        next_btn = page.locator(SEL_NEXT_BTN).first
+                        if next_btn.count() > 0:
+                            next_btn.scroll_into_view_if_needed()
+                            if next_btn.is_visible():
+                                next_btn.click(force=True, timeout=8000)
+                                advanced = _wait_changed(
+                                    prev_title, prev_indicator, timeout_sec=6
+                                )
+                    except Exception:
+                        advanced = False
+
+                    if advanced:
+                        time.sleep(0.5)
+                        continue
+
+                    # 2) 【答题卡】兜底跳转（src ExamPage.vue: .sheet .quest-indexs-list li > span 为题号）
+                    current_idx = 0
+                    try:
+                        indicator = self._page.locator(SEL_QUEST_INDICATOR).first
+                        if indicator.count() > 0 and indicator.is_visible():
+                            m = re.search(r"(\d+)\s*/\s*(\d+)", indicator.inner_text())
+                            if m:
+                                current_idx = int(m.group(1))
+                    except Exception:
+                        current_idx = 0
+
+                    found_jump = False
+                    try:
+                        card_btn = self._page.locator(SEL_ANSWER_CARD_BTN).last
+                        if card_btn.count() > 0 and card_btn.is_visible():
+                            card_btn.scroll_into_view_if_needed()
+                            card_btn.click(force=True, timeout=5000)
+                            time.sleep(1.2)
+
+                            target_nums = [
+                                str(current_idx + 1),
+                                f"{current_idx + 1:02d}",
+                            ]
+                            for next_q_num in target_nums:
+                                jump_target = self._page.locator(
+                                    f".sheet .quest-indexs-list li:has(span:text-is('{next_q_num}')), "
+                                    f".sheet .quest-indexs-list li:has-text('{next_q_num}')"
+                                ).first
+                                if jump_target.count() > 0 and jump_target.is_visible():
+                                    jump_target.click(force=True, timeout=5000)
+                                    found_jump = _wait_changed(
+                                        prev_title, prev_indicator, timeout_sec=6
+                                    )
+                                    break
+                    except Exception:
+                        found_jump = False
+
+                    if found_jump:
+                        time.sleep(0.5)
+                        continue
+
+                    # 3) 仍无法推进：检查是否已到结算/交卷阶段
+                    exam_context = self._get_exam_page_context()
+                    if exam_context == "result":
+                        self.log.info("检测到已进入考试结果页，结束答题循环。")
                         break
-                    continue
+
+                    submit_area = self._page.locator(
+                        "button:has-text('交卷'), button:has-text('完成')"
+                    )
+                    if submit_area.count() > 0 and submit_area.first.is_visible():
+                        self.log.info("当前已无下一题，检测到交卷入口，结束答题循环。")
+                        break
+
+                    try:
+                        popups = page.locator(
+                            ".van-popup, .mint-popup, .confirm-sheet, .sheet, .mint-msgbox"
+                        )
+                        for k in range(popups.count()):
+                            p = popups.nth(k)
+                            if p.is_visible():
+                                txt = p.inner_text()
+                                if any(
+                                    x in txt
+                                    for x in ["未作答", "共", "道题", "完成", "交卷"]
+                                ):
+                                    self.log.info(
+                                        f"探测到结算/交卷层: {txt.replace('\\n', ' ')[:50]}..."
+                                    )
+                                    break
+                        else:
+                            # 4) 最后兜底：不直接判定“只有 1 题”，给 SPA 多一点切页时间
+                            self.log.warning(
+                                "无法定位可用的下一题入口，继续等待页面切换或题目刷新。"
+                            )
+                            time.sleep(2.0)
+                            continue
+                        break
+                    except TargetClosedError:
+                        self.log.warning("检测到页面已关闭，提前结束答题循环。")
+                        break
                 else:
                     self.log.warning(
                         f"   [警告] 题库有匹配但无法定位到具体选项: {ans_opts}"
@@ -645,17 +1110,22 @@ class ExamMixin(BaseMixin):
                         time.sleep(1)
                     continue
 
-                # 路径 B: 未开启随机 -> 尝试手工干预命令行交互
-                if self._interactive_answering(
+                # 路径 B: 未开启随机 -> 必须人工处理（终端输入 或 网页手动勾选）
+                self.log.warning("题库缺失：请在终端输入答案，或在网页手动勾选后继续。")
+                ok = self._interactive_answering(
                     title, options, options_count, opt_texts
-                ):
+                )
+                if ok:
                     matched += 1
                     time.sleep(random.randint(q_time, q_time + q_offset))
-                    next_btn = self._page.locator(SEL_NEXT_BTN).first
-                    if next_btn.is_visible():
+                    next_btn = page.locator(SEL_NEXT_BTN).first
+                    if next_btn.count() > 0 and next_btn.is_visible():
                         next_btn.click(force=True)
                         time.sleep(1)
                     continue
+
+                self.log.warning("题库缺失且未完成人工作答，停止作答循环。")
+                break
 
                 # 路径 C: 交互跳过或失败 -> 尝试通过答题卡跳转或兜底前进
                 msg = "手工交互已跳过"
@@ -680,21 +1150,14 @@ class ExamMixin(BaseMixin):
                         found_jump = False
                         for next_q_num in target_nums:
                             jump_target = self._page.locator(
-                                f".van-popup :text-is('{next_q_num}'), "
-                                f".mint-popup :text-is('{next_q_num}'), "
-                                f".sheet :text-is('{next_q_num}'), "
-                                f".answer-sheet :text-is('{next_q_num}'), "
-                                f".sheet-item:has-text('{next_q_num}')"
+                                f".sheet .quest-indexs-list li:has(span:text-is('{next_q_num}')), "
+                                f".sheet .quest-indexs-list li:has-text('{next_q_num}')"
                             ).first
 
                             if not jump_target.is_visible():
-                                jump_target = (
-                                    self._page.locator(
-                                        f"div:text-is('{next_q_num}'), span:text-is('{next_q_num}')"
-                                    )
-                                    .filter(has_not=self._page.locator(".quest-stem"))
-                                    .last
-                                )
+                                jump_target = self._page.locator(
+                                    f".sheet span:text-is('{next_q_num}'), .sheet div:text-is('{next_q_num}')"
+                                ).first
 
                             if jump_target.is_visible():
                                 self.log.info(

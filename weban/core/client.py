@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import TYPE_CHECKING, Any, Dict
 import logging
 import threading
 from .browser import BrowserMixin
@@ -7,10 +7,19 @@ from .study import StudyMixin
 from .answer import AnswerMixin
 from .exam import ExamMixin
 
+if TYPE_CHECKING:
+    from playwright.sync_api import Browser, BrowserContext, Page, Playwright
+
 logger = logging.getLogger(__name__)
 
 
 class WeBanClient(BrowserMixin, AuthMixin, StudyMixin, AnswerMixin, ExamMixin):
+    if TYPE_CHECKING:
+        _page: Page | None
+        _context: BrowserContext | None
+        _browser: Browser | None
+        _playwright: Playwright | None
+
     def __init__(
         self,
         tenant_name: str,
@@ -34,6 +43,22 @@ class WeBanClient(BrowserMixin, AuthMixin, StudyMixin, AnswerMixin, ExamMixin):
         self.answers = self._load_answers()
 
         # 浏览器相关对象在 _start() 时初始化，由 BrowserMixin 统一管理
+        self._playwright = None
+        self._browser = None
+        self._context = None
+        self._page = None
+
+        # SPA 页面状态缓存
+        self.current_url = ""
+        self.current_hash = ""
+        self.page_state = {
+            "url": "",
+            "hash": "",
+            "path": "",
+            "query": {},
+            "state": "blank",
+        }
+
         # 共享资源锁
         self._answers_lock = threading.Lock()
 

@@ -108,10 +108,10 @@ class AuthMixin(BaseMixin):
         from .browser import BrowserConfig
         import logging as _logging
 
-        _page: Page
-        _context: BrowserContext
-        _browser: Browser
-        _playwright: Playwright
+        _page: Page | None
+        _context: BrowserContext | None
+        _browser: Browser | None
+        _playwright: Playwright | None
         log: "_Union[_logging.Logger, _logging.LoggerAdapter]"
         base_url: str
         token: str
@@ -137,7 +137,7 @@ class AuthMixin(BaseMixin):
             return False
 
     def _has_login_form(self) -> bool:
-        """检查当前页面是否仍停留在登录表单。"""
+        """检测当前页面是否出现登录表单元素组，用于判断是否已跳转到登录页。"""
         if not self._page:
             return False
         try:
@@ -217,9 +217,15 @@ class AuthMixin(BaseMixin):
     def login(self) -> Dict[str, Any]:
         self._start()
 
+        # 检查 _page 是否已初始化
+        if not self._page:
+            raise RuntimeError("Page is not initialized")
+
         def _extract_user_result() -> Dict[str, Any]:
             result: Dict[str, Any] = {"ok": True}
             try:
+                if not self._page:
+                    return result
                 user_data = self._page.evaluate("localStorage.getItem('user')")
                 if user_data:
                     user_obj = json.loads(user_data)

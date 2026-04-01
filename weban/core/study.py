@@ -3,7 +3,7 @@ import time
 import datetime
 import logging
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, List
+from typing import TYPE_CHECKING, Any, List, Dict
 
 from .const import (
     SEL_AGREE_CHECKBOX,
@@ -36,6 +36,7 @@ from .const import (
 from .captcha import (
     has_captcha as _has_captcha,
     handle_click_captcha as _handle_click_captcha,
+    _log_captcha_contexts as _log_captcha_contexts,
 )
 from .base import BaseMixin
 
@@ -93,23 +94,43 @@ class StudyMixin(BaseMixin):
     """自动学习流程 Mixin，通过多重继承供 WeBanClient 使用。"""
 
     if TYPE_CHECKING:
-        browser_config: Any
-        answers: Any
+        from typing import Union as _Union
+        from playwright.sync_api import Page, BrowserContext, Browser, Playwright
+        from .browser import BrowserConfig
+        import logging as _logging
+
+        _page: Page | None
+        _context: BrowserContext | None
+        _browser: Browser | None
+        _playwright: Playwright | None
+        log: "_Union[_logging.Logger, _logging.LoggerAdapter]"
+        base_url: str
+        token: str
+        user_id: str
+        tenant_name: str
+        account: str
+        password: str
+        browser_config: "BrowserConfig"
+        answers: Dict[str, Any]
 
     # ------------------------------------------------------------------
     # 页面结构辅助方法
     # ------------------------------------------------------------------
 
     def _detect_project_type(self) -> str:
-        """从当前页面 URL query 推断 projectType（pre / normal / special 等）。"""
-        try:
-            url = self._page.url
-            m = re.search(r"projectType=([^&/#]+)", url)
-            if m:
-                return m.group(1)
-        except Exception:
-            pass
-        return ""
+        """从统一页面状态中推断 projectType（pre / normal / special 等）。"""
+        page_state = self._ensure_page_state()
+        query = page_state.get("query", {})
+        project_type = str(query.get("projectType", "")).strip()
+        if project_type:
+            return project_type
+
+        url = page_state.get("url", "") or self.current_url
+        if not url:
+            return ""
+
+        m = re.search(r"projectType=([^&/#]+)", url)
+        return m.group(1) if m else ""
 
     def _handle_protocol_page(self) -> bool:
         """处理承诺书/协议签署页（ProtocolPageWk.vue / ProtocolPage.vue）。
@@ -117,6 +138,8 @@ class StudyMixin(BaseMixin):
         自动勾选同意框并点击下一步；若有签名提交按钮也一并点击。
         返回是否处理了该页面（True = 检测到并已处理）。
         """
+        if not self._page:
+            return False
         try:
             agree_cb = self._page.locator(SEL_AGREE_CHECKBOX)
             next_btn = self._page.locator(SEL_BTN_NEXT_STEP)
@@ -148,6 +171,8 @@ class StudyMixin(BaseMixin):
 
         点击第一个未完成的子项目，返回是否成功点击进入下一层。
         """
+        if not self._page:
+            return False
         try:
             blocks = self._page.locator(SEL_TASK_OR_IMG_BLOCK)
             if blocks.count() == 0:
@@ -180,8 +205,15 @@ class StudyMixin(BaseMixin):
           3. LabIndex 的 .img-text-block 列表
         直到进入真正的课程列表页（含 .van-collapse-item / .img-texts-item / .fchl-item）为止。
         """
+        if not self._page:
+            return
+
         for _round in range(5):
             time.sleep(1)
+
+            # 检查 _page 是否仍然有效
+            if not self._page:
+                return
 
             # 已在课程列表页，直接返回
             if self._page.locator(SEL_COURSE_LIST_MARKERS).count() > 0:
@@ -194,6 +226,8 @@ class StudyMixin(BaseMixin):
                 continue
 
             # LabIndex（.img-text-block 独立存在）
+            if not self._page:
+                return
             lab_blocks = self._page.locator(SEL_IMG_TEXT_BLOCK)
             if lab_blocks.count() > 0:
                 self.log.info("[实验室] 检测到 LabIndex 页，点击第一个实验项目")
@@ -203,15 +237,16 @@ class StudyMixin(BaseMixin):
 
             # 等待任意一种课程结构出现，超时则跳出本轮探测
             try:
-                self._page.wait_for_selector(
-                    SEL_COURSE_LIST_WAIT_TARGETS,
-                    timeout=5000,
-                )
+                if self._page:
+                    self._page.wait_for_selector(
+                        SEL_COURSE_LIST_WAIT_TARGETS,
+                        timeout=5000,
+                    )
             except Exception:
                 pass
 
         # 始终未能进入课程页，呼叫用户干预
-        if self._page.locator(SEL_COURSE_LIST_MARKERS).count() == 0:
+        if self._page and self._page.locator(SEL_COURSE_LIST_MARKERS).count() == 0:
             self._pause_for_user_intervention(
                 "无法突破中间页到达章节列表，请确认是否存在未知的反爬验证或签到，手动点击进入课程目录页。"
             )
@@ -227,6 +262,9 @@ class StudyMixin(BaseMixin):
         subjectType 对应关系：3=必修课程  2=选修课程  1=匹配课程
         返回是否切换成功（Tab 不存在时返回 False）。
         """
+        if not self._page:
+            return False
+
         _tab_labels = {3: "必修课程", 2: "选修课程", 1: "匹配课程"}
         label = _tab_labels.get(subject_type, "")
         if not label:
@@ -239,7 +277,11 @@ class StudyMixin(BaseMixin):
             if "van-tab--active" not in (tab.first.get_attribute("class") or ""):
                 tab.first.click(force=True)
                 time.sleep(1.5)
-            self.log.info(f"[Tab] 切换到「{label}」")
+            page_state = self._ensure_page_state()
+            self.log.debug(
+                f"[Tab] 切换到「{label}」"
+                f" state={page_state['state']} path={page_state['path'] or '<root>'}"
+            )
             return True
         except Exception as e:
             self.log.warning(f"[Tab] 切换 Tab ({label}) 失败: {e}")
@@ -278,6 +320,8 @@ class StudyMixin(BaseMixin):
                 SEL_FCHL_ITEM_NOT_PASSED,
             ]
         )
+        if not self._page:
+            return None
         for sel in selectors:
             items = self._page.locator(sel)
             for i in range(items.count()):
@@ -291,41 +335,66 @@ class StudyMixin(BaseMixin):
                     return item
         return None
 
-    def _count_page_tasks(self) -> tuple:
-        """统计当前页面的课程总数和已完成数，返回 (total, finished)。
+    def _get_study_page_context(self) -> str:
+        """基于统一页面状态判断当前学习页面上下文。"""
+        if not self._page:
+            return "unknown"
 
-        优先利用 Vue 实例对象直接读取数据，失败则回退到 DOM 解析：
-          - .fchl-item 结构（Foods/实验课）
-          - .van-collapse-item 折叠章节（普通课程，从进度文本解析）
-        """
+        page_state = self._ensure_page_state()
+        route_path = str(page_state.get("path", "")).strip("/")
+        query = page_state.get("query", {})
+        state = str(page_state.get("state", "unknown"))
+
         try:
-            # 尝试直接从 Vue 实例读取分类数据 (匹配 StudyPage.vue)
-            stats = self._page.evaluate(
-                """() => {
-                    const page = document.querySelector('.page');
-                    if (page && page.__vue__ && page.__vue__.categoryList) {
-                        let total = 0, finished = 0;
-                        page.__vue__.categoryList.forEach(c => {
-                            total += c.totalNum || 0;
-                            finished += c.finishedNum || 0;
-                        });
-                        return {total, finished};
-                    }
-                    return null;
-                }"""
-            )
-            if stats and stats.get("total", 0) > 0:
-                self.log.debug(
-                    f"[Vue解析] 成功获取课程进度: {stats['finished']}/{stats['total']}"
-                )
-                return stats["total"], stats["finished"]
+            if (
+                self._page.locator(SEL_COMMENT_BACK_BTN).count() > 0
+                or self._is_mcwk_course_page()
+            ):
+                return "course-detail"
+            if self._page.locator(SEL_COLLAPSE_ITEM).count() > 0:
+                return "collapse-list"
+            if self._page.locator(f"{SEL_IMG_TEXT_ITEM}, {SEL_FCHL_ITEM}").count() > 0:
+                return "course-list"
+            if self._page.locator(SEL_IMG_TEXT_BLOCK).count() > 0:
+                return "sub-project-list"
+            if self._page.locator(SEL_TASK_BLOCK).count() > 0:
+                return "project-list"
         except Exception:
             pass
 
+        if route_path == "learning-task-list":
+            if query.get("projectType") or query.get("subjectType"):
+                return "course-list"
+            return "project-list"
+
+        if state == "study":
+            return "course-detail"
+        if state == "project_list":
+            return "project-list"
+        if state == "course_list":
+            return "course-list"
+
+        return "unknown"
+
+    def _count_page_tasks(self) -> tuple:
+        """统计当前页面的课程总数和已完成数，返回 (total, finished)。"""
+        if not self._page:
+            return (0, 0)
+
+        context = self._get_study_page_context()
+        if context not in {"collapse-list", "course-list"}:
+            self.log.debug(f"[课程统计] 跳过非课程列表上下文: {context}")
+            return (0, 0)
+
         fchl_items = self._page.locator(SEL_FCHL_ITEM)
         if fchl_items.count() > 0:
-            finished = self._page.locator(SEL_FCHL_ITEM + ".fchl-item-active").count()
+            finished = self._page.locator(f"{SEL_FCHL_ITEM}.fchl-item-active").count()
             return fchl_items.count(), finished
+
+        img_items = self._page.locator(SEL_IMG_TEXT_ITEM)
+        if img_items.count() > 0:
+            finished = self._page.locator(f"{SEL_IMG_TEXT_ITEM}.passed").count()
+            return img_items.count(), finished
 
         total, finished = 0, 0
         collapse_items = self._page.locator(SEL_COLLAPSE_ITEM)
@@ -333,13 +402,80 @@ class StudyMixin(BaseMixin):
             title_el = collapse_items.nth(i).locator(SEL_COLLAPSE_CELL_TITLE)
             if title_el.count() == 0:
                 continue
-            text = title_el.inner_text()
+            text = title_el.first.inner_text().strip()
             m = re.search(r"(\d+)\s*/\s*(\d+)", text)
             if m:
                 f, t = int(m.group(1)), int(m.group(2))
                 total += t
                 finished += f
         return total, finished
+
+    def _current_tab_has_unfinished_courses(
+        self,
+        study_mode: str,
+        completed_courses: set,
+        failed_courses: set,
+    ) -> bool:
+        """判断当前 Tab 是否仍存在未完成课程。"""
+        if not self._page:
+            return False
+
+        context = self._get_study_page_context()
+        if context not in {"collapse-list", "course-list"}:
+            self.log.debug(f"[课程判定] 跳过非课程列表上下文: {context}")
+            return False
+
+        try:
+            if study_mode == "force":
+                if (
+                    self._page.locator(f"{SEL_IMG_TEXT_ITEM}, {SEL_FCHL_ITEM}").count()
+                    > 0
+                ):
+                    return True
+            else:
+                items = self._page.locator(SEL_IMG_TEXT_ITEM_NOT_PASSED)
+                for i in range(items.count()):
+                    item = items.nth(i)
+                    title = self._extract_item_title(item)
+                    if (
+                        title
+                        and title not in completed_courses
+                        and title not in failed_courses
+                    ):
+                        return True
+
+                items = self._page.locator(SEL_FCHL_ITEM_NOT_PASSED)
+                for i in range(items.count()):
+                    item = items.nth(i)
+                    title = self._extract_item_title(item)
+                    if (
+                        title
+                        and title not in completed_courses
+                        and title not in failed_courses
+                    ):
+                        return True
+        except Exception:
+            pass
+
+        try:
+            collapse_items = self._page.locator(SEL_COLLAPSE_ITEM)
+            for i in range(collapse_items.count()):
+                title_el = collapse_items.nth(i).locator(SEL_COLLAPSE_CELL_TITLE)
+                if title_el.count() == 0:
+                    continue
+                text = title_el.first.inner_text().strip()
+                m = re.search(r"(\d+)\s*/\s*(\d+)", text)
+                if not m:
+                    if study_mode == "force":
+                        return True
+                    continue
+                finished, total = int(m.group(1)), int(m.group(2))
+                if total > 0 and (study_mode == "force" or finished < total):
+                    return True
+        except Exception:
+            pass
+
+        return False
 
     def _log_round_start(
         self, current_round: int, all_tasks: int, study_time: int
@@ -378,81 +514,47 @@ class StudyMixin(BaseMixin):
         非强制模式下跳过已全部完成（完成数 >= 总数）的章节。
         返回 True 表示成功展开了一个新章节，False 表示所有章节均已展开或完成。
         """
+        if not self._page:
+            return False
+
+        if self._get_study_page_context() != "collapse-list":
+            return False
+
         collapse_items = self._page.locator(SEL_COLLAPSE_ITEM)
 
-        # 优先使用 Vue 状态来判定，防止 DOM 读取错误
         for i in range(state.active_section_index + 1, collapse_items.count()):
             item = collapse_items.nth(i)
-            # 非强制模式：跳过已全部完成的章节（完成数 >= 总数）
+
             if study_mode != "force":
                 try:
-                    # 通过 Vue 的 categoryList 判断进度更稳
-                    is_completed = self._page.evaluate(
-                        """(idx) => {
-                            const p = document.querySelector('.page');
-                            if (p && p.__vue__ && p.__vue__.categoryList && p.__vue__.categoryList[idx]) {
-                                const c = p.__vue__.categoryList[idx];
-                                return (c.finishedNum || 0) >= (c.totalNum || 1);
-                            }
-                            return null;
-                        }""",
-                        i,
-                    )
-                    if is_completed is True:
-                        continue
-                    elif is_completed is None:
-                        # 降级：读取 DOM 文本
-                        title_el = item.locator(SEL_COLLAPSE_CELL_TITLE)
-                        if title_el.count() > 0:
-                            m = re.search(r"(\d+)\s*/\s*(\d+)", title_el.inner_text())
-                            if m and int(m.group(1)) >= int(m.group(2)):
-                                continue
+                    title_el = item.locator(SEL_COLLAPSE_CELL_TITLE)
+                    if title_el.count() > 0:
+                        text = title_el.first.inner_text().strip()
+                        m = re.search(r"(\d+)\s*/\s*(\d+)", text)
+                        if m and int(m.group(1)) >= int(m.group(2)):
+                            continue
                 except Exception:
                     pass
 
-            # 尝试由 Vue 展开
+            btn = item.locator(SEL_COLLAPSE_ITEM_TITLE).first
             try:
-                self._page.evaluate(
-                    """(idx) => {
-                        const p = document.querySelector('.page');
-                        if (p && p.__vue__) {
-                            if (typeof p.__vue__.onCollapseChange === 'function') {
-                                p.__vue__.activeNames = idx;
-                                p.__vue__.onCollapseChange(idx);
-                            }
-                        }
-                    }""",
-                    i,
-                )
+                if btn.count() > 0:
+                    expanded = (
+                        btn.get_attribute("aria-expanded") or ""
+                    ).lower() == "true"
+                    if not expanded:
+                        btn.click(force=True)
+                else:
+                    item.click(force=True)
             except Exception:
-                pass
-
-            # fallback: locator click
-            btn = item.locator(SEL_COLLAPSE_ITEM_TITLE)
-            if btn.count() > 0:
-                if btn.first.get_attribute("aria-expanded") == "false":
-                    try:
-                        btn.first.click()
-                    except Exception:
-                        pass
+                continue
 
             state.active_section_index = i
 
-            # 关键：由于前端是异步获取章节内容，这里必须等待 Vue 渲染新的 courseList！
             for _wait in range(8):
                 time.sleep(1)
                 try:
-                    # 检查 Vue 是否已经拉取到了当前的课程数据
-                    has_vue_data = self._page.evaluate(
-                        """() => {
-                            const p = document.querySelector('.page');
-                            return p && p.__vue__ && p.__vue__.courseList && p.__vue__.courseList.length > 0;
-                        }"""
-                    )
-                    # 检查 DOM 是否已经挂载了列表项
-                    dom_count = self._page.locator(SEL_COURSE_JS_ITEMS_VISIBLE).count()
-
-                    if has_vue_data or dom_count > 0:
+                    if self._page.locator(SEL_COURSE_JS_ITEMS_VISIBLE).count() > 0:
                         break
                 except Exception:
                     pass
@@ -470,29 +572,34 @@ class StudyMixin(BaseMixin):
     def _dismiss_broadcast(self) -> None:
         """检测并关闭广播公告弹窗（.broadcast-modal），有则点击关闭按钮。"""
         try:
-            broadcast = self._page.locator(SEL_BROADCAST_MODAL)
-            if broadcast.count() > 0 and broadcast.first.is_visible():
-                broadcast.first.locator("button").first.click(force=True)
-                self.log.info("[公告] 已关闭广播公告弹窗")
-                time.sleep(0.5)
+            if self._page:
+                broadcast = self._page.locator(SEL_BROADCAST_MODAL)
+                if broadcast.count() > 0 and broadcast.first.is_visible():
+                    broadcast.first.locator("button").first.click(force=True)
+                    self.log.info("[公告] 已关闭广播公告弹窗")
+                    time.sleep(0.5)
         except Exception:
             pass
 
     def _get_course_runtime_frame(self):
         """获取课程详情页内承载 mcwk 课件运行时的 iframe。"""
+        if not self._page:
+            return None
         try:
             for frame in self._page.frames:
                 if frame == self._page.main_frame:
                     continue
 
                 try:
-                    frame_url = (frame.url or "").lower()
+                    raw_frame_url = (frame.url or "").strip()
                 except Exception:
-                    frame_url = ""
+                    raw_frame_url = ""
 
-                if "qidian.qq.com" in frame_url or "chatv3" in frame_url:
-                    self.log.debug(f"[img-texts] 跳过无关 iframe: url={frame_url}")
-                    continue
+                frame_url = raw_frame_url.lower()
+                has_url = bool(raw_frame_url)
+                is_mycourse_host = (
+                    ".mycourse.cn" in frame_url or "mycourse.cn" in frame_url
+                )
 
                 try:
                     has_runtime = frame.evaluate(
@@ -507,18 +614,32 @@ class StudyMixin(BaseMixin):
                     has_course_markers = False
 
                 is_mcwk_host = "mcwk.mycourse.cn" in frame_url
-                is_blank_course_frame = (not frame_url) and has_runtime
+                has_cscapt = "cscapt=" in frame_url
+                if "cscapt=true" in frame_url:
+                    cscapt_state = "true"
+                elif has_cscapt:
+                    cscapt_state = "false"
+                else:
+                    cscapt_state = "missing"
 
-                self.log.debug(
-                    f"[img-texts] 检查 iframe: url={frame_url}, has_runtime={has_runtime}, has_course_markers={has_course_markers}, is_mcwk_host={is_mcwk_host}"
-                )
+                if has_url and is_mycourse_host:
+                    self.log.debug(
+                        f"[img-texts] 检查 iframe: url={raw_frame_url}, has_runtime={has_runtime}, has_course_markers={has_course_markers}, is_mcwk_host={is_mcwk_host}, cscapt={cscapt_state}"
+                    )
 
-                if has_runtime or is_mcwk_host or is_blank_course_frame:
-                    self.log.debug(f"[img-texts] 命中课程 iframe: url={frame_url}")
+                if has_runtime or is_mcwk_host:
+                    if has_url and is_mycourse_host:
+                        self.log.debug(
+                            f"[img-texts] 命中课程 iframe: url={raw_frame_url}, cscapt={cscapt_state}"
+                        )
+                    else:
+                        self.log.debug(
+                            "[img-texts] 命中匿名课程 iframe: reason=runtime"
+                        )
                     return frame
 
-                if has_course_markers and not frame_url:
-                    self.log.debug("[img-texts] 命中匿名课程 iframe: url=<blank>")
+                if has_course_markers and not has_url:
+                    self.log.debug("[img-texts] 命中匿名课程 iframe: reason=markers")
                     return frame
         except Exception as e:
             self.log.debug(f"[img-texts] 枚举 iframe 异常: error={e}")
@@ -528,7 +649,7 @@ class StudyMixin(BaseMixin):
     def _is_mcwk_course_page(self) -> bool:
         """判断当前是否处于 mcwk 课件页或其 iframe 已加载。"""
         try:
-            if "mcwk.mycourse.cn" in self._page.url.lower():
+            if self._page and "mcwk.mycourse.cn" in self._page.url.lower():
                 return True
         except Exception:
             pass
@@ -570,10 +691,31 @@ class StudyMixin(BaseMixin):
 
         while time.time() < deadline:
             try:
-                if self._page.locator(SEL_COURSE_LIST_MARKERS).count() > 0:
+                if (
+                    self._page
+                    and self._page.locator(SEL_COURSE_LIST_MARKERS).count() > 0
+                ):
                     return True
             except Exception:
                 pass
+
+            try:
+                if self._page and _has_captcha(self._page):
+                    self.log.info(
+                        "[img-texts] 课程完成阶段检测到点选验证码，开始自动处理"
+                    )
+                    captcha_ok = _handle_click_captcha(self._page, self.log)
+                    if captcha_ok:
+                        self.log.info(
+                            "[img-texts] 点选验证码处理完成，继续等待课程完成状态变化"
+                        )
+                        time.sleep(2)
+                        continue
+                    self.log.warning(
+                        "[img-texts] 点选验证码未确认通过，继续等待页面变化"
+                    )
+            except Exception as e:
+                self.log.debug(f"[img-texts] 处理课程完成后的点选验证码异常: {e}")
 
             course_frame = self._get_course_runtime_frame()
             if course_frame is not None:
@@ -598,18 +740,50 @@ class StudyMixin(BaseMixin):
                     pass
 
             try:
-                return_btn = self._page.locator(SEL_COMMENT_BACK_BTN)
-                if return_btn.count() > 0 and return_btn.first.is_visible():
-                    return True
+                if self._page:
+                    return_btn = self._page.locator(SEL_COMMENT_BACK_BTN)
+                    if return_btn.count() > 0 and return_btn.first.is_visible():
+                        return True
             except Exception:
                 pass
 
             try:
-                url = self._page.url.lower()
-                if "comment" in url or "rating" in url:
-                    return True
+                if self._page:
+                    url = self._page.url.lower()
+                    if "comment" in url or "rating" in url:
+                        return True
             except Exception:
                 pass
+
+            # 循环检查 mcwk iframe 中是否存在评论页元素
+            deadline = time.time() + timeout_sec
+            last_error = ""
+            while time.time() < deadline:
+                course_frame = self._get_course_runtime_frame()
+                if course_frame is None:
+                    time.sleep(0.5)
+                    continue
+
+                try:
+                    # 检查评论区是否存在
+                    comment_area = course_frame.locator(".comment-area, .rating-area")
+                    if comment_area.count() > 0:
+                        return True
+
+                    # 检查评分按钮是否存在
+                    submit_btn = course_frame.locator(
+                        "button:has-text('提交'), button:has-text('确定')"
+                    )
+                    if submit_btn.count() > 0 and submit_btn.first.is_visible():
+                        return True
+                except Exception as e:
+                    last_error = str(e)
+
+                time.sleep(0.5)
+
+            if last_error:
+                self.log.debug(f"[img-texts] 未检测到课程完成标志: error={last_error}")
+            return False
 
             time.sleep(0.5)
 
@@ -648,6 +822,8 @@ class StudyMixin(BaseMixin):
                 return False
 
         try:
+            if not self._page:
+                return False
             has_finish_func = self._page.evaluate(
                 "typeof finishWxCourse === 'function'"
             )
@@ -662,8 +838,11 @@ class StudyMixin(BaseMixin):
             return False
 
         try:
-            self._page.evaluate("finishWxCourse()")
-            self.log.debug(f"[img-texts] 已调用顶层 finishWxCourse(): title={title}")
+            if self._page:
+                self._page.evaluate("finishWxCourse()")
+                self.log.debug(
+                    f"[img-texts] 已调用顶层 finishWxCourse(): title={title}"
+                )
             return True
         except Exception as e:
             self.log.warning(f"[img-texts] 课程完成流程异常，第 1 次：{title}")
@@ -674,6 +853,9 @@ class StudyMixin(BaseMixin):
 
     def _wait_for_img_text_completion_result(self, timeout_sec: float = 12) -> str:
         """等待真实完成结果，不在发送完成后立刻返回。"""
+        if not self._page:
+            return "error"
+
         deadline = time.time() + timeout_sec
 
         while time.time() < deadline:
@@ -684,6 +866,27 @@ class StudyMixin(BaseMixin):
                 pass
 
             try:
+                if self._page and _has_captcha(self._page):
+                    self.log.info(
+                        "[img-texts] 课程完成结果等待阶段检测到点选验证码，开始自动处理"
+                    )
+                    captcha_ok = _handle_click_captcha(self._page, self.log)
+                    if captcha_ok:
+                        self.log.info(
+                            "[img-texts] 点选验证码验证通过，继续等待课程完成结果"
+                        )
+                        time.sleep(2)
+                        continue
+                    self.log.warning(
+                        "[img-texts] 点选验证码未确认通过，继续等待完成结果"
+                    )
+            except Exception as e:
+                self.log.debug(f"[img-texts] 完成结果等待期间处理点选验证码异常: {e}")
+
+            if not self._page:
+                continue
+
+            try:
                 url = self._page.url.lower()
                 if "comment" in url or "rating" in url:
                     return "comment"
@@ -691,9 +894,10 @@ class StudyMixin(BaseMixin):
                 pass
 
             try:
-                return_btn = self._page.locator(SEL_COMMENT_BACK_BTN)
-                if return_btn.count() > 0 and return_btn.first.is_visible():
-                    return "return"
+                if self._page:
+                    return_btn = self._page.locator(SEL_COMMENT_BACK_BTN)
+                    if return_btn.count() > 0 and return_btn.first.is_visible():
+                        return "return"
             except Exception:
                 pass
 
@@ -715,6 +919,8 @@ class StudyMixin(BaseMixin):
             SEL_IMG_TEXT_ITEM_NOT_PASSED,
             SEL_IMG_TEXT_ITEM,
         ]
+        if not self._page:
+            return None
         for sel in selectors:
             items = self._page.locator(sel)
             self.log.debug(
@@ -736,6 +942,8 @@ class StudyMixin(BaseMixin):
 
     def _is_img_text_course_passed(self, title: str) -> bool:
         """通过 Vue 数据或列表项 css class 确认图文课程是否真正完成。"""
+        if not self._page:
+            return False
         # 优先通过 Vue 组件读取数据
         try:
             is_passed = self._page.evaluate(
@@ -773,7 +981,8 @@ class StudyMixin(BaseMixin):
         for attempt in range(1, max_attempts + 1):
             current_url = ""
             try:
-                current_url = self._page.url
+                if self._page:
+                    current_url = self._page.url
             except Exception:
                 pass
             self.log.debug(
@@ -803,6 +1012,45 @@ class StudyMixin(BaseMixin):
                         f"[img-texts] 课程完成动作未就绪，第 {attempt}/{max_attempts} 次：{title}"
                     )
                 continue
+
+            try:
+                needs_captcha = False
+                if course_frame is not None:
+                    try:
+                        frame_url = (course_frame.url or "").lower()
+                        needs_captcha = (
+                            "mcwk.mycourse.cn" in frame_url
+                            and "cscapt=true" in frame_url
+                        )
+                    except Exception:
+                        needs_captcha = False
+
+                if needs_captcha and self._page:
+                    captcha_handled = False
+                    for _ in range(20):
+                        if _has_captcha(self._page):
+                            self.log.info(
+                                "[img-texts] 课程完成阶段检测到点选验证码，开始自动处理"
+                            )
+                            captcha_ok = _handle_click_captcha(self._page, self.log)
+                            captcha_handled = True
+                            if captcha_ok:
+                                self.log.info("[img-texts] 点选验证码已处理完成")
+                                time.sleep(2)
+                            else:
+                                self.log.warning("[img-texts] 点选验证码未确认通过")
+                            break
+
+                        time.sleep(0.5)
+
+                    if not captcha_handled:
+                        self.log.debug(
+                            "[img-texts] cscapt=true，但在课程完成阶段等待窗口内未检测到点选验证码"
+                        )
+                else:
+                    time.sleep(1)
+            except Exception as e:
+                self.log.debug(f"[img-texts] finishWxCourse 后处理点选验证码异常: {e}")
 
             completion_state = self._wait_for_img_text_completion_result(timeout_sec=12)
             self.log.debug(
@@ -846,10 +1094,22 @@ class StudyMixin(BaseMixin):
                 self._wait_for_post_course_state(timeout_sec=4)
                 time.sleep(study_time)
 
+        try:
+            if self._page:
+                self.log.warning(
+                    f"[img-texts] 课程完成校验最终失败，输出验证码上下文诊断: {title}"
+                )
+                _log_captcha_contexts(self._page, self.log)
+        except Exception as e:
+            self.log.debug(f"[img-texts] 输出验证码上下文诊断异常: {e}")
+
         return False
 
     def _return_to_chapter_list(self) -> bool:
         """从课程详情页、评论页或 mcwk 课件页返回章节列表。"""
+        if not self._page:
+            return False
+
         list_markers = (
             ".van-collapse-item, .img-texts-item, .fchl-item, "
             ".task-block, .img-text-block"
@@ -858,34 +1118,33 @@ class StudyMixin(BaseMixin):
         try:
             if self._page.locator(list_markers).count() > 0:
                 return True
-        except Exception:
-            pass
 
-        course_frame = self._get_course_runtime_frame()
-        if course_frame is not None:
-            try:
-                acted = course_frame.evaluate(
-                    """() => {
-                        const okBtn = document.querySelector('.pop-jsv-prev');
-                        if (okBtn) {
-                            okBtn.click();
-                            return 'dialog';
-                        }
-                        if (typeof backToList === 'function') {
-                            backToList();
-                            return 'backToList';
-                        }
-                        const back = document.querySelector('.back-list');
-                        if (back) {
-                            back.click();
-                            return 'back-list';
-                        }
-                        return '';
-                    }"""
-                )
-                self.log.debug(f"[img-texts] iframe 返回动作结果: {acted}")
-            except Exception:
-                acted = ""
+            acted = ""
+            course_frame = self._get_course_runtime_frame()
+            if course_frame is not None:
+                try:
+                    acted = course_frame.evaluate(
+                        """() => {
+                            const okBtn = document.querySelector('.pop-jsv-prev');
+                            if (okBtn) {
+                                okBtn.click();
+                                return 'dialog';
+                            }
+                            if (typeof backToList === 'function') {
+                                backToList();
+                                return 'backToList';
+                            }
+                            const back = document.querySelector('.back-list');
+                            if (back) {
+                                back.click();
+                                return 'back-list';
+                            }
+                            return '';
+                        }"""
+                    )
+                    self.log.debug(f"[img-texts] iframe 返回动作结果: {acted}")
+                except Exception:
+                    acted = ""
 
             if not acted:
                 try:
@@ -898,52 +1157,18 @@ class StudyMixin(BaseMixin):
                 except Exception:
                     acted = ""
 
-                if not acted:
+            if not acted:
+                try:
                     back = self._page.locator(SEL_NAV_BAR_LEFT)
                     if back.count() > 0:
                         back.first.click(force=True)
                         acted = "top-back"
+                except Exception:
+                    acted = ""
 
-            if not acted:
-                return False
-        else:
-            return_btn = self._page.locator(SEL_COMMENT_BACK_BTN)
-            if return_btn.count() > 0:
-                return_btn.first.click(force=True)
-            else:
-                back = self._page.locator(SEL_NAV_BAR_LEFT)
-                if back.count() > 0:
-                    back.first.click(force=True)
-                else:
-                    return False
-
-        deadline = time.time() + 10
-        while time.time() < deadline:
-            try:
-                if self._page.locator(list_markers).count() > 0:
-                    return True
-            except Exception:
-                pass
-
-            try:
-                url = self._page.url.lower()
-                if (
-                    "detail" not in url
-                    and "video" not in url
-                    and "play" not in url
-                    and "course" not in url
-                    and "comment" not in url
-                    and "rating" not in url
-                ):
-                    return True
-            except Exception:
-                pass
-
-            time.sleep(0.5)
-
-        try:
-            return self._page.locator(list_markers).count() > 0
-        except Exception:
+            return bool(acted)
+        except Exception as e:
+            self.log.debug(f"[img-texts] 返回章节列表异常: {e}")
             return False
 
     def _find_course_target(self, locator, failed_courses: set, completed_courses: set):
@@ -965,6 +1190,9 @@ class StudyMixin(BaseMixin):
         成功进入后更新 state 的 current_project_title / study_tabs / active_tab_index。
         返回是否成功进入了一个新项目。
         """
+        if not self._page:
+            return False
+
         try:
             self._page.goto(
                 f"{self.base_url}/#/learning-task-list",
@@ -1038,27 +1266,31 @@ class StudyMixin(BaseMixin):
         self.log.info("所有学习项目已遍历完成。")
         return False
 
-    def _try_next_study_tab(self, state: _StudyRunState) -> bool:
+    def _try_next_study_tab(
+        self,
+        state: _StudyRunState,
+        study_mode: str,
+        completed_courses: set,
+        failed_courses: set,
+    ) -> bool:
         """尝试切换到当前项目的下一个课程 Tab（选修/匹配等）。
 
-        切换成功后检查该 Tab 下是否有未完成课程。
-        返回 True 表示成功切换到有内容的新 Tab，False 表示已无更多 Tab。
+        切换成功后检查该 Tab 下是否仍有未完成课程。
+        返回 True 表示成功切换到有未完成课程的新 Tab，False 表示已无更多 Tab。
         """
         while state.active_tab_index + 1 < len(state.study_tabs):
             state.active_tab_index += 1
             state.active_section_index = -1
             st = state.study_tabs[state.active_tab_index]
             if self._switch_to_study_tab(st):
-                time.sleep(1)
-                has_content = (
-                    self._page.locator(
-                        ".img-texts-item, .van-collapse-item, .fchl-item"
-                    ).count()
-                    > 0
-                    and self._page.locator(".img-texts-item:not(.passed)").count() > 0
-                )
-                if has_content:
+                time.sleep(1.5)
+                if self._current_tab_has_unfinished_courses(
+                    study_mode, completed_courses, failed_courses
+                ):
+                    self.log.info(f"[切换Tab] 已切换到课程类型: {st}，继续学习")
                     return True
+
+                self.log.info(f"[切换Tab] 课程类型: {st} 无未完成课程，尝试下一个")
                 self.log.info("[Tab] 切换后该 Tab 无未完成课程，继续下一 Tab")
         return False
 
@@ -1093,6 +1325,10 @@ class StudyMixin(BaseMixin):
             return
 
         # 等待课程列表页加载完成
+        if not self._page:
+            self.log.error("Page is not initialized, cannot start study process")
+            return
+
         try:
             self._page.wait_for_selector(
                 ".van-collapse-item, .img-texts-item, .fchl-item",
@@ -1142,13 +1378,18 @@ class StudyMixin(BaseMixin):
         # 主循环：最多迭代 500 次防止死循环
         for _ in range(500):
             try:
-                # ----------------------------------------------------------
-                # 验证码检测
-                # ----------------------------------------------------------
-                if _has_captcha(self._page):
-                    self.log.info("[验证码] 检测到验证码，尝试自动处理")
-                    _handle_click_captcha(self._page, self.log)
-                    time.sleep(2)
+                page_state = self._ensure_page_state()
+                current_context = self._get_study_page_context()
+
+                if (
+                    page_state["state"] in {"blank", "unknown"}
+                    and current_context == "unknown"
+                ):
+                    self.log.debug(
+                        f"[页面状态] 学习流程等待稳定: "
+                        f"state={page_state['state']} url={page_state['url'] or '<blank>'}"
+                    )
+                    time.sleep(1)
                     continue
 
                 # ----------------------------------------------------------
@@ -1262,9 +1503,43 @@ class StudyMixin(BaseMixin):
 
                 # ----------------------------------------------------------
                 # 当前 Tab 已无更多内容：切换到下一个 Tab
+                # 在判定无课前，先确认当前页面已恢复到课程列表上下文，
+                # 避免验证码/播放器中间态导致误判整页为空。
                 # ----------------------------------------------------------
+                if not self._return_to_chapter_list():
+                    self.log.warning(
+                        "[Tab] 当前不在课程列表页，且自动返回失败，等待页面恢复后重试"
+                    )
+                    time.sleep(2)
+                    continue
+
+                time.sleep(1)
+                if self._current_tab_has_unfinished_courses(
+                    study_mode, completed_courses, failed_courses
+                ):
+                    retry_fchl_target = self._find_fchl_target(
+                        study_mode, failed_courses, completed_courses
+                    )
+                    retry_img_target = self._find_course_target(
+                        self._page.locator(img_sel),
+                        failed_courses,
+                        completed_courses,
+                    )
+                    if retry_fchl_target is not None or retry_img_target is not None:
+                        self.log.info(
+                            "[Tab] 检测到当前 Tab 仍有未完成课程，等待页面刷新后重试"
+                        )
+                        time.sleep(2)
+                        continue
+
+                    self.log.warning(
+                        "[Tab] 当前 Tab 仍有未完成课程，但均已标记为失败课程，结束当前 Tab 以避免死循环"
+                    )
+
                 self.log.info("[Tab] 当前 Tab 已无未完成课程，尝试切换下一个 Tab")
-                if self._try_next_study_tab(state):
+                if self._try_next_study_tab(
+                    state, study_mode, completed_courses, failed_courses
+                ):
                     failed_courses.clear()
                     completed_courses.clear()
                     time.sleep(1)
@@ -1302,10 +1577,11 @@ class StudyMixin(BaseMixin):
                 # 普通模式：进入下一个项目
                 failed_courses.clear()
                 completed_courses.clear()
+                round_completed = 0
                 if not self._goto_next_project(state, completed_projects):
                     self.log.info("所有学习项目已完成，退出学习流程。")
                     return
-                break
+                continue
 
             except Exception as e:
                 self.log.error(f"学习主循环异常：{e}", exc_info=True)
@@ -1323,9 +1599,9 @@ class StudyMixin(BaseMixin):
         self.log.info("课程阅读时长已达标")
 
     def finish_study(self) -> None:
-        pass
         """标记当前学习任务完成。"""
         try:
-            self._page.evaluate("finishWxCourse()")
+            if self._page:
+                self._page.evaluate("finishWxCourse()")
         except Exception:
             pass

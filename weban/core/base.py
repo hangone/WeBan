@@ -12,10 +12,10 @@ class BaseMixin:
     """所有 Mixin 的基类，包含共用的工具方法和类型声明。"""
 
     if TYPE_CHECKING:
-        _page: Page
-        _context: BrowserContext
-        _browser: Browser
-        _playwright: Playwright
+        _page: "Page | None"
+        _context: "BrowserContext | None"
+        _browser: "Browser | None"
+        _playwright: "Playwright | None"
         log: "_Union[_logging.Logger, _logging.LoggerAdapter]"
         base_url: str
         token: str
@@ -25,8 +25,99 @@ class BaseMixin:
         password: str
         browser_config: "BrowserConfig"
         answers: Dict[str, Any]
+        current_url: str
+        current_hash: str
+        page_state: Dict[str, Any]
 
     # _clean_text moved to weban.app.runtime.clean_text
+
+    def _get_current_url(self) -> str:
+        """安全获取当前页面 URL。"""
+        if not self._page:
+            return ""
+        try:
+            return (self._page.url or "").strip()
+        except Exception:
+            return ""
+
+    def _refresh_page_state(self) -> Dict[str, Any]:
+        """刷新并缓存当前 SPA 页面状态。"""
+        url = self._get_current_url()
+        hash_part = ""
+        path = ""
+        query: Dict[str, str] = {}
+
+        if "#/" in url:
+            hash_part = url.split("#/", 1)[1]
+        elif "#" in url:
+            hash_part = url.split("#", 1)[1]
+
+        if hash_part:
+            path = hash_part.split("?", 1)[0].strip("/")
+            query_str = hash_part.split("?", 1)[1] if "?" in hash_part else ""
+            if query_str:
+                for part in query_str.split("&"):
+                    if not part:
+                        continue
+                    key, _, value = part.partition("=")
+                    if key:
+                        query[key] = value
+
+        state = "unknown"
+        if not url:
+            state = "blank"
+        elif "learning-task-list" in url:
+            state = "project_list"
+        elif any(k in url for k in ["study", "course", "resource"]):
+            state = "study"
+        elif any(k in url for k in ["exam", "paper", "review"]):
+            state = "exam"
+
+        if self._page:
+            try:
+                if self._page.locator(".quest-stem, .quest-option-item").count() > 0:
+                    state = "exam_question"
+                elif (
+                    self._page.locator(
+                        ".score-num, .score, .exam-score, .result-score, .score-text"
+                    ).count()
+                    > 0
+                ):
+                    state = "exam_result"
+                elif (
+                    self._page.locator(
+                        ".van-collapse-item, .img-texts-item, .fchl-item"
+                    ).count()
+                    > 0
+                ):
+                    state = "course_list"
+                elif self._page.locator(".task-block, .img-text-block").count() > 0:
+                    state = "project_list"
+            except Exception:
+                pass
+
+        self.current_url = url
+        self.current_hash = hash_part
+        self.page_state = {
+            "url": url,
+            "hash": hash_part,
+            "path": path,
+            "query": query,
+            "state": state,
+        }
+        return self.page_state
+
+    def _ensure_page_state(
+        self, expected_states: set[str] | None = None
+    ) -> Dict[str, Any]:
+        """获取当前页面状态，并在需要时校验状态是否符合预期。"""
+        page_state = self._refresh_page_state()
+        if expected_states and page_state["state"] not in expected_states:
+            self.log.debug(
+                f"[页面状态] 当前 state={page_state['state']} "
+                f"url={page_state['url'] or '<blank>'}"
+            )
+        return page_state
 
     def _sleep_with_progress(self, seconds: int) -> None:
         """带进度条或分阶段日志的休眠，并在休眠期间定期检测异常。"""
