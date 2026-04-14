@@ -4,7 +4,6 @@ import logging
 from .base import BaseMixin
 
 from playwright.sync_api import sync_playwright
-from playwright._impl._errors import TargetClosedError
 
 if TYPE_CHECKING:
     import logging as _logging
@@ -95,10 +94,8 @@ class BrowserMixin(BaseMixin):
                 if self._context and self._page:
                     _ = self._page.url  # 触发一次属性访问，若已关闭会抛出异常
                 return
-            except TargetClosedError:
-                self.log.warning("检测到浏览器/上下文已被异常关闭，正在重新启动...")
-                self._stop()
             except Exception:
+                self.log.warning("检测到浏览器/上下文已被异常关闭，正在重新启动...")
                 self._stop()
 
         # 启动 Playwright 并选择浏览器引擎
@@ -120,6 +117,8 @@ class BrowserMixin(BaseMixin):
                 "--mute-audio",  # 静音，避免视频声音干扰
                 "--disable-blink-features=AutomationControlled",  # 禁用自动化标识
                 "--disable-infobars",  # 隐藏"Chrome 正受到自动化软件控制"信息栏
+                "--disable-dev-shm-usage",  # 避免共享内存问题
+                "--no-sandbox",  # 避免沙箱问题
             ],
         )
 
@@ -131,6 +130,7 @@ class BrowserMixin(BaseMixin):
                     "AppleWebKit/605.1.15 (KHTML, like Gecko) "
                     "Version/17.4 Mobile/15E148 Safari/604.1"
                 ),
+                viewport={"width": 390, "height": 844},  # iPhone 14 Pro 视口
             )
         else:
             raise RuntimeError("Failed to initialize browser")
@@ -142,6 +142,17 @@ class BrowserMixin(BaseMixin):
         if self._context:
             self._context.set_default_timeout(self.browser_config.timeout_ms)
             self._page = self._context.new_page()
+
+            # 监听页面崩溃
+            self._page.on("crash", lambda _: self.log.warning("页面崩溃检测"))
+            self._page.on(
+                "console",
+                lambda msg: (
+                    self.log.debug(f"[浏览器控制台] {msg.type}: {msg.text}")
+                    if msg.type == "error"
+                    else None
+                ),
+            )
         else:
             raise RuntimeError("Failed to initialize browser context")
 

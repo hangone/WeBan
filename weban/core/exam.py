@@ -21,7 +21,7 @@ from .const import (
     SEL_ANSWER_CARD_BTN,
     SEL_COURSE_LIST_MARKERS,
 )
-from .captcha import handle_click_captcha, has_captcha
+from .captcha import handle_tencent_captcha, has_captcha
 from .base import BaseMixin
 from playwright._impl._errors import TargetClosedError
 
@@ -62,16 +62,27 @@ class ExamMixin(BaseMixin):
             raise RuntimeError("Page is not initialized")
         dialogs = self._page.locator(SEL_DIALOG)
 
+        self.log.debug(f"[对话框] 找到 {dialogs.count()} 个对话框元素")
+
         for i in range(dialogs.count()):
             d = dialogs.nth(i)
             if not d.is_visible():
+                self.log.debug(f"[对话框] 对话框 {i} 不可见，跳过")
                 continue
             text = d.inner_text().strip().replace("\n", " ")
+            self.log.debug(f"[对话框] 对话框 {i} 内容: {text}")
 
             # 1. 拒绝类（无法考试）
             if any(
                 k in text
-                for k in ["未开放", "已关闭", "不允许", "暂无考试机会", "次数已用"]
+                for k in [
+                    "未开放",
+                    "已关闭",
+                    "不允许",
+                    "暂无考试机会",
+                    "次数已用",
+                    "课程学习未完成",
+                ]
             ):
                 self.log.warning(f"无法考试: {text}")
                 btn = d.locator(SEL_CONFIRM_BTN).first
@@ -489,21 +500,59 @@ class ExamMixin(BaseMixin):
 
             # 检查考试项
             items = self._page.locator(".exam-item")
+            self.log.info(f"[考试] 找到 {items.count()} 个考试项")
             for j in range(items.count()):
                 it = items.nth(j)
+                exam_title = it.locator(".exam-item-title").first
+                exam_title_text = (
+                    exam_title.inner_text().strip()
+                    if exam_title.count() > 0
+                    else "未知标题"
+                )
+                self.log.info(f"[考试] 检查考试项 {j + 1}: {exam_title_text}")
+
                 p_span = it.locator(".exam-item-title .exam-pass")
+                p_span_count = p_span.count()
+                self.log.debug(f"[考试] 合格标记元素数量: {p_span_count}")
+                if p_span_count > 0:
+                    p_text = (
+                        p_span.first.inner_text().strip()
+                        if p_span.first.is_visible()
+                        else ""
+                    )
+                    self.log.debug(f"[考试] 合格标记文本: '{p_text}'")
+
                 if exam_mode == "true" and p_span.count() > 0:
-                    self.log.info(f"[及格跳过] {title} 子项已合格")
+                    self.log.info(f"[及格跳过] {exam_title_text} 子项已合格")
                     continue
 
-                join = it.locator('button.exam-button:has-text("参加考试")').first
+                # 支持更多样式的考试按钮
+                join = it.locator(
+                    'button.exam-button:has-text("参加考试"), button.exam-button:has-text("开始考试"), button.exam-button:has-text("模拟考试")'
+                ).first
                 if not join.is_visible():
-                    continue
-                join.click()
-                time.sleep(1.5)
+                    # van-cell 或其他容器内的按钮
+                    join = (
+                        it.locator("button, .van-button")
+                        .filter(has_text=re.compile(r"参加|开始|模拟|去"))
+                        .first
+                    )
+                    if join.count() == 0 or not join.is_visible():
+                        continue
 
-                if self._handle_exam_dialog(exam_mode) == "return":
+                join.click()
+                time.sleep(2)
+
+                dialog_result = self._handle_exam_dialog(exam_mode)
+                if dialog_result == "return":
+                    self.log.info(
+                        f"[考试] 弹窗决策: 跳过当前考试 (dialog_result={dialog_result})"
+                    )
                     continue
+                else:
+                    self.log.info(
+                        f"[考试] 弹窗决策: 继续处理 (dialog_result={dialog_result})"
+                    )
 
                 # --- 进入答题 ---
                 self.log.info(f"[答题] 开始作答：{title}")
@@ -529,18 +578,25 @@ class ExamMixin(BaseMixin):
                             if not has_captcha(self._page):
                                 break
                             self.log.info("[验证码] 检测到考试验证码，正在自动处理...")
-                            handle_click_captcha(self._page, self.log)
+                            handle_tencent_captcha(self._page, self.log)
                             time.sleep(2)
 
-                    # 等待进入正式答题页或结果页，避免 SPA 尚未切换完成就开始按题目逻辑执行
+                    # 延长考试页面加载等待时间至 20s，应对某些学校节点的缓慢响应
                     if not self._wait_for_exam_context(
-                        {"question", "result"}, timeout_sec=10
+                        {"question", "result"}, timeout_sec=20
                     ):
+                        exam_context = self._get_exam_page_context()
                         page_state = self._ensure_page_state()
                         self.log.warning(
-                            f"答题页加载超时，当前 state={page_state['state']} "
+                            f"答题页加载超时 (20s)，当前 context={exam_context} state={page_state['state']} "
                             f"url={page_state['url'] or '<blank>'}，尝试继续探测..."
                         )
+                        # 如果已经在考试列表或课程页，说明进入考试失败，直接跳过当前项
+                        if exam_context in {"exam-list", "course"}:
+                            self.log.warning(
+                                f"未能进入答题页面（当前处于 {exam_context}），跳过项：{title}"
+                            )
+                            continue
 
                     # --- 执行题目搜索与勾选 ---
                     should_submit = self._do_answering(
@@ -631,6 +687,7 @@ class ExamMixin(BaseMixin):
         same_count = 0
         force_advance_attempts = 0
 
+        invalid_context_count = 0
         for _ in range(500):
             time.sleep(1.2)
 
@@ -642,12 +699,20 @@ class ExamMixin(BaseMixin):
                 break
 
             if exam_context not in {"question", "exam", "unknown"}:
+                invalid_context_count += 1
                 self.log.debug(
-                    f"[答题] 当前页面上下文为 {exam_context}，"
+                    f"[答题] 当前页面上下文为 {exam_context} ({invalid_context_count}/30)，"
                     f"state={page_state['state']} url={page_state['url'] or '<blank>'}"
                 )
+                if invalid_context_count > 30:
+                    self.log.warning(
+                        f"持续处于非答题上下文 {exam_context}，强制退出答题循环。"
+                    )
+                    break
                 time.sleep(1)
                 continue
+
+            invalid_context_count = 0
 
             # 1. 检测弹窗
             try:
@@ -866,6 +931,11 @@ class ExamMixin(BaseMixin):
                 else []
             )
 
+            # 记录题型信息用于调试
+            question_type = item.get("type", 1) if item else 1
+            if question_type == 2:
+                self.log.debug(f"   [题型] 多选题，正确答案数量: {len(ans_opts)}")
+
             # 4. 日志并点击
             opt_texts = []
             all_opt_texts = []
@@ -930,27 +1000,52 @@ class ExamMixin(BaseMixin):
 
             found = False
             if ans_opts:
+                question_type = item.get("type", 1) if item else 1
+                clicked_count = 0
                 for i in range(options_count):
                     opt = options.nth(i)
                     octext = ignore_symbols(opt.inner_text())
+                    should_click = False
                     for a in ans_opts:
                         c_a = ignore_symbols(a)
                         if c_a and octext and (c_a in octext or octext in c_a):
-                            opt.click(force=True, timeout=5000)
-                            # 确保点击生效：ExamPage.vue 中选中态会给 quest-option-item 增加 selected class
-                            try:
-                                for _ in range(15):
-                                    cls = (opt.get_attribute("class") or "").lower()
-                                    if "selected" in cls:
-                                        break
-                                    time.sleep(0.1)
-                            except Exception:
-                                pass
-                            found = True
+                            should_click = True
+                            self.log.debug(f"   [匹配] 选项 {chr(65 + i)}: {a[:30]}...")
+                            break
+
+                    if should_click:
+                        self.log.debug(f"   [点击] 选项 {chr(65 + i)}")
+                        opt.click(force=True, timeout=5000)
+                        clicked_count += 1
+                        # 确保点击生效：ExamPage.vue 中选中态会给 quest-option-item 增加 selected class
+                        try:
+                            for _ in range(15):
+                                cls = (opt.get_attribute("class") or "").lower()
+                                if "selected" in cls:
+                                    self.log.debug(
+                                        f"   [状态] 选项 {chr(65 + i)} 已选中"
+                                    )
+                                    break
+                                time.sleep(0.1)
+                        except Exception:
+                            pass
+                        found = True
+
+                if question_type == 2:
+                    self.log.debug(
+                        f"   [多选题] 应选 {len(ans_opts)} 个，已点击 {clicked_count} 个"
+                    )
 
                 if found:
                     matched += 1
-                    time.sleep(random.randint(q_time, q_time + q_offset))
+                    # 对于多选题，等待更长时间确保所有选项点击生效
+                    wait_time = random.randint(q_time, q_time + q_offset)
+                    if question_type == 2 and clicked_count > 1:
+                        wait_time = max(wait_time, 3)  # 多选题至少等待3秒
+                        self.log.debug(
+                            f"   [等待] 多选题等待 {wait_time} 秒确保状态更新"
+                        )
+                    time.sleep(wait_time)
 
                     # 记录推进前的题目/指示器，用于判断是否真正切到下一题
                     prev_title = title

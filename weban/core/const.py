@@ -107,28 +107,31 @@ SEL_BTN_NEXT_STEP = (
     "button:has-text('下一步'), a:has-text('下一步'), "
     "button:has-text('同意'), a:has-text('同意')"
 )
-SEL_COURSE_LIST_MARKERS = (
-    ".van-collapse-item, .img-texts-item, .fchl-item, .task-block, .img-text-block"
-)
-SEL_COURSE_LIST_WAIT_TARGETS = ".van-collapse-item, .img-texts-item, .fchl-item, .task-block, .img-text-block, #agree"
-SEL_IMG_TEXT_ITEM = ".img-texts-item"
-SEL_IMG_TEXT_ITEM_VISIBLE = ".img-texts-item:visible"
-SEL_IMG_TEXT_ITEM_NOT_PASSED = ".img-texts-item:not(.passed)"
-SEL_IMG_TEXT_ITEM_NOT_PASSED_VISIBLE = ".img-texts-item:not(.passed):visible"
+SEL_COURSE_LIST_MARKERS = ".van-collapse-item, .img-texts-item, .fchl-item"
+SEL_COURSE_LIST_WAIT_TARGETS = ".van-collapse-item, .img-texts-item, .fchl-item, .task-block, .img-text-block, #agree, .van-cell"
+SEL_IMG_TEXT_ITEM = ".img-texts-item, .img-text-item, .img-text-block-item, .course-item, .lesson-item, .list-item, .van-cell"
+SEL_IMG_TEXT_ITEM_VISIBLE = ".img-texts-item:visible, .img-text-item:visible, .img-text-block-item:visible, .course-item:visible, .lesson-item:visible, .list-item:visible, .van-cell:visible"
+SEL_IMG_TEXT_ITEM_NOT_PASSED = ".img-texts-item:not(.passed), .img-text-item:not(.passed), .img-text-block-item:not(.passed), .course-item:not(.passed), .lesson-item:not(.passed), .list-item:not(.passed), .van-cell:not(.passed)"
+SEL_IMG_TEXT_ITEM_NOT_PASSED_VISIBLE = ".img-texts-item:not(.passed):visible, .img-text-item:not(.passed):visible, .img-text-block-item:not(.passed):visible, .course-item:not(.passed):visible, .lesson-item:not(.passed):visible, .list-item:not(.passed):visible, .van-cell:not(.passed):visible"
 
-SEL_FCHL_ITEM = ".fchl-item"
-SEL_FCHL_ITEM_VISIBLE = ".fchl-item:visible"
-SEL_FCHL_ITEM_NOT_PASSED = ".fchl-item:not(.fchl-item-active)"
-SEL_FCHL_ITEM_NOT_PASSED_VISIBLE = ".fchl-item:not(.fchl-item-active):visible"
-SEL_COLLAPSE_ITEM = ".van-collapse-item"
-SEL_COLLAPSE_ITEM_TITLE = ".van-collapse-item__title"
+SEL_FCHL_ITEM = ".fchl-item, .fchl-items, .course-item-fchl"
+SEL_FCHL_ITEM_VISIBLE = ".fchl-item:visible, .fchl-items:visible"
+SEL_FCHL_ITEM_NOT_PASSED = (
+    ".fchl-item:not(.fchl-item-active), .fchl-items:not(.fchl-item-active)"
+)
+SEL_FCHL_ITEM_NOT_PASSED_VISIBLE = ".fchl-item:not(.fchl-item-active):visible, .fchl-items:not(.fchl-item-active):visible"
+SEL_COLLAPSE_ITEM = ".van-collapse-item, .course-chapter, .chapter-list-item"
+SEL_COLLAPSE_ITEM_TITLE = ".van-collapse-item__title, .van-cell__title, .chapter-title"
 SEL_COLLAPSE_CELL_TITLE = ".van-cell__title"
 SEL_RUNTIME_BTN_BACKLIST = ".back-list"
 SEL_COMMENT_BACK_BTN = ".comment-footer-button:has-text('返回')"
 SEL_NAV_BAR_LEFT = ".van-nav-bar__left"
 SEL_DIALOG_PREV_BTN = ".pop-jsv-prev"
 SEL_DIALOG_POP = ".pop-jsv, .pop-jsv-prev"
-SEL_ITEM_TITLE_TEXT = ".title, .fchl-item-content-title"
+SEL_ITEM_TITLE_TEXT = ".title, .fchl-item-content-title, .van-cell__title, .img-texts-item-title, .course-name, .name, .lesson-name"
+SEL_TASK_OR_IMG_BLOCK = (
+    ".task-block, .img-text-block, .img-texts-item-block, .project-item, .van-card"
+)
 SEL_RUNTIME_MARKERS = (
     ".back-list, .btn-start, .btn-next, .btn-prev, .btn-at, .btn-af, .page-WH"
 )

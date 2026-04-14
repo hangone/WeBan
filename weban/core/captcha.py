@@ -48,10 +48,12 @@ _thread_local = threading.local()
 # ---------------------------------------------------------------------------
 _SEL_CAPTCHA_BG = (
     ".tencent-captcha-dy__verify-bg-img, .tencent-captcha-dy__verify-bg, "
-    ".tencent-captcha-dy__verify-img-area, .tencent-captcha-dy__verify"
+    ".tencent-captcha-dy__verify-img-area, .tencent-captcha-dy__verify, "
+    ".WPA3-SELECT-BG"
 )
 _SEL_CAPTCHA_PROMPT = (
-    ".tencent-captcha-dy__header-answer img, .tencent-captcha-dy__header-answer"
+    ".tencent-captcha-dy__header-answer img, .tencent-captcha-dy__header-answer, "
+    ".WPA3-SELECT-HINT"
 )
 _SEL_CAPTCHA_CONFIRM_BTN = (
     ".tencent-captcha-dy__verify-confirm-btn:not("
@@ -64,7 +66,8 @@ _SEL_CAPTCHA_ERROR_TIP = (
 _SEL_CAPTCHA_VISIBILITY_MARKERS = (
     ".tencent-captcha-dy__verify-bg-img, "
     "#tCaptchaDyContent, "
-    ".tencent-captcha-dy__header-answer"
+    ".tencent-captcha-dy__header-answer, "
+    ".WPA3-SELECT-PANEL"
 )
 
 
@@ -142,7 +145,7 @@ def _debug_save_ocr(label: str, img_bytes: bytes, code: str) -> None:
         pass
 
 
-def _ocr_captcha_with_retry(capt_img, ocr, log, max_retries: int = 6) -> Optional[str]:
+def _ocr_captcha_with_retry(capt_img, ocr, log, max_retries: int = 3) -> Optional[str]:
     """识别文字图片验证码（ddddocr），刷新后等待图片 src 变化再截图，最多重试 max_retries 次。
 
     参数：
@@ -152,7 +155,11 @@ def _ocr_captcha_with_retry(capt_img, ocr, log, max_retries: int = 6) -> Optiona
         max_retries - 最大刷新重试次数
     返回 4 位验证码字符串，识别失败则返回 None。
     """
-    img_bytes = capt_img.screenshot()
+    try:
+        img_bytes = capt_img.screenshot(timeout=5000, animations="disabled")
+    except Exception as e:
+        log.warning(f"[文字验证码] 截图失败: {e}")
+        return None
     code = ocr.classification(img_bytes)
     _debug_save_ocr("attempt0", img_bytes, code)
 
@@ -164,11 +171,9 @@ def _ocr_captcha_with_retry(capt_img, ocr, log, max_retries: int = 6) -> Optiona
         )
         try:
             old_src = capt_img.get_attribute("src") or ""
-            # 点击图片本身触发刷新
-            capt_img.click(force=True)
-            # 等待 src 属性变化，最多等 3 秒
-            for _ in range(30):
-                time.sleep(0.1)
+            capt_img.click(force=True, timeout=5000)
+            for _ in range(10):
+                time.sleep(0.2)
                 new_src = capt_img.get_attribute("src") or ""
                 if new_src and new_src != old_src:
                     break
@@ -177,7 +182,10 @@ def _ocr_captcha_with_retry(capt_img, ocr, log, max_retries: int = 6) -> Optiona
         except Exception as e:
             log.warning(f"[文字验证码] 刷新失败: {e}")
             time.sleep(1)
-        img_bytes = capt_img.screenshot()
+        try:
+            img_bytes = capt_img.screenshot(timeout=5000, animations="disabled")
+        except Exception:
+            break
         code = ocr.classification(img_bytes)
         _debug_save_ocr(f"attempt{attempt + 1}", img_bytes, code)
 
@@ -582,12 +590,23 @@ def _captcha_visible(frame) -> bool:
 
     用 Playwright 原生 is_visible() 检测，避免脚本注入。
     验证码弹出时核心容器必然可见，隐藏预加载时则不可见。
+    同时检查 URL 参数 cscapt=true，确保是真实激活的验证码。
     """
+    # 首先检查 URL 参数，只有 cscapt=true 时才可能是真实验证码
+    state = _get_captcha_url_state(frame)
+    if not state.get("has_cscapt_true"):
+        return False
+
     for sel in _SEL_CAPTCHA_VISIBILITY_MARKERS:
         try:
             el = frame.locator(sel)
-            if el.count() > 0 and el.first.is_visible():
-                return True
+            if el.count() > 0:
+                item = el.first
+                if item.is_visible():
+                    # 关键修复：增加宽高检查，避免 DOM 存在但高度为 0 的虚假元素
+                    bb = item.bounding_box()
+                    if bb and bb["width"] > 10 and bb["height"] > 10:
+                        return True
         except Exception:
             pass
     return False
@@ -700,51 +719,52 @@ def _log_captcha_contexts(page, log) -> None:
 
 
 def _find_captcha_context(page):
-    """仅在 mcwk 完成课程链路对应的 iframe 中查找验证码，返回 (ctx, vendor_hint)。
-
-    判定条件：
-    - 必须是子 iframe；
-    - iframe 必须存在真实 URL；
-    - iframe URL 必须同时包含 mcwk.mycourse.cn 与 cscapt=true；
-    - 且验证码核心元素必须真实可见。
-    """
+    """查找验证码上下文（支持 main_frame 和 iframe）。"""
     try:
-        contexts = list(page.frames)
-    except Exception:
-        contexts = []
+        # 1. 优先检查主页面（登录页常见）
+        if _captcha_visible(page.main_frame):
+            return page.main_frame, "主页面验证码"
 
-    seen = set()
-
-    for ctx in contexts:
-        try:
+        # 2. 检查 iframe（课程任务页常见）
+        frames = list(page.frames)
+        for ctx in frames:
             if ctx == page.main_frame:
                 continue
-
-            ctx_id = id(ctx)
-            if ctx_id in seen:
-                continue
-            seen.add(ctx_id)
-
-            state = _get_captcha_url_state(ctx)
-            if not state["has_url"]:
-                continue
-            if not state["is_mcwk"]:
-                continue
-            if not state["has_cscapt_true"]:
-                continue
-            if not _captcha_visible(ctx):
-                continue
-
-            return ctx, f"点选验证码(cscapt={state['cscapt']})"
-        except Exception:
-            pass
-
+            if _captcha_visible(ctx):
+                # 记录一下如果是来自 mcwk 的特殊标记
+                state = _get_captcha_url_state(ctx)
+                hint = f"iframe验证码(mcwk={state['is_mcwk']})"
+                return ctx, hint
+    except Exception:
+        pass
     return None, None
 
 
 def _find_captcha_frame(page):
     """兼容旧调用的别名，返回验证码 frame（不含 vendor_hint）。"""
     return _find_captcha_context(page)
+
+
+def handle_tencent_captcha(page, log) -> bool:
+    """自动处理腾讯系验证码（统一入口）。"""
+    ctx, hint = _find_captcha_context(page)
+    if ctx is None:
+        return False
+
+    # 根据平台特性判定：点选验证码仅出现在课程完成页（cscapt=true）
+    state = _get_captcha_url_state(ctx)
+    if not state.get("has_cscapt_true"):
+        # 学习过程中的验证码元素是预加载，不是真实弹窗，静默跳过
+        return False
+
+    log.info(f"[{hint}] 检测到腾讯点选验证码，开始自动识别处理...")
+    return handle_click_captcha(page, log)
+
+
+def handle_slider_captcha(page, ctx, log) -> bool:
+    """暂时保留滑块占位。"""
+    log.warning("[验证码] 暂未启用滑块处理逻辑")
+    return False
 
 
 def has_captcha(page) -> bool:
@@ -789,17 +809,30 @@ def handle_click_captcha(page, log) -> bool:
         prompt_el = prompt_el.first
         main_el = main_el.first
 
+        prompt_visible = False
+        main_visible = False
+
         try:
             prompt_el.wait_for(state="visible", timeout=5000)
+            prompt_visible = True
         except Exception:
             log.warning("[点选验证码] 提示图等待超时，尝试继续...")
         try:
             main_el.wait_for(state="visible", timeout=5000)
+            main_visible = True
         except Exception:
             log.warning("[点选验证码] 主背景图等待超时，尝试继续...")
+
+        if not prompt_visible and not main_visible:
+            log.warning("[点选验证码] 提示图和主背景图均不可见，跳过验证码处理")
+            return False
+
         time.sleep(0.5)
 
-        # ---- 获取提示图字节（优先 HTTP 下载，避免截图超时）----
+        if ctx.page.is_closed() if hasattr(ctx, "page") else False:
+            log.warning("[点选验证码] 页面已关闭，跳过验证码处理")
+            return False
+
         prompt_bytes, prompt_url = _fetch_element_image(ctx, prompt_el, log, "提示图")
 
         # 从提示图 URL 推导主图 URL（img_index=0 → img_index=1）
@@ -940,9 +973,8 @@ def _derive_main_url(prompt_url: str) -> Optional[str]:
 
 def _get_main_render_size(ctx, main_el, log) -> Optional[Tuple[float, float]]:
     """获取主图容器的渲染尺寸，优先使用 Playwright 原生 bounding_box()。"""
-    # 优先用 Playwright 原生接口
     try:
-        bb = main_el.bounding_box()
+        bb = main_el.bounding_box(timeout=3000)
         if bb and bb["width"] > 0 and bb["height"] > 0:
             log.debug(
                 f"[点选验证码] 主图渲染尺寸(bounding_box): {bb['width']:.0f}x{bb['height']:.0f}"
@@ -951,9 +983,9 @@ def _get_main_render_size(ctx, main_el, log) -> Optional[Tuple[float, float]]:
     except Exception:
         pass
 
-    # bounding_box 返回 0 时，遍历父容器选择器兜底
     try:
-        size = ctx.evaluate("""() => {
+        size = ctx.evaluate(
+            """() => {
             const sels = [
                 '.tencent-captcha-dy__verify-img-area',
                 '.tencent-captcha-dy__verify',
@@ -969,7 +1001,8 @@ def _get_main_render_size(ctx, main_el, log) -> Optional[Tuple[float, float]]:
                 }
             }
             return null;
-        }""")
+        }"""
+        )
         if size and len(size) == 2 and size[0] > 0 and size[1] > 0:
             log.debug(
                 f"[点选验证码] 主图渲染尺寸(evaluate fallback): {size[0]:.0f}x{size[1]:.0f}"
@@ -988,7 +1021,8 @@ def _fetch_frame_bg_image(ctx, log) -> Optional[bytes]:
     此函数需要 evaluate 读取 CSS 属性，无 Playwright 原生替代方案。
     """
     try:
-        urls = ctx.evaluate("""() => {
+        urls = ctx.evaluate(
+            """() => {
             const found = [];
             for (const el of document.querySelectorAll('*')) {
                 const style = el.getAttribute('style') || '';
@@ -999,7 +1033,8 @@ def _fetch_frame_bg_image(ctx, log) -> Optional[bytes]:
                 if (m) found.push(m[1]);
             }
             return [...new Set(found)];
-        }""")
+        }"""
+        )
         if not urls:
             return None
         log.debug(f"[点选验证码] 全局扫描找到 {len(urls)} 个背景图 URL")
@@ -1056,10 +1091,10 @@ def _fetch_element_image(
         except Exception:
             pass
 
-    # 3. JS computed style（evaluate 不可避免：Playwright 无读取 computedStyle 的原生 API）
     if not url:
         try:
-            result = el.evaluate("""el => {
+            result = el.evaluate(
+                """el => {
                 if (el.tagName === 'IMG') {
                     const src = el.src || el.getAttribute('src');
                     if (src && src.startsWith('http')) return src;
@@ -1070,7 +1105,8 @@ def _fetch_element_image(
                 const cs = window.getComputedStyle(el).backgroundImage;
                 m = cs.match(/url\\([\"']?(https?:\\/\\/[^\"')\\s]+)[\"']?\\)/);
                 return m ? m[1] : null;
-            }""")
+            }"""
+            )
             if result and result.startswith("http"):
                 url = result
         except Exception:
@@ -1099,13 +1135,29 @@ def _fetch_element_image(
         except Exception as e:
             log.warning(f"[点选验证码] {label} HTTP 下载失败: {e}，回退截图...")
 
-    # 5. 截图兜底（元素不可见时直接跳过，避免 30s 超时）
+    # 5. 截图兜底（元素不可见或尺寸异常时跳过，避免 29.9s 长挂超时）
     log.debug(f"[点选验证码] {label} 未提取到 URL，使用截图...")
     try:
-        if not el.is_visible():
+        try:
+            is_visible = el.is_visible()
+        except Exception:
+            is_visible = False
+
+        if not is_visible:
             log.debug(f"[点选验证码] {label} 元素不可见，跳过截图")
             return None, None
-        data = el.screenshot(timeout=10000)
+
+        bb = None
+        try:
+            bb = el.bounding_box(timeout=3000)
+        except Exception:
+            pass
+
+        if not bb or bb["width"] < 5 or bb["height"] < 5:
+            log.debug(f"[点选验证码] {label} 元素尺寸过小({bb})，跳过截图")
+            return None, None
+
+        data = el.screenshot(timeout=5000, animations="disabled")
         return data, None
     except Exception as e:
         log.warning(f"[点选验证码] {label} 截图失败: {e}")
@@ -1163,38 +1215,39 @@ def _click_captcha_point(page, ctx, main_el, point, log, idx: int) -> None:
     """
     x, y = float(point[0]), float(point[1])
 
-    # 尝试获取元素绝对位置，用于人类鼠标移动
     try:
-        bb = main_el.bounding_box()
+        if page.is_closed():
+            log.warning(f"[点选验证码] 页面已关闭，无法点击第 {idx + 1} 个坐标")
+            return
+    except Exception:
+        pass
+
+    try:
+        bb = main_el.bounding_box(timeout=3000)
         if bb:
             abs_x = bb["x"] + x
             abs_y = bb["y"] + y
 
-            # 从当前鼠标位置移动到目标点（贝塞尔曲线）
-            # 起点：元素左上角附近（模拟从图片边缘移入）
             start_x = bb["x"] + bb["width"] * random.uniform(0.05, 0.2)
             start_y = bb["y"] + bb["height"] * random.uniform(0.05, 0.2)
             _human_mouse_move(page, start_x, start_y, abs_x, abs_y, log)
 
-            # 落点随机微抖动（±2px），模拟手部轻微抖动
             jitter_x = abs_x + random.uniform(-2, 2)
             jitter_y = abs_y + random.uniform(-2, 2)
             page.mouse.move(jitter_x, jitter_y)
-            time.sleep(random.uniform(0.05, 0.15))  # 落点停顿
+            time.sleep(random.uniform(0.05, 0.15))
     except Exception as e:
         log.debug(f"[点选验证码] 贝塞尔移动失败（忽略）: {e}")
 
-    # Playwright 推荐方式：locator.click(position=...) —— 带相对坐标，不绕过可见性检查
     try:
-        main_el.click(position={"x": x, "y": y}, force=True)
+        main_el.click(position={"x": x, "y": y}, force=True, timeout=5000)
         log.debug(f"[点选验证码] 已点击第 {idx + 1} 个坐标 ({x:.0f}, {y:.0f})")
         return
     except Exception as e:
         log.debug(f"[点选验证码] locator.click 失败，尝试 mouse.click 兜底: {e}")
 
-    # 兜底：通过 bounding_box 计算绝对坐标，使用 Page 的 mouse 对象点击
     try:
-        bb = main_el.bounding_box()
+        bb = main_el.bounding_box(timeout=3000)
         if bb:
             abs_x = bb["x"] + x
             abs_y = bb["y"] + y

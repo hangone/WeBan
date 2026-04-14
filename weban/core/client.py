@@ -59,6 +59,9 @@ class WeBanClient(BrowserMixin, AuthMixin, StudyMixin, AnswerMixin, ExamMixin):
             "state": "blank",
         }
 
+        # 学习相关状态
+        self.project_title = ""
+
         # 共享资源锁
         self._answers_lock = threading.Lock()
 

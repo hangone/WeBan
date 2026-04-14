@@ -184,12 +184,34 @@ class TaskEngine:
                         f"(单任务时长: {task_settings.study_time}秒, "
                         f"模式: {task_settings.study_mode})"
                     )
-                    client.run_study(
+                    completion_stats = client.run_study(
                         study_time=task_settings.study_time,
                         study_mode=task_settings.study_mode,
                     )
 
-                if task_settings.exam_mode != "false":
+                    # 检查是否有未完成的课程
+                    if completion_stats.get("incomplete", 0) > 0:
+                        logger.warning(
+                            f"检测到 {completion_stats['incomplete']} 门课程未完成，跳过考试流程"
+                        )
+                        logger.info(
+                            f"课程完成情况 - 总计: {completion_stats['total']}, "
+                            f"已完成: {completion_stats['completed']}, "
+                            f"未完成: {completion_stats['incomplete']}"
+                        )
+                        # 不进入考试流程
+                    elif task_settings.exam_mode != "false":
+                        logger.info(
+                            f"所有课程已完成，开始考试流程 (模式: {task_settings.exam_mode})"
+                        )
+                        client.run_exam(
+                            exam_question_time=task_settings.exam_question_time,
+                            exam_question_time_offset=task_settings.exam_question_time_offset,
+                            random_answer=task_settings.random_answer,
+                            exam_mode=task_settings.exam_mode,
+                            exam_submit_match_rate=task_settings.exam_submit_match_rate,
+                        )
+                elif task_settings.exam_mode != "false":
                     logger.info(f"开始考试流程 (模式: {task_settings.exam_mode})")
                     client.run_exam(
                         exam_question_time=task_settings.exam_question_time,

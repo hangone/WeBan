@@ -6,8 +6,6 @@ import logging
 
 # OCR 函数统一在 captcha 模块中维护
 from .captcha import (
-    handle_click_captcha,
-    has_captcha,
     _get_ocr,
     _ocr_captcha_with_retry,
 )
@@ -22,7 +20,6 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 # Toast messages that indicate a permanent / non-retryable failure.
-# When any of these substrings appear we stop waiting and return early.
 _FATAL_ERROR_PATTERNS = (
     "账号不存在",
     "用户不存在",
@@ -40,7 +37,6 @@ _FATAL_ERROR_PATTERNS = (
 )
 
 # Toast messages that are retryable (captcha / password wrong → user may fix).
-# We log them as warnings but keep polling.
 _RETRYABLE_ERROR_PATTERNS = (
     "验证码",
     "密码",
@@ -50,21 +46,15 @@ _RETRYABLE_ERROR_PATTERNS = (
 
 
 def _classify_toast(msg: str) -> str:
-    """Classify a login toast message.
-
-    Returns:
-        'fatal'     – stop immediately, login cannot succeed
-        'retryable' – log warning and keep waiting
-        'ignore'    – unrelated toast, skip
-    """
     for pat in _FATAL_ERROR_PATTERNS:
         if pat in msg:
             return "fatal"
     for pat in _RETRYABLE_ERROR_PATTERNS:
         if pat in msg:
             return "retryable"
-    # Any other non-empty server message is worth showing but we keep waiting
     if msg.strip():
+        if "锁定" in msg or "停用" in msg or "禁用" in msg:
+            return "fatal"
         return "retryable"
     return "ignore"
 
@@ -99,6 +89,10 @@ _SEL_TOAST_MESSAGE = (
     ".mint-toast, .mint-toast-text, "
     ".van-dialog__message, .el-message__content"
 )
+_SEL_POPUP_CONFIRM = (
+    ".van-dialog__confirm, .mint-msgbox-confirm, "
+    "button:has-text('确定'), button:has-text('确认')"
+)
 
 
 class AuthMixin(BaseMixin):
@@ -124,7 +118,6 @@ class AuthMixin(BaseMixin):
         def _start(self) -> None: ...
 
     def _storage_has_auth(self) -> bool:
-        """检查 localStorage 中是否已写入登录态。"""
         if not self._page:
             return False
         try:
@@ -137,7 +130,6 @@ class AuthMixin(BaseMixin):
             return False
 
     def _has_login_form(self) -> bool:
-        """检测当前页面是否出现登录表单元素组，用于判断是否已跳转到登录页。"""
         if not self._page:
             return False
         try:
@@ -146,8 +138,12 @@ class AuthMixin(BaseMixin):
                 return False
             for i in range(min(loc.count(), 8)):
                 try:
-                    if loc.nth(i).is_visible():
-                        return True
+                    it = loc.nth(i)
+                    if it.is_visible():
+                        # 检查尺寸，防止幽灵元素
+                        bb = it.bounding_box()
+                        if bb and bb["width"] > 5 and bb["height"] > 5:
+                            return True
                 except Exception:
                     continue
             return False
@@ -155,7 +151,6 @@ class AuthMixin(BaseMixin):
             return False
 
     def _has_post_login_markers(self) -> bool:
-        """检查登录后首页/任务页的关键元素是否已出现。"""
         if not self._page:
             return False
         try:
@@ -164,7 +159,6 @@ class AuthMixin(BaseMixin):
             return False
 
     def _is_logged_in(self) -> bool:
-        """检查当前页面是否已登录。综合 URL、localStorage 和页面结构判断。"""
         if not self._page:
             return False
         try:
@@ -180,28 +174,70 @@ class AuthMixin(BaseMixin):
             has_login_form = self._has_login_form()
             has_post_login_markers = self._has_post_login_markers()
 
-            # 登录页且表单仍可见，认为尚未登录成功
             if ("#/login" in url or "/login" in url.split("#")[0]) and has_login_form:
                 return False
-
-            # 出现登录后页面特征，直接视为成功
             if has_post_login_markers:
                 return True
-
-            # 某些单页应用场景下 URL 还没切走，但 localStorage 已写入且表单消失
             if has_auth and not has_login_form:
                 return True
-
-            # 不在登录页、且 localStorage 已有登录态，也视为成功
             if "#/login" not in url and "/login" not in url.split("#")[0] and has_auth:
                 return True
-
             return False
         except Exception:
             return False
 
+    def _handle_auth_response(self, response: Any) -> None:
+        """拦截登录 API 响应，直接提取 Token 和用户信息。"""
+        try:
+            url = response.url
+            if "login.do" in url and response.status == 200:
+                res = response.json()
+                if isinstance(res, dict) and str(res.get("code")) == "0":
+                    data = res.get("data") or {}
+                    token = data.get("token")
+                    user = data.get("user") or {}
+                    if token:
+                        self.token = token
+                        self._auth_captured = True
+                        self.log.info(
+                            f"[网络拦截] 发现有效登录 Token：{user.get('userName') or '用户'}"
+                        )
+                        if user.get("userId"):
+                            self.user_id = str(user.get("userId"))
+                        tenant_name_val = user.get("tenantName")
+                        if tenant_name_val:
+                            self.tenant_name = str(tenant_name_val)
+        except Exception:
+            pass
+
+    def _handle_login_popups(self) -> bool:
+        if not self._page:
+            return False
+        try:
+            confirm_btn = self._page.locator(_SEL_POPUP_CONFIRM).first
+            if confirm_btn.count() > 0 and confirm_btn.is_visible():
+                msg_text = "提示"
+                try:
+                    for sel in [
+                        ".mint-msgbox-message",
+                        ".van-dialog__message",
+                        ".el-message__content",
+                    ]:
+                        msg_el = self._page.locator(sel).first
+                        if msg_el.count() > 0 and msg_el.is_visible():
+                            msg_text = msg_el.inner_text().strip()
+                            break
+                except Exception:
+                    pass
+                self.log.info(f"[登录辅助] 处理弹窗: {msg_text[:60]}...")
+                confirm_btn.click(force=True)
+                time.sleep(1)
+                return True
+        except Exception:
+            pass
+        return False
+
     def _navigate_and_check_login(self) -> bool:
-        """导航到任务页后检查是否已登录。"""
         if not self._page:
             return False
         try:
@@ -215,16 +251,26 @@ class AuthMixin(BaseMixin):
             return False
 
     def login(self) -> Dict[str, Any]:
-        self._start()
+        try:
+            self._start()
+        except Exception as e:
+            self.log.error(f"浏览器启动失败: {e}")
+            return {"ok": False, "msg": f"浏览器启动失败: {e}"}
 
-        # 检查 _page 是否已初始化
         if not self._page:
             raise RuntimeError("Page is not initialized")
+
+        # 检查页面是否已关闭
+        def is_page_valid() -> bool:
+            try:
+                return self._page is not None and not self._page.is_closed()
+            except Exception:
+                return False
 
         def _extract_user_result() -> Dict[str, Any]:
             result: Dict[str, Any] = {"ok": True}
             try:
-                if not self._page:
+                if not self._page or self._page.is_closed():
                     return result
                 user_data = self._page.evaluate("localStorage.getItem('user')")
                 if user_data:
@@ -237,10 +283,11 @@ class AuthMixin(BaseMixin):
                 pass
             return result
 
-        # --- Token 注入模式 ---
-        injected = False
         if self.user_id and self.token:
             self.log.info("检测到配置了 userId 和 token，尝试直接使用...")
+            if not is_page_valid():
+                self.log.warning("页面已关闭，尝试重新启动浏览器...")
+                self._start()
             self._page.goto(f"{self.base_url}/#/", wait_until="domcontentloaded")
             self._page.evaluate(f"""
                 localStorage.setItem('token', '{self.token}');
@@ -252,169 +299,147 @@ class AuthMixin(BaseMixin):
             """)
             self._page.reload(wait_until="domcontentloaded")
             time.sleep(2)
-            injected = True
             if self._is_logged_in():
                 self.log.info("使用配置的 Token 登录成功")
                 return _extract_user_result()
-            else:
-                self.log.warning("提供的 Token 无效或已过期，自动尝试账号密码登录...")
 
-        if not injected:
-            # 直接导航到首页，让它跳转到登录页
-            self._page.goto(f"{self.base_url}/#/", wait_until="domcontentloaded")
-            time.sleep(1)
+        if not is_page_valid():
+            self.log.warning("页面已关闭，尝试重新启动浏览器...")
+            self._start()
 
+        self._page.goto(f"{self.base_url}/#/", wait_until="domcontentloaded")
+        time.sleep(1)
         self.log.info("进入登录流程")
+        self._auth_captured = False
 
-        # --- 选择学校 ---
-        if self.tenant_name:
-            try:
-                tenant_input = self._page.locator(_SEL_INPUT_TENANT)
-                tenant_input.wait_for(state="visible", timeout=5000)
-                tenant_input.click()
-                time.sleep(0.5)
-                self._page.locator(_SEL_INPUT_TENANT_SEARCH).fill(self.tenant_name)
-                time.sleep(0.5)
-                self._page.locator(
-                    f".van-cell__title span:text-is('{self.tenant_name}')"
-                ).first.click()
-                time.sleep(0.5)
-                # 等待学校选择的遮罩层或弹窗消失，避免阻挡后续点击
+        self._page.on("response", self._handle_auth_response)
+        try:
+            # --- 选择学校 ---
+            if self.tenant_name:
                 try:
-                    self._page.locator(_SEL_MODAL_OVERLAY).wait_for(
-                        state="hidden", timeout=3000
-                    )
-                except Exception:
-                    pass
-            except Exception as e:
-                self.log.warning(f"自动选择学校失败，等待手动选择: {e}")
-
-        # --- 填写账号密码 ---
-        if self.account and self.password:
-            try:
-                acc_input = self._page.locator(_SEL_INPUT_ACCOUNT).first
-                acc_input.wait_for(state="visible", timeout=5000)
-                acc_input.fill(self.account)
-
-                pwd_input = self._page.locator(_SEL_INPUT_PASSWORD).first
-                pwd_input.wait_for(state="visible", timeout=5000)
-                pwd_input.fill(self.password)
-
-                # 图片验证码
-                capt_img = self._page.locator(_SEL_CAPTCHA_IMG).first
-                try:
-                    capt_img.wait_for(state="visible", timeout=5000)
-                except Exception:
-                    pass
-
-                if capt_img.is_visible():
+                    tenant_input = self._page.locator(_SEL_INPUT_TENANT)
+                    tenant_input.wait_for(state="visible", timeout=5000)
+                    tenant_input.click()
+                    time.sleep(0.5)
+                    self._page.locator(_SEL_INPUT_TENANT_SEARCH).fill(self.tenant_name)
+                    time.sleep(0.5)
+                    self._page.locator(
+                        f".van-cell__title span:text-is('{self.tenant_name}')"
+                    ).first.click()
+                    time.sleep(0.5)
                     try:
+                        self._page.locator(_SEL_MODAL_OVERLAY).wait_for(
+                            state="hidden", timeout=3000
+                        )
+                    except Exception:
+                        pass
+                except Exception as e:
+                    self.log.warning(f"自动选择学校失败: {e}")
+
+                for _ in range(2):
+                    if self._handle_login_popups():
+                        time.sleep(0.5)
+                    else:
+                        break
+
+            # --- 填写账号密码 ---
+            if self.account and self.password:
+                try:
+                    acc_input = self._page.locator(_SEL_INPUT_ACCOUNT).first
+                    acc_input.wait_for(state="visible", timeout=5000)
+                    acc_input.fill(self.account)
+                    pwd_input = self._page.locator(_SEL_INPUT_PASSWORD).first
+                    pwd_input.wait_for(state="visible", timeout=5000)
+                    pwd_input.fill(self.password)
+
+                    capt_img = self._page.locator(_SEL_CAPTCHA_IMG).first
+                    try:
+                        capt_img.wait_for(state="visible", timeout=5000)
+                    except Exception:
+                        pass
+
+                    if capt_img.is_visible():
                         ocr = _get_ocr()
                         code = _ocr_captcha_with_retry(capt_img, ocr, self.log)
-                        if code is None:
-                            self.log.warning(
-                                "[文字验证码] 识别失败，跳过自动填写，等待手动输入"
-                            )
-                        else:
-                            self.log.debug(f"[文字验证码] ddddocr 识别结果: {code}")
+                        if code:
+                            self.log.debug(f"[文字验证码] 识别结果: {code}")
                             capt_input = self._page.locator(_SEL_CAPTCHA_INPUT).first
-                            capt_input.wait_for(state="visible", timeout=2000)
-                            capt_input.fill(code)
-                    except Exception as e:
-                        self.log.error(f"[文字验证码] 处理失败: {e}")
+                            if capt_input.is_visible():
+                                capt_input.fill(code)
 
-                # 点击登录按钮（a.loginp-submit 是 Login.vue 中唯一的提交按钮）
-                try:
                     submit_loc = self._page.locator(_SEL_LOGIN_SUBMIT_BTN)
                     if submit_loc.count() > 0:
                         submit_loc.first.click(force=True)
                     else:
                         self._page.keyboard.press("Enter")
+                    time.sleep(2)
+                except Exception as e:
+                    self.log.warning(f"自动填写表单失败: {e}")
+
+            # --- 轮询等待 ---
+            deadline = time.time() + self.browser_config.manual_login_timeout_sec
+            _last_reported: set = set()
+            _auth_detected_at: float | None = None
+            _last_was_tencent: bool = False
+
+            while time.time() < deadline:
+                if not is_page_valid():
+                    self.log.warning("页面已关闭，退出登录流程")
+                    return {"ok": False, "msg": "页面已关闭"}
+
+                if self._is_logged_in() or getattr(self, "_auth_captured", False):
+                    self.log.info("登录成功")
+                    return _extract_user_result()
+
+                try:
+                    has_auth = self._storage_has_auth()
+                    has_form = self._has_login_form()
+                    if has_auth and not has_form:
+                        if _auth_detected_at is None:
+                            _auth_detected_at = time.time()
+                            self.log.info("发现登录态，等待跳转...")
+                        elif time.time() - _auth_detected_at >= 2:
+                            if self._navigate_and_check_login():
+                                return _extract_user_result()
+                    else:
+                        _auth_detected_at = None
                 except Exception:
-                    self._page.keyboard.press("Enter")
-                time.sleep(2)
-            except Exception as e:
-                self.log.warning(f"自动填写账号密码失败，等待手动输入: {e}")
+                    pass
 
-        # --- 轮询等待登录成功 ---
-        deadline = time.time() + self.browser_config.manual_login_timeout_sec
-        _last_reported: set = set()  # 已上报过的 toast，避免重复刷屏
-        _auth_detected_at: float | None = None
-
-        while time.time() < deadline:
-            # 优先直接判断是否已经登录成功
-            if self._is_logged_in():
-                self.log.info("登录成功")
-                return _extract_user_result()
-
-            # 某些手动登录场景下会先写入 localStorage，再异步跳转页面
-            try:
-                has_auth = self._storage_has_auth()
-                has_login_form = self._has_login_form()
-
-                if has_auth and not has_login_form:
-                    if _auth_detected_at is None:
-                        _auth_detected_at = time.time()
-                        self.log.info("检测到登录态已写入，等待页面完成跳转...")
-                    elif time.time() - _auth_detected_at >= 2:
-                        if self._navigate_and_check_login():
-                            self.log.info("登录成功")
-                            return _extract_user_result()
-                else:
-                    _auth_detected_at = None
-            except Exception:
+                # 注：登录页通常只有文字验证码，不需要检查点选验证码
+                # 腾讯点选验证码主要出现在课程完成页，不在登录页
+                # 因此这里注释掉点选验证码检查，避免误判
                 pass
 
-            # ---- 点选验证码 ----
-            try:
-                if has_captcha(self._page):
-                    self.log.info("[点选验证码] 检测到点选验证码，尝试自动识别...")
-                    handle_click_captcha(self._page, self.log)
-            except Exception:
-                break
+                self._handle_login_popups()
 
-            # ---- 检测页面 Toast / Dialog 错误提示 ----
-            try:
-                raw_msgs = self._page.locator(_SEL_TOAST_MESSAGE).all_inner_texts()
-                msgs = [m.strip() for m in raw_msgs if m.strip()]
+                try:
+                    raw_msgs = self._page.locator(_SEL_TOAST_MESSAGE).all_inner_texts()
+                    for msg in [m.strip() for m in raw_msgs if m.strip()]:
+                        kind = _classify_toast(msg)
+                        if kind == "ignore":
+                            continue
+                        if msg not in _last_reported:
+                            _last_reported.add(msg)
+                            if kind == "fatal":
+                                self.log.error(f"登录失败：{msg}")
+                                return {"ok": False, "msg": msg}
+                            self.log.warning(f"提示：{msg}")
 
-                for msg in msgs:
-                    kind = _classify_toast(msg)
-
-                    if kind == "ignore":
-                        continue
-
-                    # 只对新出现的消息上报
-                    if msg not in _last_reported:
-                        _last_reported.add(msg)
-
-                        if kind == "fatal":
-                            self.log.error(f"登录失败：{msg}")
-                            return {"ok": False, "msg": msg}
-                        else:
-                            # retryable：记录警告，判断是否为验证码错误并自动重试
-                            self.log.warning(f"登录提示：{msg}")
-
-                    # 验证码识别错误 → 自动刷新重试
-                    if "验证码" in msg and any(
-                        k in msg for k in ("错", "误", "效", "不正确")
-                    ):
-                        capt_img = self._page.locator(_SEL_CAPTCHA_IMG).first
-                        if capt_img.is_visible():
-                            ocr = _get_ocr()
-                            code = _ocr_captcha_with_retry(capt_img, ocr, self.log)
-                            if code is None:
-                                self.log.warning(
-                                    "[文字验证码] 重新识别失败，继续等待手动处理"
-                                )
-                            else:
-                                self.log.info(f"[文字验证码] 重新识别结果: {code}")
-                                capt_input = self._page.locator(
-                                    _SEL_CAPTCHA_INPUT
-                                ).first
-                                if capt_input.is_visible():
-                                    capt_input.fill(code)
-                                    try:
+                        if "验证码" in msg and any(
+                            k in msg for k in ("错", "误", "效", "不正确")
+                        ):
+                            capt_img = self._page.locator(_SEL_CAPTCHA_IMG).first
+                            if capt_img.is_visible():
+                                ocr = _get_ocr()
+                                code = _ocr_captcha_with_retry(capt_img, ocr, self.log)
+                                if code:
+                                    self.log.info(f"[验证码重试] 识别结果: {code}")
+                                    capt_input = self._page.locator(
+                                        _SEL_CAPTCHA_INPUT
+                                    ).first
+                                    if capt_input.is_visible():
+                                        capt_input.fill(code)
                                         submit_loc = self._page.locator(
                                             _SEL_LOGIN_SUBMIT_BTN
                                         )
@@ -422,18 +447,19 @@ class AuthMixin(BaseMixin):
                                             submit_loc.first.click(force=True)
                                         else:
                                             self._page.keyboard.press("Enter")
-                                    except Exception:
-                                        self._page.keyboard.press("Enter")
-                                    time.sleep(2)
-                                    _last_reported.discard(msg)  # 允许下次重新上报
-
+                                        time.sleep(2)
+                                        _last_reported.discard(msg)
+                except Exception:
+                    pass
+                time.sleep(1.0)
+        finally:
+            try:
+                if self._page:
+                    self._page.remove_listener("response", self._handle_auth_response)
             except Exception:
                 pass
 
-            if self._is_logged_in():
-                self.log.info("登录成功")
-                return _extract_user_result()
-            time.sleep(1.0)
-
-        self.log.error("登录超时，请检查账号、密码或网络是否正常")
+        if self._is_logged_in():
+            return _extract_user_result()
+        self.log.error("登录超时")
         return {"ok": False}
