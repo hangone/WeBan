@@ -1076,6 +1076,27 @@
     ],
     "type": 1
   },
+  "“以邻为壑”的安全模式会导致？": {
+    "optionList": [
+      {
+        "content": "共同安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "冲突加剧",
+        "isCorrect": 1
+      },
+      {
+        "content": "经济繁荣",
+        "isCorrect": 2
+      },
+      {
+        "content": "文化融合",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "“仿冒身份欺诈”这种类型的骗子往往会编造多重身份。": {
     "optionList": [
       {
@@ -1461,6 +1482,27 @@
       {
         "content": "温暖的力量要大于寒冷的力量",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "“卡脖子” 技术的威胁在于？": {
+    "optionList": [
+      {
+        "content": "促进技术进步",
+        "isCorrect": 2
+      },
+      {
+        "content": "限制国家发展",
+        "isCorrect": 1
+      },
+      {
+        "content": "提升国际地位",
+        "isCorrect": 2
+      },
+      {
+        "content": "无关紧要",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -4460,6 +4502,10 @@
       {
         "content": "做自己喜欢的任何事情",
         "isCorrect": 2
+      },
+      {
+        "content": "做自己喜欢的任何事情（包括可能不尊重他人、伤害自己甚至违法乱纪的事情）",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -5344,6 +5390,18 @@
       {
         "content": "脑脊液。",
         "isCorrect": 1
+      },
+      {
+        "content": "母乳",
+        "isCorrect": 1
+      },
+      {
+        "content": "精液、阴道分泌物",
+        "isCorrect": 1
+      },
+      {
+        "content": "血液",
+        "isCorrect": 1
       }
     ],
     "type": 2
@@ -5743,6 +5801,10 @@
       {
         "content": "不规范的动作往往导致人用力不合理，有劲使不出，在陌生的水域容易出事。",
         "isCorrect": 1
+      },
+      {
+        "content": "矫正错误动作是很快的，只要尝试立刻见效。",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -7427,6 +7489,27 @@
     ],
     "type": 1
   },
+  "世界格局对我国国家安全的影响是？": {
+    "optionList": [
+      {
+        "content": "无关",
+        "isCorrect": 2
+      },
+      {
+        "content": "单极格局最稳定",
+        "isCorrect": 2
+      },
+      {
+        "content": "多极化有利安全",
+        "isCorrect": 1
+      },
+      {
+        "content": "两极格局最安全",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "两位同学发生了冲突，其中一位同学说：“我还有点事情，我先走了。”然后迅速离开了现场。这种处理人际冲突的方法属于（）。": {
     "optionList": [
       {
@@ -7687,6 +7770,27 @@
     ],
     "type": 1
   },
+  "中国传统文化强调的国家安全意识是？": {
+    "optionList": [
+      {
+        "content": "盲目乐观",
+        "isCorrect": 2
+      },
+      {
+        "content": "忧患意识",
+        "isCorrect": 1
+      },
+      {
+        "content": "事不关己",
+        "isCorrect": 2
+      },
+      {
+        "content": "依赖国际援助",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "中国共产党人的初心和使命，就是为中国人民______，为中华民族______。这个初心和使命是激励中国共产党人不断前进的根本动力。（ ）": {
     "optionList": [
       {
@@ -7787,6 +7891,48 @@
       },
       {
         "content": "文明和谐",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "中国在国际格局中的目标是？": {
+    "optionList": [
+      {
+        "content": "主导单极格局",
+        "isCorrect": 2
+      },
+      {
+        "content": "推动多极化",
+        "isCorrect": 1
+      },
+      {
+        "content": "维持两极格局",
+        "isCorrect": 2
+      },
+      {
+        "content": "孤立外交",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "中国处理邻国关系的原则是？": {
+    "optionList": [
+      {
+        "content": "军事扩张",
+        "isCorrect": 2
+      },
+      {
+        "content": "睦邻友好",
+        "isCorrect": 1
+      },
+      {
+        "content": "以邻为壑",
+        "isCorrect": 2
+      },
+      {
+        "content": "孤立政策",
         "isCorrect": 2
       }
     ],
@@ -7927,6 +8073,27 @@
     ],
     "type": 1
   },
+  "中国雾霾问题主要威胁？": {
+    "optionList": [
+      {
+        "content": "大气生态安全",
+        "isCorrect": 1
+      },
+      {
+        "content": "水体生态安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "底土生态安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "生物生态安全",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "中央提出的“统筹维护和塑造国家安全”强调？": {
     "optionList": [
       {
@@ -7974,6 +8141,27 @@
       {
         "content": "错误",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "中日钓鱼岛争端的启示是：": {
+    "optionList": [
+      {
+        "content": "武力解决",
+        "isCorrect": 2
+      },
+      {
+        "content": "对话协商",
+        "isCorrect": 1
+      },
+      {
+        "content": "忽视争议",
+        "isCorrect": 2
+      },
+      {
+        "content": "国际干预",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -8878,6 +9066,27 @@
       },
       {
         "content": "留校察看以上",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "乒乓外交的作用是？": {
+    "optionList": [
+      {
+        "content": "加剧国际矛盾",
+        "isCorrect": 2
+      },
+      {
+        "content": "改善中美关系",
+        "isCorrect": 1
+      },
+      {
+        "content": "强化意识形态对立",
+        "isCorrect": 2
+      },
+      {
+        "content": "无关紧要",
         "isCorrect": 2
       }
     ],
@@ -16004,6 +16213,27 @@
     ],
     "type": 2
   },
+  "关于共同安全理论的意义，以下说法正确的是？": {
+    "optionList": [
+      {
+        "content": "打破“他国不安全则本国安全”的恶性循环",
+        "isCorrect": 1
+      },
+      {
+        "content": "要求各国仅关注自身安全利益",
+        "isCorrect": 2
+      },
+      {
+        "content": "主张通过合作实现全球整体安全",
+        "isCorrect": 1
+      },
+      {
+        "content": "认为国家安全与他国安全必然对立",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
   "关于冰毒，以下说法正确的是：": {
     "optionList": [
       {
@@ -16184,6 +16414,27 @@
       }
     ],
     "type": 2
+  },
+  "关于国家安全领域 “外” 和 “内” 的基本含义，下列说法正确的是：": {
+    "optionList": [
+      {
+        "content": "国家安全仅包含外部安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "影响国家安全的因素只有“外患”",
+        "isCorrect": 2
+      },
+      {
+        "content": "保障国家安全需实现“攘外”与“安内”的统一",
+        "isCorrect": 1
+      },
+      {
+        "content": "内部安全的重要性高于外部安全",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "关于国际通用的实验室防护等级，下面说法正确的是：": {
     "optionList": [
@@ -17448,6 +17699,48 @@
       },
       {
         "content": "乳胶管",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "冷战后的世界格局是：": {
+    "optionList": [
+      {
+        "content": "单极格局",
+        "isCorrect": 2
+      },
+      {
+        "content": "两极格局",
+        "isCorrect": 2
+      },
+      {
+        "content": "一超多强",
+        "isCorrect": 1
+      },
+      {
+        "content": "多极化",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "冷战时期的时代主题是：": {
+    "optionList": [
+      {
+        "content": "和平与发展",
+        "isCorrect": 2
+      },
+      {
+        "content": "战争与革命",
+        "isCorrect": 1
+      },
+      {
+        "content": "经济全球化",
+        "isCorrect": 2
+      },
+      {
+        "content": "文化融合",
         "isCorrect": 2
       }
     ],
@@ -20961,6 +21254,27 @@
     ],
     "type": 2
   },
+  "国家安全工作归根结底是为了保障什么？": {
+    "optionList": [
+      {
+        "content": "政治安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "国家利益",
+        "isCorrect": 2
+      },
+      {
+        "content": "人民利益",
+        "isCorrect": 1
+      },
+      {
+        "content": "党的执政地位",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "国家安全工作必须坚持党绝对领导的意义在于（    ）。": {
     "optionList": [
       {
@@ -21156,6 +21470,10 @@
       {
         "content": "以上都是",
         "isCorrect": 1
+      },
+      {
+        "content": "国家安全本身是外部安全和内部安全的统一",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -28984,6 +29302,27 @@
     ],
     "type": 1
   },
+  "宗教极端主义的危害在于？": {
+    "optionList": [
+      {
+        "content": "促进文化多样性",
+        "isCorrect": 2
+      },
+      {
+        "content": "破坏社会稳定",
+        "isCorrect": 1
+      },
+      {
+        "content": "推动经济发展",
+        "isCorrect": 2
+      },
+      {
+        "content": "提升国民素质",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "宗教的戒律与通常国家的法律是什么关系？": {
     "optionList": [
       {
@@ -33658,6 +33997,27 @@
     ],
     "type": 1
   },
+  "总体国家安全观提出的直接时代背景是？": {
+    "optionList": [
+      {
+        "content": "2008年金融危机",
+        "isCorrect": 2
+      },
+      {
+        "content": "2010年后内外安全形势恶化",
+        "isCorrect": 1
+      },
+      {
+        "content": "中国加入",
+        "isCorrect": 2
+      },
+      {
+        "content": "香港回归",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "总体国家安全观是新形势下党中央对我国面临的各种安全问题和安全挑战的系统回应，标志着党和国家对国家安全问题的理论认识提升到了新的高度，具有（   ）的重要特征。": {
     "optionList": [
       {
@@ -33729,6 +34089,27 @@
       }
     ],
     "type": 2
+  },
+  "总体国家安全观的核心主张是？": {
+    "optionList": [
+      {
+        "content": "优先保障外部安全，内部安全次之",
+        "isCorrect": 2
+      },
+      {
+        "content": "外部安全和内部安全并重，动态平衡",
+        "isCorrect": 1
+      },
+      {
+        "content": "以军事安全为唯一核心",
+        "isCorrect": 2
+      },
+      {
+        "content": "完全依赖国际合作解决安全问题",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "总体国家安全观的第一要义是（    ）。": {
     "optionList": [
@@ -36715,6 +37096,27 @@
     ],
     "type": 2
   },
+  "改革开放后中国安全环境变化的原因是？": {
+    "optionList": [
+      {
+        "content": "国际形势缓和",
+        "isCorrect": 1
+      },
+      {
+        "content": "军事扩张",
+        "isCorrect": 2
+      },
+      {
+        "content": "闭关锁国",
+        "isCorrect": 2
+      },
+      {
+        "content": "意识形态对立",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "改革开放和社会主义现代化建设深入推进，实现中华民族伟大复兴进入了______的历史进程。（）": {
     "optionList": [
       {
@@ -37351,6 +37753,27 @@
       {
         "content": "催眠",
         "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
+  "新安全观强调的“共同安全”包括？": {
+    "optionList": [
+      {
+        "content": "仅关注自身安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "各国安全相互依存",
+        "isCorrect": 1
+      },
+      {
+        "content": "通过合作化解安全困境",
+        "isCorrect": 1
+      },
+      {
+        "content": "吸收国际共同安全理念",
+        "isCorrect": 1
       }
     ],
     "type": 2
@@ -39218,6 +39641,48 @@
       }
     ],
     "type": 2
+  },
+  "极端主义对国家安全的主要威胁包括？": {
+    "optionList": [
+      {
+        "content": "破坏社会稳定",
+        "isCorrect": 1
+      },
+      {
+        "content": "削弱政府公信力",
+        "isCorrect": 1
+      },
+      {
+        "content": "引发国际制裁",
+        "isCorrect": 2
+      },
+      {
+        "content": "激化社会矛盾",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "极端主义的核心行为逻辑是？": {
+    "optionList": [
+      {
+        "content": "通过温和手段实现政治诉求",
+        "isCorrect": 2
+      },
+      {
+        "content": "不计后果采取极端手段达成目的",
+        "isCorrect": 1
+      },
+      {
+        "content": "依托国际组织进行合法抗争",
+        "isCorrect": 2
+      },
+      {
+        "content": "仅通过思想传播影响社会",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "某医院医生李某的患者张某得知其丈夫是部队军医后，以“杂志社编辑”身份高价求购部队内部刊物和视频资料。李某虽知违法，但在金钱诱惑下说服丈夫偷拍资料出售。患者张某使用的腐蚀手段是？": {
     "optionList": [
@@ -41391,6 +41856,27 @@
     ],
     "type": 1
   },
+  "民族问题对国家安全的影响取决于？": {
+    "optionList": [
+      {
+        "content": "民族数量",
+        "isCorrect": 2
+      },
+      {
+        "content": "处理方式",
+        "isCorrect": 1
+      },
+      {
+        "content": "地理位置",
+        "isCorrect": 2
+      },
+      {
+        "content": "经济水平",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "民法的基本原则主要有（）。": {
     "optionList": [
       {
@@ -43018,6 +43504,19 @@
       }
     ],
     "type": 1
+  },
+  "燃气事故的类型有？": {
+    "optionList": [
+      {
+        "content": "一氧化碳中毒",
+        "isCorrect": 1
+      },
+      {
+        "content": "燃气爆炸",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
   },
   "燃气器具在使用过程中，应该注意哪些安全事项？": {
     "optionList": [
@@ -45162,6 +45661,27 @@
     ],
     "type": 1
   },
+  "相较于传统国家安全观，新时代总体国家安全观在核心理念上的突破性概念体现在：": {
+    "optionList": [
+      {
+        "content": "仅涵盖维护",
+        "isCorrect": 2
+      },
+      {
+        "content": "仅涵盖塑造",
+        "isCorrect": 2
+      },
+      {
+        "content": "统一维护与塑造",
+        "isCorrect": 1
+      },
+      {
+        "content": "与传统安全无关",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "看到溺水者，首先应该：": {
     "optionList": [
       {
@@ -45800,6 +46320,27 @@
       }
     ],
     "type": 2
+  },
+  "管仲提出的“五害”不包括？": {
+    "optionList": [
+      {
+        "content": "水灾",
+        "isCorrect": 2
+      },
+      {
+        "content": "旱灾",
+        "isCorrect": 2
+      },
+      {
+        "content": "战争",
+        "isCorrect": 1
+      },
+      {
+        "content": "虫灾",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "管制刀具是指匕首、三棱刀、弹簧刀（跳刀）及其他相类似的单刃、 双刃、三棱尖刀。": {
     "optionList": [
