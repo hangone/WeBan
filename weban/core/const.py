@@ -152,7 +152,9 @@ SEL_RUNTIME_MARKERS = (
 SEL_RUNTIME_FRAME_SKELETON = ".page-container, .page-item, .btn-next, .back-list"
 SEL_COURSE_JS_ITEMS_VISIBLE = ".img-texts-item:visible, .fchl-item:visible"
 SEL_RUNTIME_ACTIVE_VIDEO = ".page-active video"
-SEL_RUNTIME_VIDEO_PLAY_BTN = ".page-active .vjs-big-play-button, .vjs-big-play-button:visible"
+SEL_RUNTIME_VIDEO_PLAY_BTN = (
+    ".page-active .vjs-big-play-button, .vjs-big-play-button:visible"
+)
 SEL_RUNTIME_CHOICE = ".page-active [class*='p12'], .page-active [class*='choice']"
 SEL_RUNTIME_INTERACTIVE_ITEMS = (
     ".page-active [class*='p17'], .page-active .interactive-item"

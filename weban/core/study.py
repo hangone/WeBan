@@ -624,18 +624,22 @@ class StudyMixin(BaseMixin):
                         self.log.debug(f"[播放] 识别到课程框架: {f.url[:60]}...")
                         return True
                     if f.evaluate("typeof finishWxCourse === 'function'"):
-                        self.log.debug(f"[播放] 识别到课程框架 (JS函数确认): {f.url[:60]}...")
+                        self.log.debug(
+                            f"[播放] 识别到课程框架 (JS函数确认): {f.url[:60]}..."
+                        )
                         return True
                 except Exception:
                     pass
             time.sleep(1)
-        
+
         # 调试：输出当前所有框架信息
         if self._page:
-            self.log.debug(f"[框架诊断] 未找到课程框架。当前页面所有框架 ({len(self._page.frames)}):")
+            self.log.debug(
+                f"[框架诊断] 未找到课程框架。当前页面所有框架 ({len(self._page.frames)}):"
+            )
             for i, f in enumerate(self._page.frames):
                 self.log.debug(f"  - Frame {i}: URL={f.url[:80]}..., Name={f.name}")
-            
+
         return False
 
     def _is_mcwk_course_page(self) -> bool:
@@ -750,7 +754,11 @@ class StudyMixin(BaseMixin):
                 # 3. 处理播放前的协议勾选 (如果有)
                 try:
                     agree_cb = frame.locator(SEL_AGREE_CHECKBOX).first
-                    if agree_cb.count() > 0 and agree_cb.is_visible() and not agree_cb.is_checked():
+                    if (
+                        agree_cb.count() > 0
+                        and agree_cb.is_visible()
+                        and not agree_cb.is_checked()
+                    ):
                         self.log.info("[互动] 勾选同意协议")
                         agree_cb.click(force=True)
                         time.sleep(0.5)
@@ -930,9 +938,13 @@ class StudyMixin(BaseMixin):
                     # 连续 20 次没有发现新动作则认为已经结束（约40-50秒，用于等待缓慢的文本动画）
                     consecutive_no_action += 1
                     if consecutive_no_action % 5 == 0:
-                        self.log.debug(f"[播放] 正在等待页面状态更新 ({consecutive_no_action}/20)...")
+                        self.log.debug(
+                            f"[播放] 正在等待页面状态更新 ({consecutive_no_action}/20)..."
+                        )
                     if consecutive_no_action > 20:
-                        self.log.info("[播放] 连续长时间无交互动作，判定当前交互已结束。")
+                        self.log.info(
+                            "[播放] 连续长时间无交互动作，判定当前交互已结束。"
+                        )
                         break
                 else:
                     consecutive_no_action = 0

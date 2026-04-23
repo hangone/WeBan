@@ -632,11 +632,11 @@ def _captcha_visible(frame, require_cscapt: bool = True) -> bool:
                                 pointerEvents: s.pointerEvents
                             };
                         }""")
-                        
+
                         # 腾讯验证码 z-index 通常极高，且透明度不能为 0
-                        if props["opacity"] < 0.1 or props["pointerEvents"] == 'none':
+                        if props["opacity"] < 0.1 or props["pointerEvents"] == "none":
                             continue
-                            
+
                         # 如果是 iframe，z-index 可能不在元素本身而在容器上，这里做宽松处理
                         # 但如果 z-index 明确为负数，则肯定不可见
                         if props["zIndex"] < 0:
@@ -771,7 +771,7 @@ def _log_captcha_contexts(page, log) -> None:
 
 def _find_captcha_context(page, require_cscapt: bool = True):
     """查找验证码上下文（支持 main_frame 和 iframe）。
-    
+
     验证码可能出现在子框架（iframe）中，也可能出现在父级 DOM（main_frame）中。
     """
     try:
@@ -784,7 +784,7 @@ def _find_captcha_context(page, require_cscapt: bool = True):
         for ctx in frames:
             if ctx == page.main_frame:
                 continue
-            
+
             # 如果是微课课件帧，跳过其作为验证码容器的直接判定
             url = (ctx.url or "").lower()
             if "mcwk.mycourse.cn" in url and (".html" in url or "/course/" in url):
