@@ -2,12 +2,12 @@
   "100毫升血液中，酒精含量20—80毫克之间会被认定为？": {
     "optionList": [
       {
-        "content": "酒驾",
-        "isCorrect": 1
-      },
-      {
         "content": "醉驾",
         "isCorrect": 2
+      },
+      {
+        "content": "酒驾",
+        "isCorrect": 1
       }
     ],
     "type": 1
@@ -15,12 +15,12 @@
   "100毫升血液中，酒精含量达到多少毫克以上会被认定为醉驾？": {
     "optionList": [
       {
-        "content": "80",
-        "isCorrect": 1
-      },
-      {
         "content": "60",
         "isCorrect": 2
+      },
+      {
+        "content": "80",
+        "isCorrect": 1
       },
       {
         "content": "100",
@@ -320,7 +320,7 @@
   "400-5XX-6XXX打来电话：“你好，我们是xx客服，您买的东西虽然已经交了全款，但是由于物流的大意弄成了分期付款形式，如果取消，可以按我的提示去ATM机操作。”你要怎么接下一句话？": {
     "optionList": [
       {
-        "content": "400开头的电话只能用作被叫的，你是怎么把它变成主叫的？骗人电话。",
+        "content": "400开头的电话一般是用作被叫的，打来的不是推销就是诈骗，挂掉。",
         "isCorrect": 1
       },
       {
@@ -328,7 +328,7 @@
         "isCorrect": 2
       },
       {
-        "content": "400开头的电话一般是用作被叫的，打来的不是推销就是诈骗，挂掉。",
+        "content": "400开头的电话只能用作被叫的，你是怎么把它变成主叫的？骗人电话。",
         "isCorrect": 1
       }
     ],
@@ -336,10 +336,6 @@
   },
   "400xxxxxx打来电话称是微信钱包客服：“你的微信钱包正在面临被黑客攻击的危险，你可以先把你钱包里的钱转到我们给你开通的一个安全账户中，然后提现就可以了。”这时你该怎么办？": {
     "optionList": [
-      {
-        "content": "400开头的电话怎么可能是主叫电话呢？骗人的。不信。",
-        "isCorrect": 1
-      },
       {
         "content": "400开头不是推销就是诈骗；安全账户=骗子话术。挂掉！",
         "isCorrect": 1
@@ -1420,6 +1416,10 @@
       {
         "content": "缺乏专业相关学科知识",
         "isCorrect": 1
+      },
+      {
+        "content": "缺乏专业相关经验",
+        "isCorrect": 1
       }
     ],
     "type": 1
@@ -1964,6 +1964,10 @@
       {
         "content": "做自己喜欢的任何事",
         "isCorrect": 2
+      },
+      {
+        "content": "做自己喜欢的任何事情（包括可能不尊重他人、伤害自己甚至违法乱纪的事情）",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -2055,7 +2059,7 @@
         "isCorrect": 1
       },
       {
-        "content": "所处环境完全干涸后。",
+        "content": "所处环境完全干涸后",
         "isCorrect": 1
       },
       {
@@ -2065,18 +2069,6 @@
       {
         "content": "在空气中暴露30分钟",
         "isCorrect": 2
-      },
-      {
-        "content": "离开人类血液、体液独立存在时。",
-        "isCorrect": 1
-      },
-      {
-        "content": "56℃条件下30分钟后。",
-        "isCorrect": 1
-      },
-      {
-        "content": "所处环境完全干涸后",
-        "isCorrect": 1
       }
     ],
     "type": 2
@@ -2869,6 +2861,18 @@
       {
         "content": "脑脊液。",
         "isCorrect": 1
+      },
+      {
+        "content": "母乳",
+        "isCorrect": 1
+      },
+      {
+        "content": "精液、阴道分泌物",
+        "isCorrect": 1
+      },
+      {
+        "content": "血液",
+        "isCorrect": 1
       }
     ],
     "type": 2
@@ -2978,12 +2982,8 @@
         "isCorrect": 1
       },
       {
-        "content": "接触被患者污染的毛巾。",
+        "content": "接触被患者污染的毛巾",
         "isCorrect": 2
-      },
-      {
-        "content": "接吻、性交、飞沫。",
-        "isCorrect": 1
       }
     ],
     "type": 1
@@ -3090,26 +3090,6 @@
   "下面做法有助于维护国家安全的是：": {
     "optionList": [
       {
-        "content": "认真学习国家安全理论和知识。",
-        "isCorrect": 1
-      },
-      {
-        "content": "积极参加国家安全宣传教育活动。",
-        "isCorrect": 1
-      },
-      {
-        "content": "熟悉有关国家安全法律法规。",
-        "isCorrect": 1
-      },
-      {
-        "content": "一旦发现危害国家安全的行为，立即向学校保卫部门或国家安全机关报告",
-        "isCorrect": 1
-      },
-      {
-        "content": "一旦发现危害国家安全的行为，立即向学校请示。",
-        "isCorrect": 1
-      },
-      {
         "content": "认真学习国家安全理论和知识",
         "isCorrect": 1
       },
@@ -3119,6 +3099,10 @@
       },
       {
         "content": "熟悉有关国家安全法律法规",
+        "isCorrect": 1
+      },
+      {
+        "content": "一旦发现危害国家安全的行为，立即向学校保卫部门或国家安全机关报告",
         "isCorrect": 1
       }
     ],
@@ -3192,6 +3176,10 @@
   },
   "下面关于游泳姿势，正确的是：": {
     "optionList": [
+      {
+        "content": "矫正错误动作是很快的，只要尝试立刻见效。",
+        "isCorrect": 2
+      },
       {
         "content": "不规范的动作往往导致人用力不合理，有劲使不出，在陌生的水域容易出事。",
         "isCorrect": 1
@@ -3428,18 +3416,6 @@
       },
       {
         "content": "红眼病（结膜炎）",
-        "isCorrect": 1
-      },
-      {
-        "content": "脚气。",
-        "isCorrect": 1
-      },
-      {
-        "content": "灰指甲。",
-        "isCorrect": 1
-      },
-      {
-        "content": "红眼病。",
         "isCorrect": 1
       }
     ],
@@ -4307,12 +4283,12 @@
   "下面躲避雾霾的方式中错误的是：": {
     "optionList": [
       {
-        "content": "门窗从早到晚一直关闭，直到数天后雾霾解除。",
-        "isCorrect": 1
-      },
-      {
         "content": "关闭门窗和各种通气口，减少雾霾进入。",
         "isCorrect": 2
+      },
+      {
+        "content": "门窗从早到晚一直关闭，直到数天后雾霾解除。",
+        "isCorrect": 1
       },
       {
         "content": "趁中午阳光较充足、污染物较少时，短时间开窗换气。",
@@ -4879,6 +4855,27 @@
     ],
     "type": 1
   },
+  "世界格局对我国国家安全的影响是？": {
+    "optionList": [
+      {
+        "content": "无关",
+        "isCorrect": 2
+      },
+      {
+        "content": "单极格局最稳定",
+        "isCorrect": 2
+      },
+      {
+        "content": "多极化有利安全",
+        "isCorrect": 1
+      },
+      {
+        "content": "两极格局最安全",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "“世界粮食日”是一年中的哪一天？": {
     "optionList": [
       {
@@ -5375,6 +5372,27 @@
     ],
     "type": 1
   },
+  "中国传统文化强调的国家安全意识是？": {
+    "optionList": [
+      {
+        "content": "盲目乐观",
+        "isCorrect": 2
+      },
+      {
+        "content": "忧患意识",
+        "isCorrect": 1
+      },
+      {
+        "content": "事不关己",
+        "isCorrect": 2
+      },
+      {
+        "content": "依赖国际援助",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "中国共产党人的初心和使命，就是为中国人民______，为中华民族______。这个初心和使命是激励中国共产党人不断前进的根本动力。（ ）": {
     "optionList": [
       {
@@ -5475,6 +5493,48 @@
       },
       {
         "content": "文明和谐",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "中国在国际格局中的目标是？": {
+    "optionList": [
+      {
+        "content": "主导单极格局",
+        "isCorrect": 2
+      },
+      {
+        "content": "推动多极化",
+        "isCorrect": 1
+      },
+      {
+        "content": "维持两极格局",
+        "isCorrect": 2
+      },
+      {
+        "content": "孤立外交",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "中国处理邻国关系的原则是？": {
+    "optionList": [
+      {
+        "content": "军事扩张",
+        "isCorrect": 2
+      },
+      {
+        "content": "睦邻友好",
+        "isCorrect": 1
+      },
+      {
+        "content": "以邻为壑",
+        "isCorrect": 2
+      },
+      {
+        "content": "孤立政策",
         "isCorrect": 2
       }
     ],
@@ -5615,6 +5675,27 @@
     ],
     "type": 1
   },
+  "中国雾霾问题主要威胁？": {
+    "optionList": [
+      {
+        "content": "大气生态安全",
+        "isCorrect": 1
+      },
+      {
+        "content": "水体生态安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "底土生态安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "生物生态安全",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "中央提出的“统筹维护和塑造国家安全”强调？": {
     "optionList": [
       {
@@ -5662,6 +5743,27 @@
       {
         "content": "错误",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "中日钓鱼岛争端的启示是：": {
+    "optionList": [
+      {
+        "content": "武力解决",
+        "isCorrect": 2
+      },
+      {
+        "content": "对话协商",
+        "isCorrect": 1
+      },
+      {
+        "content": "忽视争议",
+        "isCorrect": 2
+      },
+      {
+        "content": "国际干预",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -5865,54 +5967,6 @@
   },
   "为了防范毒品，我们应该：": {
     "optionList": [
-      {
-        "content": "树立正确的人生观，不盲目追求享受、寻求刺激。",
-        "isCorrect": 1
-      },
-      {
-        "content": "交友本着多多益善的原则，什么人都来往。",
-        "isCorrect": 2
-      },
-      {
-        "content": "不进不正当的娱乐场所。",
-        "isCorrect": 1
-      },
-      {
-        "content": "对娱乐场所的陌生人、香烟、饮料食品等提高警惕，决不吸食摇头丸、K粉等兴奋剂。",
-        "isCorrect": 1
-      },
-      {
-        "content": "接受毒品基本知识和禁毒法律法规教育，了解毒品的危害，并积极宣传。",
-        "isCorrect": 1
-      },
-      {
-        "content": "懂得“吸毒一口，掉入虎口”“一朝沾毒，终生戒毒”的道理。",
-        "isCorrect": 1
-      },
-      {
-        "content": "了解了毒品常识后就可以不再参加禁毒宣传了。",
-        "isCorrect": 2
-      },
-      {
-        "content": "不听信毒品能治病减肥，给人解脱痛苦、带来快乐的谎言。",
-        "isCorrect": 1
-      },
-      {
-        "content": "经常与家人、同辈沟通，讨论自己的行为和未来的发展目标，健康成长。",
-        "isCorrect": 1
-      },
-      {
-        "content": "家庭成员、宿舍成员相互监督，摒除抽烟喝酒熬夜泡吧等坏习惯。",
-        "isCorrect": 1
-      },
-      {
-        "content": "正确把握好奇心，不抱有侥幸心理。",
-        "isCorrect": 1
-      },
-      {
-        "content": "远离滥用药物的可能。",
-        "isCorrect": 1
-      },
       {
         "content": "树立正确的人生观，不盲目追求享受、寻求刺激",
         "isCorrect": 1
@@ -6549,6 +6603,27 @@
     ],
     "type": 1
   },
+  "乒乓外交的作用是？": {
+    "optionList": [
+      {
+        "content": "加剧国际矛盾",
+        "isCorrect": 2
+      },
+      {
+        "content": "改善中美关系",
+        "isCorrect": 1
+      },
+      {
+        "content": "强化意识形态对立",
+        "isCorrect": 2
+      },
+      {
+        "content": "无关紧要",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "乘坐两轮摩托车应当：": {
     "optionList": [
       {
@@ -6622,6 +6697,27 @@
       }
     ],
     "type": 1
+  },
+  "乘坐扶梯出现突发状况时，第一时间应：": {
+    "optionList": [
+      {
+        "content": "一心逃离扶梯",
+        "isCorrect": 2
+      },
+      {
+        "content": "大声呼救提醒他人",
+        "isCorrect": 1
+      },
+      {
+        "content": "马上按下紧急按钮",
+        "isCorrect": 1
+      },
+      {
+        "content": "提醒大家不要向前靠近",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
   },
   "乘坐机动车时不得将（   ）伸出车外？": {
     "optionList": [
@@ -6912,10 +7008,6 @@
       },
       {
         "content": "以交纳保证金、账号提现失败、账号被冻结等各种理由，要求受害人反复转账",
-        "isCorrect": 1
-      },
-      {
-        "content": "通过钓鱼网站直接获取银行卡、密码等信息进行转账",
         "isCorrect": 1
       }
     ],
@@ -7547,19 +7639,19 @@
   "什么样的人会被送去强制戒毒？": {
     "optionList": [
       {
-        "content": "拒绝接受社区戒毒的。",
+        "content": "拒绝接受社区戒毒的",
         "isCorrect": 1
       },
       {
-        "content": "在社区戒毒期间吸食、注射毒品的。",
+        "content": "在社区戒毒期间吸食、注射毒品的",
         "isCorrect": 1
       },
       {
-        "content": "严重违反社区戒毒协议的。",
+        "content": "严重违反社区戒毒协议的",
         "isCorrect": 1
       },
       {
-        "content": "经社区戒毒、强制隔离戒毒后再次吸食、注射毒品的。",
+        "content": "经社区戒毒、强制隔离戒毒后再次吸食、注射毒品的",
         "isCorrect": 1
       }
     ],
@@ -7599,10 +7691,6 @@
       {
         "content": "木材、纸张。",
         "isCorrect": 2
-      },
-      {
-        "content": "电器。",
-        "isCorrect": 1
       },
       {
         "content": "未断电的电器。",
@@ -8290,10 +8378,6 @@
       {
         "content": "关闭断电后放在吹风机架上",
         "isCorrect": 2
-      },
-      {
-        "content": "拔了插头后放在床上",
-        "isCorrect": 2
       }
     ],
     "type": 2
@@ -8586,54 +8670,6 @@
   },
   "以下哪些情况需要你提高警惕小心毒品？": {
     "optionList": [
-      {
-        "content": "考学压力太大，同学给你可以提神的小粉末。",
-        "isCorrect": 1
-      },
-      {
-        "content": "找了酒吧服务员兼职，老板和同事请你尝试“好玩的”，还说用了就是一家人。",
-        "isCorrect": 1
-      },
-      {
-        "content": "受偏头痛困扰多年，同学告诉你他有“特效药”，保证一吃见效。",
-        "isCorrect": 1
-      },
-      {
-        "content": "聚会时你看到有人“吸药面”，你想离开却被朋友们说太怂。",
-        "isCorrect": 1
-      },
-      {
-        "content": "朋友承认他曾尝试吸毒，根本不会上瘾，问你要不要尝试。",
-        "isCorrect": 1
-      },
-      {
-        "content": "在酒吧有美女给你推荐新型嗨药、聚会必备，可以免费给你尝试。",
-        "isCorrect": 1
-      },
-      {
-        "content": "男朋友说他搞到吃了可以更爽的“粉面”，如果你不跟他试试就要分手。",
-        "isCorrect": 1
-      },
-      {
-        "content": "你跟朋友去新开的夜总会玩，酒保说在搞活动，你们来就提供你们娱乐必备小药丸。",
-        "isCorrect": 1
-      },
-      {
-        "content": "聚会时朋友拿出了五颜六色的“糖片”。",
-        "isCorrect": 1
-      },
-      {
-        "content": "在外“混得好”的同学来看你，请你尝试“新鲜玩意”。",
-        "isCorrect": 1
-      },
-      {
-        "content": "工作中认识了很多有钱的朋友，他们邀请你跟他们一起“嗨”，你不同意就不能再与他们联系了。",
-        "isCorrect": 1
-      },
-      {
-        "content": "失恋了兄弟安慰你，给你喝可以忘却烦恼的“加料水”。",
-        "isCorrect": 1
-      },
       {
         "content": "考学压力太大，同学给你可以提神的小粉末",
         "isCorrect": 1
@@ -8935,6 +8971,27 @@
     ],
     "type": 2
   },
+  "以下哪些是我国《刑法》规定的毒品犯罪的罪名？": {
+    "optionList": [
+      {
+        "content": "强迫他人吸食、注射毒品罪",
+        "isCorrect": 1
+      },
+      {
+        "content": "引诱、教唆、欺骗他人吸食、注射毒品罪",
+        "isCorrect": 1
+      },
+      {
+        "content": "窝藏、转移、隐瞒毒品、毒赃罪",
+        "isCorrect": 1
+      },
+      {
+        "content": "吸毒罪",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
   "以下哪些是我国《刑法》规定的毒品犯罪罪名？（ ）": {
     "optionList": [
       {
@@ -9187,18 +9244,6 @@
       {
         "content": "使用杜冷丁",
         "isCorrect": 2
-      },
-      {
-        "content": "吸食K粉",
-        "isCorrect": 1
-      },
-      {
-        "content": "口服摇头丸",
-        "isCorrect": 1
-      },
-      {
-        "content": "注射海洛因",
-        "isCorrect": 1
       }
     ],
     "type": 2
@@ -9698,24 +9743,12 @@
         "isCorrect": 2
       },
       {
-        "content": "夸赞对方：“你的肌肉练得真好！怎么练的能告诉我秘诀吗？”",
+        "content": "“你是不是在健身？能把教练推给我吗？他很有水平！”",
         "isCorrect": 1
       },
       {
         "content": "布置全是“性”元素的办公环境",
         "isCorrect": 2
-      },
-      {
-        "content": "对女友讲个荤段子，女友害羞的锤了我一拳",
-        "isCorrect": 1
-      },
-      {
-        "content": "“你是不是在健身？能把教练推给我吗？他很有水平！”",
-        "isCorrect": 1
-      },
-      {
-        "content": "给恋人讲了个荤段子，对方笑着锤了我一拳",
-        "isCorrect": 1
       },
       {
         "content": "给恋人讲了个荤段子，对方笑着锤了我一拳（双方均无任何不适）",
@@ -10547,6 +10580,27 @@
     ],
     "type": 1
   },
+  "“以邻为壑”的安全模式会导致？": {
+    "optionList": [
+      {
+        "content": "共同安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "冲突加剧",
+        "isCorrect": 1
+      },
+      {
+        "content": "经济繁荣",
+        "isCorrect": 2
+      },
+      {
+        "content": "文化融合",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "仰卧起坐容易带来腰椎问题，应该弃绝这项运动？": {
     "optionList": [
       {
@@ -10747,6 +10801,19 @@
     ],
     "type": 1
   },
+  "传销在我国是合法的吗？": {
+    "optionList": [
+      {
+        "content": "是",
+        "isCorrect": 2
+      },
+      {
+        "content": "不是",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
   "传销有哪几大特点？": {
     "optionList": [
       {
@@ -10908,6 +10975,19 @@
     "optionList": [
       {
         "content": "不要。",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "住处突发火灾，浓烟迅速蔓延，你需要用湿毛巾捂住口鼻沿疏散通道逃生。下列关于湿毛巾的使用，做法最合理安全的是：": {
+    "optionList": [
+      {
+        "content": "保持毛巾单层使用，透气效果最好，逃生速度最快",
+        "isCorrect": 2
+      },
+      {
+        "content": "将湿毛巾对折3次变8层，既能有效过滤60%烟尘，也能保证正常呼吸，不影响疏散节奏",
         "isCorrect": 1
       }
     ],
@@ -11843,14 +11923,6 @@
   "使用安全锤敲碎钢化玻璃的时候，正确的顺序是？": {
     "optionList": [
       {
-        "content": "先敲击四角，在敲击中间",
-        "isCorrect": 1
-      },
-      {
-        "content": "先敲击中间，在敲击四角",
-        "isCorrect": 2
-      },
-      {
         "content": "先敲击四角，再敲击中间",
         "isCorrect": 1
       },
@@ -12651,10 +12723,6 @@
       },
       {
         "content": "被提起刑事诉讼",
-        "isCorrect": 1
-      },
-      {
-        "content": "行为曝光后“社死”，被谴责",
         "isCorrect": 1
       }
     ],
@@ -13744,6 +13812,27 @@
     ],
     "type": 2
   },
+  "关于共同安全理论的意义，以下说法正确的是？": {
+    "optionList": [
+      {
+        "content": "打破“他国不安全则本国安全”的恶性循环",
+        "isCorrect": 1
+      },
+      {
+        "content": "要求各国仅关注自身安全利益",
+        "isCorrect": 2
+      },
+      {
+        "content": "主张通过合作实现全球整体安全",
+        "isCorrect": 1
+      },
+      {
+        "content": "认为国家安全与他国安全必然对立",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
   "关于冰毒，以下说法正确的是：": {
     "optionList": [
       {
@@ -13946,6 +14035,27 @@
     ],
     "type": 2
   },
+  "关于国家安全领域 “外” 和 “内” 的基本含义，下列说法正确的是：": {
+    "optionList": [
+      {
+        "content": "国家安全仅包含外部安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "影响国家安全的因素只有“外患”",
+        "isCorrect": 2
+      },
+      {
+        "content": "保障国家安全需实现“攘外”与“安内”的统一",
+        "isCorrect": 1
+      },
+      {
+        "content": "内部安全的重要性高于外部安全",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "关于国际通用的实验室防护等级，下面说法正确的是：": {
     "optionList": [
       {
@@ -13963,6 +14073,27 @@
       {
         "content": "P4是最低档，P1是最高档。",
         "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
+  "关于大麻，下面说法正确的是：": {
+    "optionList": [
+      {
+        "content": "主要毒性成分为四氢大麻酚，具有致幻作用。",
+        "isCorrect": 1
+      },
+      {
+        "content": "吸食后可发生意识不清、焦虑、抑郁等。",
+        "isCorrect": 1
+      },
+      {
+        "content": "吸食后对人产生敌意冲动或有自杀意愿，可诱发精神错乱。",
+        "isCorrect": 1
+      },
+      {
+        "content": "吸食大麻会损伤大脑，还可引起退行性脑病。",
+        "isCorrect": 1
       }
     ],
     "type": 2
@@ -14304,36 +14435,12 @@
       {
         "content": "即使短信里称谓和署名都对，只要带链接，依然有可能是木马短信。",
         "isCorrect": 1
-      },
-      {
-        "content": "只要是官方号码发的信息，里面的链接就没问题。",
-        "isCorrect": 2
-      },
-      {
-        "content": "骗子会利用假基站冒充官方号码发信息，链接不能随意点，可以去官网或电话查询。",
-        "isCorrect": 1
       }
     ],
     "type": 1
   },
   "关于泄露国家秘密的法律制裁，下面说法正确的是：": {
     "optionList": [
-      {
-        "content": "量刑较重。",
-        "isCorrect": 1
-      },
-      {
-        "content": "将受到秘密处决。",
-        "isCorrect": 2
-      },
-      {
-        "content": "宽大政策更为优厚。",
-        "isCorrect": 1
-      },
-      {
-        "content": "只有批评教育，不涉及刑罚。",
-        "isCorrect": 2
-      },
       {
         "content": "量刑较重",
         "isCorrect": 1
@@ -14676,16 +14783,16 @@
   "关于艾滋病，孕前、产前在医生指导下进行规范的母婴阻断，预防率可达：": {
     "optionList": [
       {
-        "content": "95%以上",
-        "isCorrect": 1
-      },
-      {
         "content": "85%以上",
         "isCorrect": 2
       },
       {
         "content": "90%以上",
         "isCorrect": 2
+      },
+      {
+        "content": "95%以上",
+        "isCorrect": 1
       }
     ],
     "type": 1
@@ -14711,26 +14818,6 @@
       },
       {
         "content": "很多人的窗口期什么症状也没有。",
-        "isCorrect": 1
-      },
-      {
-        "content": "窗口期的时候，人体内艾滋病病毒太少，所以检测不出来。",
-        "isCorrect": 2
-      },
-      {
-        "content": "窗口期的时候，人体内的艾滋病抗体还不够多，所以检测不出来。",
-        "isCorrect": 1
-      },
-      {
-        "content": "窗口期的时候，人体内的艾滋病抗体还不够多，所以检测不出来",
-        "isCorrect": 1
-      },
-      {
-        "content": "窗口期进行常规抗体检测时，人体内艾滋病病毒太少，所以检测不出来。",
-        "isCorrect": 2
-      },
-      {
-        "content": "窗口期进行常规抗体检测时，人体内的艾滋病抗体还不够多，所以检测不出来。",
         "isCorrect": 1
       }
     ],
@@ -15310,6 +15397,48 @@
       },
       {
         "content": "乳胶管",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "冷战后的世界格局是：": {
+    "optionList": [
+      {
+        "content": "单极格局",
+        "isCorrect": 2
+      },
+      {
+        "content": "两极格局",
+        "isCorrect": 2
+      },
+      {
+        "content": "一超多强",
+        "isCorrect": 1
+      },
+      {
+        "content": "多极化",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "冷战时期的时代主题是：": {
+    "optionList": [
+      {
+        "content": "和平与发展",
+        "isCorrect": 2
+      },
+      {
+        "content": "战争与革命",
+        "isCorrect": 1
+      },
+      {
+        "content": "经济全球化",
+        "isCorrect": 2
+      },
+      {
+        "content": "文化融合",
         "isCorrect": 2
       }
     ],
@@ -16595,6 +16724,27 @@
     ],
     "type": 1
   },
+  "“卡脖子” 技术的威胁在于？": {
+    "optionList": [
+      {
+        "content": "促进技术进步",
+        "isCorrect": 2
+      },
+      {
+        "content": "限制国家发展",
+        "isCorrect": 1
+      },
+      {
+        "content": "提升国际地位",
+        "isCorrect": 2
+      },
+      {
+        "content": "无关紧要",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "危化品条例规定，任何单位和个人对违反本条例规定的行为，有权向负有危险化学品安全监督管理职责的部门举报。": {
     "optionList": [
       {
@@ -17428,10 +17578,6 @@
   },
   "发生高危性行为后，下面说法正确的是：": {
     "optionList": [
-      {
-        "content": "等3个月后去检查，结果还是阴性的话，就肯定没感染。",
-        "isCorrect": 1
-      },
       {
         "content": "等3个月后去检查，结果还是阴性的话，就肯定没感染。",
         "isCorrect": 1
@@ -18851,12 +18997,12 @@
   "“喂，你好，你的家人出了车祸在医院呢，请你马上汇款到医院给你的家人做手术。卡号和户名已经发到了你的手机上。”你要怎么接下一句话？": {
     "optionList": [
       {
-        "content": "“好的，谢谢你。”然后给自己的家人打电话确认。",
-        "isCorrect": 1
-      },
-      {
         "content": "“什么？我的家人出事了？我马上去汇钱。”",
         "isCorrect": 2
+      },
+      {
+        "content": "“好的，谢谢你。”然后给自己的家人打电话确认。",
+        "isCorrect": 1
       }
     ],
     "type": 1
@@ -19290,6 +19436,27 @@
     ],
     "type": 2
   },
+  "国家安全工作归根结底是为了保障什么？": {
+    "optionList": [
+      {
+        "content": "政治安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "国家利益",
+        "isCorrect": 2
+      },
+      {
+        "content": "人民利益",
+        "isCorrect": 1
+      },
+      {
+        "content": "党的执政地位",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "国家安全工作必须坚持党绝对领导的意义在于（    ）。": {
     "optionList": [
       {
@@ -19512,6 +19679,10 @@
       {
         "content": "以上都是",
         "isCorrect": 1
+      },
+      {
+        "content": "国家安全本身是外部安全和内部安全的统一",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -20637,7 +20808,7 @@
     ],
     "type": 1
   },
-  "在审查经营主体是否合法时。不仅要查企业是否合法，也需要查查所谓的“投资项目”是否在企业注册的经营范围内。": {
+  "在审查经营主体是否合法时，不仅要查企业是否合法，也需要查查所谓的“投资项目”是否在企业注册的经营范围内。": {
     "optionList": [
       {
         "content": "正确",
@@ -20734,22 +20905,6 @@
       },
       {
         "content": "做到人走灯灭，人走断电。",
-        "isCorrect": 1
-      },
-      {
-        "content": "禁止吸烟，禁止使用明火",
-        "isCorrect": 1
-      },
-      {
-        "content": "禁止使用大功率电器",
-        "isCorrect": 1
-      },
-      {
-        "content": "避免电器长时间使用或超时充电",
-        "isCorrect": 1
-      },
-      {
-        "content": "做到人走灯灭，人走断电",
         "isCorrect": 1
       }
     ],
@@ -21105,14 +21260,6 @@
   },
   "在房间中发现楼里着火了，应该如何开门逃跑呢？": {
     "optionList": [
-      {
-        "content": "用手背轻触门板和把手，判断火势。",
-        "isCorrect": 1
-      },
-      {
-        "content": "捂住口鼻，抓紧时间，直接打开门逃跑。",
-        "isCorrect": 2
-      },
       {
         "content": "用手背轻触门板和把手，根据温度判断火势大小",
         "isCorrect": 1
@@ -23700,15 +23847,15 @@
   "“套路贷”和“高利贷”有区别吗？": {
     "optionList": [
       {
-        "content": "“高利贷”风险系数高",
+        "content": "“高利贷”出借人希望借款人按约定支付高额利息并返还本金，目的是为了获取高额利息。恶性大于“套路贷”。",
         "isCorrect": 2
       },
       {
-        "content": "“套路贷”风险系数高",
+        "content": "“套路贷”是以“借款”为名行非法占有被害人财物之实。“套路贷”作为一种新型的诈骗，其恶性远超传统意义的“高利贷”。",
         "isCorrect": 1
       },
       {
-        "content": "完全没区别",
+        "content": "完全没区别。",
         "isCorrect": 2
       }
     ],
@@ -23998,6 +24145,10 @@
       },
       {
         "content": "不围观、不参与非法聚集活动",
+        "isCorrect": 1
+      },
+      {
+        "content": "多学习法律法规知识",
         "isCorrect": 1
       }
     ],
@@ -25950,6 +26101,19 @@
     ],
     "type": 1
   },
+  "婴儿发生气道梗阻时，无论家长是否会海姆立克急救法，都一定要先拨打急救电话。": {
+    "optionList": [
+      {
+        "content": "对",
+        "isCorrect": 1
+      },
+      {
+        "content": "错",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "婴儿心肺复苏的按压频率为15---18秒内完成30次按压。": {
     "optionList": [
       {
@@ -27381,16 +27545,12 @@
   "安全的密码是什么样的？": {
     "optionList": [
       {
-        "content": "随机的数字和字母，对自己有意义，但是别人不知道的数字和字母组合。",
+        "content": "随机的数字和字母组合，对自己有意义、但是别人不知道的数字和字母组合。",
         "isCorrect": 1
       },
       {
         "content": "键盘上按顺序的字母或者自己生日。",
         "isCorrect": 2
-      },
-      {
-        "content": "随机的数字和字母组合，对自己有意义、但是别人不知道的数字和字母组合。",
-        "isCorrect": 1
       }
     ],
     "type": 1
@@ -27420,8 +27580,20 @@
   "安装APP时，提示需要访问你手机中的照片、联系人等，怎样做最妥当？": {
     "optionList": [
       {
+        "content": "现在APP不都这样嘛，同意访问",
+        "isCorrect": 2
+      },
+      {
         "content": "谨慎一些，查看一下软件的安全性；如果安全但是没必要，也不开放访问",
         "isCorrect": 1
+      },
+      {
+        "content": "看一下有没有隐私协议，有就可以信任",
+        "isCorrect": 2
+      },
+      {
+        "content": "既然安装了这个APP，我就很信任它了，它可以随便访问我的个人信息",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -27443,6 +27615,27 @@
       },
       {
         "content": "错误",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "宗教极端主义的危害在于？": {
+    "optionList": [
+      {
+        "content": "促进文化多样性",
+        "isCorrect": 2
+      },
+      {
+        "content": "破坏社会稳定",
+        "isCorrect": 1
+      },
+      {
+        "content": "推动经济发展",
+        "isCorrect": 2
+      },
+      {
+        "content": "提升国民素质",
         "isCorrect": 2
       }
     ],
@@ -28603,16 +28796,16 @@
   "对于没有顶端的部位如指端、头部、截肢残端，应选用（）包扎。": {
     "optionList": [
       {
-        "content": "回返式包扎法",
-        "isCorrect": 1
-      },
-      {
         "content": "环形包扎法",
         "isCorrect": 2
       },
       {
         "content": "螺旋包扎法",
         "isCorrect": 2
+      },
+      {
+        "content": "回返式包扎法",
+        "isCorrect": 1
       },
       {
         "content": "8字环绕包扎法",
@@ -29768,6 +29961,10 @@
   "小王收到了某银行发来的网银升级提示，小王按照短信提示做了，却发现卡内的10万元不见了，小王该怎么做？": {
     "optionList": [
       {
+        "content": "按照短信的电话打过去，找他们理论。",
+        "isCorrect": 2
+      },
+      {
         "content": "立刻报警。",
         "isCorrect": 1
       },
@@ -29778,10 +29975,6 @@
       {
         "content": "与公安和银行部门联系，第一时间冻结对方的卡号。",
         "isCorrect": 1
-      },
-      {
-        "content": "按照短信的电话打过去，找他们理论。",
-        "isCorrect": 2
       }
     ],
     "type": 2
@@ -32221,6 +32414,27 @@
     ],
     "type": 1
   },
+  "总体国家安全观提出的直接时代背景是？": {
+    "optionList": [
+      {
+        "content": "2008年金融危机",
+        "isCorrect": 2
+      },
+      {
+        "content": "2010年后内外安全形势恶化",
+        "isCorrect": 1
+      },
+      {
+        "content": "中国加入",
+        "isCorrect": 2
+      },
+      {
+        "content": "香港回归",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "总体国家安全观是新形势下党中央对我国面临的各种安全问题和安全挑战的系统回应，标志着党和国家对国家安全问题的理论认识提升到了新的高度，具有（   ）的重要特征。": {
     "optionList": [
       {
@@ -32271,6 +32485,27 @@
       }
     ],
     "type": 2
+  },
+  "总体国家安全观的核心主张是？": {
+    "optionList": [
+      {
+        "content": "优先保障外部安全，内部安全次之",
+        "isCorrect": 2
+      },
+      {
+        "content": "外部安全和内部安全并重，动态平衡",
+        "isCorrect": 1
+      },
+      {
+        "content": "以军事安全为唯一核心",
+        "isCorrect": 2
+      },
+      {
+        "content": "完全依赖国际合作解决安全问题",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "总体国家安全观的第一要义是（    ）。": {
     "optionList": [
@@ -32812,12 +33047,12 @@
   "我们在网络上可以随意购买未开刃的长刀。": {
     "optionList": [
       {
-        "content": "错误",
-        "isCorrect": 1
-      },
-      {
         "content": "正确",
         "isCorrect": 2
+      },
+      {
+        "content": "错误",
+        "isCorrect": 1
       }
     ],
     "type": 1
@@ -35398,6 +35633,27 @@
     ],
     "type": 2
   },
+  "改革开放后中国安全环境变化的原因是？": {
+    "optionList": [
+      {
+        "content": "国际形势缓和",
+        "isCorrect": 1
+      },
+      {
+        "content": "军事扩张",
+        "isCorrect": 2
+      },
+      {
+        "content": "闭关锁国",
+        "isCorrect": 2
+      },
+      {
+        "content": "意识形态对立",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "改革开放和社会主义现代化建设深入推进，实现中华民族伟大复兴进入了______的历史进程。（）": {
     "optionList": [
       {
@@ -36085,6 +36341,27 @@
     ],
     "type": 2
   },
+  "新安全观强调的“共同安全”包括？": {
+    "optionList": [
+      {
+        "content": "仅关注自身安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "各国安全相互依存",
+        "isCorrect": 1
+      },
+      {
+        "content": "通过合作化解安全困境",
+        "isCorrect": 1
+      },
+      {
+        "content": "吸收国际共同安全理念",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "《新时代公民道德建设实施纲要》要求推动践行的职业道德主要内容不包括以下哪项？": {
     "optionList": [
       {
@@ -36711,12 +36988,12 @@
   "是否具备了几个必要条件，燃烧就一定会发生？": {
     "optionList": [
       {
-        "content": "否",
-        "isCorrect": 1
-      },
-      {
         "content": "是",
         "isCorrect": 2
+      },
+      {
+        "content": "否",
+        "isCorrect": 1
       }
     ],
     "type": 1
@@ -37390,14 +37667,6 @@
       {
         "content": "纸板，长度较长，超过两个关节。",
         "isCorrect": 2
-      },
-      {
-        "content": "长度较长，超过两个关节。",
-        "isCorrect": 1
-      },
-      {
-        "content": "长度较短，不到两个关节。",
-        "isCorrect": 2
       }
     ],
     "type": 1
@@ -37610,12 +37879,12 @@
   "服用过阿司匹林后，可以饮酒吗？": {
     "optionList": [
       {
-        "content": "不可以",
-        "isCorrect": 1
-      },
-      {
         "content": "可以",
         "isCorrect": 2
+      },
+      {
+        "content": "不可以",
+        "isCorrect": 1
       }
     ],
     "type": 1
@@ -38012,14 +38281,6 @@
       },
       {
         "content": "机动车上道路行驶需要投保交强险、登记上牌、驾驶人需要持有驾驶证，属于机动车的电动车，应依法遵守此规定，非机动车无此要求",
-        "isCorrect": 1
-      },
-      {
-        "content": "非机动车上道路行驶需要投保交强险、登记上牌、驾驶人需要持有驾驶证，属于机动车的电动自行车，应依法遵守此规定，机动车无此要求",
-        "isCorrect": 2
-      },
-      {
-        "content": "机动车上道路行驶需要投保交强险、登记上牌、驾驶人需要持有驾驶证，属于机动车的电动自行车，应依法遵守此规定，非机动车无此要求",
         "isCorrect": 1
       }
     ],
@@ -38424,6 +38685,48 @@
       }
     ],
     "type": 2
+  },
+  "极端主义对国家安全的主要威胁包括？": {
+    "optionList": [
+      {
+        "content": "破坏社会稳定",
+        "isCorrect": 1
+      },
+      {
+        "content": "削弱政府公信力",
+        "isCorrect": 1
+      },
+      {
+        "content": "引发国际制裁",
+        "isCorrect": 2
+      },
+      {
+        "content": "激化社会矛盾",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "极端主义的核心行为逻辑是？": {
+    "optionList": [
+      {
+        "content": "通过温和手段实现政治诉求",
+        "isCorrect": 2
+      },
+      {
+        "content": "不计后果采取极端手段达成目的",
+        "isCorrect": 1
+      },
+      {
+        "content": "依托国际组织进行合法抗争",
+        "isCorrect": 2
+      },
+      {
+        "content": "仅通过思想传播影响社会",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "某医院医生李某的患者张某得知其丈夫是部队军医后，以“杂志社编辑”身份高价求购部队内部刊物和视频资料。李某虽知违法，但在金钱诱惑下说服丈夫偷拍资料出售。患者张某使用的腐蚀手段是？": {
     "optionList": [
@@ -40233,22 +40536,6 @@
   "每年的消防安全日是哪一天？": {
     "optionList": [
       {
-        "content": "11月9日。",
-        "isCorrect": 1
-      },
-      {
-        "content": "11月6日。",
-        "isCorrect": 2
-      },
-      {
-        "content": "11月8日。",
-        "isCorrect": 2
-      },
-      {
-        "content": "11月10日。",
-        "isCorrect": 2
-      },
-      {
         "content": "11月9日",
         "isCorrect": 1
       },
@@ -40511,26 +40798,6 @@
       {
         "content": "茶叶",
         "isCorrect": 1
-      },
-      {
-        "content": "兑入普通饮料中",
-        "isCorrect": 1
-      },
-      {
-        "content": "跳跳糖",
-        "isCorrect": 1
-      },
-      {
-        "content": "果冻",
-        "isCorrect": 1
-      },
-      {
-        "content": "奶茶",
-        "isCorrect": 1
-      },
-      {
-        "content": "干花",
-        "isCorrect": 1
       }
     ],
     "type": 2
@@ -40610,6 +40877,27 @@
     ],
     "type": 1
   },
+  "民族问题对国家安全的影响取决于？": {
+    "optionList": [
+      {
+        "content": "民族数量",
+        "isCorrect": 2
+      },
+      {
+        "content": "处理方式",
+        "isCorrect": 1
+      },
+      {
+        "content": "地理位置",
+        "isCorrect": 2
+      },
+      {
+        "content": "经济水平",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "民法的基本原则主要有（）。": {
     "optionList": [
       {
@@ -40647,6 +40935,18 @@
       },
       {
         "content": "面色发紫",
+        "isCorrect": 1
+      },
+      {
+        "content": "双手紧握喉咙，无法咳嗽",
+        "isCorrect": 1
+      },
+      {
+        "content": "说不出话",
+        "isCorrect": 1
+      },
+      {
+        "content": "嘴唇和皮肤出现青紫色",
         "isCorrect": 1
       }
     ],
@@ -42331,6 +42631,19 @@
     ],
     "type": 1
   },
+  "燃气事故的类型有？": {
+    "optionList": [
+      {
+        "content": "一氧化碳中毒",
+        "isCorrect": 1
+      },
+      {
+        "content": "燃气爆炸",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "燃气器具在使用过程中，应该注意哪些安全事项？": {
     "optionList": [
       {
@@ -43213,6 +43526,10 @@
   },
   "用灭火器灭火时，灭火器的喷射口应该对准火焰的（）。": {
     "optionList": [
+      {
+        "content": "中部",
+        "isCorrect": 2
+      },
       {
         "content": "根部",
         "isCorrect": 1
@@ -44461,6 +44778,27 @@
     ],
     "type": 1
   },
+  "相较于传统国家安全观，新时代总体国家安全观在核心理念上的突破性概念体现在：": {
+    "optionList": [
+      {
+        "content": "仅涵盖维护",
+        "isCorrect": 2
+      },
+      {
+        "content": "仅涵盖塑造",
+        "isCorrect": 2
+      },
+      {
+        "content": "统一维护与塑造",
+        "isCorrect": 1
+      },
+      {
+        "content": "与传统安全无关",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "看到溺水者，首先应该：": {
     "optionList": [
       {
@@ -44574,6 +44912,10 @@
       },
       {
         "content": "更接近社会人情百态",
+        "isCorrect": 1
+      },
+      {
+        "content": "缺少丰富的社交活动",
         "isCorrect": 1
       }
     ],
@@ -45150,6 +45492,27 @@
       }
     ],
     "type": 2
+  },
+  "管仲提出的“五害”不包括？": {
+    "optionList": [
+      {
+        "content": "水灾",
+        "isCorrect": 2
+      },
+      {
+        "content": "旱灾",
+        "isCorrect": 2
+      },
+      {
+        "content": "战争",
+        "isCorrect": 1
+      },
+      {
+        "content": "虫灾",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "管制刀具是指匕首、三棱刀、弹簧刀（跳刀）及其他相类似的单刃、 双刃、三棱尖刀。": {
     "optionList": [
@@ -45859,10 +46222,6 @@
         "isCorrect": 1
       },
       {
-        "content": "加强矛盾纠纷排查处",
-        "isCorrect": 1
-      },
-      {
         "content": "加强矛盾纠纷排查调处",
         "isCorrect": 1
       }
@@ -46323,6 +46682,14 @@
       },
       {
         "content": "骗取银行卡验证码等信息",
+        "isCorrect": 1
+      },
+      {
+        "content": "用各种理由骗你续费进去",
+        "isCorrect": 1
+      },
+      {
+        "content": "质押合同",
         "isCorrect": 1
       }
     ],
@@ -46948,6 +47315,10 @@
       {
         "content": "可以治疗，要定期吃药，控制病情。",
         "isCorrect": 1
+      },
+      {
+        "content": "不可以治疗，也没有疫苗。",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -48669,15 +49040,15 @@
   "请问我国目前与国家安全相关的法律法规有多少部？": {
     "optionList": [
       {
-        "content": "90多部",
+        "content": "几十部",
         "isCorrect": 2
       },
       {
-        "content": "190多部",
+        "content": "将近200部",
         "isCorrect": 1
       },
       {
-        "content": "290多部",
+        "content": "超过300部",
         "isCorrect": 2
       }
     ],
@@ -48773,6 +49144,19 @@
     "type": 1
   },
   "贪婪心理型诈骗是指利用用户的贪婪心理来进行欺诈，这种诈骗一般受害者多为爱贪便宜的人群，": {
+    "optionList": [
+      {
+        "content": "正确",
+        "isCorrect": 1
+      },
+      {
+        "content": "错误",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "贪婪心理型诈骗是指利用用户的贪婪心理来进行欺诈，这种诈骗的受害者多为想要谋取利益的人。": {
     "optionList": [
       {
         "content": "正确",
@@ -50231,6 +50615,10 @@
       },
       {
         "content": "充电宝有无合格证、3C认证",
+        "isCorrect": 1
+      },
+      {
+        "content": "充电宝有无合格证",
         "isCorrect": 1
       }
     ],

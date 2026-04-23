@@ -3,24 +3,16 @@
 # ---------------------------------------------------------------------------
 # 业务流程通用选择器
 # ---------------------------------------------------------------------------
-SEL_DIALOG = ".van-dialog, .van-toast, .mint-msgbox, .mint-toast"
+SEL_DIALOG = ".van-dialog, .mint-msgbox, .mint-toast"
 SEL_BROADCAST_MODAL = ".broadcast-modal"
 SEL_BROADCAST_CLOSE_BTN = ".broadcast-modal button"
 
 # 流程控制
-SEL_JOIN_BTN = 'button.exam-button:has-text("参加考试")'
-SEL_START_BTN = 'a.popup-btn:has-text("开始考试")'
+SEL_JOIN_BTN = '.exam-button:has-text("参加考试")'
+SEL_START_BTN = '.popup-btn:has-text("开始考试")'
 SEL_SUBMIT_BTN = (
-    ".sheet .bottom-ctrls .mint-button:has-text('交卷'), "
     ".sheet .bottom-ctrls button:has-text('交卷'), "
-    ".sheet .bottom-ctrls a:has-text('交卷'), "
-    ".confirm-sheet .bottom-ctrls .mint-button:has-text('交卷'), "
-    ".confirm-sheet .bottom-ctrls button:has-text('交卷'), "
-    ".confirm-sheet .bottom-ctrls a:has-text('交卷'), "
-    ".sheet .bottom-ctrls button:text-matches('^\\s*交\\s*卷\\s*$', 'i'), "
-    ".confirm-sheet .bottom-ctrls button:text-matches('^\\s*交\\s*卷\\s*$', 'i'), "
-    "button:text-matches('^\\s*交\\s*卷\\s*$', 'i'), "
-    ".mint-button:text-matches('^\\s*交\\s*卷\\s*$', 'i')"
+    ".confirm-sheet .bottom-ctrls button:has-text('交卷')"
 )
 
 # 任务/项目列表
@@ -36,18 +28,12 @@ SUBMIT_CONFIRM_LABELS = [
     "确 认",
     "确认",
     "确定",
-    "确认交卷",
     "提交",
-    "立即交卷",
     "交卷",
-    "提交试卷",
 ]
 SUBMIT_IGNORE_LABELS = ["取消", "退出", "暂不", "返回", "继续考试"]
 
-SEL_CONFIRM_BTN = (
-    ".van-dialog__confirm, .mint-msgbox-confirm, "
-    "button:text-is('确认'), button:text-is('确定'), button:text-is('确 认')"
-)
+SEL_CONFIRM_BTN = "button:has-text('确认'), button:has-text('确定')"
 
 SEL_SUBMIT_CONFIRM = (
     ", ".join(
@@ -63,77 +49,129 @@ SEL_SUBMIT_CONFIRM = (
 SEL_COURSE_READY = ".van-tab, .van-collapse-item, .img-texts-item, .fchl-item"
 SEL_INTERMEDIATE_WAIT_TARGETS = (
     ".van-collapse-item, .img-texts-item, .fchl-item, #agree, "
-    ".agree-checkbox input, input[type='checkbox'], .img-text-block, .task-block"
+    "input[type='checkbox'], .img-text-block, .task-block"
 )
 SEL_COURSE_LIST_MARKERS = ".van-collapse-item, .img-texts-item, .fchl-item"
 
 SEL_NEXT_BTN = (
-    ".bottom-ctrls .mint-button:has-text('下一题'), "
-    ".bottom-ctrls button:has-text('下一题'), "
-    ".bottom-ctrls a:has-text('下一题'), "
-    ".bottom-ctrls button:text-matches('^\\s*下\\s*一\\s*题\\s*$', 'i'), "
-    ".bottom-ctrls span:text-matches('^\\s*下\\s*一\\s*题\\s*$', 'i'), "
-    ".bottom-ctrls div:text-matches('^\\s*下\\s*一\\s*题\\s*$', 'i'), "
-    "button:has-text('下一题'), a:has-text('下一题'), "
-    ".btn-next, .btn-primary-next"
+    ".btn-start, .btn-next, .btn-ce, .btn-aq, .btn-at, .btn-af, .btn-base, .back-list, "
+    "button:has-text('下一题'), .mint-button:has-text('下一题'), .van-button:has-text('下一题')"
 )
 
 SEL_ANSWER_CARD_BTN = (
-    ".bottom-ctrls .mint-button:has-text('答题卡'), "
     ".bottom-ctrls button:has-text('答题卡'), "
-    ".bottom-ctrls a:has-text('答题卡'), "
-    ".bottom-ctrls button:text-matches('^\\s*答\\s*题\\s*卡\\s*$', 'i'), "
-    ".bottom-ctrls span:text-matches('^\\s*答\\s*题\\s*卡\\s*$', 'i'), "
-    ".bottom-ctrls div:text-matches('^\\s*答\\s*题\\s*卡\\s*$', 'i')"
+    ".bottom-ctrls button:has-text('查看答题卡')"
 )
 
-SEL_BTN_SUBMIT_SIGN = "button:has-text('提交'), button:has-text('确认提交')"
+SEL_BTN_SUBMIT_SIGN = "button:has-text('保 存'), button:has-text('确认')"
 SEL_TASK_DONE_LABEL = ".task-block-done"
 
 # ---------------------------------------------------------------------------
 # 页面状态检测
 # ---------------------------------------------------------------------------
 SEL_EXAM_TAB = '.van-tab:has-text("在线考试")'
-SEL_QUESTION_TITLE = ".quest-stem"
-SEL_OPTIONS = ".quest-option-item"
+SEL_EXAM_ITEM = ".exam-item"
+SEL_EXAM_ITEM_TITLE = ".exam-item-title, .exam-info h3"
+SEL_EXAM_ITEM_PASS = ".exam-pass, .exam-result"
+SEL_EXAM_RESULT_SCORE = ".score-num, .score, .exam-score, .result-score, .score-text"
+SEL_EXAM_SUBMIT_AREA = "button:has-text('交卷'), button:has-text('完成')"
+SEL_EXAM_PREPARE_POPUPS = (
+    ".van-popup, .mint-popup, .confirm-sheet, .sheet, .mint-msgbox"
+)
+SEL_EXAM_PREPARE_NEXT = "button:has-text('下一步'), a:has-text('下一步')"
+SEL_EXAM_PREPARE_CONFIRM = (
+    "button:has-text('确认'), button:has-text('完成'), button:has-text('提交')"
+)
+SEL_EXAM_INTERMEDIATE_PROJECT = ".img-text-block, .task-block"
+SEL_QUESTION_TITLE = ".quest-stem, .answerPg-container-title"
+SEL_OPTIONS = ".quest-option-item, .answerPg-container-item"
 SEL_QUEST_CATEGORY = ".quest-category"
-SEL_QUEST_INDICATOR = ".quest-indicator"
+SEL_QUEST_INDICATOR = ".quest-indicator, .answerPg-header-no"
+SEL_QUESTION_TITLE_SUB = ".title, .quest-title, .stem-text"
+SEL_EXAM_SHEET = ".sheet"
+SEL_EXAM_CONFIRM_SHEET = ".confirm-sheet"
+SEL_EXAM_SHEET_BOTTOM_CTRLS = ".sheet .bottom-ctrls"
+SEL_EXAM_CONFIRM_SHEET_BOTTOM_CTRLS = ".confirm-sheet .bottom-ctrls"
+SEL_EXAM_BOTTOM_CTRLS = ".bottom-ctrls"
+SEL_EXAM_NEXT_BTN_IN_BOTTOM = "button:has-text('下一题'), .mint-button:has-text('下一题'), .van-button:has-text('下一题')"
+SEL_EXAM_CARD_BTN_IN_BOTTOM = "text=答题卡"
+SEL_EXAM_QUEST_INDEX_ITEM_TEMPLATE = ".sheet .quest-indexs-list li:has(span:text-is('{num}')), .sheet .quest-indexs-list li:has-text('{num}')"
+SEL_EXAM_QUEST_INDEX_TEXT_TEMPLATE = (
+    ".sheet span:text-is('{num}'), .sheet div:text-is('{num}')"
+)
 
 # ---------------------------------------------------------------------------
 # 课程学习核心选择器
 # ---------------------------------------------------------------------------
 SEL_AGREE_CHECKBOX = "#agree, input[type='checkbox']"
-SEL_BTN_NEXT_STEP = (
-    "button:has-text('下一步'), a:has-text('下一步'), "
-    "button:has-text('同意'), a:has-text('同意')"
+SEL_BTN_NEXT_STEP = "button:has-text('下一步'), button:has-text('同意')"
+SEL_COURSE_TAB = ".van-tab"
+SEL_COURSE_LIST_WAIT_TARGETS = (
+    ".van-collapse-item, .img-texts-item, .fchl-item, .task-block, .img-text-block, "
+    "#agree, .van-cell"
 )
-SEL_COURSE_LIST_MARKERS = ".van-collapse-item, .img-texts-item, .fchl-item"
-SEL_COURSE_LIST_WAIT_TARGETS = ".van-collapse-item, .img-texts-item, .fchl-item, .task-block, .img-text-block, #agree, .van-cell"
-SEL_IMG_TEXT_ITEM = ".img-texts-item, .img-text-item, .img-text-block-item, .course-item, .lesson-item, .list-item, .van-cell"
-SEL_IMG_TEXT_ITEM_VISIBLE = ".img-texts-item:visible, .img-text-item:visible, .img-text-block-item:visible, .course-item:visible, .lesson-item:visible, .list-item:visible, .van-cell:visible"
-SEL_IMG_TEXT_ITEM_NOT_PASSED = ".img-texts-item:not(.passed), .img-text-item:not(.passed), .img-text-block-item:not(.passed), .course-item:not(.passed), .lesson-item:not(.passed), .list-item:not(.passed), .van-cell:not(.passed)"
-SEL_IMG_TEXT_ITEM_NOT_PASSED_VISIBLE = ".img-texts-item:not(.passed):visible, .img-text-item:not(.passed):visible, .img-text-block-item:not(.passed):visible, .course-item:not(.passed):visible, .lesson-item:not(.passed):visible, .list-item:not(.passed):visible, .van-cell:not(.passed):visible"
+SEL_COURSE_LIST_CONTENT_ITEMS = ", ".join(
+    [
+        ".img-texts-item",
+        ".fchl-item",
+        ".task-block",
+        ".van-collapse-item__content .van-cell",
+        ".van-collapse-item__content .course-item",
+        ".van-collapse-item__content .lesson-item",
+        ".list-item-content",
+    ]
+)
+SEL_IMG_TEXT_ITEM = ".img-texts-item, .van-collapse-item__content .van-cell"
+SEL_IMG_TEXT_ITEM_VISIBLE = (
+    ".img-texts-item:visible, .van-collapse-item__content .van-cell:visible"
+)
+SEL_IMG_TEXT_ITEM_NOT_PASSED = (
+    ".img-texts-item:not(.passed), .van-collapse-item__content .van-cell:not(.passed)"
+)
+SEL_IMG_TEXT_ITEM_NOT_PASSED_VISIBLE = ".img-texts-item:not(.passed):visible, .van-collapse-item__content .van-cell:not(.passed):visible"
 
-SEL_FCHL_ITEM = ".fchl-item, .fchl-items, .course-item-fchl"
-SEL_FCHL_ITEM_VISIBLE = ".fchl-item:visible, .fchl-items:visible"
-SEL_FCHL_ITEM_NOT_PASSED = (
-    ".fchl-item:not(.fchl-item-active), .fchl-items:not(.fchl-item-active)"
-)
-SEL_FCHL_ITEM_NOT_PASSED_VISIBLE = ".fchl-item:not(.fchl-item-active):visible, .fchl-items:not(.fchl-item-active):visible"
-SEL_COLLAPSE_ITEM = ".van-collapse-item, .course-chapter, .chapter-list-item"
-SEL_COLLAPSE_ITEM_TITLE = ".van-collapse-item__title, .van-cell__title, .chapter-title"
+SEL_FCHL_ITEM = ".fchl-item"
+SEL_FCHL_ITEM_VISIBLE = ".fchl-item:visible"
+SEL_FCHL_ITEM_NOT_PASSED = ".fchl-item:not(.fchl-item-active)"
+SEL_FCHL_ITEM_NOT_PASSED_VISIBLE = ".fchl-item:not(.fchl-item-active):visible"
+SEL_COLLAPSE_ITEM = ".van-collapse-item"
+SEL_COLLAPSE_ITEM_TITLE = ".van-cell__title"
 SEL_COLLAPSE_CELL_TITLE = ".van-cell__title"
+SEL_COLLAPSE_ITEM_CONTENT = ".van-collapse-item__content"
 SEL_RUNTIME_BTN_BACKLIST = ".back-list"
 SEL_COMMENT_BACK_BTN = ".comment-footer-button:has-text('返回')"
 SEL_NAV_BAR_LEFT = ".van-nav-bar__left"
+SEL_NAV_BAR_TITLE = ".van-nav-bar__title"
 SEL_DIALOG_PREV_BTN = ".pop-jsv-prev"
 SEL_DIALOG_POP = ".pop-jsv, .pop-jsv-prev"
-SEL_ITEM_TITLE_TEXT = ".title, .fchl-item-content-title, .van-cell__title, .img-texts-item-title, .course-name, .name, .lesson-name"
-SEL_TASK_OR_IMG_BLOCK = (
-    ".task-block, .img-text-block, .img-texts-item-block, .project-item, .van-card"
-)
+SEL_ITEM_TITLE_TEXT = ".title, .fchl-item-content-title, .van-cell__title, .name"
+SEL_ITEM_COMPLETED_ICON = ".van-icon-success, .van-icon-passed, .icon-finish"
 SEL_RUNTIME_MARKERS = (
     ".back-list, .btn-start, .btn-next, .btn-prev, .btn-at, .btn-af, .page-WH"
 )
 SEL_RUNTIME_FRAME_SKELETON = ".page-container, .page-item, .btn-next, .back-list"
 SEL_COURSE_JS_ITEMS_VISIBLE = ".img-texts-item:visible, .fchl-item:visible"
+SEL_RUNTIME_ACTIVE_VIDEO = ".page-active video"
+SEL_RUNTIME_VIDEO_PLAY_BTN = ".page-active .vjs-big-play-button"
+SEL_RUNTIME_CHOICE = ".page-active [class*='p12'], .page-active [class*='choice']"
+SEL_RUNTIME_INTERACTIVE_ITEMS = (
+    ".page-active [class*='p17'], .page-active .interactive-item"
+)
+SEL_RUNTIME_INTERACTIVE_CLOSE = ".page-active .p1712"
+SEL_RUNTIME_QUIZ_LABELS = ".page-active .aq-item-label"
+SEL_RUNTIME_QUIZ_CHECKED = ".page-active input:checked"
+SEL_RUNTIME_NAV_BTNS = ", ".join(
+    [
+        ".page-active .btn-aq-21",
+        ".page-active .btn-aq",
+        ".page-active .btn-at",
+        ".page-active .btn-af",
+        ".page-active .btn-start",
+        ".page-active .btn-next",
+        ".page-active .btn-ce",
+        ".page-active .back-list",
+    ]
+)
+SEL_RUNTIME_PROBE_CANDIDATES = (
+    ".page-active img, .page-active div, .page-active a, .page-active label"
+)

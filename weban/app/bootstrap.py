@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import logging
 import traceback
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Protocol, Any
 
 from weban.app.config import AppConfig
 from weban.app.runtime import ensure_playwright_browsers, get_base_path
@@ -27,7 +26,7 @@ class AppBootstrap:
     base_path: str
     config: AppConfig
     logger: SupportsLogging
-    raw_logger: logging.Logger
+    raw_logger: Any
     engine: TaskEngine
 
 
@@ -35,9 +34,7 @@ def bootstrap_app(version: str) -> AppBootstrap:
     """完成应用启动前的初始化，并返回运行上下文。"""
     base_path = get_base_path()
 
-    # 配置加载前先使用简易 logger，避免 config 读取阶段没有日志输出
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s|%(message)s")
-    startup_logger = logging.getLogger("startup")
+    from loguru import logger as startup_logger
 
     config = AppConfig(base_path, logger=startup_logger)
     config.load()
@@ -71,7 +68,7 @@ def bootstrap_app(version: str) -> AppBootstrap:
     config.logger = logger
 
     # setup_logger 会重置 root logger；更新检查使用原始 Logger，避免类型不匹配
-    raw_logger = logging.getLogger()
+    raw_logger = logger
 
     engine = TaskEngine(config, logger)
 

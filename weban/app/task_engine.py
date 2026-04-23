@@ -1,4 +1,3 @@
-import logging
 import os
 import sys
 import time
@@ -13,6 +12,7 @@ from weban.core.captcha import (
 )
 from weban.app.runtime import get_bool_value
 from weban.logger import setup_account_file_handler
+from loguru import logger
 
 
 @dataclass(slots=True)
@@ -35,7 +35,7 @@ class TaskSettings:
 class TaskEngine:
     """自动化任务调度引擎，负责多账号并发执行。"""
 
-    def __init__(self, config: Any, logger: logging.Logger | logging.LoggerAdapter):
+    def __init__(self, config: Any, logger: Any):
         self.config = config
         self.logger = logger
         self.settings = config.settings
@@ -90,15 +90,13 @@ class TaskEngine:
             "manual_login_timeout_sec": task_settings.manual_timeout,
         }
 
-    def _make_account_logger(
-        self, log_name: str
-    ) -> tuple[logging.LoggerAdapter, logging.FileHandler]:
+    def _make_account_logger(self, log_name: str) -> tuple[Any, int]:
         """为单账号任务创建带 account 字段的日志适配器和独立文件 handler。"""
-        logger = logging.LoggerAdapter(logging.getLogger(), {"account": log_name})
-        handler = setup_account_file_handler(
+        account_logger = logger.bind(account=log_name)
+        handler_id = setup_account_file_handler(
             self._base_path, log_name, debug=self._debug_enabled
         )
-        return logger, handler
+        return account_logger, handler_id
 
     def _prepare_runtime(self) -> None:
         """初始化运行期公共状态。"""
@@ -152,11 +150,11 @@ class TaskEngine:
         set_captcha_debug_account(log_name)
 
         task_settings = self._build_task_settings(account_cfg)
-        logger, account_handler = self._make_account_logger(log_name)
+        account_logger, handler_id = self._make_account_logger(log_name)
         browser_cfg = self._build_browser_config(task_settings)
 
         try:
-            logger.info("开始执行任务")
+            account_logger.info("开始执行任务")
             with WeBanClient(
                 tenant_name=str(
                     account_cfg.get("tenant_name", account_cfg.get("tenantName", ""))
@@ -169,19 +167,19 @@ class TaskEngine:
                 token=str(account_cfg.get("token", "")).strip(),
                 user={},
                 browser=browser_cfg,
-                log=logger,
+                log=account_logger,
             ) as client:
                 login_result = client.login()
                 if not login_result or not login_result.get("ok"):
-                    logger.error(f"登录失败：{login_result}")
+                    account_logger.error(f"登录失败：{login_result}")
                     return False
 
                 self.config.update_account_state(account_index, login_info=login_result)
 
                 if task_settings.study_mode != "false":
-                    logger.info(
+                    account_logger.info(
                         "开始学习流程 "
-                        f"(单任务时长: {task_settings.study_time}秒, "
+                        f"(单任务最小可用时长: {task_settings.study_time}秒, "
                         f"模式: {task_settings.study_mode})"
                     )
                     completion_stats = client.run_study(
@@ -191,17 +189,17 @@ class TaskEngine:
 
                     # 检查是否有未完成的课程
                     if completion_stats.get("incomplete", 0) > 0:
-                        logger.warning(
+                        account_logger.warning(
                             f"检测到 {completion_stats['incomplete']} 门课程未完成，跳过考试流程"
                         )
-                        logger.info(
+                        account_logger.info(
                             f"课程完成情况 - 总计: {completion_stats['total']}, "
                             f"已完成: {completion_stats['completed']}, "
                             f"未完成: {completion_stats['incomplete']}"
                         )
                         # 不进入考试流程
                     elif task_settings.exam_mode != "false":
-                        logger.info(
+                        account_logger.info(
                             f"所有课程已完成，开始考试流程 (模式: {task_settings.exam_mode})"
                         )
                         client.run_exam(
@@ -212,7 +210,9 @@ class TaskEngine:
                             exam_submit_match_rate=task_settings.exam_submit_match_rate,
                         )
                 elif task_settings.exam_mode != "false":
-                    logger.info(f"开始考试流程 (模式: {task_settings.exam_mode})")
+                    account_logger.info(
+                        f"开始考试流程 (模式: {task_settings.exam_mode})"
+                    )
                     client.run_exam(
                         exam_question_time=task_settings.exam_question_time,
                         exam_question_time_offset=task_settings.exam_question_time_offset,
@@ -221,23 +221,24 @@ class TaskEngine:
                         exam_submit_match_rate=task_settings.exam_submit_match_rate,
                     )
 
-                logger.info("账号所有任务执行完成")
+                account_logger.info("账号所有任务执行完成")
 
                 if not task_settings.close_browser:
-                    logger.info("配置指定任务完成后不关闭浏览器，程序将在此挂起。")
+                    account_logger.info(
+                        "配置指定任务完成后不关闭浏览器，程序将在此挂起。"
+                    )
                     while True:
                         time.sleep(1)
 
             return True
 
         except Exception as exc:
-            logger.error(f"任务执行失败: {exc}")
+            account_logger.error(f"任务执行失败: {exc}")
             traceback.print_exc(file=sys.stderr)
             return False
 
         finally:
             try:
-                logging.getLogger().removeHandler(account_handler)
-                account_handler.close()
+                logger.remove(handler_id)
             except Exception:
                 pass

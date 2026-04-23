@@ -435,7 +435,10 @@ class AnswerMixin(BaseMixin):
                 tab_names = ["学习项目", "结束项目"]
                 for tab_name in tab_names:
                     self.log.info(f"[历史记录] 正在扫描：{tab_name}")
-                    self._page.goto(f"{self.base_url}/#/learning-task-list")
+                    self._page.goto(
+                        f"{self.base_url}/#/learning-task-list",
+                        wait_until="domcontentloaded",
+                    )
                     time.sleep(2)
 
                     tab_el = self._page.locator(
@@ -451,7 +454,10 @@ class AnswerMixin(BaseMixin):
                     proj_count = self._page.locator(_SEL_TASK_BLOCK).count()
                     for proj_idx in range(proj_count):
                         # 每轮重回列表并切换 Tab，确保 DOM 状态最新
-                        self._page.goto(f"{self.base_url}/#/learning-task-list")
+                        self._page.goto(
+                            f"{self.base_url}/#/learning-task-list",
+                            wait_until="domcontentloaded",
+                        )
                         time.sleep(1)
                         tab_el = self._page.locator(
                             f'.van-tab:has-text("{tab_name}")'
@@ -506,7 +512,7 @@ class AnswerMixin(BaseMixin):
                                     self._page.go_back()
                                     self._wait_for(_SEL_REVIEW_ITEM, timeout=6000)
 
-                            self._page.goto(record_url)
+                            self._page.goto(record_url, wait_until="domcontentloaded")
                             self._wait_for(_SEL_EXAM_TAB, timeout=6000)
             finally:
                 self._page.remove_listener("response", _handle_response)

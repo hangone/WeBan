@@ -1,20 +1,21 @@
 import re
 import time
-import logging
+import random
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, List, Dict
 
 from .const import (
     SEL_AGREE_CHECKBOX,
     SEL_BTN_NEXT_STEP,
+    SEL_COURSE_TAB,
     SEL_COURSE_LIST_MARKERS,
+    SEL_COURSE_LIST_CONTENT_ITEMS,
     SEL_COURSE_LIST_WAIT_TARGETS,
     SEL_FCHL_ITEM,
     SEL_COLLAPSE_ITEM,
     SEL_COLLAPSE_ITEM_TITLE,
     SEL_BROADCAST_MODAL,
     SEL_COMMENT_BACK_BTN,
-    SEL_NAV_BAR_LEFT,
     SEL_ITEM_TITLE_TEXT,
     SEL_TASK_OR_IMG_BLOCK,
     SEL_IMG_TEXT_BLOCK,
@@ -26,14 +27,26 @@ from .const import (
     SEL_IMG_TEXT_ITEM_NOT_PASSED,
     SEL_TASK_BLOCK,
     SEL_IMG_TEXT_ITEM,
+    SEL_ITEM_COMPLETED_ICON,
+    SEL_RUNTIME_ACTIVE_VIDEO,
+    SEL_RUNTIME_VIDEO_PLAY_BTN,
+    SEL_RUNTIME_CHOICE,
+    SEL_RUNTIME_INTERACTIVE_ITEMS,
+    SEL_RUNTIME_INTERACTIVE_CLOSE,
+    SEL_RUNTIME_QUIZ_LABELS,
+    SEL_RUNTIME_QUIZ_CHECKED,
+    SEL_RUNTIME_NAV_BTNS,
+    SEL_RUNTIME_PROBE_CANDIDATES,
+    SEL_NAV_BAR_LEFT,
+    SEL_NAV_BAR_TITLE,
+    SEL_DIALOG_POP,
+    SEL_DIALOG_PREV_BTN,
 )
 from .captcha import (
     has_captcha as _has_captcha,
     handle_tencent_captcha as _handle_tencent_captcha,
 )
 from .base import BaseMixin
-
-logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # projectCategory → 类型名称映射
@@ -208,7 +221,7 @@ class StudyMixin(BaseMixin):
 
         # Tab 文案在不同项目里不稳定，尽量用关键字匹配。
         _tab_keywords = {
-            3: ["必修"],
+            3: ["必修", "课程学习"],
             2: ["选修", "自选"],
             1: ["匹配"],
         }
@@ -218,7 +231,7 @@ class StudyMixin(BaseMixin):
 
         try:
             for label in labels:
-                tab = self._page.locator(f'.van-tab:has-text("{label}")')
+                tab = self._page.locator(f'{SEL_COURSE_TAB}:has-text("{label}")')
                 if tab.count() > 0:
                     active_cls = tab.first.get_attribute("class") or ""
                     if "van-tab--active" not in active_cls:
@@ -307,8 +320,14 @@ class StudyMixin(BaseMixin):
             try:
                 title_btn.scroll_into_view_if_needed(timeout=2000)
                 title_btn.click(timeout=5000)
-                time.sleep(1.5)
                 self.log.info(f"[章节] 展开: {title_text or f'#{i + 1}'}")
+                # 很多时候展开章节会触发网络请求拉取列表，等待列表元素出现
+                try:
+                    self._page.wait_for_selector(
+                        SEL_COURSE_LIST_MARKERS, state="visible", timeout=5000
+                    )
+                except Exception:
+                    time.sleep(2)
                 return True
             except Exception as e:
                 self.log.debug(f"[章节] 展开失败({i + 1}): {e}")
@@ -330,17 +349,12 @@ class StudyMixin(BaseMixin):
         if not self._page or self._page.is_closed():
             return []
 
-        dom_tasks: list[dict[str, Any]] = []
-        selectors = [
-            SEL_IMG_TEXT_ITEM,
-            SEL_FCHL_ITEM,
-            ".van-collapse-item__content .van-cell",
-            ".van-collapse-item__content .course-item",
-            ".van-collapse-item__content .lesson-item",
-            ".list-item-content",
-        ]
+        if self._get_study_page_context() == "project-list":
+            self.log.debug("[扫描] 当前处于项目列表页，跳过课程扫描")
+            return []
 
-        loc = self._page.locator(", ".join(selectors))
+        dom_tasks: list[dict[str, Any]] = []
+        loc = self._page.locator(SEL_COURSE_LIST_CONTENT_ITEMS)
         for i in range(loc.count()):
             it = loc.nth(i)
             try:
@@ -359,10 +373,7 @@ class StudyMixin(BaseMixin):
             passed = (
                 "passed" in cls
                 or "finished" in cls
-                or it.locator(
-                    ".van-icon-success, .van-icon-passed, .icon-finish"
-                ).count()
-                > 0
+                or it.locator(SEL_ITEM_COMPLETED_ICON).count() > 0
                 or "已完成" in (it.inner_text() or "")
             )
 
@@ -379,6 +390,46 @@ class StudyMixin(BaseMixin):
 
         self.log.debug(f"[扫描] DOM 扫描完成，总计 {len(dom_tasks)} 门课程")
         return dom_tasks
+
+    def _summarize_collapse_progress(self) -> dict[str, int] | None:
+        """汇总折叠章节标题中的已完成/总数进度。"""
+        if not self._page or self._page.is_closed():
+            return None
+
+        collapse_items = self._page.locator(SEL_COLLAPSE_ITEM)
+        if collapse_items.count() == 0:
+            return None
+
+        total = 0
+        completed = 0
+        found_progress = False
+
+        for i in range(collapse_items.count()):
+            item = collapse_items.nth(i)
+            title_btn = item.locator(SEL_COLLAPSE_ITEM_TITLE).first
+            if title_btn.count() == 0:
+                continue
+            try:
+                title_text = title_btn.inner_text().strip()
+            except Exception:
+                continue
+
+            finished_num, total_num = self._parse_section_progress(title_text)
+            if finished_num is None or total_num is None:
+                continue
+
+            found_progress = True
+            total += total_num
+            completed += min(finished_num, total_num)
+
+        if not found_progress:
+            return None
+
+        return {
+            "total": total,
+            "completed": completed,
+            "incomplete": max(0, total - completed),
+        }
 
     def _log_page_diagnostics(self):
         if not self._page or self._page.is_closed():
@@ -551,12 +602,15 @@ class StudyMixin(BaseMixin):
     def _is_mcwk_course_page(self) -> bool:
         return self._get_course_runtime_frame() is not None
 
-    def _wait_for_mcwk_runtime(self, timeout: float = 8) -> bool:
+    def _wait_for_mcwk_runtime(self, timeout: float = 12) -> bool:
         end = time.time() + timeout
         while time.time() < end:
             f = self._get_course_runtime_frame()
             if f:
                 try:
+                    # 检查是否有核心交互元素（如 btn-start 或 btn-next 或 btn-base）
+                    if f.locator(SEL_RUNTIME_NAV_BTNS + ", .page-item").count() > 0:
+                        return True
                     if f.evaluate("typeof finishWxCourse === 'function'"):
                         return True
                 except Exception:
@@ -581,21 +635,274 @@ class StudyMixin(BaseMixin):
             time.sleep(0.5)
         return False
 
-    def _trigger_img_text_completion(self, frame, title: str) -> bool:
-        try:
-            if frame:
-                frame.evaluate(
-                    "if(typeof finishWxCourse === 'function') finishWxCourse();"
-                )
-                return True
+    def _setup_quiz_handler(self):
+        """设置答题响应监听器，自动捕获正确答案"""
+        if not hasattr(self, "_last_quiz_answer"):
+            self._last_quiz_answer = None
+
+        # 确保只绑定一次
+        if not hasattr(self, "_has_quiz_handler"):
             if self._page:
-                self._page.evaluate(
-                    "if(typeof finishWxCourse === 'function') finishWxCourse();"
-                )
-                return True
+                self._page.on("response", self._quiz_response_handler)
+                self._has_quiz_handler = True
+
+    def _quiz_response_handler(self, response):
+        try:
+            # 不去假设 URL，直接从所有 JSON 响应中提取 answerLabel
+            ctype = response.headers.get("content-type") or ""
+            if "json" not in ctype.lower():
+                return
+
+            data = response.json()
+            if (
+                isinstance(data, dict)
+                and str(data.get("code")) == "0"
+                and "data" in data
+            ):
+                d = data["data"]
+                if isinstance(d, dict) and "answerLabel" in d:
+                    ans = d["answerLabel"]
+                    if ans:
+                        self._last_quiz_answer = ans
         except Exception:
             pass
-        return False
+
+    def _trigger_img_text_completion(self, frame, title: str) -> bool:
+        """
+        高仿真微课播放逻辑。
+        参考 item.js 与 sdk.js 中的交互逻辑，通过模拟点击对应元素来推进课程。
+        """
+        self._setup_quiz_handler()
+        try:
+            if not frame:
+                if not self._page:
+                    return False
+                frame = self._page
+
+            clicked = False
+            # 去除固定 60 步限制，依赖外部超时或结束状态跳出
+            consecutive_no_action = 0
+            while True:
+                # 每 2 秒点击一次（带点随机抖动）
+                jitter = random.uniform(0.1, 0.5)
+                time.sleep(2.0 + jitter)
+
+                # 1. 检查验证码 (有且只有在 csCapt=true 且 weiban=weiban 下需要，参考 sdk.js)
+                url = (frame.url or "").lower()
+                if "weiban=weiban" in url and "cscapt=true" in url:
+                    if _has_captcha(self._page):
+                        self.log.info("[验证码] 检测到微课完成验证码，开始自动处理...")
+                        _handle_tencent_captcha(
+                            self._page, self.log, require_cscapt=False
+                        )
+                        time.sleep(2)
+                        continue
+
+                # 2. 检查是否有视频正在播放或已结束
+                video_ended = False
+                try:
+                    videos = frame.locator(SEL_RUNTIME_ACTIVE_VIDEO)
+                    if videos.count() > 0:
+                        # 获取视频状态
+                        is_paused = videos.first.evaluate("el => el.paused")
+                        is_ended = videos.first.evaluate("el => el.ended")
+
+                        if is_ended:
+                            video_ended = True
+                        elif not is_paused:
+                            self.log.debug(
+                                "[视频] 视频正在播放中，等待动画/视频完成..."
+                            )
+                            clicked = True
+                            consecutive_no_action = 0
+                            continue
+                except Exception:
+                    pass
+
+                # 3. 处理视频播放按钮
+                if not video_ended:
+                    video_play_btn = frame.locator(SEL_RUNTIME_VIDEO_PLAY_BTN).first
+                    if video_play_btn.count() > 0 and video_play_btn.is_visible():
+                        self.log.info("[互动] 发现未播放的视频，点击播放")
+                        video_play_btn.click(force=True)
+                        time.sleep(1)
+                        clicked = True
+                        consecutive_no_action = 0
+                        continue
+
+                # 4. 处理页面内的特定交互逻辑 (优先尝试标准逻辑)
+
+                # Page 12: 单选逻辑 (通用)
+                p12_choice = frame.locator(SEL_RUNTIME_CHOICE).first
+                if p12_choice.count() > 0 and p12_choice.is_visible():
+                    self.log.debug("[互动] 处理通用选择交互")
+                    p12_choice.click(force=True)
+                    time.sleep(0.5)
+
+                # Page 17: 多项交互 (通用)
+                p17_items = frame.locator(SEL_RUNTIME_INTERACTIVE_ITEMS)
+                for i in range(p17_items.count()):
+                    it = p17_items.nth(i)
+                    if it.is_visible() and "brightness(0.7)" not in (
+                        it.get_attribute("style") or ""
+                    ):
+                        self.log.debug(f"[互动] 点击 Page 17 弹窗元素 #{i + 1}")
+                        it.click(force=True)
+                        time.sleep(0.3)
+
+                # Page 17: 关闭弹出层
+                p17_close = frame.locator(SEL_RUNTIME_INTERACTIVE_CLOSE).first
+                if p17_close.count() > 0 and p17_close.is_visible():
+                    self.log.debug("[互动] 关闭 Page 17 弹窗")
+                    p17_close.click(force=True)
+                    time.sleep(0.5)
+
+                # 5. 处理投票和答题逻辑 (参考 item.js)
+                aq_labels = frame.locator(SEL_RUNTIME_QUIZ_LABELS)
+                if aq_labels.count() > 0 and aq_labels.first.is_visible():
+                    # 检查是否已选中答案
+                    if frame.locator(SEL_RUNTIME_QUIZ_CHECKED).count() == 0:
+                        try:
+                            ans_label = getattr(self, "_last_quiz_answer", None)
+                            if ans_label:
+                                import re
+
+                                self.log.info(
+                                    f"[自动答题] 使用捕获到的正确答案: {ans_label}"
+                                )
+                                # 解析 A, B, C, D 对应的索引
+                                correct_indices = []
+                                for m in re.finditer(r"([A-Z])", ans_label):
+                                    correct_indices.append(ord(m.group(1)) - ord("A"))
+
+                                # 点击正确选项
+                                for idx in correct_indices:
+                                    if idx < aq_labels.count():
+                                        aq_labels.nth(idx).click(force=True)
+                                        time.sleep(0.2)
+
+                                # 答题完成后清空，避免影响下一题
+                                self._last_quiz_answer = None
+                            else:
+                                # 无答案，走随机逻辑试错
+                                self.log.info(
+                                    "[互动] 暂无已知答案，自动随机选择以试错..."
+                                )
+                                count = aq_labels.count()
+                                if count > 0:
+                                    num_to_select = random.randint(1, count)
+                                    indices = random.sample(range(count), num_to_select)
+                                    for idx in indices:
+                                        aq_labels.nth(idx).click(force=True)
+                                        time.sleep(0.2)
+                        except Exception as e:
+                            self.log.debug(f"[互动] 答题处理异常: {e}")
+                        time.sleep(1)
+
+                # 6. 寻找推进按钮 (必须限定在 .page-active 下寻找)
+                # 警告：绝对不要加入 .btn-base！因为 .btn-prev 和 .btn-next 都有 .btn-base 类！
+                # 加入 .btn-base 会导致在某些页面匹配到 .btn-prev 从而无休止地疯狂后退引发死循环。
+                nav_selectors = [sel.strip() for sel in SEL_RUNTIME_NAV_BTNS.split(",")]
+
+                found_nav = False
+                for sel in nav_selectors:
+                    try:
+                        btn = frame.locator(sel).first
+                        if btn.count() > 0 and btn.is_visible() and btn.is_enabled():
+                            self.log.debug(f"[互动] 点击推进按钮: {sel.split('.')[-1]}")
+                            btn.click(force=True, timeout=3000)
+                            found_nav = True
+                            clicked = True
+                            consecutive_no_action = 0
+                            break
+                    except Exception:
+                        continue
+
+                if not found_nav:
+                    # 6. 如果没找到标准导航按钮，尝试探测页面内可能的交互元素 (根据内容自动判断)
+                    try:
+                        # 查找所有可见的 img, div, a (仅限激活页面)
+                        probe_candidates = frame.locator(SEL_RUNTIME_PROBE_CANDIDATES)
+                        for i in range(probe_candidates.count()):
+                            cand = probe_candidates.nth(i)
+                            if cand.is_visible() and cand.is_enabled():
+                                # 启发式判断：游标为 pointer，或者类名包含关键特征
+                                is_likely_button = cand.evaluate("""el => {
+                                    const style = window.getComputedStyle(el);
+                                    if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+                                    if (style.cursor === 'pointer') return true;
+                                    
+                                    const cls = String(el.className || "");
+                                    const id = String(el.id || "");
+                                    const text = (el.innerText || "").trim();
+                                    const src = el.tagName === 'IMG' ? String(el.getAttribute('src') || "") : "";
+                                    
+                                    if (el.tagName === 'BODY' || el.tagName === 'HTML' || el.tagName === 'SECTION') return false;
+                                    if (/prev|back|return/i.test(cls + id + src)) return false;
+
+                                    // 匹配常见的按钮/交互类名特征
+                                    const keyPatterns = /btn|click|touch|item|box|label|aq-|ce|start|next|p\\d{2,}|submit|confirm/i;
+                                    if (keyPatterns.test(cls + id + src)) {
+                                        if (/bg|loader|container|slide|wrap|inner/i.test(cls + id)) return false;
+                                        return true;
+                                    }
+                                    
+                                    // 文本内容判断
+                                    if (text.length > 0 && text.length < 10) {
+                                        if (/(下一步|确定|开始|提交|继续|点击|查看|详情|选择|答案)/.test(text)) return true;
+                                    }
+                                    return false;
+                                }""")
+
+                                if is_likely_button:
+                                    # 避免同一周期重复点击
+                                    was_probed = cand.evaluate(
+                                        "el => el.dataset.probed === 'true'"
+                                    )
+                                    if not was_probed:
+                                        self.log.debug(
+                                            f"[自动互动] 探测到潜在按钮 (Class: {cand.evaluate('el => el.className')})"
+                                        )
+                                        cand.evaluate(
+                                            "el => el.dataset.probed = 'true'"
+                                        )
+                                        cand.click(force=True)
+                                        time.sleep(1.0)  # 点击后等待响应
+                                        found_nav = True
+                                        consecutive_no_action = 0  # 重置计数
+                                        break
+                    except Exception as e:
+                        self.log.debug(f"[自动互动] 探测过程异常: {e}")
+
+                    if found_nav:
+                        continue
+
+                    # 检查是否已经到达结束页或列表页
+                    if self._get_study_page_context() != "course-detail":
+                        self.log.info("[播放] 课程已切换至列表或结果页，完成。")
+                        return True
+
+                    # 检查是否有完成对话框 (参考 sdk.js renderDialog)
+                    if frame.locator(SEL_DIALOG_POP).count() > 0:
+                        self.log.info("[播放] 检测到完成弹窗，点击返回")
+                        frame.locator(SEL_DIALOG_PREV_BTN).click(force=True)
+                        return True
+
+                    # 连续 15 次没有发现新动作则认为已经结束（约30秒，用于等待缓慢的文本动画）
+                    consecutive_no_action += 1
+                    if consecutive_no_action > 15:
+                        break
+                else:
+                    consecutive_no_action = 0
+
+            return clicked
+        except Exception as e:
+            err_msg = str(e).lower()
+            if "frame was detached" in err_msg or "has been closed" in err_msg:
+                self.log.info("[播放] 页面已跳转或框架被卸载，判定为完成。")
+                return True
+            self.log.warning(f"[互动] 播放过程异常: {str(e)}")
+            return False
 
     def _wait_for_img_text_completion_result(self, timeout: float = 12) -> str:
         end = time.time() + timeout
@@ -677,20 +984,26 @@ class StudyMixin(BaseMixin):
             cls = (it.get_attribute("class") or "").lower()
             if "passed" in cls or "finished" in cls:
                 return True
-            if (
-                it.locator(".van-icon-success, .van-icon-passed, .icon-finish").count()
-                > 0
-            ):
+            if it.locator(SEL_ITEM_COMPLETED_ICON).count() > 0:
                 return True
         return False
 
     def _finish_img_text_course(self, title: str, study_time: int) -> bool:
+        start_time = time.time()
         for _att in range(3):
             f = self._get_course_runtime_frame()
             if f:
                 self._wait_for_mcwk_runtime()
             if not self._trigger_img_text_completion(f, title):
                 continue
+
+            # 点击流程完毕后，检查是否达到了设定的最少学习时长
+            elapsed = time.time() - start_time
+            remaining = int(study_time - elapsed)
+            if remaining > 0:
+                self.log.info(f"等待课程达标最小学习时长... 还需 {remaining} 秒")
+                self._sleep_with_progress(remaining)
+
             res = self._wait_for_img_text_completion_result()
             if res:
                 if res != "list":
@@ -712,18 +1025,33 @@ class StudyMixin(BaseMixin):
                 f.evaluate("if(typeof backToList === 'function') backToList();")
                 time.sleep(1)
             if self._page:
-                back = self._page.locator(SEL_NAV_BAR_LEFT).first
-                if back.count() > 0 and back.is_visible():
-                    back.scroll_into_view_if_needed(timeout=2000)
-                    back.click(timeout=5000)
-                    time.sleep(1)
                 btn_back = self._page.locator(SEL_COMMENT_BACK_BTN).first
                 if btn_back.count() > 0 and btn_back.is_visible():
                     btn_back.scroll_into_view_if_needed(timeout=2000)
                     btn_back.click(timeout=5000)
                     time.sleep(1)
+
+            ctx_now = self._get_study_page_context()
+            if ctx_now not in ("course-list", "collapse-list"):
+                if self._page:
+                    btn_nav_back = self._page.locator(SEL_NAV_BAR_LEFT).first
+                    if btn_nav_back.count() > 0 and btn_nav_back.is_visible():
+                        self.log.debug("[导航] 尝试点击顶部导航返回按钮兜底...")
+                        btn_nav_back.click(timeout=5000)
+                        time.sleep(1)
+
+            ctx_now = self._get_study_page_context()
+            if ctx_now not in ("course-list", "collapse-list"):
+                if self._page and "undefined" in (self._page.url or ""):
+                    self.log.warning(
+                        "[导航] 发现异常的 undefined 路由，尝试强制浏览器后退..."
+                    )
+                    self._page.go_back(timeout=5000)
+                    time.sleep(1)
+
             return self._get_study_page_context() in ("course-list", "collapse-list")
-        except Exception:
+        except Exception as e:
+            self.log.warning(f"[导航] 返回列表页过程异常: {e}")
             return False
 
     def _goto_next_project(
@@ -733,29 +1061,88 @@ class StudyMixin(BaseMixin):
             return False
         ctx = self._get_study_page_context()
         if ctx in ("course-list", "collapse-list"):
-            # 如果当前项目已经处理过，返回False结束学习
+            # 如果当前项目已经处理过，不要直接结束，应该尝试回到列表页寻找下一个
             if state.current_project_title and state.current_project_title in completed:
-                self.log.debug(f"项目「{state.current_project_title}」已处理完毕")
-                return False
-
-            # 不再检查项目是否100%完成，而是直接进入项目检查课程
-            self.log.debug("[导航] 当前已在课程列表页，直接处理该项目")
-            try:
-                nav_title = self._page.locator(
-                    ".van-nav-bar__title, .project-title, .header-title"
-                ).first
-                if nav_title.count() > 0:
-                    self.project_title = nav_title.inner_text().strip()
-            except Exception:
-                pass
-            if not state.current_project_title:
-                state.current_project_title = self.project_title or "未知项目"
-            state.study_tabs = self._get_current_study_tabs()
-            return True
+                self.log.debug(
+                    f"项目「{state.current_project_title}」已处理完毕，返回列表页"
+                )
+                # 强制导航回列表页
+                try:
+                    self._page.goto(
+                        f"{self.base_url}/#/learning-task-list",
+                        wait_until="domcontentloaded",
+                        timeout=15000,
+                    )
+                    time.sleep(3)
+                    state.current_project_title = ""
+                    state.study_tabs = []
+                    state.active_section_index = -1
+                except Exception:
+                    return False
+                ctx = self._get_study_page_context()
+                if ctx not in ("course-list", "collapse-list"):
+                    # 已回到项目中心，继续按项目导航逻辑处理下一个项目
+                    pass
+                else:
+                    self.log.debug(
+                        "[导航] 返回项目中心后仍处于课程页，继续按当前项目处理"
+                    )
+                    try:
+                        nav_title = self._page.locator(SEL_NAV_BAR_TITLE).first
+                        if nav_title.count() > 0:
+                            self.project_title = nav_title.inner_text().strip()
+                    except Exception:
+                        pass
+                    if not state.current_project_title:
+                        state.current_project_title = self.project_title or "未知项目"
+                    state.study_tabs = self._get_current_study_tabs()
+                    return True
+            else:
+                self.log.debug("[导航] 当前已在课程列表页，直接处理该项目")
+                try:
+                    nav_title = self._page.locator(SEL_NAV_BAR_TITLE).first
+                    if nav_title.count() > 0:
+                        self.project_title = nav_title.inner_text().strip()
+                except Exception:
+                    pass
+                if (
+                    not state.current_project_title
+                    and not (self.project_title or "").strip()
+                ):
+                    self.log.debug(
+                        "[导航] 当前课程页缺少可靠项目标题，先返回项目中心重新定位项目"
+                    )
+                    try:
+                        self._page.goto(
+                            f"{self.base_url}/#/learning-task-list",
+                            wait_until="domcontentloaded",
+                            timeout=15000,
+                        )
+                        time.sleep(3)
+                    except Exception:
+                        return False
+                    ctx = self._get_study_page_context()
+                    if ctx not in ("course-list", "collapse-list"):
+                        # 已回到项目中心，走下方通用项目导航逻辑
+                        pass
+                    else:
+                        self.project_title = self.project_title or "未知项目"
+                        state.current_project_title = self.project_title
+                        state.study_tabs = self._get_current_study_tabs()
+                        return True
+                else:
+                    if not state.current_project_title:
+                        state.current_project_title = self.project_title or "未知项目"
+                    state.study_tabs = self._get_current_study_tabs()
+                    return True
 
         self.log.info("正在导航至学习项目中心...")
         try:
-            self._page.goto(f"{self.base_url}/#/learning-task-list", timeout=15000)
+            self._page.goto(
+                f"{self.base_url}/#/learning-task-list",
+                wait_until="domcontentloaded",
+                timeout=15000,
+            )
             time.sleep(3)
         except Exception:
             pass
@@ -821,7 +1208,6 @@ class StudyMixin(BaseMixin):
                 if item:
                     if self._safe_click(item):
                         time.sleep(2)
-                        self._sleep_with_progress(study_time)
                         ok = self._finish_img_text_course(title, study_time)
                         if not ok:
                             self.log.warning(f"课程完成失败：{title}")
@@ -849,49 +1235,25 @@ class StudyMixin(BaseMixin):
         if not self._page or self._page.is_closed():
             return {"total": 0, "completed": 0, "incomplete": 0}
 
-        total = 0
-        completed_count = 0
-
         try:
             # 先返回课程列表页
             self._return_to_chapter_list()
             time.sleep(2)
 
+            collapse_stats = self._summarize_collapse_progress()
+            if collapse_stats is not None:
+                self.log.info(
+                    "[课程统计] 章节汇总 - "
+                    f"总课程数: {collapse_stats['total']}, "
+                    f"已完成: {collapse_stats['completed']}, "
+                    f"未完成: {collapse_stats['incomplete']}"
+                )
+                return collapse_stats
+
             # 扫描所有课程项
             tasks = self._collect_tasks_in_current_tab()
             total = len(tasks)
-
-            for task in tasks:
-                if task.get("passed"):
-                    completed_count += 1
-
-            incomplete = total - completed_count
-
-            self.log.info(
-                f"[课程统计] 总课程数: {total}, 已完成: {completed_count}, 未完成: {incomplete}"
-            )
-
-            return {
-                "total": total,
-                "completed": completed_count,
-                "incomplete": incomplete,
-            }
-        except Exception as e:
-            self.log.warning(f"统计课程完成情况失败: {e}")
-            return {"total": 0, "completed": 0, "incomplete": 0}
-
-        total = 0
-        completed_count = 0
-
-        try:
-            # 扫描所有课程项
-            tasks = self._collect_tasks_in_current_tab()
-            total = len(tasks)
-
-            for task in tasks:
-                if task.get("passed"):
-                    completed_count += 1
-
+            completed_count = sum(1 for task in tasks if task.get("passed"))
             incomplete = total - completed_count
 
             self.log.info(
@@ -915,6 +1277,17 @@ class StudyMixin(BaseMixin):
         if not self._page or self._page.is_closed():
             return completion_stats
         try:
+            try:
+                self._page.goto(
+                    f"{self.base_url}/#/learning-task-list",
+                    wait_until="domcontentloaded",
+                    timeout=15000,
+                )
+                time.sleep(3)
+                self._dismiss_broadcast()
+            except Exception:
+                self.log.debug("[导航] 初始化跳转项目中心失败，继续使用当前页面状态")
+
             while self._goto_next_project(state, completed_projs, study_mode):
                 proj_title = state.current_project_title
                 failed, completed = set(), set()

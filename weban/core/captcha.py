@@ -63,6 +63,7 @@ _SEL_CAPTCHA_CONFIRM_BTN = (
 _SEL_CAPTCHA_ERROR_TIP = (
     ".tencent-captcha-dy__verify-error-text, .tencent-captcha-dy__verify-error-tip"
 )
+_SEL_CAPTCHA_REFRESH_BTN = ".tencent-captcha-dy__header-refresh, .tencent-captcha-dy__verify-refresh, #tCaptchaDyRefresh"
 _SEL_CAPTCHA_VISIBILITY_MARKERS = (
     ".tencent-captcha-dy__verify-bg-img, "
     "#tCaptchaDyContent, "
@@ -585,17 +586,21 @@ def detect_captcha(
 # ---------------------------------------------------------------------------
 
 
-def _captcha_visible(frame) -> bool:
+def _captcha_visible(frame, require_cscapt: bool = True) -> bool:
     """检查验证码核心元素在 frame 内是否真正可见。
 
     用 Playwright 原生 is_visible() 检测，避免脚本注入。
     验证码弹出时核心容器必然可见，隐藏预加载时则不可见。
-    同时检查 URL 参数 cscapt=true，确保是真实激活的验证码。
+
+    Args:
+        frame: Playwright Frame 对象
+        require_cscapt: 是否要求 URL 参数 cscapt=true（默认 True）
+                       课程完成场景可能需要设为 False 以放宽检测
     """
-    # 首先检查 URL 参数，只有 cscapt=true 时才可能是真实验证码
-    state = _get_captcha_url_state(frame)
-    if not state.get("has_cscapt_true"):
-        return False
+    if require_cscapt:
+        state = _get_captcha_url_state(frame)
+        if not state.get("has_cscapt_true"):
+            return False
 
     for sel in _SEL_CAPTCHA_VISIBILITY_MARKERS:
         try:
@@ -603,7 +608,6 @@ def _captcha_visible(frame) -> bool:
             if el.count() > 0:
                 item = el.first
                 if item.is_visible():
-                    # 关键修复：增加宽高检查，避免 DOM 存在但高度为 0 的虚假元素
                     bb = item.bounding_box()
                     if bb and bb["width"] > 10 and bb["height"] > 10:
                         return True
@@ -718,20 +722,22 @@ def _log_captcha_contexts(page, log) -> None:
         log.debug(f"[点选验证码][诊断] 输出上下文信息失败: {e}")
 
 
-def _find_captcha_context(page):
-    """查找验证码上下文（支持 main_frame 和 iframe）。"""
+def _find_captcha_context(page, require_cscapt: bool = True):
+    """查找验证码上下文（支持 main_frame 和 iframe）。
+
+    Args:
+        page: Playwright Page 对象
+        require_cscapt: 是否要求 cscapt=true 参数（默认 True）
+    """
     try:
-        # 1. 优先检查主页面（登录页常见）
-        if _captcha_visible(page.main_frame):
+        if _captcha_visible(page.main_frame, require_cscapt):
             return page.main_frame, "主页面验证码"
 
-        # 2. 检查 iframe（课程任务页常见）
         frames = list(page.frames)
         for ctx in frames:
             if ctx == page.main_frame:
                 continue
-            if _captcha_visible(ctx):
-                # 记录一下如果是来自 mcwk 的特殊标记
+            if _captcha_visible(ctx, require_cscapt):
                 state = _get_captcha_url_state(ctx)
                 hint = f"iframe验证码(mcwk={state['is_mcwk']})"
                 return ctx, hint
@@ -740,21 +746,25 @@ def _find_captcha_context(page):
     return None, None
 
 
-def _find_captcha_frame(page):
+def _find_captcha_frame(page, require_cscapt: bool = True):
     """兼容旧调用的别名，返回验证码 frame（不含 vendor_hint）。"""
-    return _find_captcha_context(page)
+    return _find_captcha_context(page, require_cscapt)
 
 
-def handle_tencent_captcha(page, log) -> bool:
-    """自动处理腾讯系验证码（统一入口）。"""
-    ctx, hint = _find_captcha_context(page)
+def handle_tencent_captcha(page, log, require_cscapt: bool = True) -> bool:
+    """自动处理腾讯系验证码（统一入口）。
+
+    Args:
+        page: Playwright Page 对象
+        log: Logger 对象
+        require_cscapt: 是否要求 cscapt=true 参数（默认 True）
+    """
+    ctx, hint = _find_captcha_context(page, require_cscapt)
     if ctx is None:
         return False
 
-    # 根据平台特性判定：点选验证码仅出现在课程完成页（cscapt=true）
     state = _get_captcha_url_state(ctx)
-    if not state.get("has_cscapt_true"):
-        # 学习过程中的验证码元素是预加载，不是真实弹窗，静默跳过
+    if require_cscapt and not state.get("has_cscapt_true"):
         return False
 
     log.info(f"[{hint}] 检测到腾讯点选验证码，开始自动识别处理...")
@@ -767,9 +777,14 @@ def handle_slider_captcha(page, ctx, log) -> bool:
     return False
 
 
-def has_captcha(page) -> bool:
-    """检测当前页面是否弹出了点选验证码。"""
-    ctx, _ = _find_captcha_context(page)
+def has_captcha(page, require_cscapt: bool = True) -> bool:
+    """检测当前页面是否弹出了点选验证码。
+
+    Args:
+        page: Playwright Page 对象
+        require_cscapt: 是否要求 cscapt=true 参数（默认 True）
+    """
+    ctx, _ = _find_captcha_context(page, require_cscapt)
     return ctx is not None
 
 
@@ -946,7 +961,18 @@ def handle_click_captcha(page, log) -> bool:
                     err_text = error_tip.first.inner_text()
                 except Exception:
                     pass
-                log.warning(f"[点选验证码] 验证未通过，错误提示: {err_text!r}")
+                log.warning(
+                    f"[点选验证码] 验证未通过，错误提示: {err_text!r}，尝试点击刷新按钮..."
+                )
+
+                # 尝试点击刷新按钮
+                try:
+                    refresh_btn = ctx.locator(_SEL_CAPTCHA_REFRESH_BTN)
+                    if refresh_btn.count() > 0:
+                        refresh_btn.first.click(force=True)
+                        time.sleep(1)
+                except Exception:
+                    pass
                 return False
         except Exception:
             pass
