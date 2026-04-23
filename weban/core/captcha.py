@@ -65,10 +65,13 @@ _SEL_CAPTCHA_ERROR_TIP = (
 )
 _SEL_CAPTCHA_REFRESH_BTN = ".tencent-captcha-dy__header-refresh, .tencent-captcha-dy__verify-refresh, #tCaptchaDyRefresh"
 _SEL_CAPTCHA_VISIBILITY_MARKERS = (
-    ".tencent-captcha-dy__verify-bg-img, "
-    "#tCaptchaDyContent, "
-    ".tencent-captcha-dy__header-answer, "
-    ".WPA3-SELECT-PANEL"
+    "iframe[src*='captcha.qq.com']",
+    "iframe[id*='tcaptcha']",
+    ".tcaptcha-transform",  # 腾讯验证码外层容器
+    ".t-mask, .t-captcha-mask",  # 遮罩层特征
+    ".tencent-captcha-dy__verify-bg-img",
+    "#tCaptchaDyContent",
+    ".WPA3-SELECT-PANEL",
 )
 
 
@@ -602,15 +605,59 @@ def _captcha_visible(frame, require_cscapt: bool = True) -> bool:
         if not state.get("has_cscapt_true"):
             return False
 
+    url = (frame.url or "").lower()
+    # 课程页面本身绝不是验证码框架，验证码应在弹出层或独立 iframe 中
+    if "mcwk.mycourse.cn" in url and (".html" in url or "/course/" in url):
+        return False
+
+    state = _get_captcha_url_state(frame)
     for sel in _SEL_CAPTCHA_VISIBILITY_MARKERS:
         try:
             el = frame.locator(sel)
             if el.count() > 0:
                 item = el.first
                 if item.is_visible():
+                    # 1. 基础尺寸检查
                     bb = item.bounding_box()
-                    if bb and bb["width"] > 10 and bb["height"] > 10:
-                        return True
+                    if not bb or bb["width"] < 10 or bb["height"] < 10:
+                        continue
+
+                    # 2. 深度属性检查 (z-index, opacity, pointer-events)
+                    try:
+                        props = item.evaluate("""el => {
+                            const s = window.getComputedStyle(el);
+                            return {
+                                zIndex: parseInt(s.zIndex) || 0,
+                                opacity: parseFloat(s.opacity),
+                                pointerEvents: s.pointerEvents
+                            };
+                        }""")
+                        
+                        # 腾讯验证码 z-index 通常极高，且透明度不能为 0
+                        if props["opacity"] < 0.1 or props["pointerEvents"] == 'none':
+                            continue
+                            
+                        # 如果是 iframe，z-index 可能不在元素本身而在容器上，这里做宽松处理
+                        # 但如果 z-index 明确为负数，则肯定不可见
+                        if props["zIndex"] < 0:
+                            continue
+                    except Exception:
+                        pass
+
+                    # 3. 启发式过滤：课程页面本身很大，验证码面板通常在固定范围内
+                    # 如果面板尺寸过大（如超过视口的 90%），通常是误报（可能是整个页面的背景）
+                    try:
+                        vw = frame.evaluate("window.innerWidth")
+                        vh = frame.evaluate("window.innerHeight")
+                        if bb["width"] > vw * 0.9 and bb["height"] > vh * 0.9:
+                            continue
+                    except Exception:
+                        if bb["width"] > 600 or bb["height"] > 800:
+                            continue
+
+                    # 诊断日志：只有在调试模式下才记录匹配信息
+                    # (由于此函数调用极其频繁，平时不输出日志)
+                    return True
         except Exception:
             pass
     return False
@@ -724,19 +771,25 @@ def _log_captcha_contexts(page, log) -> None:
 
 def _find_captcha_context(page, require_cscapt: bool = True):
     """查找验证码上下文（支持 main_frame 和 iframe）。
-
-    Args:
-        page: Playwright Page 对象
-        require_cscapt: 是否要求 cscapt=true 参数（默认 True）
+    
+    验证码可能出现在子框架（iframe）中，也可能出现在父级 DOM（main_frame）中。
     """
     try:
+        # 1. 优先检查主页面（父级 DOM）
         if _captcha_visible(page.main_frame, require_cscapt):
-            return page.main_frame, "主页面验证码"
+            return page.main_frame, "主页面验证码 (Parent DOM)"
 
+        # 2. 遍历所有子框架
         frames = list(page.frames)
         for ctx in frames:
             if ctx == page.main_frame:
                 continue
+            
+            # 如果是微课课件帧，跳过其作为验证码容器的直接判定
+            url = (ctx.url or "").lower()
+            if "mcwk.mycourse.cn" in url and (".html" in url or "/course/" in url):
+                continue
+
             if _captcha_visible(ctx, require_cscapt):
                 state = _get_captcha_url_state(ctx)
                 hint = f"iframe验证码(mcwk={state['is_mcwk']})"

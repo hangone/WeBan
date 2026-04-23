@@ -581,42 +581,65 @@ class StudyMixin(BaseMixin):
             pass
 
     def _get_course_runtime_frame(self):
+        """获取课程运行时的核心框架 (通常是 iframe)。"""
         if not self._page or self._page.is_closed():
             return None
         try:
+            # 优先尝试根据常见的微课域名或路径标识符查找
             for f in self._page.frames:
                 if f == self._page.main_frame:
                     continue
                 url = (f.url or "").lower()
-                if "mcwk" in url or "course" in url:
+                # 匹配 mcwk 域名或 course 路径
+                if "mcwk.mycourse.cn" in url or "/course/" in url or "courseid=" in url:
                     return f
-                try:
-                    if f.evaluate("typeof finishWxCourse === 'function'"):
-                        return f
-                except Exception:
-                    pass
-        except Exception:
-            pass
-        return None
 
-    def _is_mcwk_course_page(self) -> bool:
-        return self._get_course_runtime_frame() is not None
+            # 如果没找到，尝试查找特定的 iframe 元素 (WeBan 详情页通常使用 .page-iframe)
+            try:
+                iframe_el = self._page.locator("iframe.page-iframe").first
+                if iframe_el.count() > 0:
+                    src = (iframe_el.get_attribute("src") or "").lower()
+                    if src:
+                        for f in self._page.frames:
+                            if (f.url or "").lower() == src:
+                                return f
+            except Exception:
+                pass
+
+            return None
+        except Exception as e:
+            self.log.debug(f"[框架探测] 异常: {e}")
+            return None
 
     def _wait_for_mcwk_runtime(self, timeout: float = 12) -> bool:
+        """等待微课播放框架加载完成。"""
         end = time.time() + timeout
+        self.log.debug("[播放] 等待课程框架加载...")
         while time.time() < end:
             f = self._get_course_runtime_frame()
             if f:
                 try:
-                    # 检查是否有核心交互元素（如 btn-start 或 btn-next 或 btn-base）
+                    # 检查框架内是否已经加载了基本的 DOM 骨架或关键函数
                     if f.locator(SEL_RUNTIME_NAV_BTNS + ", .page-item").count() > 0:
+                        self.log.debug(f"[播放] 识别到课程框架: {f.url[:60]}...")
                         return True
                     if f.evaluate("typeof finishWxCourse === 'function'"):
+                        self.log.debug(f"[播放] 识别到课程框架 (JS函数确认): {f.url[:60]}...")
                         return True
                 except Exception:
                     pass
-            time.sleep(0.5)
+            time.sleep(1)
+        
+        # 调试：输出当前所有框架信息
+        if self._page:
+            self.log.debug(f"[框架诊断] 未找到课程框架。当前页面所有框架 ({len(self._page.frames)}):")
+            for i, f in enumerate(self._page.frames):
+                self.log.debug(f"  - Frame {i}: URL={f.url[:80]}..., Name={f.name}")
+            
         return False
+
+    def _is_mcwk_course_page(self) -> bool:
+        return self._get_course_runtime_frame() is not None
 
     def _wait_for_post_course_state(self, timeout: float = 8) -> bool:
         end = time.time() + timeout
@@ -679,6 +702,9 @@ class StudyMixin(BaseMixin):
                     return False
                 frame = self._page
 
+            self.log.info(f"[播放] 开始交互流程: {title}")
+            self.log.debug(f"[播放] 目标框架 URL: {frame.url}")
+
             clicked = False
             # 去除固定 60 步限制，依赖外部超时或结束状态跳出
             consecutive_no_action = 0
@@ -691,7 +717,9 @@ class StudyMixin(BaseMixin):
                 url = (frame.url or "").lower()
                 if "weiban=weiban" in url and "cscapt=true" in url:
                     if _has_captcha(self._page):
-                        self.log.info("[验证码] 检测到微课完成验证码，开始自动处理...")
+                        self.log.info(
+                            f"[验证码] 检测到课程内验证码（当前帧: {frame.url[:40]}...），开始自动处理..."
+                        )
                         _handle_tencent_captcha(
                             self._page, self.log, require_cscapt=False
                         )
@@ -719,11 +747,22 @@ class StudyMixin(BaseMixin):
                 except Exception:
                     pass
 
-                # 3. 处理视频播放按钮
+                # 3. 处理播放前的协议勾选 (如果有)
+                try:
+                    agree_cb = frame.locator(SEL_AGREE_CHECKBOX).first
+                    if agree_cb.count() > 0 and agree_cb.is_visible() and not agree_cb.is_checked():
+                        self.log.info("[互动] 勾选同意协议")
+                        agree_cb.click(force=True)
+                        time.sleep(0.5)
+                        consecutive_no_action = 0
+                except Exception:
+                    pass
+
+                # 4. 处理视频播放按钮
                 if not video_ended:
                     video_play_btn = frame.locator(SEL_RUNTIME_VIDEO_PLAY_BTN).first
                     if video_play_btn.count() > 0 and video_play_btn.is_visible():
-                        self.log.info("[互动] 发现未播放的视频，点击播放")
+                        self.log.info("[互动] 发现未播放的视频/播放按钮，点击播放")
                         video_play_btn.click(force=True)
                         time.sleep(1)
                         clicked = True
@@ -888,9 +927,12 @@ class StudyMixin(BaseMixin):
                         frame.locator(SEL_DIALOG_PREV_BTN).click(force=True)
                         return True
 
-                    # 连续 15 次没有发现新动作则认为已经结束（约30秒，用于等待缓慢的文本动画）
+                    # 连续 20 次没有发现新动作则认为已经结束（约40-50秒，用于等待缓慢的文本动画）
                     consecutive_no_action += 1
-                    if consecutive_no_action > 15:
+                    if consecutive_no_action % 5 == 0:
+                        self.log.debug(f"[播放] 正在等待页面状态更新 ({consecutive_no_action}/20)...")
+                    if consecutive_no_action > 20:
+                        self.log.info("[播放] 连续长时间无交互动作，判定当前交互已结束。")
                         break
                 else:
                     consecutive_no_action = 0
@@ -991,9 +1033,10 @@ class StudyMixin(BaseMixin):
     def _finish_img_text_course(self, title: str, study_time: int) -> bool:
         start_time = time.time()
         for _att in range(3):
+            # 必须等待框架出现
+            self._wait_for_mcwk_runtime()
             f = self._get_course_runtime_frame()
-            if f:
-                self._wait_for_mcwk_runtime()
+
             if not self._trigger_img_text_completion(f, title):
                 continue
 
