@@ -297,69 +297,90 @@ class ExamMixin(BaseMixin):
         except Exception:
             pass
 
-        # 1. 进入“答题卡/交卷”路径（参考前端 ExamPage.vue：.sheet / .confirm-sheet）
+        # 1. 进入"答题卡/交卷"路径（参考前端 ExamPage.vue：.sheet / .confirm-sheet）
+        # - 交卷按钮可能在最后一题底部的 .bottom-ctrls 中（考试模式常见）
         # - 交卷按钮可能只出现在答题卡(sheet)里
         # - 点击交卷后，可能进入 confirm-sheet 再次交卷
         # - 也可能弹出 dialog 需要最终确认
         result_text = ""
 
-        # 1.1 尝试打开答题卡(sheet)，确保交卷按钮出现
-        for _ in range(3):
-            try:
-                sheet = self._page.locator(SEL_EXAM_SHEET).first
-                if sheet.count() > 0 and sheet.is_visible():
-                    break
-            except Exception:
-                pass
-
-            try:
-                card_btn = self._page.locator(SEL_ANSWER_CARD_BTN).last
-                if card_btn.count() > 0 and card_btn.is_visible():
-                    self.log.debug("[提交流程] 点击答题卡")
-                    card_btn.click(force=True, timeout=5000)
-                    time.sleep(1.2)
-                    continue
-            except Exception:
-                pass
-
-            break
-
-        # 1.2 点击 sheet 内的“交卷”（优先使用 SEL_SUBMIT_BTN，其次用 src 路径兜底）
+        # 1.1 考试模式：优先检测底部控制栏的交卷按钮（最后一题页面的常见位置）
         clicked_submit = False
-        for _ in range(3):
+        for _ in range(2):
             try:
-                submit_btn = self._page.locator(SEL_SUBMIT_BTN).last
-                if submit_btn.count() > 0 and submit_btn.is_visible():
-                    btn_text = submit_btn.inner_text().strip()
-                    self.log.debug(f"[提交流程] 点击主要按钮: {btn_text}")
-                    submit_btn.click(force=True, timeout=5000)
-                    time.sleep(1.5)
-                    clicked_submit = True
-                    break
-            except Exception:
-                pass
-
-            # src 兜底：.sheet .bottom-ctrls 里的“交卷”
-            try:
-                sheet_submit = (
-                    self._page.locator(SEL_EXAM_SHEET_BOTTOM_CTRLS)
-                    .locator(SEL_SUBMIT_BTN)
-                    .last
+                bottom_submit = (
+                    self._page.locator(SEL_EXAM_BOTTOM_CTRLS)
+                    .locator("button:has-text('交卷')")
+                    .first
                 )
-                if sheet_submit.count() > 0 and sheet_submit.is_visible():
-                    self.log.debug("[提交流程] 点击答题卡内交卷")
-                    sheet_submit.click(force=True, timeout=5000)
+                if bottom_submit.count() > 0 and bottom_submit.is_visible():
+                    self.log.debug("[提交流程] 点击底部交卷按钮")
+                    bottom_submit.click(force=True, timeout=5000)
                     time.sleep(1.5)
                     clicked_submit = True
                     break
             except Exception:
                 pass
+            time.sleep(0.5)
 
-            time.sleep(1)
-
-        # 1.3 若进入 confirm-sheet，再次点击 confirm-sheet 内的“交卷”
-        if clicked_submit:
+        # 1.2 若底部未找到，尝试打开答题卡(sheet)
+        if not clicked_submit:
             for _ in range(3):
+                try:
+                    sheet = self._page.locator(SEL_EXAM_SHEET).first
+                    if sheet.count() > 0 and sheet.is_visible():
+                        break
+                except Exception:
+                    pass
+
+                try:
+                    card_btn = self._page.locator(SEL_ANSWER_CARD_BTN).last
+                    if card_btn.count() > 0 and card_btn.is_visible():
+                        self.log.debug("[提交流程] 点击答题卡")
+                        card_btn.click(force=True, timeout=5000)
+                        time.sleep(1.2)
+                        continue
+                except Exception:
+                    pass
+
+                break
+
+            # 1.3 点击 sheet 内的"交卷"
+            for _ in range(3):
+                try:
+                    submit_btn = self._page.locator(SEL_SUBMIT_BTN).last
+                    if submit_btn.count() > 0 and submit_btn.is_visible():
+                        btn_text = submit_btn.inner_text().strip()
+                        self.log.debug(f"[提交流程] 点击主要按钮: {btn_text}")
+                        submit_btn.click(force=True, timeout=5000)
+                        time.sleep(1.5)
+                        clicked_submit = True
+                        break
+                except Exception:
+                    pass
+
+                # src 兜底：.sheet .bottom-ctrls 里的"交卷"
+                try:
+                    sheet_submit = (
+                        self._page.locator(SEL_EXAM_SHEET_BOTTOM_CTRLS)
+                        .locator(SEL_SUBMIT_BTN)
+                        .last
+                    )
+                    if sheet_submit.count() > 0 and sheet_submit.is_visible():
+                        self.log.debug("[提交流程] 点击答题卡内交卷")
+                        sheet_submit.click(force=True, timeout=5000)
+                        time.sleep(1.5)
+                        clicked_submit = True
+                        break
+                except Exception:
+                    pass
+
+                time.sleep(1)
+
+        # 1.3 若进入 confirm-sheet 或弹窗，处理确认提交
+        if clicked_submit:
+            time.sleep(1)
+            for _ in range(5):
                 try:
                     confirm_sheet_submit = (
                         self._page.locator(SEL_EXAM_CONFIRM_SHEET_BOTTOM_CTRLS)
@@ -376,7 +397,19 @@ class ExamMixin(BaseMixin):
                         break
                 except Exception:
                     pass
-                time.sleep(1)
+
+                try:
+                    confirm_btn = self._page.locator(SEL_SUBMIT_CONFIRM).last
+                    if confirm_btn.count() > 0 and confirm_btn.is_visible():
+                        btn_text = confirm_btn.inner_text().strip()
+                        self.log.debug(f"[提交流程] 点击弹窗确认按钮: {btn_text}")
+                        confirm_btn.click(force=True, timeout=5000)
+                        time.sleep(2)
+                        break
+                except Exception:
+                    pass
+
+                time.sleep(0.5)
 
         # 2. 点击最终业务确认按钮（针对“确定交卷吗？”等弹窗）
         confirm_btn = self._page.locator(SEL_SUBMIT_CONFIRM).last

@@ -3,6 +3,7 @@ import time
 import random
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, List, Dict
+from itertools import combinations
 
 from .const import (
     SEL_AGREE_CHECKBOX,
@@ -662,37 +663,103 @@ class StudyMixin(BaseMixin):
             time.sleep(0.5)
         return False
 
-    def _setup_quiz_handler(self):
+    def _setup_quiz_handler(self, frame=None):
         """设置答题响应监听器，自动捕获正确答案"""
         if not hasattr(self, "_last_quiz_answer"):
             self._last_quiz_answer = None
+        if not hasattr(self, "_last_quiz_is_right"):
+            self._last_quiz_is_right = None
+        if not hasattr(self, "_quiz_attempted_answers"):
+            self._quiz_attempted_answers = set()
+        if not hasattr(self, "_current_question_type"):
+            self._current_question_type = 1
 
         # 确保只绑定一次
         if not hasattr(self, "_has_quiz_handler"):
             if self._page:
                 self._page.on("response", self._quiz_response_handler)
                 self._has_quiz_handler = True
+                self.log.debug("[答题监听] 已注册响应处理器")
 
     def _quiz_response_handler(self, response):
         try:
-            # 不去假设 URL，直接从所有 JSON 响应中提取 answerLabel
-            ctype = response.headers.get("content-type") or ""
-            if "json" not in ctype.lower():
+            url = response.url
+
+            # 只处理 mercuryprovider/router 接口
+            if "mercuryprovider/router" not in url:
                 return
 
+            self.log.debug(f"[响应] {url}")
+
             data = response.json()
-            if (
-                isinstance(data, dict)
-                and str(data.get("code")) == "0"
-                and "data" in data
-            ):
-                d = data["data"]
-                if isinstance(d, dict) and "answerLabel" in d:
-                    ans = d["answerLabel"]
-                    if ans:
-                        self._last_quiz_answer = ans
-        except Exception:
-            pass
+
+            # 检查是否包含答案信息
+            if isinstance(data, dict):
+                d = data.get("data", {})
+                if isinstance(d, dict):
+                    # 记录所有包含 isRight 或 answerLabel 的响应
+                    if "answerLabel" in d or "isRight" in d:
+                        # 捕获答案标签
+                        if "answerLabel" in d:
+                            ans = d["answerLabel"]
+                            if ans:
+                                self._last_quiz_answer = ans
+                                self.log.info(f"[答题响应] 答案: {ans}")
+                        # 捕获答题结果
+                        if "isRight" in d:
+                            self._last_quiz_is_right = d["isRight"]
+                            result = "正确" if d["isRight"] == 1 else "错误"
+                            self.log.info(f"[答题响应] 结果: {result}")
+                        return
+
+        except Exception as e:
+            self.log.debug(f"[响应处理异常] {e}")
+
+    def _parse_answer_label(self, answer_label: str) -> list[int]:
+        """解析答案标签为选项索引列表。
+
+        格式: "-A-B-C-D" 表示选择 A、B、C、D
+        返回: [0, 1, 2, 3] 对应 A、B、C、D 的索引
+        """
+        if not answer_label:
+            return []
+
+        indices = []
+        # 匹配所有字母 A-Z
+        for match in re.finditer(r"([A-Z])", answer_label):
+            letter = match.group(1)
+            idx = ord(letter) - ord("A")
+            if 0 <= idx < 26:
+                indices.append(idx)
+
+        return indices
+
+    def _get_next_untried_answer(
+        self, options_count: int, question_type: int
+    ) -> list[int]:
+        """获取下一个未尝试过的答案组合。
+
+        使用智能试错策略：
+        1. 单选题：顺序尝试每个选项
+        2. 多选题：从少到多尝试组合，避免全选一开始就排除
+        """
+        attempted = getattr(self, "_quiz_attempted_answers", set())
+
+        if question_type == 1 or options_count <= 2:
+            # 单选题或选项很少：顺序尝试每个选项
+            for i in range(options_count):
+                combo = (i,)
+                if combo not in attempted:
+                    return list(combo)
+        else:
+            # 多选题：按选择数量从少到多尝试
+            for num_select in range(1, options_count + 1):
+                for combo in combinations(range(options_count), num_select):
+                    if combo not in attempted:
+                        return list(combo)
+
+        # 所有组合都试过了，返回第一个选项兜底
+        return [0]
 
     def _trigger_img_text_completion(self, frame, title: str) -> bool:
         """
@@ -700,6 +767,15 @@ class StudyMixin(BaseMixin):
         参考 item.js 与 sdk.js 中的交互逻辑，通过模拟点击对应元素来推进课程。
         """
         self._setup_quiz_handler()
+        # 重置答题尝试记录（新课程开始时）
+        if hasattr(self, "_quiz_attempted_answers"):
+            self._quiz_attempted_answers.clear()
+        else:
+            self._quiz_attempted_answers = set()
+        self._last_quiz_answer = None
+        self._last_quiz_is_right = None
+        self._current_question_type = 1
+
         try:
             if not frame:
                 if not self._page:
@@ -806,45 +882,129 @@ class StudyMixin(BaseMixin):
 
                 # 5. 处理投票和答题逻辑 (参考 item.js)
                 aq_labels = frame.locator(SEL_RUNTIME_QUIZ_LABELS)
-                if aq_labels.count() > 0 and aq_labels.first.is_visible():
+                options_count = aq_labels.count()
+
+                if options_count > 0 and aq_labels.first.is_visible():
                     # 检查是否已选中答案
-                    if frame.locator(SEL_RUNTIME_QUIZ_CHECKED).count() == 0:
+                    checked_count = frame.locator(SEL_RUNTIME_QUIZ_CHECKED).count()
+                    ans_label = getattr(self, "_last_quiz_answer", None)
+
+                    self.log.debug(
+                        f"[答题状态] 选项数: {options_count}, 已选: {checked_count}, 服务器答案: {ans_label}"
+                    )
+
+                    if checked_count == 0:
+                        # 还没有选择任何选项，需要选择
                         try:
-                            ans_label = getattr(self, "_last_quiz_answer", None)
                             if ans_label:
-                                import re
+                                # 有服务器返回的正确答案，使用它
+                                correct_indices = self._parse_answer_label(ans_label)
+                                letters = [chr(65 + i) for i in correct_indices]
+                                is_right = getattr(self, "_last_quiz_is_right", None)
 
-                                self.log.info(
-                                    f"[自动答题] 使用捕获到的正确答案: {ans_label}"
-                                )
-                                # 解析 A, B, C, D 对应的索引
-                                correct_indices = []
-                                for m in re.finditer(r"([A-Z])", ans_label):
-                                    correct_indices.append(ord(m.group(1)) - ord("A"))
-
-                                # 点击正确选项
-                                for idx in correct_indices:
-                                    if idx < aq_labels.count():
-                                        aq_labels.nth(idx).click(force=True)
+                                if is_right == 1:
+                                    # 答案已确认正确，使用并清除
+                                    self.log.info(
+                                        f"[自动答题] 使用已确认答案: {ans_label} -> {letters}"
+                                    )
+                                    # 点击正确选项
+                                    for idx in correct_indices:
+                                        if idx < options_count:
+                                            aq_labels.nth(idx).click(force=True)
+                                            time.sleep(0.2)
+                                    # 等待选项被选中
+                                    for _ in range(10):
                                         time.sleep(0.2)
+                                        if (
+                                            frame.locator(
+                                                SEL_RUNTIME_QUIZ_CHECKED
+                                            ).count()
+                                            > 0
+                                        ):
+                                            break
+                                    # 清除，准备下一题
+                                    self._last_quiz_answer = None
+                                    self._last_quiz_is_right = None
+                                    self._quiz_attempted_answers.clear()
+                                else:
+                                    # 服务器返回答案但未确认（刚试错后），直接使用
+                                    self.log.info(
+                                        f"[自动答题] 使用服务器答案: {ans_label} -> {letters}"
+                                    )
+                                    # 点击正确选项
+                                    for idx in correct_indices:
+                                        if idx < options_count:
+                                            aq_labels.nth(idx).click(force=True)
+                                            time.sleep(0.2)
+                                    # 等待选项被选中
+                                    for _ in range(10):
+                                        time.sleep(0.2)
+                                        if (
+                                            frame.locator(
+                                                SEL_RUNTIME_QUIZ_CHECKED
+                                            ).count()
+                                            > 0
+                                        ):
+                                            break
 
-                                # 答题完成后清空，避免影响下一题
-                                self._last_quiz_answer = None
                             else:
-                                # 无答案，走随机逻辑试错
-                                self.log.info(
-                                    "[互动] 暂无已知答案，自动随机选择以试错..."
+                                # 无服务器答案，需要试错
+                                question_type = getattr(
+                                    self, "_current_question_type", 1
                                 )
-                                count = aq_labels.count()
-                                if count > 0:
-                                    num_to_select = random.randint(1, count)
-                                    indices = random.sample(range(count), num_to_select)
-                                    for idx in indices:
-                                        aq_labels.nth(idx).click(force=True)
+                                attempted = getattr(
+                                    self, "_quiz_attempted_answers", set()
+                                )
+                                attempted_combo = self._get_next_untried_answer(
+                                    options_count, question_type
+                                )
+                                letters = [chr(65 + i) for i in attempted_combo]
+
+                                self.log.info(
+                                    f"[自动答题] 试错: {letters} (已试 {len(attempted)} 次)"
+                                )
+
+                                # 记录这次尝试（使用 frozenset 以便添加到 set 中）
+                                attempted.add(frozenset(attempted_combo))
+                                self._quiz_attempted_answers = attempted
+
+                                # 点击选项（使用 JavaScript 确保触发事件）
+                                for idx in attempted_combo:
+                                    if idx < options_count:
+                                        label = aq_labels.nth(idx)
+                                        # 尝试点击 label 内的 input，否则点击 label 本身
+                                        input_el = label.locator("input").first
+                                        if input_el.count() > 0:
+                                            input_el.evaluate("el => el.click()")
+                                        else:
+                                            label.evaluate("el => el.click()")
                                         time.sleep(0.2)
+
+                                # 等待选项被选中（最多等待 2 秒）
+                                for _ in range(10):
+                                    time.sleep(0.2)
+                                    new_checked = frame.locator(
+                                        SEL_RUNTIME_QUIZ_CHECKED
+                                    ).count()
+                                    if new_checked > 0:
+                                        self.log.debug(
+                                            f"[自动答题] 选项已选中: {new_checked} 个"
+                                        )
+                                        break
+
                         except Exception as e:
                             self.log.debug(f"[互动] 答题处理异常: {e}")
-                        time.sleep(1)
+                            # 出错时兜底：点击第一个选项
+                            try:
+                                if aq_labels.count() > 0:
+                                    aq_labels.nth(0).click(force=True)
+                            except Exception:
+                                pass
+                    else:
+                        # 已经有选项被选中了，等待导航按钮提交
+                        self.log.debug(
+                            f"[自动答题] 已选 {checked_count} 个选项，等待提交"
+                        )
 
                 # 6. 寻找推进按钮 (必须限定在 .page-active 下寻找)
                 # 警告：绝对不要加入 .btn-base！因为 .btn-prev 和 .btn-next 都有 .btn-base 类！
@@ -856,11 +1016,30 @@ class StudyMixin(BaseMixin):
                     try:
                         btn = frame.locator(sel).first
                         if btn.count() > 0 and btn.is_visible() and btn.is_enabled():
-                            self.log.debug(f"[互动] 点击推进按钮: {sel.split('.')[-1]}")
+                            btn_text = ""
+                            try:
+                                btn_text = btn.inner_text().strip()[:20]
+                            except Exception:
+                                pass
+                            btn_name = sel.split(".")[-1].split(":")[0]
+                            self.log.info(
+                                f"[互动] 点击按钮: {btn_name}"
+                                + (f" ({btn_text})" if btn_text else "")
+                            )
                             btn.click(force=True, timeout=3000)
                             found_nav = True
                             clicked = True
                             consecutive_no_action = 0
+
+                            # 如果是答题提交按钮，等待服务器响应
+                            if btn_name in ("btn-aq", "btn-at"):
+                                for _ in range(10):
+                                    time.sleep(0.3)
+                                    if self._last_quiz_answer is not None:
+                                        self.log.info(
+                                            f"[答题] 收到服务器答案: {self._last_quiz_answer}"
+                                        )
+                                        break
                             break
                     except Exception:
                         continue
