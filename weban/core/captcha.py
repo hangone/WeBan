@@ -34,7 +34,7 @@ import threading
 import urllib.request
 import cv2
 import numpy as np
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, cast
 
 # 调试模式：开启后将把验证码截图保存到 logs/ 目录
 _DEBUG_SAVE = False
@@ -46,13 +46,21 @@ _thread_local = threading.local()
 # ---------------------------------------------------------------------------
 # DOM 元素选择器常量定义
 # ---------------------------------------------------------------------------
+# 主背景图 - 优先选择 img 元素，其次是容器
 _SEL_CAPTCHA_BG = (
-    ".tencent-captcha-dy__verify-bg-img, .tencent-captcha-dy__verify-bg, "
-    ".tencent-captcha-dy__verify-img-area, .tencent-captcha-dy__verify, "
+    ".tencent-captcha-dy__verify-bg-img, "  # img 元素（首选）
+    ".tencent-captcha-dy__verify-img-area img, "  # 备用 img
+    ".tencent-captcha-dy__verify-bg, "  # 容器 div（次选）
+    ".tencent-captcha-dy__verify, "
     ".WPA3-SELECT-BG"
 )
+# 提示图 - 优先选择 img 元素
 _SEL_CAPTCHA_PROMPT = (
-    ".tencent-captcha-dy__header-answer img, .tencent-captcha-dy__header-answer, "
+    ".tencent-captcha-dy__header-answer img, "  # img 元素（首选）
+    ".tencent-captcha-dy__header-answer, "  # 容器本身（次选，可能背景图）
+    ".tencent-captcha-dy__prompt-img, "  # 备用选择器
+    ".tcaptcha-dy-prompt, "
+    ".WPA3-SELECT-HINT img, "
     ".WPA3-SELECT-HINT"
 )
 _SEL_CAPTCHA_CONFIRM_BTN = (
@@ -66,11 +74,7 @@ _SEL_CAPTCHA_ERROR_TIP = (
 _SEL_CAPTCHA_REFRESH_BTN = ".tencent-captcha-dy__header-refresh, .tencent-captcha-dy__verify-refresh, #tCaptchaDyRefresh"
 _SEL_CAPTCHA_VISIBILITY_MARKERS = (
     "iframe[src*='captcha.qq.com']",
-    "iframe[id*='tcaptcha']",
-    ".tcaptcha-transform",  # 腾讯验证码外层容器
-    ".t-mask, .t-captcha-mask",  # 遮罩层特征
     ".tencent-captcha-dy__verify-bg-img",
-    "#tCaptchaDyContent",
     ".WPA3-SELECT-PANEL",
 )
 
@@ -592,74 +596,27 @@ def detect_captcha(
 def _captcha_visible(frame, require_cscapt: bool = True) -> bool:
     """检查验证码核心元素在 frame 内是否真正可见。
 
-    用 Playwright 原生 is_visible() 检测，避免脚本注入。
-    验证码弹出时核心容器必然可见，隐藏预加载时则不可见。
+    在 mcwk iframe 中，验证码容器始终预加载存在。
+    只有当 URL 含 cscapt=true 且验证码真正弹出时才需要处理。
 
     Args:
         frame: Playwright Frame 对象
         require_cscapt: 是否要求 URL 参数 cscapt=true（默认 True）
-                       课程完成场景可能需要设为 False 以放宽检测
     """
-    if require_cscapt:
-        state = _get_captcha_url_state(frame)
-        if not state.get("has_cscapt_true"):
-            return False
+    state = _get_captcha_url_state(frame)
 
-    url = (frame.url or "").lower()
-    # 课程页面本身绝不是验证码框架，验证码应在弹出层或独立 iframe 中
-    if "mcwk.mycourse.cn" in url and (".html" in url or "/course/" in url):
+    if require_cscapt and not state.get("has_cscapt_true"):
         return False
 
-    state = _get_captcha_url_state(frame)
-    for sel in _SEL_CAPTCHA_VISIBILITY_MARKERS:
-        try:
-            el = frame.locator(sel)
-            if el.count() > 0:
-                item = el.first
-                if item.is_visible():
-                    # 1. 基础尺寸检查
-                    bb = item.bounding_box()
-                    if not bb or bb["width"] < 10 or bb["height"] < 10:
-                        continue
+    try:
+        bg_img = frame.locator(".tencent-captcha-dy__verify-bg-img").first
+        if bg_img.count() > 0 and bg_img.is_visible():
+            bb = bg_img.bounding_box()
+            if bb and bb["width"] > 50 and bb["height"] > 50:
+                return True
+    except Exception:
+        pass
 
-                    # 2. 深度属性检查 (z-index, opacity, pointer-events)
-                    try:
-                        props = item.evaluate("""el => {
-                            const s = window.getComputedStyle(el);
-                            return {
-                                zIndex: parseInt(s.zIndex) || 0,
-                                opacity: parseFloat(s.opacity),
-                                pointerEvents: s.pointerEvents
-                            };
-                        }""")
-
-                        # 腾讯验证码 z-index 通常极高，且透明度不能为 0
-                        if props["opacity"] < 0.1 or props["pointerEvents"] == "none":
-                            continue
-
-                        # 如果是 iframe，z-index 可能不在元素本身而在容器上，这里做宽松处理
-                        # 但如果 z-index 明确为负数，则肯定不可见
-                        if props["zIndex"] < 0:
-                            continue
-                    except Exception:
-                        pass
-
-                    # 3. 启发式过滤：课程页面本身很大，验证码面板通常在固定范围内
-                    # 如果面板尺寸过大（如超过视口的 90%），通常是误报（可能是整个页面的背景）
-                    try:
-                        vw = frame.evaluate("window.innerWidth")
-                        vh = frame.evaluate("window.innerHeight")
-                        if bb["width"] > vw * 0.9 and bb["height"] > vh * 0.9:
-                            continue
-                    except Exception:
-                        if bb["width"] > 600 or bb["height"] > 800:
-                            continue
-
-                    # 诊断日志：只有在调试模式下才记录匹配信息
-                    # (由于此函数调用极其频繁，平时不输出日志)
-                    return True
-        except Exception:
-            pass
     return False
 
 
@@ -773,27 +730,21 @@ def _find_captcha_context(page, require_cscapt: bool = True):
     """查找验证码上下文（支持 main_frame 和 iframe）。
 
     验证码可能出现在子框架（iframe）中，也可能出现在父级 DOM（main_frame）中。
+    课程完成时的验证码会在 mcwk.mycourse.cn iframe 内部弹出（URL 含 cscapt=true）。
     """
     try:
-        # 1. 优先检查主页面（父级 DOM）
-        if _captcha_visible(page.main_frame, require_cscapt):
-            return page.main_frame, "主页面验证码 (Parent DOM)"
-
-        # 2. 遍历所有子框架
         frames = list(page.frames)
-        for ctx in frames:
-            if ctx == page.main_frame:
-                continue
 
-            # 如果是微课课件帧，跳过其作为验证码容器的直接判定
-            url = (ctx.url or "").lower()
-            if "mcwk.mycourse.cn" in url and (".html" in url or "/course/" in url):
-                continue
+        for ctx in frames:
+            state = _get_captcha_url_state(ctx)
 
             if _captcha_visible(ctx, require_cscapt):
-                state = _get_captcha_url_state(ctx)
-                hint = f"iframe验证码(mcwk={state['is_mcwk']})"
-                return ctx, hint
+                if ctx == page.main_frame:
+                    return ctx, "主页面验证码 (Parent DOM)"
+                else:
+                    hint = f"iframe验证码(mcwk={state['is_mcwk']}, cscapt={state['cscapt']})"
+                    return ctx, hint
+
     except Exception:
         pass
     return None, None
@@ -802,6 +753,553 @@ def _find_captcha_context(page, require_cscapt: bool = True):
 def _find_captcha_frame(page, require_cscapt: bool = True):
     """兼容旧调用的别名，返回验证码 frame（不含 vendor_hint）。"""
     return _find_captcha_context(page, require_cscapt)
+
+
+def _get_visible_captcha_element(frame, selectors, element_name, log):
+    """获取真正可见的验证码元素。
+
+    从多个候选选择器中找到第一个真正可见（visible）的元素。
+    避免选择到隐藏的容器 div。
+
+    Args:
+        frame: Playwright Frame 对象
+        selectors: 选择器字符串（逗号分隔的多个选择器）
+        element_name: 元素名称（用于日志）
+        log: Logger 对象
+
+    Returns:
+        可见的元素 Locator，如果没有找到则返回 None
+    """
+    # 拆分多个选择器
+    selector_list = [s.strip() for s in selectors.split(",")]
+
+    # 首先尝试找到所有候选元素
+    for selector in selector_list:
+        try:
+            loc = frame.locator(selector)
+            count = loc.count()
+            if count == 0:
+                continue
+
+            # 检查每个匹配的元素，找到第一个真正可见的
+            for i in range(count):
+                try:
+                    el = loc.nth(i)
+                    if el.is_visible():
+                        # 额外检查：确保元素有实际尺寸
+                        bb = el.bounding_box()
+                        if bb and bb.get("width", 0) > 30 and bb.get("height", 0) > 30:
+                            log.debug(
+                                f"[点选验证码] 找到可见的{element_name}: {selector} (索引 {i})"
+                            )
+                            return el
+                except Exception:
+                    continue
+        except Exception:
+            continue
+
+    return None
+
+
+def _detect_captcha_type(frame, log):
+    """检测验证码类型。
+
+    Returns:
+        'click': 点选验证码
+        'unknown': 未知类型
+    """
+    try:
+        # 检查提示文字
+        header_text = ""
+        try:
+            click_text = frame.locator(".tencent-captcha-dy__header-text")
+            if click_text.count() > 0:
+                header_text = click_text.first.inner_text(timeout=1000)
+        except Exception:
+            pass
+
+        is_click_text = "点击" in header_text or "依次" in header_text
+
+        # 根据文字判断
+        if is_click_text:
+            log.debug(f"[验证码类型检测] 检测到点选验证码 (文字: '{header_text}')")
+            return "click"
+
+        # 检查点选特征
+        click_prompt = frame.locator(".tencent-captcha-dy__header-answer img")
+        has_click_img = click_prompt.count() > 0
+
+        if has_click_img:
+            log.debug("[验证码类型检测] 检测到点选验证码 (有提示图)")
+            return "click"
+        else:
+            log.debug(f"[验证码类型检测] 无法确定类型 (text='{header_text}')")
+            return "unknown"
+    except Exception as e:
+        log.debug(f"[验证码类型检测] 检测失败: {e}")
+        return "unknown"
+
+
+def handle_click_captcha_in_frame(frame, log) -> bool:
+    """在指定 frame 内处理腾讯点选验证码。
+
+    用于课程完成场景，验证码已知在 mcwk iframe 内。
+    使用截图方式获取验证码图片，使用 locator 点击。
+
+    Args:
+        frame: Playwright Frame 对象（mcwk iframe）
+        log: Logger 对象
+    """
+    try:
+        state = _get_captcha_url_state(frame)
+        log.info("[点选验证码] 在 mcwk iframe 内处理验证码...")
+        log.debug(
+            f"[点选验证码] 验证码上下文: url={state['url']} | "
+            f"mcwk={str(state['is_mcwk']).lower()} | cscapt={state['cscapt']}"
+        )
+
+        # 等待验证码真正弹出（等待可见的图片元素出现）
+        # 关键修复：验证码容器 .tencent-captcha-dy__verify-bg 可能一直存在但隐藏
+        # 需要等待 .tencent-captcha-dy__verify-bg-img 图片元素真正可见
+        log.debug("[点选验证码] 等待验证码真正弹出...")
+        max_wait_attempts = 15
+        prompt_el = None
+        main_el = None
+
+        for attempt in range(max_wait_attempts):
+            # 尝试获取真正可见的元素
+            if not prompt_el:
+                prompt_el = _get_visible_captcha_element(
+                    frame, _SEL_CAPTCHA_PROMPT, "提示图", log
+                )
+            if not main_el:
+                main_el = _get_visible_captcha_element(
+                    frame, _SEL_CAPTCHA_BG, "主背景图", log
+                )
+
+            # 关键：主图是必须的，提示图可以稍后获取
+            if main_el:
+                if prompt_el:
+                    log.debug(f"[点选验证码] 验证码已真正可见 (尝试 {attempt + 1})")
+                    break
+                else:
+                    # 有主图但没有提示图，再等待一下提示图
+                    log.debug(
+                        f"[点选验证码] 主图已可见，等待提示图... (尝试 {attempt + 1})"
+                    )
+                    # 尝试使用提示图容器（即使没有img子元素，也可能有背景图）
+                    if attempt > 3:
+                        try:
+                            prompt_container = frame.locator(
+                                ".tencent-captcha-dy__header-answer"
+                            ).first
+                            if (
+                                prompt_container.count() > 0
+                                and prompt_container.is_visible()
+                            ):
+                                bb = prompt_container.bounding_box()
+                                if (
+                                    bb
+                                    and bb.get("width", 0) > 20
+                                    and bb.get("height", 0) > 10
+                                ):
+                                    log.debug(
+                                        f"[点选验证码] 使用提示图容器作为备选 (尝试 {attempt + 1})"
+                                    )
+                                    prompt_el = prompt_container
+                                    break
+                        except Exception as e:
+                            log.debug(f"[点选验证码] 备选提示图容器检查失败: {e}")
+
+                    if attempt > 8:  # 8次尝试后如果只有主图，也继续
+                        log.warning(
+                            "[点选验证码] 只找到主图，未找到提示图，尝试仅使用主图处理"
+                        )
+                        break
+
+            # 记录诊断信息
+            if attempt % 3 == 0:
+                try:
+                    hidden_img = frame.locator(".tencent-captcha-dy__verify-bg-img")
+                    prompt_img = frame.locator(".tencent-captcha-dy__header-answer img")
+                    log.debug(
+                        f"[点选验证码] 等待中... (尝试 {attempt + 1}/{max_wait_attempts}) | "
+                        f"主图: {hidden_img.count()}, 提示图: {prompt_img.count()}"
+                    )
+                except Exception:
+                    log.debug(
+                        f"[点选验证码] 等待验证码弹出... (尝试 {attempt + 1}/{max_wait_attempts})"
+                    )
+
+            time.sleep(1.5)
+        else:
+            # 所有尝试都失败了
+            log.warning("[点选验证码] 验证码等待超时")
+
+            # 如果至少有主图，尝试继续
+            if main_el:
+                log.warning("[点选验证码] 只有主图，没有提示图，尝试继续处理")
+            else:
+                log.error("[点选验证码] 主图也未找到，无法处理")
+
+            # 输出详细诊断信息
+            try:
+                log.debug("[点选验证码] ========== 诊断信息 ==========")
+
+                # 检查各个选择器
+                for sel in [
+                    ".tencent-captcha-dy__verify-bg",
+                    ".tencent-captcha-dy__verify-bg-img",
+                    ".tencent-captcha-dy__header-answer",
+                ]:
+                    try:
+                        loc = frame.locator(sel)
+                        count = loc.count()
+                        for i in range(min(count, 3)):
+                            el = loc.nth(i)
+                            try:
+                                is_vis = el.is_visible()
+                                is_hidden = el.is_hidden()
+                                bb = el.bounding_box()
+                                log.debug(
+                                    f"[点选验证码] 诊断: {sel}[{i}] - "
+                                    f"visible={is_vis}, hidden={is_hidden}, "
+                                    f"bbox={bb}"
+                                )
+                            except Exception as e2:
+                                log.debug(
+                                    f"[点选验证码] 诊断: {sel}[{i}] - 检查失败: {e2}"
+                                )
+                    except Exception as e:
+                        log.debug(f"[点选验证码] 诊断: {sel} - 错误: {e}")
+
+                log.debug("[点选验证码] ========== 诊断结束 ==========")
+            except Exception:
+                pass
+            return False
+
+        # 获取确认按钮
+        confirm_btn = frame.locator(_SEL_CAPTCHA_CONFIRM_BTN).first
+
+        # 额外等待确保验证码完全渲染
+        time.sleep(0.8)
+
+        # 关键修复：截图前重新获取元素，防止stale element
+        # 因为等待期间DOM可能已更新，原来的元素引用可能失效
+        log.debug("[点选验证码] 重新获取元素引用...")
+        try:
+            # 重新获取主图元素
+            main_el = _get_visible_captcha_element(
+                frame, _SEL_CAPTCHA_BG, "主背景图", log
+            )
+            if main_el is None:
+                log.error("[点选验证码] 重新获取主图失败")
+                return False
+
+            # 重新获取提示图元素
+            prompt_el = _get_visible_captcha_element(
+                frame, _SEL_CAPTCHA_PROMPT, "提示图", log
+            )
+            # 如果找不到img，尝试容器
+            if prompt_el is None:
+                prompt_container = frame.locator(
+                    ".tencent-captcha-dy__header-answer"
+                ).first
+                if prompt_container.count() > 0 and prompt_container.is_visible():
+                    bb = prompt_container.bounding_box()
+                    if bb and bb.get("width", 0) > 20:
+                        prompt_el = prompt_container
+                        log.debug("[点选验证码] 使用提示图容器")
+        except Exception as e:
+            log.warning(f"[点选验证码] 重新获取元素失败: {e}")
+
+        # 使用截图方式获取验证码图片（不通过 URL 下载）
+        prompt_bytes = None
+        if prompt_el is not None:
+            log.debug("[点选验证码] 使用截图获取提示图...")
+            for retry in range(3):  # 最多重试3次
+                try:
+                    # 每次重试前检查元素是否仍然有效
+                    assert prompt_el is not None
+                    if not prompt_el.is_visible():
+                        log.debug("[点选验证码] 提示图不再可见，尝试重新获取...")
+                        prompt_el = _get_visible_captcha_element(
+                            frame, _SEL_CAPTCHA_PROMPT, "提示图", log
+                        )
+                        if prompt_el is None:
+                            continue
+
+                    prompt_bytes = prompt_el.screenshot(
+                        timeout=5000, animations="disabled"
+                    )
+                    if prompt_bytes:
+                        decoded = cv2.imdecode(
+                            np.frombuffer(prompt_bytes, np.uint8), cv2.IMREAD_COLOR
+                        )
+                        if decoded is not None:
+                            _debug_save("prompt_screenshot", decoded)
+                        log.debug("[点选验证码] 提示图截图成功")
+                        break
+                except Exception as e:
+                    log.warning(
+                        f"[点选验证码] 提示图截图失败 (重试 {retry + 1}/3): {e}"
+                    )
+                    time.sleep(0.5)
+
+        # 如果没有提示图，尝试使用主图的一部分作为提示（顶部区域通常是提示区）
+        if prompt_bytes is None:
+            log.warning("[点选验证码] 无提示图，尝试从主图顶部裁剪获取提示区域...")
+            try:
+                # 重新获取主图确保有效
+                main_el = _get_visible_captcha_element(
+                    frame, _SEL_CAPTCHA_BG, "主背景图", log
+                )
+                if main_el is None:
+                    raise Exception("无法获取主图")
+
+                temp_main_bytes = main_el.screenshot(
+                    timeout=5000, animations="disabled"
+                )
+                if temp_main_bytes:
+                    temp_main_img = cv2.imdecode(
+                        np.frombuffer(temp_main_bytes, np.uint8), cv2.IMREAD_COLOR
+                    )
+                    if temp_main_img is not None:
+                        h, w = temp_main_img.shape[:2]
+                        # 裁剪顶部25%作为提示区域
+                        prompt_img = temp_main_img[0 : int(h * 0.25), 0:w]
+                        _, prompt_bytes = cv2.imencode(".png", prompt_img)
+                        prompt_bytes = prompt_bytes.tobytes()
+                        log.debug(
+                            f"[点选验证码] 从主图裁剪提示区域: {w}x{int(h * 0.25)}"
+                        )
+            except Exception as e:
+                log.debug(f"[点选验证码] 裁剪提示区域失败: {e}")
+
+        if prompt_bytes is None:
+            log.error("[点选验证码] 无法获取提示图，无法识别")
+            return False
+
+        # 关键修复：只获取一次元素，确保截图和点击使用同一个元素引用
+        # 重新获取主图元素（用于截图和点击）
+        main_el = _get_visible_captcha_element(frame, _SEL_CAPTCHA_BG, "主背景图", log)
+        if main_el is None:
+            log.error("[点选验证码] 获取主图失败")
+            return False
+
+        # 获取 DPR（必须在截图前）
+        dpr = 1.0
+        try:
+            dpr = frame.evaluate("() => window.devicePixelRatio || 1")
+            if not isinstance(dpr, (int, float)) or dpr <= 0:
+                dpr = 1.0
+        except Exception:
+            dpr = 1.0
+
+        # 确保元素在视口中可见（截图前）
+        try:
+            main_el.scroll_into_view_if_needed(timeout=3000)
+            time.sleep(0.3)
+        except Exception:
+            pass
+
+        log.debug("[点选验证码] 使用截图获取主图...")
+        try:
+            assert main_el is not None
+            main_bytes = main_el.screenshot(timeout=5000, animations="disabled")
+            decoded_main = cv2.imdecode(
+                np.frombuffer(main_bytes, np.uint8), cv2.IMREAD_COLOR
+            )
+            if decoded_main is not None:
+                _debug_save("main_screenshot", decoded_main)
+        except Exception as e:
+            log.warning(f"[点选验证码] 主图截图失败: {e}")
+            return False
+
+        if not prompt_bytes or not main_bytes:
+            log.warning("[点选验证码] 截图数据为空，无法识别")
+            return False
+
+        # 识别验证码坐标
+        log.debug("[点选验证码] 开始识别坐标...")
+        points = detect_captcha(cast(bytes, prompt_bytes), cast(bytes, main_bytes))
+
+        if not points:
+            log.warning("[点选验证码] 未识别到有效坐标")
+            return False
+
+        log.info(f"[点选验证码] 识别到 {len(points)} 个目标点: {points}")
+
+        # 获取截图图片的尺寸
+        img_arr = cv2.imdecode(np.frombuffer(main_bytes, np.uint8), cv2.IMREAD_COLOR)
+        if img_arr is None:
+            log.warning("[点选验证码] 无法解码主图")
+            return False
+
+        img_h, img_w = img_arr.shape[:2]
+
+        # 获取元素的 bounding box（CSS像素）
+        main_bb = None
+        try:
+            main_bb = main_el.bounding_box(timeout=3000)
+        except Exception:
+            pass
+
+        log.debug(
+            f"[点选验证码] DPR={dpr}, 截图={img_w}x{img_h}(设备像素), 元素CSS={main_bb['width'] if main_bb else 0:.0f}x{main_bb['height'] if main_bb else 0:.0f}"
+        )
+
+        # 验证尺寸比例
+        if main_bb and main_bb["width"] > 0 and main_bb["height"] > 0:
+            expected_w = main_bb["width"] * dpr
+            expected_h = main_bb["height"] * dpr
+            log.debug(
+                f"[点选验证码] 尺寸验证: 预期截图={expected_w:.0f}x{expected_h:.0f}, 实际={img_w}x{img_h}"
+            )
+
+        # 使用 Playwright 原生 locator.click(position=...) 点击
+        click_success_count = 0
+        for i, (px, py) in enumerate(points):
+            # 坐标转换：设备像素 -> CSS像素
+            rel_x = px / dpr
+            rel_y = py / dpr
+
+            # 边界检查
+            if main_bb and main_bb["width"] > 0 and main_bb["height"] > 0:
+                rel_x = max(10, min(rel_x, main_bb["width"] - 10))
+                rel_y = max(10, min(rel_y, main_bb["height"] - 10))
+
+            log.debug(
+                f"[点选验证码] 点击第 {i + 1}/{len(points)} 个目标: 图片=({px},{py})->元素({rel_x:.1f},{rel_y:.1f})"
+            )
+
+            # 点击前再次检查元素可见性
+            try:
+                assert main_el is not None
+                if not main_el.is_visible():
+                    log.warning(
+                        f"[点选验证码] 第 {i + 1} 个目标点击前元素不可见，尝试重新获取..."
+                    )
+                    main_el = _get_visible_captcha_element(
+                        frame, _SEL_CAPTCHA_BG, "主背景图", log
+                    )
+                    if main_el is None:
+                        log.error("[点选验证码] 重新获取主图失败")
+                        return False
+                    # 重新获取bounding box
+                    try:
+                        main_bb = main_el.bounding_box(timeout=3000)
+                    except Exception:
+                        pass
+            except Exception as e:
+                log.debug(f"[点选验证码] 可见性检查异常: {e}")
+
+            click_success = False
+            for retry in range(2):  # 最多重试2次
+                try:
+                    # 使用同一个 main_el 进行点击
+                    assert main_el is not None
+                    main_el.click(
+                        position={"x": rel_x, "y": rel_y}, force=True, timeout=5000
+                    )
+                    log.debug(f"[点选验证码] 第 {i + 1} 个目标点击成功")
+                    click_success = True
+                    click_success_count += 1
+                    break
+                except Exception as e:
+                    if retry == 0:
+                        log.warning(
+                            f"[点选验证码] 第 {i + 1} 个目标点击失败，0.5秒后重试: {e}"
+                        )
+                        time.sleep(0.5)
+                        # 重试前重新获取元素
+                        try:
+                            main_el = _get_visible_captcha_element(
+                                frame, _SEL_CAPTCHA_BG, "主背景图", log
+                            )
+                            if main_el:
+                                main_bb = main_el.bounding_box(timeout=2000)
+                        except Exception:
+                            pass
+                    else:
+                        log.error(
+                            f"[点选验证码] 第 {i + 1} 个目标点击失败（已重试）: {e}"
+                        )
+
+            if not click_success:
+                log.warning(
+                    f"[点选验证码] 第 {i + 1} 个目标最终点击失败，继续尝试下一个..."
+                )
+                # 不立即返回，尝试点击其他点
+                continue
+
+            time.sleep(0.4 + random.uniform(0.1, 0.3))
+
+        # 检查是否至少成功点击了一个点
+        if click_success_count == 0:
+            log.error("[点选验证码] 所有目标点都点击失败")
+            return False
+
+        log.info(f"[点选验证码] 成功点击 {click_success_count}/{len(points)} 个目标")
+
+        time.sleep(0.8)  # 等待点击效果生效
+
+        # 点击确认按钮
+        confirm_clicked = False
+        if confirm_btn.count() > 0:
+            try:
+                confirm_btn.wait_for(state="visible", timeout=3000)
+                if confirm_btn.is_enabled():
+                    log.debug("[点选验证码] 点击确认按钮")
+                    confirm_btn.click()
+                    confirm_clicked = True
+                    time.sleep(2.0)  # 等待验证结果
+            except Exception as e:
+                log.debug(f"[点选验证码] 确认按钮点击失败: {e}")
+
+        if not confirm_clicked:
+            log.warning("[点选验证码] 未点击确认按钮，等待2秒后检查状态...")
+            time.sleep(2.0)
+
+        # 检查验证结果
+        try:
+            # 检查是否还有验证码
+            still_has_captcha = _captcha_visible(frame, require_cscapt=False)
+            if not still_has_captcha:
+                log.info("[点选验证码] 验证码已消失，验证成功")
+                return True
+
+            # 检查错误提示
+            error_tip = frame.locator(_SEL_CAPTCHA_ERROR_TIP).first
+            if error_tip.count() > 0 and error_tip.is_visible():
+                error_text = ""
+                try:
+                    error_text = error_tip.inner_text(timeout=1000)
+                except Exception:
+                    pass
+                log.warning(f"[点选验证码] 检测到错误提示: {error_text}")
+                return False
+
+            # 验证码仍在，但没有错误提示，可能是验证中
+            log.debug("[点选验证码] 验证码仍在显示，等待1秒后再次检查...")
+            time.sleep(1.0)
+
+            still_has_captcha = _captcha_visible(frame, require_cscapt=False)
+            if not still_has_captcha:
+                log.info("[点选验证码] 验证码已消失，验证成功")
+                return True
+            else:
+                log.warning("[点选验证码] 验证码仍在，验证可能失败")
+                return False
+
+        except Exception as e:
+            log.debug(f"[点选验证码] 验证结果检查异常: {e}")
+            # 无法确定结果，假设成功
+            return True
+
+    except Exception as e:
+        log.warning(f"[点选验证码] 处理异常: {e}")
+        return False
 
 
 def handle_tencent_captcha(page, log, require_cscapt: bool = True) -> bool:
@@ -901,40 +1399,20 @@ def handle_click_captcha(page, log) -> bool:
             log.warning("[点选验证码] 页面已关闭，跳过验证码处理")
             return False
 
-        prompt_bytes, prompt_url = _fetch_element_image(ctx, prompt_el, log, "提示图")
-
-        # 从提示图 URL 推导主图 URL（img_index=0 → img_index=1）
-        main_bytes: Optional[bytes] = None
-        if prompt_url:
-            derived_url = _derive_main_url(prompt_url)
-            if derived_url:
-                log.debug(f"[点选验证码] 主图从提示图 URL 推导: {derived_url[:80]}...")
-                try:
-                    req = urllib.request.Request(
-                        derived_url, headers={"User-Agent": "Mozilla/5.0"}
-                    )
-                    with urllib.request.urlopen(req, timeout=10) as resp:
-                        main_bytes = resp.read()
-                        log.debug(
-                            f"[点选验证码] 主图推导下载成功，{len(main_bytes or b'')} B"
-                        )
-                except Exception as e:
-                    log.warning(f"[点选验证码] 主图推导下载失败: {e}")
-
-        # 推导失败时走元素 URL 提取 / 截图流程
-        if not main_bytes:
-            main_bytes, _ = _fetch_element_image(ctx, main_el, log, "主图")
-
-        # 仍为空时，JS 全局扫描 frame 内背景图（仅此处保留 evaluate，无替代方案）
-        if not main_bytes:
-            main_bytes = _fetch_frame_bg_image(ctx, log)
-
-        # 获取主图渲染尺寸，用于坐标映射
-        main_render_size: Optional[Tuple[float, float]] = None
+        # 使用截图方式获取验证码图片（不再通过 URL 下载）
+        log.debug("[点选验证码] 使用截图获取提示图...")
         try:
-            main_render_size = _get_main_render_size(ctx, main_el, log)
-        except Exception:
-            pass
+            prompt_bytes = prompt_el.screenshot(timeout=5000, animations="disabled")
+        except Exception as e:
+            log.warning(f"[点选验证码] 提示图截图失败: {e}")
+            return False
+
+        log.debug("[点选验证码] 使用截图获取主图...")
+        try:
+            main_bytes = main_el.screenshot(timeout=5000, animations="disabled")
+        except Exception as e:
+            log.warning(f"[点选验证码] 主图截图失败: {e}")
+            return False
 
         if not prompt_bytes or not main_bytes:
             log.warning(
@@ -949,26 +1427,26 @@ def handle_click_captcha(page, log) -> bool:
         )
         points = detect_captcha(prompt_bytes, main_bytes)
 
-        # 若渲染尺寸与图片像素尺寸不一致，按比例缩放坐标
-        if main_render_size and points:
-            try:
-                img_arr = cv2.imdecode(
-                    np.frombuffer(main_bytes, np.uint8), cv2.IMREAD_COLOR
-                )
-                if img_arr is not None:
-                    img_h, img_w = img_arr.shape[:2]
-                    scale_x = main_render_size[0] / img_w
-                    scale_y = main_render_size[1] / img_h
-                    if abs(scale_x - 1.0) > 0.05 or abs(scale_y - 1.0) > 0.05:
-                        points = [
-                            (int(x * scale_x), int(y * scale_y)) for x, y in points
-                        ]
-                        log.debug(
-                            f"[点选验证码] 坐标缩放比例: x={scale_x:.3f}, y={scale_y:.3f}，"
-                            f"缩放后坐标: {points}"
-                        )
-            except Exception as e:
-                log.debug(f"[点选验证码] 坐标缩放失败（忽略）: {e}")
+        # 将截图坐标转换为元素相对坐标
+        # 获取截图图片的尺寸和元素尺寸
+        try:
+            img_arr = cv2.imdecode(
+                np.frombuffer(main_bytes, np.uint8), cv2.IMREAD_COLOR
+            )
+            if img_arr is not None:
+                img_h, img_w = img_arr.shape[:2]
+                main_bb = main_el.bounding_box(timeout=3000)
+                if main_bb and main_bb["width"] > 0 and main_bb["height"] > 0:
+                    scale_x = main_bb["width"] / img_w
+                    scale_y = main_bb["height"] / img_h
+                    points = [(int(x * scale_x), int(y * scale_y)) for x, y in points]
+                    log.debug(
+                        f"[点选验证码] 坐标缩放: 截图={img_w}x{img_h}, "
+                        f"元素={main_bb['width']:.0f}x{main_bb['height']:.0f}, "
+                        f"比例=({scale_x:.2f},{scale_y:.2f})"
+                    )
+        except Exception as e:
+            log.debug(f"[点选验证码] 坐标缩放失败（忽略）: {e}")
 
         if len(points) == 0:
             log.warning("[点选验证码] 未识别到任何坐标，破解失败")
