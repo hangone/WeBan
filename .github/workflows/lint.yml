@@ -16,18 +16,18 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@v8
         with:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: uv sync --dev
+        run: uvx sync
 
       - name: Ruff lint
-        run: uv run ruff check .
+        run: uvx ruff check .
 
       - name: Ruff format check
-        run: uv run ruff format --check .
+        run: uvx ruff format --check .
 
       - name: Pyright type check
-        run: uv run pyright
+        run: uvx pyright
