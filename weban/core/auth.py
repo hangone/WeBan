@@ -1,5 +1,6 @@
 import json
 import time
+import threading
 
 from typing import TYPE_CHECKING, Any, Dict
 import logging
@@ -198,7 +199,7 @@ class AuthMixin(BaseMixin):
                     user = data.get("user") or {}
                     if token:
                         self.token = token
-                        self._auth_captured = True
+                        self._auth_event.set()
                         self.log.info(
                             f"[网络拦截] 发现有效登录 Token：{user.get('userName') or '用户'}"
                         )
@@ -310,7 +311,7 @@ class AuthMixin(BaseMixin):
         self._page.goto(f"{self.base_url}/#/", wait_until="domcontentloaded")
         time.sleep(1)
         self.log.info("进入登录流程")
-        self._auth_captured = False
+        self._auth_event = threading.Event()
 
         self._page.on("response", self._handle_auth_response)
         try:
@@ -387,7 +388,7 @@ class AuthMixin(BaseMixin):
                     self.log.warning("页面已关闭，退出登录流程")
                     return {"ok": False, "msg": "页面已关闭"}
 
-                if self._is_logged_in() or getattr(self, "_auth_captured", False):
+                if self._is_logged_in() or self._auth_event.is_set():
                     self.log.info("登录成功")
                     return _extract_user_result()
 
@@ -451,7 +452,9 @@ class AuthMixin(BaseMixin):
                                         _last_reported.discard(msg)
                 except Exception:
                     pass
-                time.sleep(1.0)
+                self._auth_event.wait(
+                    timeout=1.0
+                )  # 用 Event.wait 替代 sleep，网络拦截可立即唤醒
         finally:
             try:
                 if self._page:

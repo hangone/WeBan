@@ -309,11 +309,89 @@ class ExamMixin(BaseMixin):
     # 提交流程
     # ========================================================================
 
+    def _dismiss_result_popup(self) -> str:
+        """等待并关闭提交成绩弹窗，返回捕捉到的分值文本。"""
+        if not self._page:
+            return ""
+
+        score_text = ""
+        deadline = time.time() + 15
+
+        while time.time() < deadline:
+            # ---- 方案1：Mint UI MessageBox (普通考试) ----
+            try:
+                msgbox = self._page.locator(".mint-msgbox-wrapper").first
+                if msgbox.count() > 0 and msgbox.is_visible():
+                    msg = msgbox.locator(".mint-msgbox-message").first
+                    if msg.count() > 0:
+                        try:
+                            score_text = msg.inner_text(timeout=1000).strip()
+                        except Exception:
+                            pass
+                        self.log.info(f"[成绩弹窗] Mint MessageBox: {score_text}")
+
+                    confirm = msgbox.locator(".mint-msgbox-confirm").first
+                    if confirm.count() > 0 and confirm.is_visible():
+                        confirm.click(force=True, timeout=5000)
+                        self.log.debug("[成绩弹窗] 已点击确认按钮关闭")
+                        time.sleep(1.5)
+                        return score_text
+            except Exception:
+                pass
+
+            # ---- 方案2：自定义 confirm-sheet (安全测评) ----
+            try:
+                sheet = self._page.locator(".confirm-sheet").first
+                if sheet.count() > 0 and sheet.is_visible():
+                    msg = sheet.locator(".confirm-message").first
+                    if msg.count() > 0:
+                        try:
+                            score_text = msg.inner_text(timeout=1000).strip()
+                        except Exception:
+                            pass
+                        self.log.info(f"[成绩弹窗] confirm-sheet: {score_text}")
+
+                    confirm = sheet.locator(
+                        ".bottom-ctrls button, .bottom-ctrls .mint-button"
+                    ).first
+                    if confirm.count() > 0 and confirm.is_visible():
+                        confirm.click(force=True, timeout=5000)
+                        self.log.debug("[成绩弹窗] confirm-sheet 已关闭")
+                        time.sleep(1.5)
+                        return score_text
+            except Exception:
+                pass
+
+            # ---- 方案3：van-dialog 通用弹窗 ----
+            try:
+                vdialog = self._page.locator(".van-dialog").first
+                if vdialog.count() > 0 and vdialog.is_visible():
+                    msg = vdialog.locator(".van-dialog__message").first
+                    if msg.count() > 0:
+                        try:
+                            score_text = msg.inner_text(timeout=1000).strip()
+                        except Exception:
+                            pass
+                        self.log.info(f"[成绩弹窗] van-dialog: {score_text}")
+
+                    confirm = vdialog.locator(".van-dialog__confirm").first
+                    if confirm.count() > 0 and confirm.is_visible():
+                        confirm.click(force=True, timeout=5000)
+                        time.sleep(1.5)
+                        return score_text
+            except Exception:
+                pass
+
+            time.sleep(0.5)
+
+        return score_text
+
     def _submit_exam(self) -> str:
         """交卷并返回结果信息。"""
         if not self._page:
             raise RuntimeError("Page is not initialized")
 
+        # 如果已经在结算页（之前点过交卷），直接读分
         try:
             score_el = self._page.locator(SEL_EXAM_RESULT_SCORE).first
             if score_el.count() > 0 and score_el.is_visible():
@@ -324,14 +402,23 @@ class ExamMixin(BaseMixin):
         except Exception:
             pass
 
-        result_text = self._click_submit_buttons()
+        # 执行逐级交卷按钮点击
+        self._click_submit_buttons()
 
+        # 等待并关闭成绩弹窗
+        popup_score = self._dismiss_result_popup()
+        if popup_score:
+            result_text = f"交卷完成: {popup_score}"
+        else:
+            result_text = "交卷完成（未捕获弹窗分数）"
+
+        # 弹窗关闭后尝试从页面读分
         try:
             score_el = self._page.locator(SEL_EXAM_RESULT_SCORE).first
             if score_el.count() > 0 and score_el.is_visible(timeout=3000):
                 final_score = score_el.inner_text().strip()
                 if final_score:
-                    result_text += f" (最终得分: {final_score})"
+                    result_text = f"交卷完成: {final_score}"
                     self.log.info(f"[提交流程] 成功捕获分值：{final_score}")
         except Exception:
             pass
@@ -339,92 +426,79 @@ class ExamMixin(BaseMixin):
         return result_text
 
     def _click_submit_buttons(self) -> str:
-        """点击各级交卷按钮。"""
+        """点击各级交卷按钮（统一重试逻辑）。"""
         assert self._page is not None
-        result_text = ""
 
-        for _ in range(2):
+        def _click_with_retry(selector, label: str, max_attempts: int = 3) -> bool:
+            """通用重试点击辅助函数。"""
+            for attempt in range(max_attempts):
+                try:
+                    btn = self._page.locator(selector).first
+                    if btn.count() > 0 and btn.is_visible():
+                        self.log.debug(f"[提交流程] 点击{label}")
+                        btn.click(force=True, timeout=5000)
+                        time.sleep(1.5)
+                        return True
+                except Exception:
+                    pass
+                time.sleep(0.5)
+            return False
+
+        def _wait_for_element(selector: str, timeout: float = 3.0) -> bool:
+            """等待元素出现并可见。"""
             try:
-                bottom_submit = (
-                    self._page.locator(SEL_EXAM_BOTTOM_CTRLS)
-                    .locator("button:has-text('交卷')")
-                    .first
-                )
-                if bottom_submit.count() > 0 and bottom_submit.is_visible():
-                    self.log.debug("[提交流程] 点击底部交卷按钮")
-                    bottom_submit.click(force=True, timeout=5000)
-                    time.sleep(1.5)
-                    break
+                el = self._page.locator(selector).first
+                if el.count() > 0:
+                    el.wait_for(state="visible", timeout=int(timeout * 1000))
+                    return True
             except Exception:
                 pass
-            time.sleep(0.5)
+            return False
 
+        # 1. 底部交卷按钮
+        _click_with_retry(
+            f"{SEL_EXAM_BOTTOM_CTRLS} button:has-text('交卷')",
+            "底部交卷按钮",
+            max_attempts=2,
+        )
+
+        # 2. 确保答题卡sheet弹出
         for _ in range(3):
-            try:
-                sheet = self._page.locator(SEL_EXAM_SHEET).first
-                if sheet.count() > 0 and sheet.is_visible():
-                    break
-            except Exception:
-                pass
+            if _wait_for_element(SEL_EXAM_SHEET, timeout=1.0):
+                break
+            _click_with_retry(SEL_ANSWER_CARD_BTN, "答题卡", max_attempts=1)
 
-            try:
-                card_btn = self._page.locator(SEL_ANSWER_CARD_BTN).last
-                if card_btn.count() > 0 and card_btn.is_visible():
-                    self.log.debug("[提交流程] 点击答题卡")
-                    card_btn.click(force=True, timeout=5000)
-                    time.sleep(1.2)
-            except Exception:
-                pass
+        # 3. Sheet内的交卷按钮
+        _click_with_retry(SEL_SUBMIT_BTN, "Sheet交卷按钮", max_attempts=3)
+        _click_with_retry(
+            f"{SEL_EXAM_SHEET_BOTTOM_CTRLS} {SEL_SUBMIT_BTN}",
+            "Sheet底部交卷",
+            max_attempts=3,
+        )
 
-        for _ in range(3):
-            try:
-                submit_btn = self._page.locator(SEL_SUBMIT_BTN).last
-                if submit_btn.count() > 0 and submit_btn.is_visible():
-                    submit_btn.click(force=True, timeout=5000)
-                    time.sleep(1.5)
-                    break
-            except Exception:
-                pass
+        # 4. 确认弹窗交卷（多种选择器兜底）
+        for selector in [
+            f"{SEL_EXAM_CONFIRM_SHEET_BOTTOM_CTRLS} {SEL_SUBMIT_BTN}",
+            SEL_SUBMIT_CONFIRM,
+        ]:
+            for _ in range(5):
+                try:
+                    confirm_btn = self._page.locator(selector).last
+                    if confirm_btn.count() > 0 and confirm_btn.is_visible():
+                        btn_text = ""
+                        try:
+                            btn_text = confirm_btn.inner_text().strip()
+                        except Exception:
+                            pass
+                        self.log.debug(f"[提交流程] 点击确认交卷: {btn_text}")
+                        confirm_btn.click(force=True, timeout=5000)
+                        time.sleep(2)
+                        break
+                except Exception:
+                    pass
+                time.sleep(0.5)
 
-            try:
-                sheet_submit = (
-                    self._page.locator(SEL_EXAM_SHEET_BOTTOM_CTRLS)
-                    .locator(SEL_SUBMIT_BTN)
-                    .last
-                )
-                if sheet_submit.count() > 0 and sheet_submit.is_visible():
-                    sheet_submit.click(force=True, timeout=5000)
-                    time.sleep(1.5)
-                    break
-            except Exception:
-                pass
-
-        for _ in range(5):
-            try:
-                confirm_submit = (
-                    self._page.locator(SEL_EXAM_CONFIRM_SHEET_BOTTOM_CTRLS)
-                    .locator(SEL_SUBMIT_BTN)
-                    .last
-                )
-                if confirm_submit.count() > 0 and confirm_submit.is_visible():
-                    confirm_submit.click(force=True, timeout=5000)
-                    time.sleep(2)
-                    break
-            except Exception:
-                pass
-
-            try:
-                confirm_btn = self._page.locator(SEL_SUBMIT_CONFIRM).last
-                if confirm_btn.count() > 0 and confirm_btn.is_visible():
-                    btn_text = confirm_btn.inner_text().strip()
-                    self.log.debug(f"[提交流程] 点击弹窗确认: {btn_text}")
-                    confirm_btn.click(force=True, timeout=5000)
-                    time.sleep(2)
-                    break
-            except Exception:
-                pass
-
-        return result_text
+        return ""
 
     # ========================================================================
     # 主考试流程
@@ -618,7 +692,18 @@ class ExamMixin(BaseMixin):
         same_count = 0
         invalid_context_count = 0
 
-        for _ in range(500):
+        # 动态上限：从页面题目总数获取，最多 5000
+        max_questions = 500
+        try:
+            indicator = page.locator(SEL_QUEST_INDICATOR).first
+            if indicator.count() > 0 and indicator.is_visible():
+                m = re.search(r"(\d+)\s*/\s*(\d+)", indicator.inner_text())
+                if m:
+                    max_questions = min(int(m.group(2)), 5000) + 10
+        except Exception:
+            pass
+
+        for q_index in range(max_questions):
             time.sleep(1.2)
 
             if self._is_in_context(PageContext.EXAM_RESULT):
@@ -637,6 +722,7 @@ class ExamMixin(BaseMixin):
 
             try:
                 popups = page.locator(SEL_EXAM_PREPARE_POPUPS)
+                popup_detected = False
                 for k in range(popups.count()):
                     p = popups.nth(k)
                     if p.is_visible():
@@ -645,8 +731,11 @@ class ExamMixin(BaseMixin):
                             x in txt for x in ["未作答", "共", "道题", "完成", "交卷"]
                         ):
                             self.log.info("探测到结算/交卷层")
+                            popup_detected = True
                             break
                         break
+                if popup_detected:
+                    break
             except TargetClosedError:
                 self.log.warning("检测到页面已关闭，提前结束。")
                 break

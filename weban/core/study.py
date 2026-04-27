@@ -57,6 +57,7 @@ _PROJECT_STUDY_TABS = {
     "military": [3],
     "lab": [3],
     "foods": [3],
+    "contest": [3],
 }
 
 
@@ -120,6 +121,9 @@ class StudyMixin(BaseMixin):
         - value=2 (option): "选修课" 或 "自选课程" 或 "选修" 或 "自选"
         - value=1 (matching): "匹配课程" 或 "匹配"
         - value=4 (exam): "在线考试"
+
+        StudyPage.vue 使用自定义 <li class="s1"> / <li class="s2"> 元素，
+        仅 subject_type=3（课程学习）需要处理。
         """
         if not self._page or self._page.is_closed():
             return False
@@ -144,6 +148,16 @@ class StudyMixin(BaseMixin):
                         tab.first.click(timeout=5000)
                         time.sleep(1)
                     self.log.debug(f"[Tab] 成功切换到: {label}")
+                    return True
+
+            # StudyPage.vue 回退: 使用自定义 <li class="s1"> 元素
+            if subject_type == 3:
+                s1_tab = self._page.locator(".scontain .s1")
+                if s1_tab.count() > 0:
+                    s1_tab.first.scroll_into_view_if_needed(timeout=2000)
+                    s1_tab.first.click(timeout=5000)
+                    time.sleep(1)
+                    self.log.debug("[Tab] StudyPage 回退: 成功切换到 s1 (课程学习)")
                     return True
 
             self.log.debug(f"[Tab] 未找到标签页: {labels}")
@@ -343,15 +357,15 @@ class StudyMixin(BaseMixin):
     def _expand_next_incomplete_section(
         self, state: _StudyRunState | None = None
     ) -> bool:
-        """展开下一个未完成的章节。
+        """展开顺序上第一个未完成的章节。
 
-        优化：使用 _summarize_collapse_progress 获取所有章节进度，
-        优先展开未完成数量最多的章节，跳过已完成的章节。
+        使用 _summarize_collapse_progress 获取所有章节进度，
+        按页面从上到下的顺序依次展开未完成的章节，跳过已完成的章节。
+        通过 state.expanded_sections 追踪已展开的章节，避免重复展开。
         """
         if not self._page or self._page.is_closed():
             return False
 
-        # 首先获取所有章节的完成情况（不需要展开）
         progress = self._summarize_collapse_progress()
         if not progress or not progress.get("sections"):
             return False
@@ -368,20 +382,27 @@ class StudyMixin(BaseMixin):
         )
 
         collapse_items = self._page.locator(SEL_COLLAPSE_ITEM)
+        expanded_sections = state.expanded_sections if state else set()
 
-        # 按未完成数量降序处理（已经在 _summarize_collapse_progress 中排序）
         for section in incomplete_sections:
             i = section["index"]
             title_text = section["title"]
             incomplete_count = section["incomplete"]
 
-            # 检查是否已经展开过此章节
-            section_key = f"{title_text}_{i}"
-            if state and section_key in state.expanded_sections:
-                self.log.debug(
-                    f"[章节] 跳过已展开过的章节: {title_text} ({incomplete_count} 未完成)"
-                )
-                continue
+            # 跳过已经连续展开过的章节（电路断路器：同一章节最多展开 3 次）
+            expand_key = f"{i}:{title_text}"
+            if expand_key in state.expanded_sections if state else False:
+                expand_count = 1
+                try:
+                    expand_count_key = f"__cnt_{expand_key}"
+                    expand_count = getattr(state, expand_count_key, 1)
+                except Exception:
+                    pass
+                if expand_count >= 2:
+                    self.log.debug(
+                        f"[章节] 跳过重复展开: {title_text} (已展开 {expand_count} 次)"
+                    )
+                    continue
 
             try:
                 item = collapse_items.nth(i)
@@ -389,12 +410,9 @@ class StudyMixin(BaseMixin):
                 if title_btn.count() == 0:
                     continue
 
-                # 检查是否已展开
                 cls = item.get_attribute("class") or ""
                 if "van-collapse-item--active" in cls:
                     self.log.debug(f"[章节] 章节已展开: {title_text}")
-                    if state:
-                        state.expanded_sections.add(section_key)
                     return True
 
                 title_btn.scroll_into_view_if_needed(timeout=2000)
@@ -403,14 +421,12 @@ class StudyMixin(BaseMixin):
                     f"[章节] 展开: {title_text} ({section['finished']}/{section['total']}, {incomplete_count} 未完成)"
                 )
 
-                # 记录已展开的章节
+                # 标记为已展开
                 if state:
-                    state.expanded_sections.add(section_key)
+                    expanded_sections.add(expand_key)
+                    state.expanded_sections = expanded_sections
 
-                # 增加等待时间让课程加载
                 time.sleep(2.5)
-
-                # 等待课程列表出现
                 try:
                     self._page.wait_for_selector(
                         SEL_COURSE_LIST_MARKERS, state="visible", timeout=8000
@@ -423,7 +439,6 @@ class StudyMixin(BaseMixin):
                 self.log.debug(f"[章节] 展开失败({title_text}): {e}")
                 continue
 
-        # 所有未完成章节都已尝试过
         self.log.debug("[章节] 所有未完成章节都已展开过")
         return False
 
@@ -474,7 +489,7 @@ class StudyMixin(BaseMixin):
         return dom_tasks
 
     def _summarize_collapse_progress(self) -> dict[str, Any] | None:
-        """汇总折叠章节的完成进度，返回详细章节信息。
+        """汇总折叠章节的完成进度，返回按页面顺序排列的详细章节信息。
 
         直接从页面解析，不需要展开折叠面板。
         """
@@ -523,8 +538,8 @@ class StudyMixin(BaseMixin):
         if not found_progress:
             return None
 
-        # 按未完成数量降序排序，优先处理未完成的章节
-        sections.sort(key=lambda x: x["incomplete"], reverse=True)
+        # 按章节索引升序排列，保持页面从上到下的自然顺序
+        sections.sort(key=lambda x: x["index"])
 
         return {
             "total": total,
@@ -1334,18 +1349,37 @@ class StudyMixin(BaseMixin):
             )
 
             min_study_time = getattr(self, "study_time", 20)
+            max_total_time = max(
+                min_study_time * 6, 600
+            )  # 硬超时：至少10分钟，最多6倍学习时长
             start_time = time.time()
             last_finish_attempt = 0
             loop_count = 0
             finish_attempt_count = 0
 
-            self.log.info(f"[计时] 最小学习时长配置: {min_study_time} 秒")
+            self.log.info(
+                f"[计时] 最小学习时长: {min_study_time}秒, 总超时: {max_total_time}秒"
+            )
 
             while True:
                 loop_count += 1
                 time.sleep(2.0 + random.uniform(0.1, 0.5))
 
                 elapsed = time.time() - start_time
+
+                # 电路断路器：总时间超限则强行退出
+                if elapsed > max_total_time:
+                    self.log.warning(
+                        f"[超时] 学习时间达到硬超时上限 {max_total_time} 秒，强制结束"
+                    )
+                    self.finish_study()
+                    time.sleep(2)
+                    if self._check_course_completed(frame):
+                        return True
+                    self.log.warning(
+                        "[超时] finishWxCourse 未成功，记录为已完成（避免死循环）"
+                    )
+                    return True
 
                 # 每 5 次循环输出一次详细状态
                 if loop_count % 5 == 1:
@@ -1779,15 +1813,7 @@ class StudyMixin(BaseMixin):
                 continue
 
             self._return_to_chapter_list()
-
-            # 刷新页面确保看到最新状态（课程可能已完成或章节状态已更新）
-            try:
-                if self._page and not self._page.is_closed():
-                    self._page.reload(wait_until="networkidle", timeout=15000)
-                    time.sleep(2)
-                    self.log.debug("[刷新] 页面已刷新")
-            except Exception as e:
-                self.log.debug(f"[刷新] 页面刷新失败: {e}")
+            time.sleep(1.5)
 
             self.log.info(f"[{idx + 1}/{total_tasks}] 正在学习: {title}")
 
@@ -1838,8 +1864,6 @@ class StudyMixin(BaseMixin):
             time.sleep(1.5)
             if self._page and self._page.is_closed():
                 break
-
-        return processed_cnt
 
         return processed_cnt
 

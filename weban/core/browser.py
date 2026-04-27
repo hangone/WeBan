@@ -98,12 +98,7 @@ class BrowserMixin(BaseMixin):
                 self.log.warning("检测到浏览器/上下文已被异常关闭，正在重新启动...")
                 self._stop()
 
-        # 启动 Playwright 并选择浏览器引擎
-        if sync_playwright:
-            self._playwright = sync_playwright().start()
-
-        if not self._playwright:
-            raise RuntimeError("Failed to initialize playwright")
+        self._playwright = sync_playwright().start()
 
         launcher = getattr(self._playwright, self.browser_config.channel, None)
         if not launcher:

@@ -110,10 +110,6 @@ SEL_COURSE_LIST_ITEMS = ", ".join(
         ".img-texts-item",
         ".fchl-item",
         ".task-block",
-        ".van-collapse-item__content .van-cell",
-        ".van-collapse-item__content .course-item",
-        ".van-collapse-item__content .lesson-item",
-        ".list-item-content",
     ]
 )
 
@@ -121,17 +117,10 @@ SEL_COLLAPSE_ITEM = ".van-collapse-item"
 SEL_COLLAPSE_ITEM_TITLE = ".van-cell__title"
 SEL_COLLAPSE_ITEM_CONTENT = ".van-collapse-item__content"
 
-SEL_IMG_TEXT_ITEM = ".img-texts-item, .van-collapse-item__content .van-cell"
-SEL_IMG_TEXT_ITEM_VISIBLE = (
-    ".img-texts-item:visible, .van-collapse-item__content .van-cell:visible"
-)
-SEL_IMG_TEXT_ITEM_NOT_PASSED = (
-    ".img-texts-item:not(.passed), .van-collapse-item__content .van-cell:not(.passed)"
-)
-SEL_IMG_TEXT_ITEM_NOT_PASSED_VISIBLE = (
-    ".img-texts-item:not(.passed):visible, "
-    ".van-collapse-item__content .van-cell:not(.passed):visible"
-)
+SEL_IMG_TEXT_ITEM = ".img-texts-item"
+SEL_IMG_TEXT_ITEM_VISIBLE = ".img-texts-item:visible"
+SEL_IMG_TEXT_ITEM_NOT_PASSED = ".img-texts-item:not(.passed)"
+SEL_IMG_TEXT_ITEM_NOT_PASSED_VISIBLE = ".img-texts-item:not(.passed):visible"
 
 SEL_FCHL_ITEM = ".fchl-item"
 SEL_FCHL_ITEM_VISIBLE = ".fchl-item:visible"
