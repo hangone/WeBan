@@ -312,17 +312,12 @@ def locate_with_template(
 
 
 def _binarize_main(gray: np.ndarray) -> np.ndarray:
-    """单策略精调二值化：自适应高斯 + 全局暗色阈值取交集。
+    """全局暗色阈值二值化 + 形态学清理。
 
-    自适应阈值捕获局部暗色线条，全局阈值过滤中等灰度背景，
-    形态学运算清理断点和噪点。
+    使用 gray<100 作为主阈值，平衡字符笔画捕获和噪声抑制。
     """
-    adaptive = cv2.adaptiveThreshold(
-        gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 31, 15
-    )
-    global_bw = (gray < 90).astype(np.uint8) * 255
-    symbol_bw = cv2.bitwise_and(adaptive, global_bw)
-    symbol_bw = cv2.morphologyEx(symbol_bw, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
+    global_bw = (gray < 100).astype(np.uint8) * 255
+    symbol_bw = cv2.morphologyEx(global_bw, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
     symbol_bw = cv2.morphologyEx(symbol_bw, cv2.MORPH_OPEN, np.ones((2, 2), np.uint8))
     return symbol_bw
 
@@ -620,6 +615,9 @@ def _captcha_visible(frame, require_cscapt: bool = True) -> bool:
     在 mcwk iframe 中，验证码容器始终预加载存在。
     只有当 URL 含 cscapt=true 且验证码真正弹出时才需要处理。
 
+    关键：腾讯验证码容器 #tcaptcha_transform_dy 在所有页面预加载，
+    但通过 opacity:0 + top:-1e+06px 隐藏。仅检查背景图可能误判。
+
     Args:
         frame: Playwright Frame 对象
         require_cscapt: 是否要求 URL 参数 cscapt=true（默认 True）
@@ -630,11 +628,38 @@ def _captcha_visible(frame, require_cscapt: bool = True) -> bool:
         return False
 
     try:
+        # 第一层：背景图必须可见且尺寸足够
         bg_img = frame.locator(".tencent-captcha-dy__verify-bg-img").first
-        if bg_img.count() > 0 and bg_img.is_visible():
-            bb = bg_img.bounding_box()
-            if bb and bb["width"] > 50 and bb["height"] > 50:
-                return True
+        if not (bg_img.count() > 0 and bg_img.is_visible()):
+            return False
+        bb = bg_img.bounding_box()
+        if not (bb and bb["width"] > 50 and bb["height"] > 50):
+            return False
+
+        # 第二层：必须同时满足以下任一条件，避免预加载 DOM 误判
+        # 条件 A：确认按钮可见（真正的验证码弹窗一定有确认按钮）
+        confirm_btn = frame.locator(".tencent-captcha-dy__verify-confirm").first
+        if confirm_btn.count() > 0 and confirm_btn.is_visible():
+            return True
+
+        # 条件 B：提示图可见
+        prompt_img = frame.locator(".tencent-captcha-dy__verify-prompt-img").first
+        if prompt_img.count() > 0 and prompt_img.is_visible():
+            return True
+
+        # 条件 C：验证码容器不在隐藏状态（opacity 不为 0，top 不为 -1e+06px）
+        try:
+            container = frame.locator("#tcaptcha_transform_dy").first
+            if container.count() > 0:
+                style = (container.get_attribute("style") or "").lower()
+                opacity_ok = "opacity: 0" not in style and "opacity:0" not in style
+                offscreen = "top: -1e+06px" in style or "top:-1e+06px" in style
+                if opacity_ok and not offscreen:
+                    return True
+        except Exception:
+            pass
+
+        return False
     except Exception:
         pass
 
@@ -825,6 +850,32 @@ def _get_visible_captcha_element(
     return None
 
 
+def _wait_for_image_load(el, timeout_ms: int = 5000) -> bool:
+    """等待 <img> 元素的图片内容真正加载完成。
+
+    Playwright 的 is_visible() 只检查 CSS 可见性，不检查图片 src
+    是否加载完毕。此函数等待 naturalWidth > 0 且 complete=true。
+    """
+    try:
+        tag_name = el.evaluate("el => el.tagName.toLowerCase()")
+        if tag_name != "img":
+            return True
+        el.evaluate(
+            "el => new Promise((resolve) => {"
+            "  if (el.complete && el.naturalWidth > 0) resolve();"
+            "  else {"
+            "    const onDone = () => { el.removeEventListener('load', onDone); el.removeEventListener('error', onDone); resolve(); };"
+            "    el.addEventListener('load', onDone);"
+            "    el.addEventListener('error', onDone);"
+            "    setTimeout(resolve, 5000);"
+            "  }"
+            "})"
+        )
+        return True
+    except Exception:
+        return False
+
+
 def _handle_captcha_core(frame, log) -> bool:
     """统一的验证码处理核心（供 handle_click_captcha_in_frame 和 handle_click_captcha 共用）。
 
@@ -934,6 +985,7 @@ def _handle_captcha_core(frame, log) -> bool:
                         if prompt_el is None:
                             break
                     assert prompt_el is not None
+                    _wait_for_image_load(prompt_el)
                     prompt_bytes = prompt_el.screenshot(
                         timeout=5000, animations="disabled"
                     )
@@ -952,6 +1004,7 @@ def _handle_captcha_core(frame, log) -> bool:
                 )
                 if main_el is None:
                     raise Exception("无法获取主图")
+                _wait_for_image_load(main_el)
                 temp_main_bytes = main_el.screenshot(
                     timeout=5000, animations="disabled"
                 )
@@ -988,6 +1041,7 @@ def _handle_captcha_core(frame, log) -> bool:
 
         try:
             assert main_el is not None
+            _wait_for_image_load(main_el)
             main_bytes = main_el.screenshot(timeout=5000, animations="disabled")
         except Exception as e:
             log.warning(f"[点选验证码] 主图截图失败: {e}")
@@ -1093,17 +1147,23 @@ def _handle_captcha_core(frame, log) -> bool:
         # ---- 点击确认按钮 ----
         if confirm_btn.count() > 0:
             try:
-                confirm_btn.wait_for(state="visible", timeout=3000)
+                confirm_btn.wait_for(state="visible", timeout=5000)
                 if confirm_btn.is_enabled():
+                    log.debug("[点选验证码] 点击确认按钮")
                     confirm_btn.click()
-                    time.sleep(2.0)
+                    time.sleep(3.0)
+                else:
+                    log.debug("[点选验证码] 确认按钮已禁用，等待自动提交...")
+                    time.sleep(3.0)
             except Exception as e:
                 log.debug(f"[点选验证码] 确认按钮点击失败: {e}")
+                time.sleep(2.0)
         else:
-            time.sleep(2.0)
+            log.debug("[点选验证码] 未找到确认按钮，等待自动提交...")
+            time.sleep(3.0)
 
         # ---- 验证结果检查 ----
-        for check in range(2):
+        for check in range(3):
             still_has_captcha = _captcha_visible(frame, require_cscapt=False)
             if not still_has_captcha:
                 log.info("[点选验证码] 验证码已消失，验证成功")
@@ -1119,10 +1179,16 @@ def _handle_captcha_core(frame, log) -> bool:
                 log.warning(f"[点选验证码] 检测到错误提示: {error_text}")
                 return False
 
-            if check == 0:
-                time.sleep(1.0)
+            if check < 2:
+                time.sleep(2.0)
 
+        # 最终诊断：输出验证码仍可见的原因
         log.warning("[点选验证码] 验证码仍在，验证可能失败")
+        try:
+            page_ref = frame.page
+        except Exception:
+            page_ref = frame
+        _log_captcha_contexts(page_ref, log)
         return False
 
     except Exception as e:

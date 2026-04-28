@@ -2,10 +2,10 @@
 set -e
 
 echo "Running Ruff formatter..."
-uvx ruff format
+uv run ruff format
 
 echo "Running Ruff check and fix..."
-uvx ruff check --fix
+uv run ruff check --fix
 
 echo "Running Pyright..."
-uvx pyright
+uv run pyright

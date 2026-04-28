@@ -295,14 +295,14 @@ pyrightconfig.json
 
 # Config
 config.toml
-pw-browsers
 
-# SRC
+# Debug
+pw-browsers/
 src/
-.zed/
-
-# Debug log output directory
 logs/
 
 # Agent
-.agents
+.agents/
+.claude/
+.zed/
+skills-lock.json

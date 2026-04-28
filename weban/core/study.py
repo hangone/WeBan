@@ -15,6 +15,7 @@ from .const import (
     SEL_FCHL_ITEM,
     SEL_COLLAPSE_ITEM,
     SEL_COLLAPSE_ITEM_TITLE,
+    SEL_COLLAPSE_ITEM_CONTENT,
     SEL_BROADCAST_MODAL,
     SEL_COMMENT_BACK_BTN,
     SEL_ITEM_TITLE_TEXT,
@@ -69,6 +70,7 @@ class _StudyRunState:
     active_section_index: int = -1
     expanded_tabs: set = field(default_factory=set)
     expanded_sections: set = field(default_factory=set)  # 记录已展开的章节
+    _expand_count_map: dict = field(default_factory=dict)  # 章节展开次数追踪
 
 
 class StudyMixin(BaseMixin):
@@ -150,14 +152,16 @@ class StudyMixin(BaseMixin):
                     self.log.debug(f"[Tab] 成功切换到: {label}")
                     return True
 
-            # StudyPage.vue 回退: 使用自定义 <li class="s1"> 元素
-            if subject_type == 3:
-                s1_tab = self._page.locator(".scontain .s1")
-                if s1_tab.count() > 0:
-                    s1_tab.first.scroll_into_view_if_needed(timeout=2000)
-                    s1_tab.first.click(timeout=5000)
+            # StudyPage.vue 回退: 使用自定义 <li class="s1"> / <li class="s2"> 元素
+            _study_page_tab_map = {3: ".scontain .s1", 2: ".scontain .s2"}
+            sp_sel = _study_page_tab_map.get(subject_type)
+            if sp_sel:
+                sp_tab = self._page.locator(sp_sel)
+                if sp_tab.count() > 0:
+                    sp_tab.first.scroll_into_view_if_needed(timeout=2000)
+                    sp_tab.first.click(timeout=5000)
                     time.sleep(1)
-                    self.log.debug("[Tab] StudyPage 回退: 成功切换到 s1 (课程学习)")
+                    self.log.debug(f"[Tab] StudyPage 回退: 成功切换到 {sp_sel}")
                     return True
 
             self.log.debug(f"[Tab] 未找到标签页: {labels}")
@@ -225,70 +229,6 @@ class StudyMixin(BaseMixin):
             return int(m.group(1)), int(m.group(2))
         except Exception:
             return None, None
-
-    def _extract_project_overview(self) -> dict[str, Any]:
-        """从页面提取项目汇总信息。
-
-        前端 CourseIndex.vue 数据结构:
-        - subjectList: [{name, value, done, total}, ...]
-        - examList: [{examPlanName, examScore, passScore, examFinishNum, examOddNum, ...}, ...]
-        - overview: {name, endTime, studyState, ...}
-        """
-        if not self._page or self._page.is_closed():
-            return {}
-
-        try:
-            js_code = """
-            () => {
-                const app = document.querySelector('.page')?.__vue__;
-                if (!app) return null;
-
-                const result = {
-                    subjects: [],
-                    exams: [],
-                    overview: {}
-                };
-
-                // 提取 subjectList
-                if (app.subjectList && Array.isArray(app.subjectList)) {
-                    for (const subj of app.subjectList) {
-                        result.subjects.push({
-                            name: subj.name || subj.nickName || '',
-                            done: subj.done || 0,
-                            total: subj.total || 0
-                        });
-                    }
-                }
-
-                // 提取 examList
-                if (app.examList && Array.isArray(app.examList)) {
-                    for (const exam of app.examList) {
-                        result.exams.push({
-                            name: exam.examPlanName || '',
-                            score: exam.examScore || 0,
-                            passScore: exam.passScore || 60,
-                            finishedNum: exam.examFinishNum || 0,
-                            remainingNum: exam.examOddNum || 0,
-                            passed: exam.examScore >= exam.passScore
-                        });
-                    }
-                }
-
-                // 提取 overview
-                if (app.overview) {
-                    result.overview = {
-                        name: app.overview.name || '',
-                        endTime: app.overview.endTime || ''
-                    };
-                }
-
-                return result;
-            }
-            """
-            data = self._page.evaluate(js_code)
-            return data if data else {}
-        except Exception:
-            return {}
 
     def _print_project_overview(self) -> None:
         """输出项目汇总信息。"""
@@ -368,7 +308,9 @@ class StudyMixin(BaseMixin):
 
         progress = self._summarize_collapse_progress()
         if not progress or not progress.get("sections"):
-            return False
+            # Fallback: 无法解析进度时，尝试盲目展开第一个未激活的章节
+            self.log.debug("[章节] 无法解析章节进度，尝试盲目展开...")
+            return self._expand_first_inactive_section(state)
 
         sections = progress["sections"]
         incomplete_sections = [s for s in sections if s["incomplete"] > 0]
@@ -383,56 +325,70 @@ class StudyMixin(BaseMixin):
 
         collapse_items = self._page.locator(SEL_COLLAPSE_ITEM)
         expanded_sections = state.expanded_sections if state else set()
+        expand_count_map = state._expand_count_map if state else {}
 
         for section in incomplete_sections:
             i = section["index"]
             title_text = section["title"]
             incomplete_count = section["incomplete"]
 
-            # 跳过已经连续展开过的章节（电路断路器：同一章节最多展开 3 次）
             expand_key = f"{i}:{title_text}"
-            if expand_key in state.expanded_sections if state else False:
-                expand_count = 1
-                try:
-                    expand_count_key = f"__cnt_{expand_key}"
-                    expand_count = getattr(state, expand_count_key, 1)
-                except Exception:
-                    pass
-                if expand_count >= 2:
-                    self.log.debug(
-                        f"[章节] 跳过重复展开: {title_text} (已展开 {expand_count} 次)"
-                    )
-                    continue
+            cur_count = expand_count_map.get(expand_key, 0)
+            if cur_count >= 3:
+                self.log.debug(
+                    f"[章节] 跳过重复展开: {title_text} (已展开 {cur_count} 次)"
+                )
+                continue
 
             try:
-                item = collapse_items.nth(i)
+                collapse_items = self._page.locator(SEL_COLLAPSE_ITEM)
+                if i >= collapse_items.count():
+                    self.log.debug(
+                        f"[章节] 索引 {i} 超出范围 ({collapse_items.count()})，尝试标题匹配"
+                    )
+                    item = self._find_collapse_by_title(title_text)
+                    if item is None:
+                        continue
+                else:
+                    item = collapse_items.nth(i)
+
                 title_btn = item.locator(SEL_COLLAPSE_ITEM_TITLE).first
                 if title_btn.count() == 0:
                     continue
 
                 cls = item.get_attribute("class") or ""
                 if "van-collapse-item--active" in cls:
-                    self.log.debug(f"[章节] 章节已展开: {title_text}")
-                    return True
+                    self.log.debug(f"[章节] 已展开(非由本次): {title_text}")
+                    if expand_key not in expand_count_map:
+                        expand_count_map[expand_key] = cur_count + 1
+                        if state:
+                            state._expand_count_map = expand_count_map
+                            expanded_sections.add(expand_key)
+                            state.expanded_sections = expanded_sections
+                        time.sleep(1)
+                        continue
+                    continue
 
-                title_btn.scroll_into_view_if_needed(timeout=2000)
+                title_btn.scroll_into_view_if_needed(timeout=3000)
+                time.sleep(0.3)
                 title_btn.click(timeout=5000)
                 self.log.info(
                     f"[章节] 展开: {title_text} ({section['finished']}/{section['total']}, {incomplete_count} 未完成)"
                 )
 
-                # 标记为已展开
+                expand_count_map[expand_key] = cur_count + 1
                 if state:
+                    state._expand_count_map = expand_count_map
                     expanded_sections.add(expand_key)
                     state.expanded_sections = expanded_sections
 
-                time.sleep(2.5)
+                time.sleep(3.0)
                 try:
                     self._page.wait_for_selector(
                         SEL_COURSE_LIST_MARKERS, state="visible", timeout=8000
                     )
                 except Exception:
-                    pass
+                    time.sleep(1.5)
 
                 return True
             except Exception as e:
@@ -442,8 +398,79 @@ class StudyMixin(BaseMixin):
         self.log.debug("[章节] 所有未完成章节都已展开过")
         return False
 
+    def _expand_first_inactive_section(self, state) -> bool:
+        """盲目展开第一个未激活的折叠章节（备用方案）。"""
+        try:
+            collapse_items = self._page.locator(SEL_COLLAPSE_ITEM)
+            for i in range(collapse_items.count()):
+                item = collapse_items.nth(i)
+                cls = item.get_attribute("class") or ""
+                if "van-collapse-item--active" in cls:
+                    continue
+
+                expand_key = f"blind_{i}"
+                expand_count_map = state._expand_count_map if state else {}
+                if expand_count_map.get(expand_key, 0) >= 2:
+                    continue
+
+                title_btn = item.locator(SEL_COLLAPSE_ITEM_TITLE).first
+                if title_btn.count() == 0:
+                    continue
+
+                title_text = "未知"
+                try:
+                    title_text = title_btn.inner_text().strip()[:30]
+                except Exception:
+                    pass
+
+                title_btn.scroll_into_view_if_needed(timeout=3000)
+                time.sleep(0.3)
+                title_btn.click(timeout=5000)
+                self.log.info(f"[章节] 盲目展开 #{i}: {title_text}")
+
+                if state:
+                    state._expand_count_map = expand_count_map
+                    expand_count_map[expand_key] = (
+                        expand_count_map.get(expand_key, 0) + 1
+                    )
+
+                time.sleep(3.0)
+                try:
+                    self._page.wait_for_selector(
+                        SEL_COURSE_LIST_MARKERS, state="visible", timeout=6000
+                    )
+                except Exception:
+                    time.sleep(1.5)
+                return True
+        except Exception as e:
+            self.log.debug(f"[章节] 盲目展开失败: {e}")
+        return False
+
+    def _find_collapse_by_title(self, title_text: str):
+        """通过标题文本匹配查找折叠章节元素。"""
+        try:
+            collapse_items = self._page.locator(SEL_COLLAPSE_ITEM)
+            for i in range(collapse_items.count()):
+                item = collapse_items.nth(i)
+                title_btn = item.locator(SEL_COLLAPSE_ITEM_TITLE).first
+                if title_btn.count() > 0:
+                    try:
+                        item_title = title_btn.inner_text().strip()
+                        if item_title == title_text or title_text in item_title:
+                            return item
+                    except Exception:
+                        continue
+        except Exception:
+            pass
+        return None
+
     def _collect_tasks_in_current_tab(self) -> List[Dict[str, Any]]:
-        """收集当前 Tab 中的课程任务。"""
+        """收集当前 Tab 中可见的课程任务。
+
+        从 CourseIndex.vue 的 DOM 结构来看，课程以 .img-texts-item 或 .fchl-item
+        形式存在，位于 .van-collapse-item 内或直接在外层。
+        只收集当前视口中可见的课程项（is_visible()），隐藏的折叠章节内的课程跳过。
+        """
         if not self._page or self._page.is_closed():
             return []
 
@@ -452,11 +479,28 @@ class StudyMixin(BaseMixin):
             self.log.debug("[扫描] 当前处于项目列表页，需要先进入项目")
             return []
 
+        # 等待课程列表项出现（SPA 可能延迟渲染）
+        try:
+            self._page.wait_for_selector(
+                SEL_COURSE_LIST_WAIT_TARGETS, state="attached", timeout=8000
+            )
+        except Exception:
+            pass
+        time.sleep(0.5)
+
         dom_tasks: list[dict[str, Any]] = []
         loc = self._page.locator(SEL_COURSE_LIST_ITEMS)
+
         for i in range(loc.count()):
             it = loc.nth(i)
             try:
+                # 尝试滚动到视口内以确保懒加载内容可见
+                try:
+                    it.scroll_into_view_if_needed(timeout=2000)
+                except Exception:
+                    pass
+                time.sleep(0.05)
+
                 if not it.is_visible():
                     continue
             except Exception:
@@ -467,7 +511,7 @@ class StudyMixin(BaseMixin):
                 continue
 
             cls = (it.get_attribute("class") or "").lower()
-            if "van-collapse-item__title" in cls or "chapter" in cls:
+            if "van-cell__title" in cls:
                 continue
 
             passed = (
@@ -517,13 +561,16 @@ class StudyMixin(BaseMixin):
 
             finished_num, total_num = self._parse_section_progress(title_text)
             if finished_num is None or total_num is None:
+                # Fallback: 章节标题不含进度数字时，尝试通过子项状态推断
+                finished_num, total_num = self._count_section_items(item)
+
+            if total_num is None or total_num == 0:
                 continue
 
             found_progress = True
             total += total_num
             completed += min(finished_num, total_num)
 
-            # 记录章节信息，用于智能展开
             sections.append(
                 {
                     "index": i,
@@ -538,15 +585,48 @@ class StudyMixin(BaseMixin):
         if not found_progress:
             return None
 
-        # 按章节索引升序排列，保持页面从上到下的自然顺序
         sections.sort(key=lambda x: x["index"])
 
         return {
             "total": total,
             "completed": completed,
             "incomplete": max(0, total - completed),
-            "sections": sections,  # 包含所有章节的详细信息
+            "sections": sections,
         }
+
+    def _count_section_items(self, collapse_item) -> tuple[int, int]:
+        """备用方案：通过检查折叠项内课程子元素的 passed/finished 状态推断进度。
+
+        DOM 结构中，课程项位于 .van-collapse-item__content 内。
+        即使折叠面板收起，子元素仍然存在于 DOM 中（仅 CSS 隐藏）。
+        """
+        try:
+            content = collapse_item.locator(SEL_COLLAPSE_ITEM_CONTENT).first
+            if content.count() == 0:
+                return 0, 0
+
+            img_items = content.locator(".img-texts-item")
+            fchl_items = content.locator(".fchl-item")
+            total_count = img_items.count() + fchl_items.count()
+            if total_count == 0:
+                return 0, 0
+
+            finished_count = 0
+            for it_sel in [
+                ".img-texts-item.passed",
+                ".img-texts-item.finished",
+                ".fchl-item.fchl-item-active",
+            ]:
+                finished_count += content.locator(it_sel).count()
+
+            # 也检查是否有绿色完成图标
+            finished_count += content.locator(SEL_ITEM_COMPLETED_ICON).count()
+
+            # 避免重复计数：最多不超过总数
+            finished_count = min(finished_count, total_count)
+            return finished_count, total_count
+        except Exception:
+            return 0, 0
 
     # ========================================================================
     # 课程运行时交互 (mcwk.mycourse.cn/item.js)
@@ -833,13 +913,15 @@ class StudyMixin(BaseMixin):
                     )
                     return result.get("answer")
                 else:
-                    self.log.debug(
+                    self.log.warning(
                         f"[答案判断] ✗ 未能提取本地答案: {result.get('reason')}"
                     )
                     if result.get("hasResultList"):
-                        self.log.debug("[答案判断]   - 已找到resultList但缺少answerIds")
+                        self.log.warning(
+                            "[答案判断]   - 已找到resultList但缺少answerIds"
+                        )
         except Exception as e:
-            self.log.debug(f"[答案判断] ✗ 提取本地答案异常: {e}")
+            self.log.warning(f"[答案判断] ✗ 提取本地答案异常: {e}")
         return None
 
     def _handle_quiz(self, frame) -> bool:
@@ -879,7 +961,7 @@ class StudyMixin(BaseMixin):
                             "[答题] 判断依据: Vue 组件 resultList.answerIds/answerList"
                         )
                     else:
-                        self.log.debug("[答题] 未找到服务器答案或本地答案")
+                        self.log.info("[答题] 未找到服务器答案或本地答案，将尝试试错")
 
                 if ans_label:
                     correct_indices = self._parse_answer_label(ans_label)
@@ -908,7 +990,7 @@ class StudyMixin(BaseMixin):
                     if is_right == 1:
                         self._quiz_attempted_answers.clear()
                         self._last_quiz_is_right = None
-                        self.log.debug("[答题] 答案正确，已清除尝试记录")
+                        self.log.info("[答题] 答案正确，已清除尝试记录")
                 else:
                     question_type = getattr(self, "_current_question_type", 1)
                     attempted = getattr(self, "_quiz_attempted_answers", set())
@@ -998,9 +1080,20 @@ class StudyMixin(BaseMixin):
         return self._probe_interactive_elements(frame)
 
     def _probe_interactive_elements(self, frame) -> bool:
-        """探测并点击潜在的交互元素。"""
+        """探测并点击潜在的交互元素。
+
+        两阶段探测：
+        1. 精确匹配 — cursor:pointer 或已知交互类名
+        2. 盲探测 — 当精确匹配无结果时，点击活跃页面中所有未被探测过的可见元素
+
+        阶段 2 用于处理那些 .btn-next 按钮被隐藏、需要先点击页面
+        交互元素才会显示按钮的课程（如 A03009 的 page-5/page-9/page-16）。
+        """
         try:
             probe_candidates = frame.locator(SEL_RUNTIME_PROBE_CANDIDATES)
+            found_any_unprobed = False
+
+            # Phase 1: 精确匹配
             for i in range(probe_candidates.count()):
                 cand = probe_candidates.nth(i)
                 if cand.is_visible() and cand.is_enabled():
@@ -1012,7 +1105,7 @@ class StudyMixin(BaseMixin):
                         const id = String(el.id || "");
                         if (/prev|back|return/i.test(cls + id)) return false;
                         if (/btn|click|touch|item|box|label|aq-|ce|start|next|submit/i.test(cls + id)) {
-                            if (/bg|loader|container/i.test(cls + id)) return false;
+                            if (/bg|loader|container|audio/i.test(cls + id)) return false;
                             return true;
                         }
                         return false;
@@ -1025,8 +1118,81 @@ class StudyMixin(BaseMixin):
                             cand.click(force=True)
                             time.sleep(1.0)
                             return True
+                        found_any_unprobed = True
+
+            # Phase 2: 盲探测 — 针对隐藏 .btn-next 的交互页面
+            if not found_any_unprobed:
+                return self._blind_probe_active_elements(frame)
+
         except Exception:
             pass
+        return False
+
+    def _blind_probe_active_elements(self, frame) -> bool:
+        """盲探测：当所有精确匹配都失败时，直接点击活跃页面中未被探测的可见元素。
+
+        许多课程会在用户点击页面上的交互元素后才显示 .btn-next 按钮。
+        这些元素的类名不规则（如 p0502, p0903），无法通过正则模式匹配到，
+        只能通过遍历点击来触发。
+
+        优先点击 cursor:pointer 元素，其次点击普通 img/div。
+        """
+        try:
+            result = frame.evaluate("""() => {
+                const active = document.querySelector('.page-active');
+                if (!active) return { clicked: false, reason: 'no active page' };
+
+                const skipPattern = /prev|back|return|audio|btn-next|btn-start|btn-base|icon|loader|bg|nav|close|page-end/i;
+
+                // 收集候选元素，分优先级
+                const priorityCandidates = [];  // cursor:pointer
+                const normalCandidates = [];    // 其他可见元素
+
+                const allCandidates = active.querySelectorAll('img, div, a, span');
+                for (const el of allCandidates) {
+                    const style = window.getComputedStyle(el);
+                    if (style.display === 'none' || style.visibility === 'hidden') continue;
+
+                    const rect = el.getBoundingClientRect();
+                    if (rect.width < 15 || rect.height < 15) continue;
+
+                    const cls = String(el.className || '');
+                    const id = String(el.id || '');
+                    if (skipPattern.test(cls) || skipPattern.test(id)) continue;
+                    if (el.dataset.probed === 'true') continue;
+
+                    const entry = { el: el, tag: el.tagName, cls: cls.substring(0, 80) };
+                    if (style.cursor === 'pointer') {
+                        priorityCandidates.push(entry);
+                    } else {
+                        normalCandidates.push(entry);
+                    }
+                }
+
+                // 优先点击 cursor:pointer 的元素
+                const candidates = priorityCandidates.length > 0
+                    ? priorityCandidates
+                    : normalCandidates;
+
+                if (candidates.length === 0) {
+                    return { clicked: false, reason: 'no candidates' };
+                }
+
+                const target = candidates[0];
+                target.el.dataset.probed = 'true';
+                target.el.click();
+                return { clicked: true, tag: target.tag, cls: target.cls };
+            }""")
+
+            if result.get("clicked"):
+                self.log.info(
+                    f"[探测] 盲探测点击: <{result['tag']}> '{result.get('cls', '')}'"
+                )
+                time.sleep(1.0)
+                return True
+
+        except Exception as e:
+            self.log.debug(f"[探测] 盲探测异常: {e}")
         return False
 
     def _return_from_comment_page(self) -> bool:
@@ -1051,18 +1217,7 @@ class StudyMixin(BaseMixin):
                 time.sleep(2)
                 return True
 
-            # 备用：点击底部导航栏的"学习中心"按钮
-            # MkTabBar 组件: van-tabbar-item，点击后跳转到 /learning-task-list
-            curriculum_btn = self._page.locator(
-                ".van-tabbar-item:has-text('学习中心')"
-            ).first
-            if curriculum_btn.count() > 0 and curriculum_btn.is_visible():
-                self.log.info("[评论] 点击底部导航「学习中心」")
-                curriculum_btn.click(force=True)
-                time.sleep(2)
-                return True
-
-            # 备用：点击导航栏返回
+            # 备用：点击导航栏返回 (评论页左上角有返回按钮)
             nav_back = self._page.locator(SEL_NAV_BAR_LEFT).first
             if nav_back.count() > 0 and nav_back.is_visible():
                 self.log.info("[评论] 点击导航栏返回")
@@ -1519,13 +1674,33 @@ class StudyMixin(BaseMixin):
                     self.log.info("[导航] 点击下一页/继续按钮")
                     continue
 
-                # 检测结束页面
+                # 检测结束页面 — 优先模拟点击 btn-next-end 触发自然完成流程
                 try:
                     page_end = frame.locator(".page-end.page-active")
                     if page_end.count() > 0 and page_end.is_visible():
                         self.log.info("[状态] 检测到课程结束页面 .page-end.page-active")
 
-                        # 尝试完成
+                        # 优先：点击 btn-next-end（item.js 会调用 finishWxCourse()）
+                        next_end_btn = frame.locator(
+                            ".page-active .btn-next-end, .btn-next-end:visible"
+                        ).first
+                        if next_end_btn.count() > 0 and next_end_btn.is_visible():
+                            self.log.info(
+                                "[完成] 点击 btn-next-end，触发自然完成流程..."
+                            )
+                            next_end_btn.click(force=True, timeout=3000)
+                            # item.js 中 setTimeout(() => finishWxCourse(), 1000)
+                            time.sleep(3)
+
+                            if self._check_course_completed(frame):
+                                self.log.info("[完成] 自然完成流程成功")
+                                return True
+
+                            self.log.debug(
+                                "[完成] btn-next-end 点击后未检测到完成，尝试备选方案"
+                            )
+
+                        # 备选：直接调用 finishWxCourse()
                         finish_attempt_count += 1
                         self.log.info(
                             f"[完成] 结束页面，第 {finish_attempt_count} 次调用 finishWxCourse()"
@@ -1570,9 +1745,13 @@ class StudyMixin(BaseMixin):
 
         for attempt in range(3):
             ctx = self._detect_page_context()
-            if ctx in (PageContext.COURSE_LIST, PageContext.PROJECT_LIST):
+            if ctx == PageContext.COURSE_LIST:
                 time.sleep(1)
                 return True
+
+            if ctx == PageContext.PROJECT_LIST:
+                self.log.debug("[导航] 当前在项目列表页，需要直接导航回课程列表")
+                return False
 
             try:
                 f = self._get_course_runtime_frame()
@@ -1592,8 +1771,11 @@ class StudyMixin(BaseMixin):
                         time.sleep(1)
 
                 ctx = self._detect_page_context()
-                if ctx in (PageContext.COURSE_LIST, PageContext.PROJECT_LIST):
+                if ctx == PageContext.COURSE_LIST:
                     return True
+                if ctx == PageContext.PROJECT_LIST:
+                    self.log.debug("[导航] 返回后落在项目列表页，可能需要重新进入项目")
+                    return False
 
                 if self._page:
                     btn_nav_back = self._page.locator(SEL_NAV_BAR_LEFT).first
@@ -1611,7 +1793,7 @@ class StudyMixin(BaseMixin):
                         time.sleep(1)
 
                 ctx = self._detect_page_context()
-                if ctx in (PageContext.COURSE_LIST, PageContext.PROJECT_LIST):
+                if ctx == PageContext.COURSE_LIST:
                     return True
 
             except Exception as e:
@@ -1619,7 +1801,7 @@ class StudyMixin(BaseMixin):
 
             time.sleep(0.5)
 
-        result = self._is_in_context(PageContext.COURSE_LIST, PageContext.PROJECT_LIST)
+        result = self._is_in_context(PageContext.COURSE_LIST)
         if not result:
             self.log.warning("[导航] 未能返回课程列表页")
         return result
@@ -1796,6 +1978,61 @@ class StudyMixin(BaseMixin):
         self.log.warning(f"[课程] 所有尝试均失败: {title}")
         return False
 
+    def _verify_course_passed_on_list(self, title: str, course_type: str) -> bool:
+        """回到课程列表页后，验证指定课程是否真的显示为已完成。
+
+        因为 finishWxCourse() 的返回值不一定可靠（有时服务端未真正记录），
+        必须以列表页实际显示的完成状态为准。
+        """
+        if not self._page or self._page.is_closed():
+            return False
+
+        ctx = self._detect_page_context()
+        if ctx != PageContext.COURSE_LIST:
+            self.log.debug(f"[验证] 当前不在课程列表页 (state={ctx.value})，跳过验证")
+            return False
+
+        try:
+            if course_type == "fchl":
+                # FCHL 课程完成标志: .fchl-item-active
+                items = self._page.locator(".fchl-item.fchl-item-active")
+                for i in range(items.count()):
+                    it = items.nth(i)
+                    try:
+                        if it.is_visible() and self._extract_item_title(it) == title:
+                            self.log.info(f"[验证] ✓ FCHL 课程确认已完成: {title}")
+                            return True
+                    except Exception:
+                        continue
+            else:
+                # 图文课程完成标志: .img-texts-item.passed 或有完成图标
+                for sel in [".img-texts-item.passed", ".img-texts-item"]:
+                    items = self._page.locator(sel)
+                    for i in range(items.count()):
+                        it = items.nth(i)
+                        try:
+                            if not it.is_visible():
+                                continue
+                            if self._extract_item_title(it) != title:
+                                continue
+                            cls = (it.get_attribute("class") or "").lower()
+                            is_passed = (
+                                "passed" in cls
+                                or "finished" in cls
+                                or it.locator(SEL_ITEM_COMPLETED_ICON).count() > 0
+                            )
+                            if is_passed:
+                                self.log.info(f"[验证] ✓ 图文课程确认已完成: {title}")
+                                return True
+                        except Exception:
+                            continue
+
+            self.log.warning(f"[验证] ✗ 课程未在列表页显示为已完成: {title}")
+            return False
+        except Exception as e:
+            self.log.debug(f"[验证] 异常: {e}")
+            return False
+
     def _process_task_list(
         self, v_tasks, study_time, study_mode, completed, failed
     ) -> int:
@@ -1812,7 +2049,12 @@ class StudyMixin(BaseMixin):
             if title in completed or title in failed:
                 continue
 
-            self._return_to_chapter_list()
+            if not self._return_to_chapter_list():
+                self.log.warning(
+                    f"[{idx + 1}/{total_tasks}] 无法返回课程列表页，"
+                    f"中止当前批次 (剩余 {total_tasks - idx} 门)"
+                )
+                break
             time.sleep(1.5)
 
             self.log.info(f"[{idx + 1}/{total_tasks}] 正在学习: {title}")
@@ -1832,8 +2074,12 @@ class StudyMixin(BaseMixin):
                     else:
                         self._sleep_with_progress(study_time)
                         self.finish_study()
-                        self._return_to_chapter_list()
-                        ok = True
+                        if not self._return_to_chapter_list():
+                            fail_reason = "返回课程列表失败"
+                        else:
+                            ok = self._verify_course_passed_on_list(title, "fchl")
+                            if not ok:
+                                fail_reason = "列表页验证未通过（课程未显示为已完成）"
             else:
                 item = self._find_img_text_item_by_title(title)
                 if not item:
@@ -1842,14 +2088,29 @@ class StudyMixin(BaseMixin):
                     fail_reason = "点击课程元素失败"
                 else:
                     time.sleep(2)
+                    flow_ok = False
                     if not self._wait_for_mcwk_runtime():
                         fail_reason = "等待课程框架超时"
                     else:
-                        ok = self._finish_img_text_course(title, study_time)
-                        if not ok:
+                        flow_ok = self._finish_img_text_course(title, study_time)
+                        if not flow_ok:
                             fail_reason = "课程播放/交互流程未完成"
-                    self._return_to_chapter_list()
+                    if not self._return_to_chapter_list():
+                        self.log.warning(
+                            f"[{idx + 1}/{total_tasks}] 课后返回课程列表失败，"
+                            f"中止当前批次"
+                        )
+                        if flow_ok:
+                            completed.add(title)
+                            processed_cnt += 1
+                        else:
+                            failed.add(title)
+                        break
                     time.sleep(1)
+                    if flow_ok:
+                        ok = self._verify_course_passed_on_list(title, "img-text")
+                        if not ok:
+                            fail_reason = "列表页验证未通过（课程未显示为已完成）"
 
             if ok:
                 completed.add(title)
@@ -1867,24 +2128,146 @@ class StudyMixin(BaseMixin):
 
         return processed_cnt
 
+    def _parse_tab_completion_from_dom(self) -> dict:
+        """从 DOM 的 .van-tab 标签中直接读取课程完成数据。
+
+        页面 DOM 结构:
+        <div class="van-tab"> 或 <li class="s1">
+          <span class="completion"><em>100</em>/100</span>
+          <span class="name">课程学习</span>
+        </div>
+
+        只统计「课程学习/必修/选修」tab，排除「在线考试」tab。
+        这是页面实际展示给用户的数据，比 Vue 内部状态更可靠。
+        """
+        if not self._page or self._page.is_closed():
+            return {}
+
+        try:
+            js_code = r"""() => {
+                // 优先从 .van-tab 读取（标准 CourseIndex.vue）
+                const tabs = document.querySelectorAll('.van-tab');
+                // 兜底：StudyPage.vue 使用自定义 <li class="s1"> / <li class="s2">
+                const sTabs = document.querySelectorAll('.scontain .s1, .scontain .s2');
+
+                const allTabs = tabs.length > 0 ? tabs : sTabs;
+                const result = { course: { total: 0, done: 0 }, exam: { total: 0, done: 0 }, raw: [] };
+
+                for (const tab of allTabs) {
+                    const text = (tab.textContent || '').trim();
+                    // 匹配 "100/100 课程学习" 或 "0/1 在线考试" 格式
+                    const m = text.match(/(\d+)\s*[/]\s*(\d+)/);
+                    if (!m) continue;
+
+                    const done = parseInt(m[1], 10);
+                    const total = parseInt(m[2], 10);
+                    const entry = { done, total, text: text.substring(0, 60) };
+                    result.raw.push(entry);
+
+                    // 区分课程和考试
+                    if (/考试|exam/i.test(text)) {
+                        result.exam.total += total;
+                        result.exam.done += done;
+                    } else {
+                        result.course.total += total;
+                        result.course.done += done;
+                    }
+                }
+                return result;
+            }"""
+            data = self._page.evaluate(js_code)
+            if data and (data.get("course", {}).get("total", 0) > 0 or data.get("raw")):
+                return data
+        except Exception as e:
+            self.log.debug(f"[统计] DOM tab 解析失败: {e}")
+        return {}
+
     def _check_course_completion(self) -> dict:
-        """检查课程完成情况。"""
+        """检查课程完成情况。以页面 DOM 显示的 tab 数据为准。
+
+        优先读取 .van-tab 标签中的完成数（页面实际展示给用户的数据），
+        排除考试 tab，只统计课程学习相关 tab。
+        Vue 数据和章节解析作为兜底方案。
+        """
         if not self._page or self._page.is_closed():
             return {"total": 0, "completed": 0, "incomplete": 0}
 
         try:
+            # 回到课程列表页
             self._return_to_chapter_list()
-            time.sleep(2)
+            time.sleep(1)
 
+            # 强制刷新页面，确保数据从服务端重新获取
+            try:
+                self._page.reload(wait_until="domcontentloaded", timeout=15000)
+                time.sleep(3)
+                self._dismiss_broadcast()
+            except Exception as e:
+                self.log.debug(f"[统计] 页面刷新失败: {e}")
+
+            # 等待课程列表元素出现
+            try:
+                self._page.wait_for_selector(
+                    SEL_COURSE_LIST_WAIT_TARGETS, state="attached", timeout=10000
+                )
+                time.sleep(1)
+            except Exception:
+                pass
+
+            # 方案 1：从 DOM tab 标签直接读取（最可靠，页面实际显示的数据）
+            tab_data = self._parse_tab_completion_from_dom()
+            course_data = tab_data.get("course", {})
+            if course_data.get("total", 0) > 0:
+                total = course_data["total"]
+                completed = course_data["done"]
+                incomplete = max(0, total - completed)
+                self.log.info(
+                    f"[课程统计] DOM tab: 总计={total}, 已完成={completed}, 未完成={incomplete}"
+                )
+                exam_data = tab_data.get("exam", {})
+                if exam_data.get("total", 0) > 0:
+                    self.log.info(
+                        f"[考试统计] DOM tab: 总计={exam_data['total']}, 已完成={exam_data['done']}"
+                    )
+                return {
+                    "total": total,
+                    "completed": completed,
+                    "incomplete": incomplete,
+                }
+
+            # 方案 2：从 Vue 数据读取（排除考试类 subject）
+            overview = self._extract_project_overview()
+            if overview and overview.get("subjects"):
+                total = 0
+                completed = 0
+                for subj in overview["subjects"]:
+                    name = subj.get("name", "")
+                    # 排除考试相关 tab
+                    if any(kw in name for kw in ["考试", "exam", "Exam"]):
+                        continue
+                    done = int(subj.get("done", 0))
+                    subj_total = int(subj.get("total", 0))
+                    total += subj_total
+                    completed += min(done, subj_total)
+                if total > 0:
+                    incomplete = max(0, total - completed)
+                    self.log.info(
+                        f"[课程统计] Vue: 总计={total}, 已完成={completed}, 未完成={incomplete}"
+                    )
+                    return {
+                        "total": total,
+                        "completed": completed,
+                        "incomplete": incomplete,
+                    }
+
+            # 方案 2：从折叠章节标题解析进度
             collapse_stats = self._summarize_collapse_progress()
             if collapse_stats is not None:
-                # 提取统计信息（不包含 sections 详情）
                 stats = {
                     "total": collapse_stats["total"],
                     "completed": collapse_stats["completed"],
                     "incomplete": collapse_stats["incomplete"],
                 }
-                # 如果有章节详情，打印出来
                 if collapse_stats.get("sections"):
                     incomplete_sections = [
                         s for s in collapse_stats["sections"] if s["incomplete"] > 0
@@ -1893,7 +2276,7 @@ class StudyMixin(BaseMixin):
                         self.log.info(
                             f"[课程统计] 未完成章节: {len(incomplete_sections)} 个"
                         )
-                        for sec in incomplete_sections[:5]:  # 只显示前5个
+                        for sec in incomplete_sections[:5]:
                             self.log.info(
                                 f"  - {sec['title']}: {sec['finished']}/{sec['total']} ({sec['incomplete']} 未完成)"
                             )
@@ -1905,6 +2288,7 @@ class StudyMixin(BaseMixin):
                 )
                 return stats
 
+            # 方案 3：仅检查当前可见 tab 的课程项
             tasks = self._collect_tasks_in_current_tab()
             total = len(tasks)
             completed_count = sum(1 for task in tasks if task.get("passed"))
@@ -1975,7 +2359,7 @@ class StudyMixin(BaseMixin):
         self._dismiss_broadcast()
         projs = self._page.locator(SEL_TASK_BLOCK)
         proj_count = projs.count()
-        self.log.debug(f"[导航] 发现 {proj_count} 个学习项目")
+        self.log.info(f"[导航] 发现 {proj_count} 个学习项目")
 
         if proj_count == 0:
             try:

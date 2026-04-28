@@ -246,3 +246,64 @@ class BaseMixin:
                 return True
             except Exception:
                 return False
+
+    def _extract_project_overview(self) -> dict[str, Any]:
+        """从页面提取项目汇总信息。
+
+        前端 CourseIndex.vue 数据结构:
+        - subjectList: [{name, value, done, total}, ...]
+        - examList: [{examPlanName, examScore, passScore, examFinishNum, examOddNum, ...}, ...]
+        - overview: {name, endTime, studyState, ...}
+        """
+        if not self._page or self._page.is_closed():
+            return {}
+
+        try:
+            js_code = """
+            () => {
+                const app = document.querySelector('.page')?.__vue__;
+                if (!app) return null;
+
+                const result = {
+                    subjects: [],
+                    exams: [],
+                    overview: {}
+                };
+
+                if (app.subjectList && Array.isArray(app.subjectList)) {
+                    for (const subj of app.subjectList) {
+                        result.subjects.push({
+                            name: subj.name || subj.nickName || '',
+                            done: subj.done || 0,
+                            total: subj.total || 0
+                        });
+                    }
+                }
+
+                if (app.examList && Array.isArray(app.examList)) {
+                    for (const exam of app.examList) {
+                        result.exams.push({
+                            name: exam.examPlanName || '',
+                            score: exam.examScore || 0,
+                            passScore: exam.passScore || 60,
+                            finishedNum: exam.examFinishNum || 0,
+                            remainingNum: exam.examOddNum || 0,
+                            passed: exam.examScore >= exam.passScore
+                        });
+                    }
+                }
+
+                if (app.overview) {
+                    result.overview = {
+                        name: app.overview.name || '',
+                        endTime: app.overview.endTime || ''
+                    };
+                }
+
+                return result;
+            }
+            """
+            data = self._page.evaluate(js_code)
+            return data if data else {}
+        except Exception:
+            return {}

@@ -12,6 +12,18 @@ from .captcha import (
 )
 
 from .base import BaseMixin
+from .const import (
+    SEL_LOGIN_TENANT_INPUT,
+    SEL_LOGIN_TENANT_SEARCH,
+    SEL_LOGIN_ACCOUNT,
+    SEL_LOGIN_PASSWORD,
+    SEL_LOGIN_CAPTCHA_IMG,
+    SEL_LOGIN_CAPTCHA_INPUT,
+    SEL_LOGIN_SUBMIT_BTN_AUTH,
+    SEL_LOGIN_TOAST,
+    SEL_LOGIN_POPUP_CONFIRM,
+    SEL_LOGIN_SCHOOL_ITEM_TEMPLATE,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -62,38 +74,32 @@ def _classify_toast(msg: str) -> str:
 
 # ---------------------------------------------------------------------------
 # DOM 元素选择器常量定义
+# 通过 const.py 统一管理，此处仅使用别名保持向后兼容
 # ---------------------------------------------------------------------------
+_SEL_INPUT_TENANT = SEL_LOGIN_TENANT_INPUT
+_SEL_INPUT_TENANT_SEARCH = SEL_LOGIN_TENANT_SEARCH
+_SEL_INPUT_ACCOUNT = SEL_LOGIN_ACCOUNT
+_SEL_INPUT_PASSWORD = SEL_LOGIN_PASSWORD
+_SEL_CAPTCHA_IMG = SEL_LOGIN_CAPTCHA_IMG
+_SEL_CAPTCHA_INPUT = SEL_LOGIN_CAPTCHA_INPUT
+_SEL_LOGIN_SUBMIT_BTN = SEL_LOGIN_SUBMIT_BTN_AUTH
+_SEL_TOAST_MESSAGE = SEL_LOGIN_TOAST
+_SEL_POPUP_CONFIRM = SEL_LOGIN_POPUP_CONFIRM
+_SEL_SCHOOL_ITEM = SEL_LOGIN_SCHOOL_ITEM_TEMPLATE
+
 _SEL_LOGIN_FORM_INPUTS = (
-    "input[placeholder*='选择学校'], "
-    "input[placeholder*='搜索关键词'], "
+    f"{_SEL_INPUT_TENANT}, "
+    f"{_SEL_INPUT_TENANT_SEARCH}, "
     "input[placeholder*='账号'], "
     "input[placeholder*='学号'], "
     "input[type='password'], "
-    "a.loginp-submit, button[type='submit'], button:has-text('登录')"
+    f"{_SEL_LOGIN_SUBMIT_BTN}, button[type='submit'], button:has-text('登录')"
 )
 _SEL_POST_LOGIN_MARKERS = (
     ".task-block, .van-tab, .van-collapse-item, .img-texts-item, "
     ".fchl-item, .broadcast-modal, .img-text-block, #agree"
 )
-_SEL_INPUT_TENANT = "input[placeholder*='选择学校']"
-_SEL_INPUT_TENANT_SEARCH = "input[placeholder*='搜索关键词']"
 _SEL_MODAL_OVERLAY = ".v-modal, .van-overlay"
-_SEL_INPUT_ACCOUNT = "input[type='text']:not([readonly]), input[placeholder*='账号'], input[placeholder*='学号']"
-_SEL_INPUT_PASSWORD = "input[type='password']"
-_SEL_CAPTCHA_IMG = "img.loginp-label-verify, img[src*='randLetterImage']"
-_SEL_CAPTCHA_INPUT = "input[maxlength='6'][autocomplete='off'], input[maxlength='6']"
-_SEL_LOGIN_SUBMIT_BTN = (
-    "a.loginp-submit, button[type='submit'], button:has-text('登录'):not([disabled])"
-)
-_SEL_TOAST_MESSAGE = (
-    ".van-toast__text, .van-toast, "
-    ".mint-toast, .mint-toast-text, "
-    ".van-dialog__message, .el-message__content"
-)
-_SEL_POPUP_CONFIRM = (
-    ".van-dialog__confirm, .mint-msgbox-confirm, "
-    "button:has-text('确定'), button:has-text('确认')"
-)
 
 
 class AuthMixin(BaseMixin):
@@ -319,14 +325,53 @@ class AuthMixin(BaseMixin):
             if self.tenant_name:
                 try:
                     tenant_input = self._page.locator(_SEL_INPUT_TENANT)
-                    tenant_input.wait_for(state="visible", timeout=5000)
+                    tenant_input.wait_for(state="visible", timeout=8000)
                     tenant_input.click()
-                    time.sleep(0.5)
-                    self._page.locator(_SEL_INPUT_TENANT_SEARCH).fill(self.tenant_name)
-                    time.sleep(0.5)
-                    self._page.locator(
-                        f".van-cell__title span:text-is('{self.tenant_name}')"
-                    ).first.click()
+                    time.sleep(0.8)
+
+                    # 在学校搜索弹窗中输入学校名称进行搜索
+                    tenant_name_clean = self.tenant_name.strip()
+                    search_input = self._page.locator(_SEL_INPUT_TENANT_SEARCH).first
+                    try:
+                        search_input.wait_for(state="visible", timeout=5000)
+                        search_input.fill(tenant_name_clean)
+                    except Exception:
+                        try:
+                            search_input = self._page.locator(
+                                ".van-search__field input, input[placeholder*='关键'], input[placeholder*='搜索']"
+                            ).first
+                            if search_input.count() > 0:
+                                search_input.fill(tenant_name_clean)
+                        except Exception:
+                            pass
+                    time.sleep(1.0)
+
+                    # 多策略匹配学校项点击
+                    school_clicked = False
+                    for school_sel in [
+                        _SEL_SCHOOL_ITEM.format(name=tenant_name_clean),
+                        f".van-cell:has-text('{tenant_name_clean}')",
+                        f".van-cell__title span:text-is('{tenant_name_clean}')",
+                        f"li:has-text('{tenant_name_clean}')",
+                    ]:
+                        try:
+                            loc = self._page.locator(school_sel)
+                            for si in range(min(loc.count(), 5)):
+                                el = loc.nth(si)
+                                if el.is_visible():
+                                    el.click(timeout=3000)
+                                    school_clicked = True
+                                    break
+                            if school_clicked:
+                                break
+                        except Exception:
+                            continue
+
+                    if not school_clicked:
+                        self.log.warning(
+                            f"未在列表中定位到学校「{tenant_name_clean}」，请检查学校名称或手动选择"
+                        )
+
                     time.sleep(0.5)
                     try:
                         self._page.locator(_SEL_MODAL_OVERLAY).wait_for(
@@ -346,27 +391,55 @@ class AuthMixin(BaseMixin):
             # --- 填写账号密码 ---
             if self.account and self.password:
                 try:
-                    acc_input = self._page.locator(_SEL_INPUT_ACCOUNT).first
-                    acc_input.wait_for(state="visible", timeout=5000)
-                    acc_input.fill(self.account)
+                    # 账号：优先使用 loginp-input 语义类（非 readonly, 非 maxlength, 非 password）
+                    acc_input = self._page.locator(_SEL_INPUT_ACCOUNT)
+                    if acc_input.count() == 0:
+                        acc_input = self._page.locator(
+                            "input[type='text']:not([readonly]):not([maxlength]):not([type='password'])"
+                        )
+                    acc_input.first.wait_for(state="visible", timeout=5000)
+                    acc_input.first.fill(self.account)
+
                     pwd_input = self._page.locator(_SEL_INPUT_PASSWORD).first
                     pwd_input.wait_for(state="visible", timeout=5000)
                     pwd_input.fill(self.password)
 
+                    # 验证码：仅当验证码图片可见时才尝试 OCR
                     capt_img = self._page.locator(_SEL_CAPTCHA_IMG).first
+                    capt_visible = False
                     try:
                         capt_img.wait_for(state="visible", timeout=5000)
+                        bb = capt_img.bounding_box()
+                        capt_visible = bb and bb["width"] > 20 and bb["height"] > 20
                     except Exception:
                         pass
 
-                    if capt_img.is_visible():
+                    if capt_visible:
                         ocr = _get_ocr()
                         code = _ocr_captcha_with_retry(capt_img, ocr, self.log)
                         if code:
-                            self.log.debug(f"[文字验证码] 识别结果: {code}")
+                            self.log.info(f"[文字验证码] 识别结果: {code}")
                             capt_input = self._page.locator(_SEL_CAPTCHA_INPUT).first
                             if capt_input.is_visible():
                                 capt_input.fill(code)
+                        else:
+                            self.log.warning(
+                                "[文字验证码] OCR 识别失败或结果长度不符，尝试宽松模式"
+                            )
+                            code2 = ocr.classification(
+                                capt_img.screenshot(timeout=5000, animations="disabled")
+                            )
+                            if code2 and len(str(code2)) >= 3:
+                                self.log.info(f"[文字验证码] 宽松模式: {code2}")
+                                capt_input = self._page.locator(
+                                    _SEL_CAPTCHA_INPUT
+                                ).first
+                                if capt_input.is_visible():
+                                    capt_input.fill(str(code2)[:6])
+                    else:
+                        self.log.debug(
+                            "[文字验证码] 未检测到验证码图片，可能是无验证码登录"
+                        )
 
                     submit_loc = self._page.locator(_SEL_LOGIN_SUBMIT_BTN)
                     if submit_loc.count() > 0:

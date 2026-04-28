@@ -34,9 +34,11 @@ from .const import (
     SEL_COURSE_LIST_MARKERS,
     SEL_JOIN_BTN,
     SEL_EXAM_SHEET,
+    SEL_EXAM_CONFIRM_SHEET,
     SEL_EXAM_CONFIRM_SHEET_BOTTOM_CTRLS,
-    SEL_EXAM_SHEET_BOTTOM_CTRLS,
     SEL_EXAM_BOTTOM_CTRLS,
+    SEL_EXAM_SHEET_SUBMIT,
+    SEL_EXAM_CONFIRM_SUBMIT,
     SEL_EXAM_NEXT_BTN_IN_BOTTOM,
     SEL_EXAM_CARD_BTN_IN_BOTTOM,
     SEL_EXAM_QUEST_INDEX_ITEM_TEMPLATE,
@@ -315,7 +317,7 @@ class ExamMixin(BaseMixin):
             return ""
 
         score_text = ""
-        deadline = time.time() + 15
+        deadline = time.time() + 20
 
         while time.time() < deadline:
             # ---- 方案1：Mint UI MessageBox (普通考试) ----
@@ -328,14 +330,20 @@ class ExamMixin(BaseMixin):
                             score_text = msg.inner_text(timeout=1000).strip()
                         except Exception:
                             pass
-                        self.log.info(f"[成绩弹窗] Mint MessageBox: {score_text}")
+                        # INFO 级别让用户直接看到考试结果
+                        self.log.info(f"🎯 考试结果: {score_text}")
 
-                    confirm = msgbox.locator(".mint-msgbox-confirm").first
-                    if confirm.count() > 0 and confirm.is_visible():
-                        confirm.click(force=True, timeout=5000)
-                        self.log.debug("[成绩弹窗] 已点击确认按钮关闭")
-                        time.sleep(1.5)
-                        return score_text
+                    # 等待确认按钮（可能有延迟渲染）
+                    for _ in range(10):
+                        confirm = msgbox.locator(
+                            ".mint-msgbox-confirm, .mint-msgbox-btn"
+                        ).first
+                        if confirm.count() > 0 and confirm.is_visible():
+                            confirm.click(force=True, timeout=5000)
+                            self.log.debug("[成绩弹窗] 已关闭 Mint MessageBox")
+                            time.sleep(1.5)
+                            return score_text
+                        time.sleep(0.3)
             except Exception:
                 pass
 
@@ -343,16 +351,25 @@ class ExamMixin(BaseMixin):
             try:
                 sheet = self._page.locator(".confirm-sheet").first
                 if sheet.count() > 0 and sheet.is_visible():
-                    msg = sheet.locator(".confirm-message").first
-                    if msg.count() > 0:
-                        try:
-                            score_text = msg.inner_text(timeout=1000).strip()
-                        except Exception:
-                            pass
-                        self.log.info(f"[成绩弹窗] confirm-sheet: {score_text}")
+                    # Try multiple sources for score text
+                    for msg_sel in [
+                        ".confirm-message",
+                        ".sheet-message",
+                        ".result-score",
+                        ".score",
+                    ]:
+                        msg = sheet.locator(msg_sel).first
+                        if msg.count() > 0:
+                            try:
+                                score_text = msg.inner_text(timeout=1000).strip()
+                                if score_text:
+                                    break
+                            except Exception:
+                                pass
+                    self.log.info(f"[成绩弹窗] confirm-sheet: {score_text}")
 
                     confirm = sheet.locator(
-                        ".bottom-ctrls button, .bottom-ctrls .mint-button"
+                        ".bottom-ctrls button, .bottom-ctrls .mint-button, button"
                     ).first
                     if confirm.count() > 0 and confirm.is_visible():
                         confirm.click(force=True, timeout=5000)
@@ -377,6 +394,37 @@ class ExamMixin(BaseMixin):
                     confirm = vdialog.locator(".van-dialog__confirm").first
                     if confirm.count() > 0 and confirm.is_visible():
                         confirm.click(force=True, timeout=5000)
+                        time.sleep(1.5)
+                        return score_text
+            except Exception:
+                pass
+
+            # ---- 方案4：van-popup 结果弹窗 ----
+            try:
+                vpopup = self._page.locator(".van-popup, .van-popup--center").first
+                if vpopup.count() > 0 and vpopup.is_visible():
+                    # 尝试读取弹窗内文本
+                    try:
+                        score_text = vpopup.inner_text(timeout=1000).strip()[:200]
+                        self.log.info(f"[成绩弹窗] van-popup: {score_text}")
+                    except Exception:
+                        pass
+                    # 尝试关闭弹窗
+                    for close_sel in [
+                        "button:has-text('确定')",
+                        "button:has-text('确认')",
+                        ".van-popup__close",
+                        ".van-overlay",
+                    ]:
+                        close_btn = vpopup.locator(close_sel).first
+                        if close_btn.count() > 0 and close_btn.is_visible():
+                            close_btn.click(force=True, timeout=5000)
+                            time.sleep(1.5)
+                            return score_text
+                    # 尝试点击覆盖层关闭
+                    overlay = self._page.locator(".van-overlay").first
+                    if overlay.count() > 0 and overlay.is_visible():
+                        overlay.click(force=True, timeout=5000)
                         time.sleep(1.5)
                         return score_text
             except Exception:
@@ -426,77 +474,157 @@ class ExamMixin(BaseMixin):
         return result_text
 
     def _click_submit_buttons(self) -> str:
-        """点击各级交卷按钮（统一重试逻辑）。"""
+        """点击各级交卷按钮（正确的多级弹窗提交流程）。
+
+        ExamPage.vue 提交流程：
+        1. 点击主页面底部「答题卡」按钮 → 弹出 .sheet 弹窗
+        2. 在 .sheet 弹窗中点击「交卷」→ 弹出 .confirm-sheet 确认弹窗
+        3. 在 .confirm-sheet 弹窗中点击「交卷」/「确 认」→ 真正提交
+
+        备用路径：部分页面可能直接有「交卷」按钮，无需答题卡。
+        """
         assert self._page is not None
 
-        def _click_with_retry(selector, label: str, max_attempts: int = 3) -> bool:
+        def _click_btn(selector, label: str, max_attempts: int = 3) -> bool:
             """通用重试点击辅助函数。"""
             for attempt in range(max_attempts):
                 try:
                     btn = self._page.locator(selector).first
                     if btn.count() > 0 and btn.is_visible():
-                        self.log.debug(f"[提交流程] 点击{label}")
-                        btn.click(force=True, timeout=5000)
-                        time.sleep(1.5)
+                        if btn.is_enabled():
+                            self.log.debug(f"[提交流程] 点击{label}")
+                            btn.click(force=True, timeout=5000)
+                            time.sleep(1.5)
+                            return True
+                        else:
+                            self.log.debug(f"[提交流程] {label}已禁用，跳过")
+                            return False
+                except Exception:
+                    pass
+                time.sleep(0.5)
+            return False
+
+        def _wait_element(selector: str, timeout: float = 5.0) -> bool:
+            """等待元素出现并可见。"""
+            deadline = time.time() + timeout
+            while time.time() < deadline:
+                try:
+                    el = self._page.locator(selector).first
+                    if el.count() > 0 and el.is_visible():
                         return True
                 except Exception:
                     pass
-                time.sleep(0.5)
+                time.sleep(0.3)
             return False
 
-        def _wait_for_element(selector: str, timeout: float = 3.0) -> bool:
-            """等待元素出现并可见。"""
-            try:
-                el = self._page.locator(selector).first
-                if el.count() > 0:
-                    el.wait_for(state="visible", timeout=int(timeout * 1000))
+        def _click_first_visible(
+            selectors: list[str], label: str, max_attempts: int = 3
+        ) -> bool:
+            """尝试多个选择器，点击第一个可见的。"""
+            for sel in selectors:
+                if _click_btn(sel, label, max_attempts=max_attempts):
                     return True
+            return False
+
+        # Step 0: 检查是否可以直接提交（某些页面有直接的提交按钮）
+        direct_submit_selectors = [
+            SEL_EXAM_SUBMIT_AREA,
+            "button:has-text('交卷'):visible",
+            "button:has-text('确认交卷'):visible",
+            ".mint-button:has-text('交卷'):visible",
+        ]
+        for sel in direct_submit_selectors:
+            try:
+                btn = self._page.locator(sel).first
+                if btn.count() > 0 and btn.is_visible() and btn.is_enabled():
+                    # 确保不是 sheet 弹窗内的按钮（那种需要走三步流程）
+                    parent_sheet = btn.locator("..").locator(".sheet, .confirm-sheet")
+                    if parent_sheet.count() == 0:
+                        self.log.info("[提交流程] 发现直接交卷按钮，尝试直接提交")
+                        btn.click(force=True, timeout=5000)
+                        time.sleep(3)
+                        return ""
             except Exception:
                 pass
-            return False
 
-        # 1. 底部交卷按钮
-        _click_with_retry(
-            f"{SEL_EXAM_BOTTOM_CTRLS} button:has-text('交卷')",
-            "底部交卷按钮",
-            max_attempts=2,
-        )
+        # Step 1: 打开答题卡 sheet 弹窗
+        self.log.debug("[提交流程] Step 1: 打开答题卡")
+        if not _wait_element(SEL_EXAM_SHEET, timeout=1.0):
+            answer_card_selectors = [
+                SEL_ANSWER_CARD_BTN,
+                SEL_EXAM_CARD_BTN_IN_BOTTOM,
+                "button:has-text('答题卡'):visible",
+                ".mint-button:has-text('答题卡'):visible",
+                ".van-button:has-text('答题卡'):visible",
+            ]
+            _click_first_visible(answer_card_selectors, "答题卡", max_attempts=3)
+            if not _wait_element(SEL_EXAM_SHEET, timeout=5.0):
+                self.log.warning("[提交流程] 答题卡弹窗未出现，尝试直接提交...")
+                # 最终兜底：尝试页面上所有可能的交卷按钮
+                all_btns = self._page.locator("button:visible, .mint-button:visible")
+                for i in range(all_btns.count()):
+                    btn = all_btns.nth(i)
+                    txt = (btn.inner_text() or "").strip()
+                    if txt and any(kw in txt for kw in ["交卷", "提交", "确认"]):
+                        if "取消" not in txt and "返回" not in txt:
+                            try:
+                                btn.click(force=True, timeout=5000)
+                                self.log.info(f"[提交流程] 兜底点击按钮: {txt}")
+                                time.sleep(3)
+                                return ""
+                            except Exception:
+                                pass
+                return ""
 
-        # 2. 确保答题卡sheet弹出
-        for _ in range(3):
-            if _wait_for_element(SEL_EXAM_SHEET, timeout=1.0):
-                break
-            _click_with_retry(SEL_ANSWER_CARD_BTN, "答题卡", max_attempts=1)
+        # Step 2: 在 sheet 弹窗中点击「交卷」
+        self.log.debug("[提交流程] Step 2: Sheet 内点击交卷")
+        sheet_submit_selectors = [
+            SEL_EXAM_SHEET_SUBMIT,
+            SEL_SUBMIT_BTN,
+            ".sheet .mint-button--danger",
+            ".sheet .bottom-ctrls button:last-child",
+            ".sheet button:has-text('交卷')",
+            ".sheet .mint-button:has-text('交卷')",
+        ]
+        _click_first_visible(sheet_submit_selectors, "Sheet交卷", max_attempts=3)
 
-        # 3. Sheet内的交卷按钮
-        _click_with_retry(SEL_SUBMIT_BTN, "Sheet交卷按钮", max_attempts=3)
-        _click_with_retry(
-            f"{SEL_EXAM_SHEET_BOTTOM_CTRLS} {SEL_SUBMIT_BTN}",
-            "Sheet底部交卷",
-            max_attempts=3,
-        )
-
-        # 4. 确认弹窗交卷（多种选择器兜底）
-        for selector in [
-            f"{SEL_EXAM_CONFIRM_SHEET_BOTTOM_CTRLS} {SEL_SUBMIT_BTN}",
-            SEL_SUBMIT_CONFIRM,
-        ]:
-            for _ in range(5):
+        # Step 3: 等待确认弹窗出现并点击提交
+        self.log.debug("[提交流程] Step 3: 等待确认弹窗并提交")
+        if not _wait_element(SEL_EXAM_CONFIRM_SHEET, timeout=8.0):
+            # 检查是否已经提交成功（可能直接进到结果页）
+            if self._is_in_context(PageContext.EXAM_RESULT):
+                self.log.info("[提交流程] 已在结果页，无需确认弹窗")
+                return ""
+            self.log.warning("[提交流程] 确认弹窗未出现，尝试等待结果...")
+            time.sleep(5)
+            if self._is_in_context(PageContext.EXAM_RESULT):
+                return ""
+        else:
+            confirm_selectors = [
+                SEL_EXAM_CONFIRM_SUBMIT,
+                SEL_SUBMIT_CONFIRM,
+                f"{SEL_EXAM_CONFIRM_SHEET_BOTTOM_CTRLS} {SEL_SUBMIT_BTN}",
+                ".confirm-sheet button:has-text('交卷')",
+                ".confirm-sheet .mint-button:has-text('交卷')",
+                ".confirm-sheet button:has-text('确 认')",
+                ".confirm-sheet button:has-text('确认')",
+            ]
+            if not _click_first_visible(confirm_selectors, "确认交卷", max_attempts=5):
+                # Last resort: click any visible button in confirm sheet
                 try:
-                    confirm_btn = self._page.locator(selector).last
-                    if confirm_btn.count() > 0 and confirm_btn.is_visible():
-                        btn_text = ""
-                        try:
-                            btn_text = confirm_btn.inner_text().strip()
-                        except Exception:
-                            pass
-                        self.log.debug(f"[提交流程] 点击确认交卷: {btn_text}")
-                        confirm_btn.click(force=True, timeout=5000)
-                        time.sleep(2)
-                        break
+                    all_btns = self._page.locator(
+                        f"{SEL_EXAM_CONFIRM_SHEET} button:visible"
+                    )
+                    for i in range(all_btns.count()):
+                        btn = all_btns.nth(i)
+                        txt = (btn.inner_text() or "").strip()
+                        if txt and "取消" not in txt and "返回" not in txt:
+                            btn.click(force=True, timeout=5000)
+                            self.log.info(f"[提交流程] 兜底点击确认弹窗按钮: {txt}")
+                            time.sleep(2)
+                            break
                 except Exception:
                     pass
-                time.sleep(0.5)
 
         return ""
 
@@ -795,7 +923,18 @@ class ExamMixin(BaseMixin):
                 pass
 
             head = f"{q_type} {progress}".strip()
-            self.log.info(f"{head} {total}. {title}" if head else f"{total}. {title}")
+            prefix = f"{head} " if head else ""
+            q_label = f"{prefix}{total}. {title}"
+            self.log.info(q_label)
+
+            # 收集所有选项文本
+            opt_texts = []
+            for i in range(options_count):
+                try:
+                    txt = options.nth(i).inner_text().strip()
+                    opt_texts.append(txt)
+                except Exception:
+                    opt_texts.append("?")
 
             found = False
             if correct_opts:
@@ -806,7 +945,6 @@ class ExamMixin(BaseMixin):
                     idx = self._find_option_index(opt_text, options, options_count)
                     if idx >= 0:
                         indices_to_click.append(idx)
-                        self.log.debug(f"   [匹配] 选项 {chr(65 + idx)}")
 
                 if indices_to_click:
                     clicked = self._click_options_by_indices(
@@ -814,6 +952,18 @@ class ExamMixin(BaseMixin):
                     )
                     found = clicked > 0
                     matched += 1
+
+                    # 一次性输出所有选项及匹配结果
+                    lines = []
+                    for i in range(options_count):
+                        label = chr(65 + i)
+                        marker = " ✓" if i in indices_to_click else "  "
+                        lines.append(f"    {marker} {label}. {opt_texts[i]}")
+                    self.log.info(
+                        f"[匹配] 题库命中 → 已选: "
+                        f"{'/'.join(chr(65 + i) for i in indices_to_click)}\n"
+                        + "\n".join(lines)
+                    )
 
                     wait_time = random.randint(q_time, q_time + q_offset)
                     if question_type == 2 and clicked > 1:
@@ -823,17 +973,37 @@ class ExamMixin(BaseMixin):
                     self._advance_to_next_question()
                     time.sleep(0.5)
                 else:
-                    self.log.warning(f"   题库有匹配但无法定位选项: {correct_opts}")
+                    self.log.warning(
+                        "[匹配失败] 题库有答案但无法在页面定位\n"
+                        + f"  正确答案: {correct_opts}\n"
+                        + "\n".join(
+                            f"    {chr(65 + i)}. {opt_texts[i]}"
+                            for i in range(options_count)
+                        )
+                    )
 
             if not found and not correct_opts:
                 if rand:
-                    self.log.debug("   [随机点选] A")
                     options.first.click(force=True, timeout=5000)
+                    # 输出选项供参考
+                    self.log.debug(
+                        "[随机] 题库无答案，随机选 A\n"
+                        + "\n".join(
+                            f"    {chr(65 + i)}. {opt_texts[i]}"
+                            for i in range(min(options_count, 6))
+                        )
+                    )
                     time.sleep(random.randint(q_time, q_time + q_offset))
                     self._advance_to_next_question()
                     continue
 
-                self.log.warning("题库缺失，请手动选择答案。")
+                self.log.warning(
+                    "[缺失] 题库无此题，需手动选择\n"
+                    + "\n".join(
+                        f"    {chr(65 + i)}. {opt_texts[i]}"
+                        for i in range(options_count)
+                    )
+                )
                 ok = self._interactive_answering(title, options, options_count, [])
                 if ok:
                     matched += 1
@@ -853,6 +1023,92 @@ class ExamMixin(BaseMixin):
             f"答题结束: 总计 {total} 题，匹配 {matched} 题，匹配率 {match_rate:.2f}%"
         )
         return match_rate >= rate_limit or rand
+
+    def _parse_exam_item_dom(self, exam_item) -> dict:
+        """从考试列表项的 DOM 中直接提取考试信息。
+
+        直接从页面 DOM 解析，不依赖 Vue 数据。当 Vue 数据不可用时
+        作为兜底方案，确保考试及格线等信息始终可用。
+
+        典型 DOM 结构:
+        <li class="exam-item">
+          <h3 class="exam-item-title">结课考试</h3>
+          <section class="exam-item-content">
+            <p><span class="exam-fail">记入考核</span>
+                <span>合格分数<span class="exam-fail">80</span>分</span></p>
+            <p>开放时间 2026-03-06 — 2026-05-31</p>
+            <p><span class="exam-fail">未考试</span>
+                <span>剩<span class="exam-fail">3</span>次机会</span></p>
+          </section>
+          <button class="exam-button">参加考试</button>
+        </li>
+
+        Returns:
+            {
+                "title": str,
+                "pass_score": int | None,
+                "status": str,
+                "remaining_attempts": int | None,
+                "counts_toward_grade": bool,
+            }
+        """
+        result = {
+            "title": "",
+            "pass_score": None,
+            "status": "",
+            "remaining_attempts": None,
+            "counts_toward_grade": False,
+        }
+
+        if not exam_item or not self._page:
+            return result
+
+        try:
+            full_text = exam_item.inner_text().strip()
+
+            # 标题
+            title_el = exam_item.locator(SEL_EXAM_ITEM_TITLE).first
+            if title_el.count() > 0:
+                result["title"] = title_el.inner_text().strip()
+
+            # 合格分数：匹配 "合格分数 80 分" 或 "合格分数80分"
+            m = re.search(r"合格分数[:\s]*(\d+)\s*分", full_text)
+            if m:
+                result["pass_score"] = int(m.group(1))
+
+            # 剩余次数：匹配 "剩 3 次机会" 或 "剩余3次"
+            m = re.search(r"剩(?:余)?\s*(\d+)\s*次", full_text)
+            if m:
+                result["remaining_attempts"] = int(m.group(1))
+
+            # 考试状态
+            status_patterns = [
+                (r"未考试", "未考试"),
+                (r"已合格|已及格|考试通过|成绩合格", "已合格"),
+                (r"未通过|不合格|未及格", "未通过"),
+                (r"已考试|已完成", "已考试"),
+            ]
+            for pattern, label in status_patterns:
+                if re.search(pattern, full_text):
+                    result["status"] = label
+                    break
+
+            # 是否记入考核
+            if "记入考核" in full_text:
+                result["counts_toward_grade"] = True
+
+            self.log.debug(
+                f"[考试DOM] {result['title']}: "
+                f"及格线={result['pass_score']}, "
+                f"状态={result['status'] or '未知'}, "
+                f"剩余={result['remaining_attempts']}次, "
+                f"记入考核={result['counts_toward_grade']}"
+            )
+
+        except Exception as e:
+            self.log.debug(f"[考试DOM] 解析异常: {e}")
+
+        return result
 
     def run_exam(
         self,
@@ -911,6 +1167,36 @@ class ExamMixin(BaseMixin):
             items = self._page.locator(SEL_EXAM_ITEM)
             self.log.info(f"[考试] 找到 {items.count()} 个考试项")
 
+            # 从 Vue 数据提取考试及格线
+            overview = self._extract_project_overview()
+            exam_pass_scores: Dict[str, int] = {}
+            if overview and overview.get("exams"):
+                for exam in overview["exams"]:
+                    name = exam.get("name", "")
+                    if name:
+                        exam_pass_scores[name] = exam.get("passScore", 60)
+                self.log.info(
+                    f"[考试] 从 Vue 提取到 {len(exam_pass_scores)} 个考试的及格线"
+                )
+            else:
+                self.log.info("[考试] Vue 数据不可用，将从 DOM 解析考试信息")
+
+            # 兜底：从 DOM 解析所有考试项的信息
+            dom_exam_info: Dict[str, dict] = {}
+            for j in range(items.count()):
+                it = items.nth(j)
+                info = self._parse_exam_item_dom(it)
+                name = info.get("title", "")
+                if name:
+                    dom_exam_info[name] = info
+                    # DOM 及格线作为 Vue 数据的补充
+                    if name not in exam_pass_scores and info.get("pass_score"):
+                        exam_pass_scores[name] = info["pass_score"]
+                        self.log.info(
+                            f"[考试] DOM 解析到 '{name}' 的及格线: "
+                            f"{info['pass_score']} 分"
+                        )
+
             for j in range(items.count()):
                 it = items.nth(j)
                 exam_title_el = it.locator(SEL_EXAM_ITEM_TITLE).first
@@ -921,9 +1207,23 @@ class ExamMixin(BaseMixin):
                 )
                 self.log.info(f"[考试] 检查子项 {j + 1}: {exam_title_text}")
 
+                # 从 DOM 获取考试信息（状态、剩余次数等）
+                dom_info = dom_exam_info.get(exam_title_text, {})
+                dom_status = dom_info.get("status", "")
+                dom_remaining = dom_info.get("remaining_attempts")
+
+                # 检查是否已合格（同时检查 CSS 类和 DOM 文本）
                 p_span = it.locator(SEL_EXAM_ITEM_PASS).first
-                if exam_mode == "true" and p_span.count() > 0 and p_span.is_visible():
+                is_passed_by_dom = (
+                    p_span.count() > 0 and p_span.is_visible()
+                ) or dom_status == "已合格"
+                if exam_mode == "true" and is_passed_by_dom:
                     self.log.info(f"[及格跳过] {exam_title_text} 已合格")
+                    continue
+
+                # 检查是否有剩余次数
+                if dom_remaining is not None and dom_remaining <= 0:
+                    self.log.warning(f"[考试] {exam_title_text} 无剩余次数，跳过")
                     continue
 
                 join = it.locator(SEL_JOIN_BTN).first
@@ -931,61 +1231,176 @@ class ExamMixin(BaseMixin):
                     self.log.debug(f"[考试] 按钮未就绪，跳过 {exam_title_text}")
                     continue
 
-                self.log.info(f"[答题] 尝试点击：{exam_title_text}")
-                join.click(force=True)
-                time.sleep(2)
+                # 及格线：优先 Vue 数据，其次 DOM（已在上方预扫描中合并）
+                pass_score = exam_pass_scores.get(exam_title_text, 60)
+                self.log.info(
+                    f"[考试] 及格线: {pass_score} 分"
+                    + (f", 剩余: {dom_remaining} 次" if dom_remaining else "")
+                    + (f", 状态: {dom_status}" if dom_status else "")
+                )
 
-                dialog_result = self._handle_exam_dialog(exam_mode)
-                if dialog_result == "return":
-                    self.log.warning(f"[答题] 弹窗提示中止：{exam_title_text}")
-                    continue
-
-                self.log.info("[答题] 正在处理启动流程...")
-                start_time = time.time()
-                entered = False
-                while time.time() - start_time < 40:
-                    try:
-                        self._handle_exam_dialog(exam_mode)
-
-                        start_btn = self._page.locator(SEL_START_BTN).first
-                        if start_btn.count() > 0 and start_btn.is_visible():
-                            self.log.debug("[答题] 点击开始考试按钮")
-                            start_btn.click(force=True)
-                            time.sleep(2)
-                            continue
-
-                        if has_captcha(self._page, require_cscapt=False):
-                            self.log.info("[验证码] 检测到考试验证码，正在自动处理...")
-                            handle_tencent_captcha(
-                                self._page, self.log, require_cscapt=False
-                            )
-                            time.sleep(2)
-
-                        if self._is_in_context(PageContext.EXAM_QUESTION):
-                            self.log.info("[答题] 已成功进入答题页面")
-                            entered = True
+                MAX_ATTEMPTS = 3
+                final_score = 0
+                passed = False
+                for attempt in range(1, MAX_ATTEMPTS + 1):
+                    if attempt > 1:
+                        self.log.info(
+                            f"[考试] 第 {attempt}/{MAX_ATTEMPTS} 次重试: "
+                            f"{exam_title_text}"
+                        )
+                        self._page.goto(
+                            f"{self.base_url}/#/learning-task-list",
+                            wait_until="domcontentloaded",
+                        )
+                        time.sleep(1.5)
+                        proj_retry = self._page.locator(SEL_TASK_BLOCK).nth(i)
+                        proj_retry.click()
+                        if not self._handle_exam_intermediate_pages():
+                            self.log.warning("重试: 无法进入项目课件页")
                             break
+                        tab_retry = self._page.locator(SEL_EXAM_TAB).first
+                        if tab_retry.is_visible():
+                            tab_retry.click(force=True)
+                            time.sleep(2)
+                        items_retry = self._page.locator(SEL_EXAM_ITEM)
+                        it_retry = items_retry.nth(j)
+                        join_retry = it_retry.locator(SEL_JOIN_BTN).first
+                        if not join_retry.is_visible():
+                            self.log.warning(
+                                f"重试: 按钮未就绪，跳过 {exam_title_text}"
+                            )
+                            break
+                        join = join_retry
 
-                    except Exception as e:
-                        self.log.debug(f"[探测过程异常] {e}")
-
+                    self.log.info(f"[答题] 尝试点击：{exam_title_text} (第{attempt}次)")
+                    join.click(force=True)
                     time.sleep(2)
 
-                result_info = "进入考试页面超时"
-                if entered:
-                    should_submit = self._do_answering(
-                        q_time=exam_question_time,
-                        q_offset=exam_question_time_offset,
-                        rand=random_answer,
-                        rate_limit=exam_submit_match_rate,
+                    dialog_result = self._handle_exam_dialog(exam_mode)
+                    if dialog_result == "return":
+                        self.log.warning(f"[答题] 弹窗提示中止：{exam_title_text}")
+                        break
+
+                    self.log.info("[答题] 正在处理启动流程...")
+                    start_time = time.time()
+                    entered = False
+                    captcha_handled = False
+                    while time.time() - start_time < 40:
+                        try:
+                            self._handle_exam_dialog(exam_mode)
+
+                            start_btn = self._page.locator(SEL_START_BTN).first
+                            if start_btn.count() > 0 and start_btn.is_visible():
+                                self.log.debug("[答题] 点击开始考试按钮")
+                                start_btn.click(force=True)
+                                time.sleep(3)
+                                continue
+
+                            if not captcha_handled and has_captcha(
+                                self._page, require_cscapt=False
+                            ):
+                                self.log.info(
+                                    "[验证码] 检测到考试验证码，正在自动处理..."
+                                )
+                                if handle_tencent_captcha(
+                                    self._page, self.log, require_cscapt=False
+                                ):
+                                    self.log.info("[验证码] 验证码处理成功")
+                                    captcha_handled = True
+                                else:
+                                    self.log.warning("[验证码] 验证码处理失败，将重试")
+                                time.sleep(3)
+                                continue
+
+                            if self._is_in_context(PageContext.EXAM_QUESTION):
+                                self.log.info("[答题] 已成功进入答题页面")
+                                entered = True
+                                break
+
+                            if has_captcha(self._page, require_cscapt=False):
+                                self.log.info(
+                                    "[验证码] 考试过程中出现验证码，正在处理..."
+                                )
+                                handle_tencent_captcha(
+                                    self._page, self.log, require_cscapt=False
+                                )
+                                time.sleep(3)
+                                continue
+
+                        except Exception as e:
+                            self.log.debug(f"[探测过程异常] {e}")
+
+                        time.sleep(2)
+
+                    result_info = "进入考试页面超时"
+                    if entered:
+                        try:
+                            should_submit = self._do_answering(
+                                q_time=exam_question_time,
+                                q_offset=exam_question_time_offset,
+                                rand=random_answer,
+                                rate_limit=exam_submit_match_rate,
+                            )
+                        except Exception as e:
+                            self.log.error(f"[考试异常] 答题过程中出错: {e}")
+                            import traceback
+
+                            self.log.debug(
+                                f"[考试异常] 堆栈:\n{traceback.format_exc()}"
+                            )
+                            result_info = f"答题异常: {e}"
+                            # 不退出浏览器，继续处理下一个考试
+                            break
+
+                        if should_submit:
+                            self.log.info(f"答题结束，准备交卷：{title}")
+                            try:
+                                result_info = self._submit_exam()
+                            except Exception as e:
+                                self.log.error(f"[考试异常] 交卷过程中出错: {e}")
+                                import traceback
+
+                                self.log.debug(
+                                    f"[考试异常] 堆栈:\n{traceback.format_exc()}"
+                                )
+                                result_info = f"交卷异常: {e}"
+                                # 不退出浏览器
+                        else:
+                            self.log.warning(
+                                f"匹配率过低且未开启随机，放弃交卷：{title}"
+                            )
+                            result_info = "放弃提交"
+                            break
+
+                    # 从结果信息中提取分数和通过状态
+                    score_match = re.search(r"(\d+)\s*分", result_info)
+                    final_score = int(score_match.group(1)) if score_match else 0
+                    # 从弹窗文本判断是否通过
+                    popup_passed = "通过" in result_info or "合格" in result_info
+
+                    self.log.info(
+                        f"[考试] {exam_title_text} 第{attempt}次得分: "
+                        f"{final_score} 分 (及格线: {pass_score} 分)"
+                        + (" [弹窗判定: 通过]" if popup_passed else "")
                     )
 
-                    if should_submit:
-                        self.log.info(f"答题结束，准备交卷：{title}")
-                        result_info = self._submit_exam()
-                    else:
-                        self.log.warning(f"匹配率过低且未开启随机，放弃交卷：{title}")
-                        result_info = "放弃提交"
+                    if final_score >= pass_score and final_score > 0:
+                        self.log.info(f"[考试] {exam_title_text} 考试通过！")
+                        passed = True
+                        break
+                    elif popup_passed and final_score == 0:
+                        # 弹窗显示通过但未提取到分数，信任弹窗
+                        self.log.info(
+                            f"[考试] {exam_title_text} 弹窗显示通过，判定合格"
+                        )
+                        passed = True
+                        final_score = pass_score
+                        break
+                    elif final_score > 0:
+                        self.log.warning(
+                            f"[考试] {exam_title_text} 未通过 "
+                            f"({final_score} < {pass_score})"
+                        )
 
                 self._page.goto(
                     f"{self.base_url}/#/learning-task-list",
@@ -993,38 +1408,35 @@ class ExamMixin(BaseMixin):
                 )
                 time.sleep(3)
 
-                pass_score = "未知"
                 remain_times = "未知"
-
-                proj_item = (
-                    self._page.locator(SEL_TASK_BLOCK)
-                    .filter(
-                        has=self._page.locator(SEL_TASK_BLOCK_TITLE).filter(
-                            has_text=re.compile(f"^{re.escape(title)}$")
-                        )
-                    )
-                    .first
-                )
-                if proj_item.count() == 0:
+                try:
                     proj_item = (
-                        self._page.locator(SEL_TASK_BLOCK).filter(has_text=title).first
+                        self._page.locator(SEL_TASK_BLOCK)
+                        .filter(
+                            has=self._page.locator(SEL_TASK_BLOCK_TITLE).filter(
+                                has_text=re.compile(f"^{re.escape(title)}$")
+                            )
+                        )
+                        .first
                     )
+                    if proj_item.count() == 0:
+                        proj_item = (
+                            self._page.locator(SEL_TASK_BLOCK)
+                            .filter(has_text=title)
+                            .first
+                        )
+                    if proj_item.count() > 0 and proj_item.is_visible():
+                        txt = proj_item.inner_text().strip()
+                        rt_m = re.search(r"(?:剩余机会|剩|机会).*?(\d+)", txt)
+                        if rt_m:
+                            remain_times = rt_m.group(1)
+                except Exception:
+                    pass
 
-                if proj_item.count() > 0 and proj_item.is_visible():
-                    txt = proj_item.inner_text().strip()
-                    ps_m = re.search(r"(?:合格分数|合格|标准|及格).*?(\d+)", txt)
-                    if ps_m:
-                        pass_score = ps_m.group(1)
-                    rt_m = re.search(r"(?:剩余机会|剩|机会).*?(\d+)", txt)
-                    if rt_m:
-                        remain_times = rt_m.group(1)
-
-                score_match = re.search(r"(\d+)分", result_info)
-                final_score = score_match.group(1) if score_match else "待确认"
-
-                self.log.info(f"【考试报告】项目：{title}")
-                self.log.info(f"   - 本次得分：{final_score} 分")
+                self.log.info(f"【考试报告】项目：{title} | 子项：{exam_title_text}")
+                self.log.info(f"   - 最终得分：{final_score} 分")
                 self.log.info(f"   - 合格标准：{pass_score} 分")
+                self.log.info(f"   - 是否通过：{'是' if passed else '否'}")
                 self.log.info(f"   - 剩余机会：{remain_times} 次")
 
                 break

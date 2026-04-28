@@ -1,4 +1,34 @@
 # ---------------------------------------------------------------------------
+# 登录页选择器 (Login.vue)
+# ---------------------------------------------------------------------------
+
+# 学校选择：登录页专有语义类名
+SEL_LOGIN_TENANT_INPUT = "input.loginp-input.loginp-inputsl[readonly]"
+SEL_LOGIN_TENANT_SEARCH = (
+    "input[placeholder*='搜索'], .van-search__field input, .search-input input"
+)
+SEL_LOGIN_ACCOUNT = (
+    "input.loginp-input:not([readonly]):not([maxlength]):not([type='password'])"
+)
+SEL_LOGIN_PASSWORD = "input.loginp-input-pwd, input.loginp-input[type='password']"
+SEL_LOGIN_CAPTCHA_IMG = "img.loginp-label-verify, img[src*='randLetterImage']"
+SEL_LOGIN_CAPTCHA_INPUT = "input.loginp-input[maxlength='6']"
+SEL_LOGIN_SUBMIT_BTN_AUTH = "a.loginp-submit"
+SEL_LOGIN_TOAST = (
+    ".van-toast__text, .van-toast, "
+    ".mint-toast, .mint-toast-text, "
+    ".van-dialog__message, .el-message__content"
+)
+SEL_LOGIN_POPUP_CONFIRM = (
+    ".van-dialog__confirm, .mint-msgbox-confirm, "
+    "button:has-text('确定'), button:has-text('确认')"
+)
+SEL_LOGIN_SCHOOL_ITEM_TEMPLATE = (
+    ".van-cell__title span:text-is('{name}'), "
+    ".van-cell:has-text('{name}') .van-cell__title"
+)
+
+# ---------------------------------------------------------------------------
 # 业务流程通用选择器
 # ---------------------------------------------------------------------------
 
@@ -64,9 +94,29 @@ SEL_EXAM_SHEET = ".sheet"
 SEL_EXAM_CONFIRM_SHEET = ".confirm-sheet"
 SEL_EXAM_SHEET_BOTTOM_CTRLS = ".sheet .bottom-ctrls"
 SEL_EXAM_CONFIRM_SHEET_BOTTOM_CTRLS = ".confirm-sheet .bottom-ctrls"
+# 主页面底部控制栏（答题卡/上一题/下一题，无交卷按钮）
+# 使用 :visible 过滤，避免匹配到 sheet/confirm-sheet 内的隐藏控制栏
 SEL_EXAM_BOTTOM_CTRLS = ".bottom-ctrls"
-SEL_EXAM_NEXT_BTN_IN_BOTTOM = "button:has-text('下一题'), .mint-button:has-text('下一题'), .van-button:has-text('下一题')"
-SEL_EXAM_CARD_BTN_IN_BOTTOM = "text=答题卡"
+# Sheet 弹窗内的交卷按钮
+SEL_EXAM_SHEET_SUBMIT = (
+    ".sheet .bottom-ctrls button:has-text('交卷'), "
+    ".sheet .bottom-ctrls .mint-button:has-text('交卷')"
+)
+# Confirm-sheet 内的确认/交卷按钮
+SEL_EXAM_CONFIRM_SUBMIT = (
+    ".confirm-sheet .bottom-ctrls button:has-text('交卷'), "
+    ".confirm-sheet .bottom-ctrls button:has-text('确 认'), "
+    ".confirm-sheet .bottom-ctrls .mint-button:has-text('交卷'), "
+    ".confirm-sheet .bottom-ctrls .mint-button:has-text('确 认')"
+)
+SEL_EXAM_NEXT_BTN_IN_BOTTOM = (
+    "button:has-text('下一题'), "
+    ".mint-button:has-text('下一题'), "
+    ".van-button:has-text('下一题')"
+)
+SEL_EXAM_CARD_BTN_IN_BOTTOM = (
+    "button:has-text('答题卡'), .mint-button:has-text('答题卡')"
+)
 SEL_EXAM_QUEST_INDEX_ITEM_TEMPLATE = (
     ".sheet .quest-indexs-list li:has(span:text-is('{num}')), "
     ".sheet .quest-indexs-list li:has-text('{num}')"
@@ -105,11 +155,11 @@ SEL_COURSE_LIST_WAIT_TARGETS = (
     ".van-collapse-item, .img-texts-item, .fchl-item, .task-block, .img-text-block, "
     "#agree, .van-cell"
 )
+# 课程列表项：仅限课程内容级别的元素，不包含 project 级别的 .task-block
 SEL_COURSE_LIST_ITEMS = ", ".join(
     [
         ".img-texts-item",
         ".fchl-item",
-        ".task-block",
     ]
 )
 
@@ -173,9 +223,11 @@ SEL_RUNTIME_NAV_BTNS = ", ".join(
         ".page-active .btn-at",
         ".page-active .btn-af",
         ".page-active .btn-start",
+        ".page-active .btn-next-end",
         ".page-active .btn-next",
         ".page-active .btn-ce",
         ".page-active .back-list",
+        ".btn-next-end:visible",
         ".btn-start:visible",
         ".btn-base:has-text('开始'):visible",
         ".btn-base:has-text('下一步'):visible",
