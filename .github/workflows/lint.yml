@@ -20,11 +20,14 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install dependencies
+        run: uv sync
+
       - name: Ruff lint
-        run: uvx ruff check .
+        run: uv run ruff check .
 
       - name: Ruff format check
-        run: uvx ruff format --check .
+        run: uv run ruff format --check .
 
       - name: Pyright type check
-        run: uvx pyright
+        run: uv run pyright
