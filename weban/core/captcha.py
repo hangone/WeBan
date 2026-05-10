@@ -19,10 +19,6 @@ captcha.py —— 验证码识别与处理模块
      detect_captcha / _captcha_visible / _find_captcha_context /
      has_captcha / handle_click_captcha
      检测页面是否存在腾讯点选验证码，并自动完成图像识别与点击操作。
-
-  5. 辅助工具
-     _click_captcha_point
-     模拟点击验证码坐标。
 """
 
 import os
@@ -316,7 +312,7 @@ def _binarize_main(gray: np.ndarray) -> np.ndarray:
 
     使用 gray<100 作为主阈值，平衡字符笔画捕获和噪声抑制。
     """
-    global_bw = (gray < 100).astype(np.uint8) * 255
+    global_bw = (gray < 60).astype(np.uint8) * 255
     symbol_bw = cv2.morphologyEx(global_bw, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
     symbol_bw = cv2.morphologyEx(symbol_bw, cv2.MORPH_OPEN, np.ones((2, 2), np.uint8))
     return symbol_bw
@@ -330,9 +326,9 @@ def _extract_candidates(symbol_bw: np.ndarray) -> List[dict]:
     candidates = []
     for i in range(1, num_labels):
         x, y, w, h, area = stats[i]
-        if area < 150 or area > 6000:
+        if area < 50 or area > 6000:
             continue
-        if w < 20 or h < 20:
+        if w < 10 or h < 10:
             continue
         if w / max(h, 1) > 3.0 or h / max(w, 1) > 3.0:
             continue
@@ -443,6 +439,27 @@ def detect_captcha(
     all_candidates = _extract_candidates(symbol_bw)
     all_candidates = _merge_nearby_candidates(all_candidates, dist=15)
 
+    # 暗色阈值候选不足时，用自适应阈值 + 黑帽作为补充
+    if len(all_candidates) < 3:
+        h_m, w_m = main_gray.shape
+        k = max(11, (min(h_m, w_m) // 18) * 2 + 1)
+        kernel = np.ones((k, k), np.uint8)
+        blackhat = cv2.morphologyEx(main_gray, cv2.MORPH_BLACKHAT, kernel)
+        _, bw1 = cv2.threshold(blackhat, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        blur = cv2.GaussianBlur(main_gray, (5, 5), 0)
+        bw2 = cv2.adaptiveThreshold(
+            blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 31, 7
+        )
+        edges = cv2.Canny(main_gray, 50, 140)
+        fallback_bw = cv2.bitwise_or(bw1, bw2)
+        fallback_bw = cv2.bitwise_or(fallback_bw, edges)
+        fallback_bw = cv2.morphologyEx(fallback_bw, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
+        fallback_bw = cv2.morphologyEx(fallback_bw, cv2.MORPH_OPEN, np.ones((2, 2), np.uint8))
+        fallback_candidates = _extract_candidates(fallback_bw)
+        fallback_candidates = _merge_nearby_candidates(fallback_candidates, dist=15)
+        if len(fallback_candidates) >= len(all_candidates):
+            all_candidates = fallback_candidates
+
     if _DEBUG_SAVE:
         debug_main = main_img.copy()
         for c in all_candidates:
@@ -506,6 +523,7 @@ def detect_captcha(
             for perm in _perms(pool_list, n_active):
                 total = 0.0
                 valid = True
+                assigned_pts: List[Tuple[int, int]] = []
                 for ti_idx, ci in zip(active_indices, perm):
                     # 找到这个候选在成本矩阵中的成本
                     cost_for_this = None
@@ -517,6 +535,21 @@ def detect_captcha(
                         valid = False
                         break
                     total += cost_for_this
+                    assigned_pts.append(all_candidates[ci]["center"])
+
+                if not valid:
+                    continue
+
+                # 空间多样性惩罚：点太近时加权
+                spatial_penalty = 0.0
+                for a in range(len(assigned_pts)):
+                    for b in range(a + 1, len(assigned_pts)):
+                        dx = assigned_pts[a][0] - assigned_pts[b][0]
+                        dy = assigned_pts[a][1] - assigned_pts[b][1]
+                        dist = (dx * dx + dy * dy) ** 0.5
+                        if dist < 30:
+                            spatial_penalty += (30 - dist) * 8.0
+                total += spatial_penalty
 
                 if valid and total < best_total:
                     best_total = total
@@ -1246,102 +1279,3 @@ def has_captcha(page, require_cscapt: bool = True) -> bool:
     """
     ctx, _ = _find_captcha_context(page, require_cscapt)
     return ctx is not None
-
-
-def _human_mouse_move(page, x1: float, y1: float, x2: float, y2: float, log) -> None:
-    """用三次贝塞尔曲线模拟人类鼠标从 (x1,y1) 移动到 (x2,y2)。
-
-    控制点在起止点附近随机偏移，步数根据距离自适应，每步间随机微延迟。
-    """
-    import math
-
-    dx = x2 - x1
-    dy = y2 - y1
-    dist = math.hypot(dx, dy)
-    steps = max(10, int(dist / 8))  # 每 8px 一步，至少 10 步
-
-    # 随机生成两个贝塞尔控制点（在起止连线两侧随机偏移）
-    rand = random.Random()
-    cp1x = x1 + dx * 0.25 + rand.uniform(-dist * 0.15, dist * 0.15)
-    cp1y = y1 + dy * 0.25 + rand.uniform(-dist * 0.15, dist * 0.15)
-    cp2x = x1 + dx * 0.75 + rand.uniform(-dist * 0.15, dist * 0.15)
-    cp2y = y1 + dy * 0.75 + rand.uniform(-dist * 0.15, dist * 0.15)
-
-    prev_px, prev_py = x1, y1
-    try:
-        for i in range(1, steps + 1):
-            t = i / steps
-            u = 1 - t
-            # 三次贝塞尔公式
-            px = u**3 * x1 + 3 * u**2 * t * cp1x + 3 * u * t**2 * cp2x + t**3 * x2
-            py = u**3 * y1 + 3 * u**2 * t * cp1y + 3 * u * t**2 * cp2y + t**3 * y2
-
-            # 只在坐标变化超过 1px 时才实际移动，减少 IPC 调用
-            if abs(px - prev_px) >= 1 or abs(py - prev_py) >= 1:
-                # 修复：使用传入的 page.mouse 而非 Frame.mouse
-                page.mouse.move(px, py)
-                prev_px, prev_py = px, py
-
-            # 每步随机延迟 5~18ms，模拟人类手速
-            time.sleep(rand.uniform(0.005, 0.018))
-    except Exception as e:
-        log.debug(f"[鼠标移动] 贝塞尔移动中出错（忽略）: {e}")
-
-
-def _click_captcha_point(page, ctx, main_el, point, log, idx: int) -> None:
-    """在主图上的指定相对坐标处模拟人类鼠标移动后点击。
-
-    流程：
-      1. 通过 bounding_box() 计算绝对坐标
-      2. 用贝塞尔曲线从当前鼠标位置移动到目标点（模拟人类轨迹）
-      3. 使用 Playwright 推荐的 locator.click(position=...) 完成点击
-      4. 失败时 fallback 到 mouse.click()
-    """
-    x, y = float(point[0]), float(point[1])
-
-    try:
-        if page.is_closed():
-            log.warning(f"[点选验证码] 页面已关闭，无法点击第 {idx + 1} 个坐标")
-            return
-    except Exception:
-        pass
-
-    try:
-        bb = main_el.bounding_box(timeout=3000)
-        if bb:
-            abs_x = bb["x"] + x
-            abs_y = bb["y"] + y
-
-            start_x = bb["x"] + bb["width"] * random.uniform(0.05, 0.2)
-            start_y = bb["y"] + bb["height"] * random.uniform(0.05, 0.2)
-            _human_mouse_move(page, start_x, start_y, abs_x, abs_y, log)
-
-            jitter_x = abs_x + random.uniform(-2, 2)
-            jitter_y = abs_y + random.uniform(-2, 2)
-            page.mouse.move(jitter_x, jitter_y)
-            time.sleep(random.uniform(0.05, 0.15))
-    except Exception as e:
-        log.debug(f"[点选验证码] 贝塞尔移动失败（忽略）: {e}")
-
-    try:
-        main_el.click(position={"x": x, "y": y}, force=True, timeout=5000)
-        log.debug(f"[点选验证码] 已点击第 {idx + 1} 个坐标 ({x:.0f}, {y:.0f})")
-        return
-    except Exception as e:
-        log.debug(f"[点选验证码] locator.click 失败，尝试 mouse.click 兜底: {e}")
-
-    try:
-        bb = main_el.bounding_box(timeout=3000)
-        if bb:
-            abs_x = bb["x"] + x
-            abs_y = bb["y"] + y
-            page.mouse.click(abs_x, abs_y)
-            log.debug(
-                f"[点选验证码] mouse.click 第 {idx + 1} 个坐标 "
-                f"({x:.0f}, {y:.0f}) → 绝对 ({abs_x:.0f}, {abs_y:.0f})"
-            )
-            return
-    except Exception as e:
-        log.warning(
-            f"[点选验证码] 点击第 {idx + 1} 个坐标 ({x:.0f}, {y:.0f}) 全部方式均失败: {e}"
-        )
