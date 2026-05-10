@@ -1,3 +1,4 @@
+import subprocess
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict
 import logging
@@ -15,7 +16,7 @@ class BrowserConfig:
     """浏览器启动与超时相关配置项。"""
 
     enabled: bool = False  # 是否启用浏览器模式
-    headless: bool = False  # 是否无头（后台静默）运行
+    headless: bool = True  # 是否无头（后台静默）运行
     channel: str = "chromium"  # 浏览器引擎：chromium / firefox / webkit
     slow_mo: int = 0  # 每步操作间隔（毫秒），调试时可适当调大
     timeout_ms: int = 30000  # 页面元素等待全局超时（毫秒）
@@ -98,6 +99,9 @@ class BrowserMixin(BaseMixin):
                 self.log.warning("检测到浏览器/上下文已被异常关闭，正在重新启动...")
                 self._stop()
 
+        # 记录启动前的前台应用，浏览器启动后把焦点还给它
+        self._prev_front_app = self._get_frontmost_app()
+
         self._playwright = sync_playwright().start()
 
         launcher = getattr(self._playwright, self.browser_config.channel, None)
@@ -113,7 +117,13 @@ class BrowserMixin(BaseMixin):
                 "--disable-blink-features=AutomationControlled",  # 禁用自动化标识
                 "--disable-infobars",  # 隐藏"Chrome 正受到自动化软件控制"信息栏
                 "--disable-dev-shm-usage",  # 避免共享内存问题
-                "--no-sandbox",  # 避免沙箱问题
+                # 防止浏览器窗口抢焦点：禁止后台节流与窗口提升
+                "--disable-background-timer-throttling",
+                "--disable-backgrounding-occluded-windows",
+                "--disable-renderer-backgrounding",
+                "--disable-features=TranslateUI",
+                "--no-first-run",
+                "--no-default-browser-check",
             ],
         )
 
@@ -125,7 +135,7 @@ class BrowserMixin(BaseMixin):
                     "AppleWebKit/605.1.15 (KHTML, like Gecko) "
                     "Version/17.4 Mobile/15E148 Safari/604.1"
                 ),
-                viewport={"width": 390, "height": 844},  # iPhone 14 Pro 视口
+                viewport={"width": 428, "height": 818},
             )
         else:
             raise RuntimeError("Failed to initialize browser")
@@ -148,8 +158,44 @@ class BrowserMixin(BaseMixin):
                     else None
                 ),
             )
+
+            # 将浏览器窗口放到后台，防止抢焦点
+            self._push_browser_to_background()
         else:
             raise RuntimeError("Failed to initialize browser context")
+
+    @staticmethod
+    def _get_frontmost_app() -> str:
+        """获取当前前台应用名称（macOS）。"""
+        try:
+            return subprocess.check_output(
+                ["osascript", "-e",
+                 'tell application "System Events" to get name of first '
+                 'application process whose frontmost is true'],
+                timeout=3,
+            ).decode().strip()
+        except Exception:
+            return ""
+
+    def _push_browser_to_background(self) -> None:
+        """把焦点还给浏览器启动前的前台应用（如终端），浏览器窗口保持可见。"""
+        if not self._page:
+            return
+        try:
+            self._page.evaluate("window.blur()")
+        except Exception:
+            pass
+
+        app = getattr(self, "_prev_front_app", "") or "Terminal"
+        try:
+            subprocess.run(
+                ["osascript", "-e", f'tell application "{app}" to activate'],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=3,
+            )
+        except Exception:
+            pass
 
     def _stop(self) -> None:
         """按顺序关闭页面上下文、浏览器和 Playwright 实例，忽略所有关闭异常。"""
