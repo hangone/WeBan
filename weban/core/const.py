@@ -78,7 +78,7 @@ SEL_EXAM_TAB = '.van-tab:has-text("在线考试")'
 SEL_EXAM_ITEM = ".exam-item"
 SEL_EXAM_ITEM_TITLE = ".exam-item-title, .exam-info h3"
 SEL_EXAM_ITEM_PASS = ".exam-pass, .exam-result"
-SEL_EXAM_RESULT_SCORE = ".score-num, .score, .exam-score, .result-score, .score-text"
+SEL_EXAM_RESULT_SCORE = ".exam-score, .result-score, .score-text"
 SEL_EXAM_SUBMIT_AREA = "button:has-text('交卷'), button:has-text('完成')"
 
 SEL_EXAM_PREPARE_POPUPS = (
@@ -92,8 +92,6 @@ SEL_EXAM_INTERMEDIATE_PROJECT = ".img-text-block, .task-block"
 
 SEL_EXAM_SHEET = ".sheet"
 SEL_EXAM_CONFIRM_SHEET = ".confirm-sheet"
-SEL_EXAM_SHEET_BOTTOM_CTRLS = ".sheet .bottom-ctrls"
-SEL_EXAM_CONFIRM_SHEET_BOTTOM_CTRLS = ".confirm-sheet .bottom-ctrls"
 # 主页面底部控制栏（答题卡/上一题/下一题，无交卷按钮）
 # 使用 :visible 过滤，避免匹配到 sheet/confirm-sheet 内的隐藏控制栏
 SEL_EXAM_BOTTOM_CTRLS = ".bottom-ctrls"
@@ -121,10 +119,6 @@ SEL_EXAM_QUEST_INDEX_ITEM_TEMPLATE = (
     ".sheet .quest-indexs-list li:has(span:text-is('{num}')), "
     ".sheet .quest-indexs-list li:has-text('{num}')"
 )
-SEL_EXAM_QUEST_INDEX_TEXT_TEMPLATE = (
-    ".sheet span:text-is('{num}'), .sheet div:text-is('{num}')"
-)
-
 # ---------------------------------------------------------------------------
 # 答题页面 (ExamPage.vue: .quest-*)
 # ---------------------------------------------------------------------------
@@ -168,7 +162,6 @@ SEL_COLLAPSE_ITEM_TITLE = ".van-cell__title"
 SEL_COLLAPSE_ITEM_CONTENT = ".van-collapse-item__content"
 
 SEL_IMG_TEXT_ITEM = ".img-texts-item"
-SEL_IMG_TEXT_ITEM_VISIBLE = ".img-texts-item:visible"
 SEL_IMG_TEXT_ITEM_NOT_PASSED = ".img-texts-item:not(.passed)"
 SEL_IMG_TEXT_ITEM_NOT_PASSED_VISIBLE = ".img-texts-item:not(.passed):visible"
 
@@ -200,22 +193,6 @@ SEL_COMMENT_BACK_BTN = ".comment-footer-button:has-text('返回')"
 # 课程运行时 (mcwk.mycourse.cn/item.js: .page-active, .btn-*, video)
 # ---------------------------------------------------------------------------
 
-SEL_RUNTIME_ACTIVE_VIDEO = ".page-active video"
-SEL_RUNTIME_VIDEO_PLAY_BTN = (
-    ".page-active .vjs-big-play-button, .vjs-big-play-button:visible"
-)
-SEL_RUNTIME_CHOICE = ".page-active [class*='p12'], .page-active [class*='choice']"
-SEL_RUNTIME_INTERACTIVE_ITEMS = (
-    ".page-active [class*='p17'], .page-active .interactive-item"
-)
-SEL_RUNTIME_INTERACTIVE_CLOSE = ".page-active .p1712"
-SEL_RUNTIME_QUIZ_LABELS = ".page-active .aq-item-label"
-SEL_RUNTIME_QUIZ_CHECKED = ".page-active input:checked"
-SEL_RUNTIME_DIALOG_POP = ".pop-jsv, .page-end.page-active"
-SEL_RUNTIME_DIALOG_PREV_BTN = (
-    ".pop-jsv-prev, .back-list, .btn-back, button:has-text('返回列表')"
-)
-
 SEL_RUNTIME_NAV_BTNS = ", ".join(
     [
         ".page-active .btn-aq-21",
@@ -224,24 +201,40 @@ SEL_RUNTIME_NAV_BTNS = ", ".join(
         ".page-active .btn-af",
         ".page-active .btn-start",
         ".page-active .btn-next-end",
+        ".page-active .btn-next2",
+        ".page-active .btn-next-aq01",
         ".page-active .btn-next",
         ".page-active .btn-ce",
+        ".page-active .btn-at-1",
+        ".page-active .btn-at",
+        ".page-active .pri-start-btn",
+        ".page-active .page-start-btn",
+        ".page-active .page-commit",
+        ".page-active .page-success-button",
+        ".page-active .page-fail-button",
         ".page-active .back-list",
-        ".btn-next-end:visible",
-        ".btn-start:visible",
-        ".btn-base:has-text('开始'):visible",
-        ".btn-base:has-text('下一步'):visible",
+        # A08030 等 VR/互动课程的自定义按钮
+        ".page-active .changePage",
+        ".page-active .page-0-button",
+        ".page-active .page-1-button",
+        ".page-active .page-2-button",
+        ".page-active .page-3-button",
+        ".page-active .page-4-button",
+        ".page-active .page-5-button",
+        ".page-active .page-6-button",
+        ".page-active .page-finish-button",
+        ".page-active .page-inspect-btn",
+        # DA0416050 等课程的浮动导航栏，btn-next/btn-prev 在 .btn-next-prev 容器内
+        ".btn-next-prev .btn-next",
+        ".btn-next-prev .btn-prev",
+        # 全局回退（不在 .page-active 内的按钮）
+        ".btn-next-end",
+        ".btn-start",
+        ".btn-base:has-text('开始')",
+        ".btn-base:has-text('下一步')",
+        # A08030 全局回退
+        ".changePage",
+        ".page-finish-button",
+        ".page-inspect-btn",
     ]
 )
-
-SEL_RUNTIME_PROBE_CANDIDATES = (
-    ".page-active img, .page-active div, .page-active a, .page-active label"
-)
-
-# ---------------------------------------------------------------------------
-# 兼容性别名 (保持向后兼容)
-# ---------------------------------------------------------------------------
-
-SEL_QUESTION_TITLE = SEL_QUEST_STEM
-SEL_QUESTION_TITLE_SUB = SEL_QUEST_STEM_SUB
-SEL_OPTIONS = SEL_QUEST_OPTIONS
