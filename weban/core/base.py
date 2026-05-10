@@ -46,6 +46,9 @@ class BaseMixin:
         current_hash: str
         page_state: Dict[str, Any]
 
+    def _push_browser_to_background(self) -> None:
+        """把焦点还给浏览器启动前的前台应用。由 BrowserMixin 实现。"""
+
     def _get_current_url(self) -> str:
         """安全获取当前页面 URL。"""
         if not self._page:
@@ -71,44 +74,40 @@ class BaseMixin:
         try:
             page = self._page
 
-            if page.locator(".quest-stem, .quest-option-item").count() > 0:
+            # 使用 is_visible() 而非 count()，避免匹配到隐藏的残留元素
+            # （如交卷后 .quest-stem 可能仍在 DOM 中但不可见）
+            if page.locator(".quest-stem, .quest-option-item").first.is_visible():
                 return PageContext.EXAM_QUESTION
 
-            if (
-                page.locator(
-                    ".score-num, .score, .exam-score, .result-score, .score-text"
-                ).count()
-                > 0
-            ):
+            # 不使用 .score / .score-num 等过于宽泛的选择器，
+            # 因为题目页面也可能存在含这些类名的 UI 元素，
+            # 导致误判为结果页，造成答题循环异常退出。
+            if page.locator(
+                ".exam-score, .result-score, .score-text"
+            ).first.is_visible():
                 return PageContext.EXAM_RESULT
 
-            if page.locator(".exam-item, .exam-list").count() > 0:
+            if page.locator(".exam-item, .exam-list").first.is_visible():
                 return PageContext.EXAM_LIST
 
-            if (
-                page.locator(".van-collapse-item, .img-texts-item, .fchl-item").count()
-                > 0
-            ):
+            if page.locator(
+                ".van-collapse-item, .img-texts-item, .fchl-item"
+            ).first.is_visible():
                 return PageContext.COURSE_LIST
 
-            task_blocks = page.locator(".task-block")
-            task_block_count = task_blocks.count()
-            if task_block_count > 0:
-                task_titles = page.locator(".task-block-title")
-                if task_titles.count() > 0:
-                    return PageContext.PROJECT_LIST
+            task_block = page.locator(".task-block .task-block-title").first
+            if task_block.is_visible():
+                return PageContext.PROJECT_LIST
 
-            img_text_blocks = page.locator(".img-text-block")
-            if img_text_blocks.count() > 0:
+            if page.locator(".img-text-block").first.is_visible():
                 return PageContext.PROJECT_LIST
 
             url = (page.url or "").lower()
             if "learning-task-list" in url:
                 return PageContext.PROJECT_LIST
-            if any(k in url for k in ["study", "course", "resource"]):
-                return PageContext.COURSE_LIST
-            if any(k in url for k in ["exam", "paper", "review"]):
-                return PageContext.EXAM_LIST
+            # 不再基于 URL 关键词推断 COURSE_LIST / EXAM_LIST，
+            # 因为 URL 可能匹配 iframe 内部地址而非主页面，
+            # 导致误判页面状态。DOM 元素检测才是可靠的依据。
 
         except Exception:
             pass
@@ -247,6 +246,71 @@ class BaseMixin:
             except Exception:
                 return False
 
+    def _force_click(self, locator) -> bool:
+        """强制点击元素，无视视口限制。
+
+        优先 Playwright force=True，失败则用 JS el.click() 绕过视口检查。
+        """
+        if not locator or not self._page or self._page.is_closed():
+            return False
+        try:
+            locator.click(force=True)
+            return True
+        except Exception:
+            try:
+                locator.evaluate("el => el.click()")
+                return True
+            except Exception:
+                return False
+
+    @staticmethod
+    def _vue_app_finder_js() -> str:
+        """返回在 Vue2/Vue3 混合页面中查找组件实例的 JS 工具函数。"""
+        return r"""
+            function getVueProxy(el) {
+                if (!el) return null;
+                if (el.__vue__) return el.__vue__;
+                if (el.__vueParentComponent?.proxy) return el.__vueParentComponent.proxy;
+                if (el.__vue_app__?._instance?.proxy) return el.__vue_app__._instance.proxy;
+                return null;
+            }
+
+            function findVueProxy(requiredKeys) {
+                const roots = ['.page', '#app', '[data-v-app]', 'body'];
+                const seen = new Set();
+                const stack = [];
+
+                for (const sel of roots) {
+                    const el = document.querySelector(sel);
+                    if (el) stack.push(el);
+                }
+                document.querySelectorAll('.page, .popup, .cpm-exam').forEach(el => stack.push(el));
+
+                while (stack.length) {
+                    const el = stack.shift();
+                    if (!el || seen.has(el)) continue;
+                    seen.add(el);
+
+                    const vm = getVueProxy(el);
+                    if (vm) {
+                        const candidates = [vm];
+                        if (vm.$parent) candidates.push(vm.$parent);
+                        if (vm.$root) candidates.push(vm.$root);
+                        for (const c of candidates) {
+                            if (!requiredKeys || requiredKeys.every(k => c && k in c)) {
+                                return c;
+                            }
+                        }
+                    }
+
+                    if (el.children) {
+                        for (const child of el.children) stack.push(child);
+                    }
+                }
+                return null;
+            }
+        """
+
     def _extract_project_overview(self) -> dict[str, Any]:
         """从页面提取项目汇总信息。
 
@@ -261,7 +325,10 @@ class BaseMixin:
         try:
             js_code = """
             () => {
-                const app = document.querySelector('.page')?.__vue__;
+                %s
+                // 源码中的 CourseIndex/StudyPage 都挂在 .page 下；这里递归查找，
+                // 避免组件根节点变化时拿不到 subjectList / examList。
+                const app = findVueProxy(['subjectList']) || findVueProxy(null);
                 if (!app) return null;
 
                 const result = {
@@ -302,8 +369,68 @@ class BaseMixin:
 
                 return result;
             }
-            """
+            """ % self._vue_app_finder_js()
             data = self._page.evaluate(js_code)
             return data if data else {}
+        except Exception:
+            return {}
+
+    def _get_project_list_progress(self) -> list[dict[str, Any]]:
+        """从项目列表页的 Vue 数据中读取所有项目的进度。
+
+        LearningTaskList.vue 的 taskList 结构:
+        [{projectName, userProjectId, progressPet, studyState, studyStateLabel, ...}]
+        """
+        if not self._page or self._page.is_closed():
+            return []
+        try:
+            js_code = """
+            () => {
+                %s
+                const app = findVueProxy(['taskList']) || findVueProxy(null);
+                if (!app || !Array.isArray(app.taskList)) return [];
+                return app.taskList.map(t => ({
+                    name: t.projectName || '',
+                    userProjectId: t.userProjectId || '',
+                    projectId: t.projectId || '',
+                    projectCategory: t.projectCategory || '',
+                    projectAttribute: t.projectAttribute || '',
+                    completion: t.completion || {},
+                    progress: t.progressPet || 0,
+                    studyState: t.studyState || 0,
+                    studyStateLabel: t.studyStateLabel || ''
+                }));
+            }
+            """ % self._vue_app_finder_js()
+            data = self._page.evaluate(js_code)
+            return data if data else []
+        except Exception:
+            return []
+
+    def _call_show_progress_api(self) -> dict[str, Any]:
+        """直接调用 /project/showProgress.do API 获取精确的课程完成数据。
+
+        比从 Vue 读取更可靠：即使 Vue 数据未加载，API 也能返回最新状态。
+        Playwright 的 page.evaluate 会自动等待 Promise resolve。
+        返回: {requiredNum, requiredFinishedNum, pushNum, pushFinishedNum,
+               optionalNum, optionalFinishedNum, examAssessmentNum, examFinishedNum, ...}
+        """
+        if not self._page or self._page.is_closed():
+            return {}
+        try:
+            js_code = """
+            () => {
+                %s
+                const app = findVueProxy(['$request']) || findVueProxy(null);
+                if (!app) return null;
+                const projectId = app.projectId || app.$route?.query?.projectId;
+                if (!projectId) return null;
+                return app.$request('/project/showProgress.do', {
+                    userProjectId: projectId
+                });
+            }
+            """ % self._vue_app_finder_js()
+            data = self._page.evaluate(js_code)
+            return data if isinstance(data, dict) else {}
         except Exception:
             return {}
