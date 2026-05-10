@@ -72,28 +72,13 @@ def _classify_toast(msg: str) -> str:
     return "ignore"
 
 
-# ---------------------------------------------------------------------------
-# DOM 元素选择器常量定义
-# 通过 const.py 统一管理，此处仅使用别名保持向后兼容
-# ---------------------------------------------------------------------------
-_SEL_INPUT_TENANT = SEL_LOGIN_TENANT_INPUT
-_SEL_INPUT_TENANT_SEARCH = SEL_LOGIN_TENANT_SEARCH
-_SEL_INPUT_ACCOUNT = SEL_LOGIN_ACCOUNT
-_SEL_INPUT_PASSWORD = SEL_LOGIN_PASSWORD
-_SEL_CAPTCHA_IMG = SEL_LOGIN_CAPTCHA_IMG
-_SEL_CAPTCHA_INPUT = SEL_LOGIN_CAPTCHA_INPUT
-_SEL_LOGIN_SUBMIT_BTN = SEL_LOGIN_SUBMIT_BTN_AUTH
-_SEL_TOAST_MESSAGE = SEL_LOGIN_TOAST
-_SEL_POPUP_CONFIRM = SEL_LOGIN_POPUP_CONFIRM
-_SEL_SCHOOL_ITEM = SEL_LOGIN_SCHOOL_ITEM_TEMPLATE
-
 _SEL_LOGIN_FORM_INPUTS = (
-    f"{_SEL_INPUT_TENANT}, "
-    f"{_SEL_INPUT_TENANT_SEARCH}, "
+    f"{SEL_LOGIN_TENANT_INPUT}, "
+    f"{SEL_LOGIN_TENANT_SEARCH}, "
     "input[placeholder*='账号'], "
     "input[placeholder*='学号'], "
     "input[type='password'], "
-    f"{_SEL_LOGIN_SUBMIT_BTN}, button[type='submit'], button:has-text('登录')"
+    f"{SEL_LOGIN_SUBMIT_BTN_AUTH}, button[type='submit'], button:has-text('登录')"
 )
 _SEL_POST_LOGIN_MARKERS = (
     ".task-block, .van-tab, .van-collapse-item, .img-texts-item, "
@@ -221,7 +206,7 @@ class AuthMixin(BaseMixin):
         if not self._page:
             return False
         try:
-            confirm_btn = self._page.locator(_SEL_POPUP_CONFIRM).first
+            confirm_btn = self._page.locator(SEL_LOGIN_POPUP_CONFIRM).first
             if confirm_btn.count() > 0 and confirm_btn.is_visible():
                 msg_text = "提示"
                 try:
@@ -238,7 +223,6 @@ class AuthMixin(BaseMixin):
                     pass
                 self.log.info(f"[登录辅助] 处理弹窗: {msg_text[:60]}...")
                 confirm_btn.click(force=True)
-                time.sleep(1)
                 return True
         except Exception:
             pass
@@ -252,7 +236,6 @@ class AuthMixin(BaseMixin):
                 f"{self.base_url}/#/learning-task-list",
                 wait_until="domcontentloaded",
             )
-            time.sleep(2)
             return self._is_logged_in()
         except Exception:
             return False
@@ -305,7 +288,6 @@ class AuthMixin(BaseMixin):
                 localStorage.setItem('user', JSON.stringify(userObj));
             """)
             self._page.reload(wait_until="domcontentloaded")
-            time.sleep(2)
             if self._is_logged_in():
                 self.log.info("使用配置的 Token 登录成功")
                 return _extract_user_result()
@@ -315,7 +297,6 @@ class AuthMixin(BaseMixin):
             self._start()
 
         self._page.goto(f"{self.base_url}/#/", wait_until="domcontentloaded")
-        time.sleep(1)
         self.log.info("进入登录流程")
         self._auth_event = threading.Event()
 
@@ -324,14 +305,14 @@ class AuthMixin(BaseMixin):
             # --- 选择学校 ---
             if self.tenant_name:
                 try:
-                    tenant_input = self._page.locator(_SEL_INPUT_TENANT)
+                    tenant_input = self._page.locator(SEL_LOGIN_TENANT_INPUT)
                     tenant_input.wait_for(state="visible", timeout=8000)
                     tenant_input.click()
                     time.sleep(0.8)
 
                     # 在学校搜索弹窗中输入学校名称进行搜索
                     tenant_name_clean = self.tenant_name.strip()
-                    search_input = self._page.locator(_SEL_INPUT_TENANT_SEARCH).first
+                    search_input = self._page.locator(SEL_LOGIN_TENANT_SEARCH).first
                     try:
                         search_input.wait_for(state="visible", timeout=5000)
                         search_input.fill(tenant_name_clean)
@@ -344,12 +325,11 @@ class AuthMixin(BaseMixin):
                                 search_input.fill(tenant_name_clean)
                         except Exception:
                             pass
-                    time.sleep(1.0)
 
                     # 多策略匹配学校项点击
                     school_clicked = False
                     for school_sel in [
-                        _SEL_SCHOOL_ITEM.format(name=tenant_name_clean),
+                        SEL_LOGIN_SCHOOL_ITEM_TEMPLATE.format(name=tenant_name_clean),
                         f".van-cell:has-text('{tenant_name_clean}')",
                         f".van-cell__title span:text-is('{tenant_name_clean}')",
                         f"li:has-text('{tenant_name_clean}')",
@@ -372,7 +352,6 @@ class AuthMixin(BaseMixin):
                             f"未在列表中定位到学校「{tenant_name_clean}」，请检查学校名称或手动选择"
                         )
 
-                    time.sleep(0.5)
                     try:
                         self._page.locator(_SEL_MODAL_OVERLAY).wait_for(
                             state="hidden", timeout=3000
@@ -384,7 +363,7 @@ class AuthMixin(BaseMixin):
 
                 for _ in range(2):
                     if self._handle_login_popups():
-                        time.sleep(0.5)
+                        pass
                     else:
                         break
 
@@ -392,7 +371,7 @@ class AuthMixin(BaseMixin):
             if self.account and self.password:
                 try:
                     # 账号：优先使用 loginp-input 语义类（非 readonly, 非 maxlength, 非 password）
-                    acc_input = self._page.locator(_SEL_INPUT_ACCOUNT)
+                    acc_input = self._page.locator(SEL_LOGIN_ACCOUNT)
                     if acc_input.count() == 0:
                         acc_input = self._page.locator(
                             "input[type='text']:not([readonly]):not([maxlength]):not([type='password'])"
@@ -400,12 +379,12 @@ class AuthMixin(BaseMixin):
                     acc_input.first.wait_for(state="visible", timeout=5000)
                     acc_input.first.fill(self.account)
 
-                    pwd_input = self._page.locator(_SEL_INPUT_PASSWORD).first
+                    pwd_input = self._page.locator(SEL_LOGIN_PASSWORD).first
                     pwd_input.wait_for(state="visible", timeout=5000)
                     pwd_input.fill(self.password)
 
                     # 验证码：仅当验证码图片可见时才尝试 OCR
-                    capt_img = self._page.locator(_SEL_CAPTCHA_IMG).first
+                    capt_img = self._page.locator(SEL_LOGIN_CAPTCHA_IMG).first
                     capt_visible = False
                     try:
                         capt_img.wait_for(state="visible", timeout=5000)
@@ -419,7 +398,7 @@ class AuthMixin(BaseMixin):
                         code = _ocr_captcha_with_retry(capt_img, ocr, self.log)
                         if code:
                             self.log.info(f"[文字验证码] 识别结果: {code}")
-                            capt_input = self._page.locator(_SEL_CAPTCHA_INPUT).first
+                            capt_input = self._page.locator(SEL_LOGIN_CAPTCHA_INPUT).first
                             if capt_input.is_visible():
                                 capt_input.fill(code)
                         else:
@@ -432,7 +411,7 @@ class AuthMixin(BaseMixin):
                             if code2 and len(str(code2)) >= 3:
                                 self.log.info(f"[文字验证码] 宽松模式: {code2}")
                                 capt_input = self._page.locator(
-                                    _SEL_CAPTCHA_INPUT
+                                    SEL_LOGIN_CAPTCHA_INPUT
                                 ).first
                                 if capt_input.is_visible():
                                     capt_input.fill(str(code2)[:6])
@@ -441,12 +420,11 @@ class AuthMixin(BaseMixin):
                             "[文字验证码] 未检测到验证码图片，可能是无验证码登录"
                         )
 
-                    submit_loc = self._page.locator(_SEL_LOGIN_SUBMIT_BTN)
+                    submit_loc = self._page.locator(SEL_LOGIN_SUBMIT_BTN_AUTH)
                     if submit_loc.count() > 0:
                         submit_loc.first.click(force=True)
                     else:
                         self._page.keyboard.press("Enter")
-                    time.sleep(2)
                 except Exception as e:
                     self.log.warning(f"自动填写表单失败: {e}")
 
@@ -454,7 +432,6 @@ class AuthMixin(BaseMixin):
             deadline = time.time() + self.browser_config.manual_login_timeout_sec
             _last_reported: set = set()
             _auth_detected_at: float | None = None
-            _last_was_tencent: bool = False
 
             while time.time() < deadline:
                 if not is_page_valid():
@@ -488,7 +465,7 @@ class AuthMixin(BaseMixin):
                 self._handle_login_popups()
 
                 try:
-                    raw_msgs = self._page.locator(_SEL_TOAST_MESSAGE).all_inner_texts()
+                    raw_msgs = self._page.locator(SEL_LOGIN_TOAST).all_inner_texts()
                     for msg in [m.strip() for m in raw_msgs if m.strip()]:
                         kind = _classify_toast(msg)
                         if kind == "ignore":
@@ -503,25 +480,24 @@ class AuthMixin(BaseMixin):
                         if "验证码" in msg and any(
                             k in msg for k in ("错", "误", "效", "不正确")
                         ):
-                            capt_img = self._page.locator(_SEL_CAPTCHA_IMG).first
+                            capt_img = self._page.locator(SEL_LOGIN_CAPTCHA_IMG).first
                             if capt_img.is_visible():
                                 ocr = _get_ocr()
                                 code = _ocr_captcha_with_retry(capt_img, ocr, self.log)
                                 if code:
                                     self.log.info(f"[验证码重试] 识别结果: {code}")
                                     capt_input = self._page.locator(
-                                        _SEL_CAPTCHA_INPUT
+                                        SEL_LOGIN_CAPTCHA_INPUT
                                     ).first
                                     if capt_input.is_visible():
                                         capt_input.fill(code)
                                         submit_loc = self._page.locator(
-                                            _SEL_LOGIN_SUBMIT_BTN
+                                            SEL_LOGIN_SUBMIT_BTN_AUTH
                                         )
                                         if submit_loc.count() > 0:
                                             submit_loc.first.click(force=True)
                                         else:
                                             self._page.keyboard.press("Enter")
-                                        time.sleep(2)
                                         _last_reported.discard(msg)
                 except Exception:
                     pass
