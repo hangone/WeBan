@@ -439,14 +439,12 @@ class AnswerMixin(BaseMixin):
                         f"{self.base_url}/#/learning-task-list",
                         wait_until="domcontentloaded",
                     )
-                    time.sleep(2)
 
                     tab_el = self._page.locator(
                         f'.van-tab:has-text("{tab_name}")'
                     ).first
                     if tab_el.is_visible():
                         tab_el.click(force=True)
-                        time.sleep(1.5)
 
                     if not self._wait_for(_SEL_TASK_BLOCK, timeout=8000):
                         continue
@@ -458,13 +456,11 @@ class AnswerMixin(BaseMixin):
                             f"{self.base_url}/#/learning-task-list",
                             wait_until="domcontentloaded",
                         )
-                        time.sleep(1)
                         tab_el = self._page.locator(
                             f'.van-tab:has-text("{tab_name}")'
                         ).first
                         if tab_el.is_visible():
                             tab_el.click(force=True)
-                        time.sleep(1)
 
                         proj = self._page.locator(_SEL_TASK_BLOCK).nth(proj_idx)
                         proj_title = (
@@ -479,7 +475,6 @@ class AnswerMixin(BaseMixin):
                         if not exam_tab.is_visible():
                             continue
                         exam_tab.click(force=True)
-                        time.sleep(1.5)
 
                         r_btns = self._page.locator(_SEL_EXAM_RECORD_BTN)
                         for exam_idx in range(r_btns.count()):
