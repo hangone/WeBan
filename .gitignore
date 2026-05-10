@@ -293,11 +293,18 @@ poetry.toml
 # LSP config files
 pyrightconfig.json
 
+# End of https://www.toptal.com/developers/gitignore/api/macos,python,pycharm+all
+
+# ruff
+.ruff_cache/
+
+# LSP config files
+pyrightconfig.json
+
 # Config
 config.toml
 
 # Debug
-pw-browsers/
 src/
 logs/
 
@@ -306,3 +313,4 @@ logs/
 .claude/
 .zed/
 skills-lock.json
+tests/
