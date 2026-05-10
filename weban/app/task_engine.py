@@ -1,6 +1,7 @@
 import os
+import signal
 import sys
-import time
+import threading
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -41,6 +42,7 @@ class TaskEngine:
         self.settings = config.settings
         self._base_path = os.path.dirname(config.config_path)
         self._debug_enabled = bool(self.settings.get("debug", False))
+        self._hang_event = threading.Event()
 
     def _build_task_settings(self, account_cfg: dict[str, Any]) -> TaskSettings:
         """合并全局 settings 与账号级覆盖配置。"""
@@ -107,6 +109,16 @@ class TaskEngine:
         """执行所有账号的自动化流程。"""
         self._prepare_runtime()
 
+        # 用信号处理让挂起线程能被 Ctrl+C 干净退出
+        original_sigint = signal.getsignal(signal.SIGINT)
+
+        def _handle_sigint(signum, frame):
+            self._hang_event.set()
+            if callable(original_sigint):
+                original_sigint(signum, frame)
+
+        signal.signal(signal.SIGINT, _handle_sigint)
+
         accounts = self.config.accounts
         for index, account_cfg in enumerate(accounts):
             name = account_cfg.get("username") or f"账号{index + 1}"
@@ -118,22 +130,25 @@ class TaskEngine:
         success_count = 0
         failed_count = 0
 
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {
-                executor.submit(self._run_single_account, account_cfg, index): index
-                for index, account_cfg in enumerate(accounts)
-            }
+        try:
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = {
+                    executor.submit(self._run_single_account, account_cfg, index): index
+                    for index, account_cfg in enumerate(accounts)
+                }
 
-            for future in as_completed(futures):
-                index = futures[future]
-                try:
-                    if future.result():
-                        success_count += 1
-                    else:
+                for future in as_completed(futures):
+                    index = futures[future]
+                    try:
+                        if future.result():
+                            success_count += 1
+                        else:
+                            failed_count += 1
+                    except Exception as exc:
+                        self.logger.error(f"[账号 {index + 1}] 线程执行异常: {exc}")
                         failed_count += 1
-                except Exception as exc:
-                    self.logger.error(f"[账号 {index + 1}] 线程执行异常: {exc}")
-                    failed_count += 1
+        finally:
+            signal.signal(signal.SIGINT, original_sigint)
 
         self.logger.info(
             f"所有账号执行完成！成功: {success_count}，失败: {failed_count}"
@@ -225,10 +240,9 @@ class TaskEngine:
 
                 if not task_settings.close_browser:
                     account_logger.info(
-                        "配置指定任务完成后不关闭浏览器，程序将在此挂起。"
+                        "配置指定任务完成后不关闭浏览器，程序将在此挂起。按 Ctrl+C 退出。"
                     )
-                    while True:
-                        time.sleep(1)
+                    self._hang_event.wait()
 
             return True
 
