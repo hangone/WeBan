@@ -79,10 +79,13 @@ SEL_EXAM_ITEM = ".exam-item"
 SEL_EXAM_ITEM_TITLE = ".exam-item-title, .exam-info h3"
 SEL_EXAM_ITEM_PASS = ".exam-pass, .exam-result"
 SEL_EXAM_RESULT_SCORE = ".exam-score, .result-score, .score-text"
-SEL_EXAM_SUBMIT_AREA = "button:has-text('交卷'), button:has-text('完成')"
+SEL_EXAM_SUBMIT_AREA = (
+    "button:has-text('交卷'), button:has-text('完成'), "
+    ".van-button:has-text('交卷')"
+)
 
 SEL_EXAM_PREPARE_POPUPS = (
-    ".van-popup, .mint-popup, .confirm-sheet, .sheet, .mint-msgbox"
+    ".van-popup, .mint-popup, .confirm-sheet, .mint-msgbox"
 )
 SEL_EXAM_PREPARE_NEXT = "button:has-text('下一步'), a:has-text('下一步')"
 SEL_EXAM_PREPARE_CONFIRM = (
@@ -95,17 +98,23 @@ SEL_EXAM_CONFIRM_SHEET = ".confirm-sheet"
 # 主页面底部控制栏（答题卡/上一题/下一题，无交卷按钮）
 # 使用 :visible 过滤，避免匹配到 sheet/confirm-sheet 内的隐藏控制栏
 SEL_EXAM_BOTTOM_CTRLS = ".bottom-ctrls"
-# Sheet 弹窗内的交卷按钮
+# Sheet 弹窗内的交卷按钮（支持 mint-button + van-button）
 SEL_EXAM_SHEET_SUBMIT = (
     ".sheet .bottom-ctrls button:has-text('交卷'), "
-    ".sheet .bottom-ctrls .mint-button:has-text('交卷')"
+    ".sheet .bottom-ctrls .mint-button:has-text('交卷'), "
+    ".sheet .bottom-ctrls .van-button:has-text('交卷'), "
+    ".sheet button:has-text('交卷'), "
+    ".sheet .van-button:has-text('交卷')"
 )
-# Confirm-sheet 内的确认/交卷按钮
+# Confirm-sheet 内的确认/交卷按钮（ExamPage 用 .bottom-ctrls，QuestionPage 直接在 .confirm-sheet 下）
 SEL_EXAM_CONFIRM_SUBMIT = (
     ".confirm-sheet .bottom-ctrls button:has-text('交卷'), "
     ".confirm-sheet .bottom-ctrls button:has-text('确 认'), "
     ".confirm-sheet .bottom-ctrls .mint-button:has-text('交卷'), "
-    ".confirm-sheet .bottom-ctrls .mint-button:has-text('确 认')"
+    ".confirm-sheet .bottom-ctrls .mint-button:has-text('确 认'), "
+    ".confirm-sheet .bottom-ctrls .van-button:has-text('交卷'), "
+    ".confirm-sheet .van-button:has-text('交卷'), "
+    ".confirm-sheet .van-button:has-text('确 认')"
 )
 SEL_EXAM_NEXT_BTN_IN_BOTTOM = (
     "button:has-text('下一题'), "
@@ -123,16 +132,17 @@ SEL_EXAM_QUEST_INDEX_ITEM_TEMPLATE = (
 # 答题页面 (ExamPage.vue: .quest-*)
 # ---------------------------------------------------------------------------
 
-SEL_QUEST_STEM = ".quest-stem"
-SEL_QUEST_STEM_SUB = ".title, .quest-title, .stem-text"
-SEL_QUEST_OPTION = ".quest-option-item"
+SEL_QUEST_STEM = ".quest-stem, .answerPg-container-show"
+SEL_QUEST_STEM_SUB = ".title, .quest-title, .stem-text, .answerPg-container-title"
+SEL_QUEST_OPTION = ".quest-option-item, .answerPg-container-item"
 SEL_QUEST_OPTIONS = ".quest-option-item, .answerPg-container-item"
 SEL_QUEST_CATEGORY = ".quest-category"
 SEL_QUEST_INDICATOR = ".quest-indicator, .answerPg-header-no"
 
 SEL_NEXT_BTN = (
     ".btn-start, .btn-next, .btn-ce, .btn-aq, .btn-at, .btn-af, .btn-base, .back-list, "
-    "button:has-text('下一题'), .mint-button:has-text('下一题'), .van-button:has-text('下一题')"
+    "button:has-text('下一题'), .mint-button:has-text('下一题'), "
+    ".van-button:has-text('下一题'), .answerPg-footer .van-button:has-text('下一题')"
 )
 SEL_ANSWER_CARD_BTN = (
     ".bottom-ctrls button:has-text('答题卡'), "

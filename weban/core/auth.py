@@ -162,17 +162,18 @@ class AuthMixin(BaseMixin):
             if "#/403" in url:
                 return False
 
+            on_login_page = "#/login" in url or "/login" in url.split("#")[0]
             has_auth = self._storage_has_auth()
             has_login_form = self._has_login_form()
             has_post_login_markers = self._has_post_login_markers()
 
-            if ("#/login" in url or "/login" in url.split("#")[0]) and has_login_form:
+            if on_login_page and has_login_form:
                 return False
             if has_post_login_markers:
                 return True
-            if has_auth and not has_login_form:
+            if has_auth and not has_login_form and not on_login_page:
                 return True
-            if "#/login" not in url and "/login" not in url.split("#")[0] and has_auth:
+            if not on_login_page and has_auth:
                 return True
             return False
         except Exception:
@@ -298,6 +299,10 @@ class AuthMixin(BaseMixin):
 
         self._page.goto(f"{self.base_url}/#/", wait_until="domcontentloaded")
         self.log.info("进入登录流程")
+
+        # 清除可能残留的旧登录态，避免误判为登录成功
+        self._page.evaluate("localStorage.removeItem('token'); localStorage.removeItem('user');")
+
         self._auth_event = threading.Event()
 
         self._page.on("response", self._handle_auth_response)

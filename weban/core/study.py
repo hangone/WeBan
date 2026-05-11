@@ -236,6 +236,79 @@ class StudyMixin(BaseMixin):
             pass
 
     # ========================================================================
+    # Vue collapse 展开辅助
+    # ========================================================================
+
+    def _vue_expand_collapse(self, index: int) -> bool:
+        """通过 Vue collapse API 展开指定索引的章节，回退到 click。
+
+        Returns True if expanded via API or click.
+        """
+        if not self._page or self._page.is_closed():
+            return False
+        try:
+            expanded = self._page.evaluate("""async (index) => {
+                %s
+                const app = findVueProxy(['activeNames']) || findVueProxy(['loadCourseData']);
+                if (!app) return false;
+                const val = app.activeNames || app.value || app.expanded;
+                const items = document.querySelectorAll('.van-collapse-item');
+                const item = items[index];
+                if (!item) return false;
+                const name = item.getAttribute('name') || String(index);
+                const normalizedName = /^\\d+$/.test(name) ? Number(name) : name;
+                if (Array.isArray(val) && !val.includes(name) && !val.includes(normalizedName)) {
+                    val.push(name);
+                    if (app.activeNames !== undefined) app.activeNames = [...val];
+                    else if (app.value !== undefined) app.value = [...val];
+                } else if (app.activeNames !== undefined) {
+                    app.activeNames = normalizedName;
+                } else if (app.value !== undefined) {
+                    app.value = normalizedName;
+                }
+                try {
+                    if (typeof app.onCollapseChange === 'function') {
+                        const ret = app.onCollapseChange(normalizedName);
+                        if (ret && typeof ret.then === 'function') await ret;
+                    } else if (typeof app.loadCourseData === 'function' && app.categoryList?.[normalizedName]) {
+                        const ret = app.loadCourseData(app.categoryList[normalizedName].categoryCode);
+                        if (ret && typeof ret.then === 'function') await ret;
+                    }
+                    if (typeof app.$nextTick === 'function') await app.$nextTick();
+                } catch(e) {
+                    return false;
+                }
+                return true;
+            }""" % self._vue_app_finder_js(), index)
+            if expanded:
+                return True
+        except Exception:
+            pass
+
+        # Fallback: click
+        try:
+            items = self._page.locator(SEL_COLLAPSE_ITEM)
+            if index < items.count():
+                title_btn = items.nth(index).locator(SEL_COLLAPSE_ITEM_TITLE).first
+                if title_btn.count() > 0:
+                    title_btn.scroll_into_view_if_needed(timeout=3000)
+                    title_btn.click(timeout=5000)
+                    return True
+        except Exception:
+            pass
+        return False
+
+    def _wait_for_collapse_content(self, timeout: int = 8) -> None:
+        """等待章节展开后课程列表渲染完成。"""
+        try:
+            self._page.wait_for_selector(
+                SEL_COURSE_LIST_ITEMS, state="attached", timeout=timeout * 1000
+            )
+        except Exception:
+            pass
+        time.sleep(0.5)
+
+    # ========================================================================
     # 课程列表与章节处理
     # ========================================================================
 
@@ -422,49 +495,7 @@ class StudyMixin(BaseMixin):
                             state.expanded_sections = expanded_sections
                     continue
 
-                # 优先通过 Vue collapse API 展开，回退到 click
-                expanded_via_api = False
-                try:
-                    expanded_via_api = self._page.evaluate("""async (index) => {
-                        %s
-                        const app = findVueProxy(['activeNames']) || findVueProxy(['loadCourseData']);
-                        if (!app) return false;
-                        const val = app.activeNames || app.value || app.expanded;
-                        const items = document.querySelectorAll('.van-collapse-item');
-                        const item = items[index];
-                        if (!item) return false;
-                        const name = item.getAttribute('name') || String(index);
-                        const normalizedName = /^\\d+$/.test(name) ? Number(name) : name;
-                        if (Array.isArray(val) && !val.includes(name) && !val.includes(normalizedName)) {
-                            val.push(name);
-                            if (app.activeNames !== undefined) app.activeNames = [...val];
-                            else if (app.value !== undefined) app.value = [...val];
-                        } else if (app.activeNames !== undefined) {
-                            app.activeNames = normalizedName;
-                        } else if (app.value !== undefined) {
-                            app.value = normalizedName;
-                        }
-                        // 当前源码展开章节后会调用 loadCourseData；仅改 activeNames 不会加载课程。
-                        try {
-                            if (typeof app.onCollapseChange === 'function') {
-                                const ret = app.onCollapseChange(normalizedName);
-                                if (ret && typeof ret.then === 'function') await ret;
-                            } else if (typeof app.loadCourseData === 'function' && app.categoryList?.[normalizedName]) {
-                                const ret = app.loadCourseData(app.categoryList[normalizedName].categoryCode);
-                                if (ret && typeof ret.then === 'function') await ret;
-                            }
-                            if (typeof app.$nextTick === 'function') await app.$nextTick();
-                        } catch(e) {
-                            return false;
-                        }
-                        return true;
-                    }""" % self._vue_app_finder_js(), i)
-                except Exception:
-                    pass
-
-                if not expanded_via_api:
-                    title_btn.scroll_into_view_if_needed(timeout=3000)
-                    title_btn.click(timeout=5000)
+                self._vue_expand_collapse(i)
                 self.log.info(
                     f"[章节] 展开: {title_text} ({section['finished']}/{section['total']}, {incomplete_count} 未完成)"
                 )
@@ -476,15 +507,7 @@ class StudyMixin(BaseMixin):
                     state.expanded_sections = expanded_sections
                     state._last_expanded_section_key = expand_key
 
-                # 等待展开动画完成，确保课程列表已渲染
-                try:
-                    self._page.wait_for_selector(
-                        SEL_COURSE_LIST_ITEMS, state="attached", timeout=8000
-                    )
-                except Exception:
-                    pass
-                time.sleep(0.5)
-
+                self._wait_for_collapse_content()
                 return True
             except Exception as e:
                 self.log.debug(f"[章节] 展开失败({title_text}): {e}")
@@ -541,63 +564,14 @@ class StudyMixin(BaseMixin):
                     )
                     continue
 
-                # 优先通过 Vue collapse API 展开，回退到 click
-                expanded_via_api = False
-                try:
-                    expanded_via_api = self._page.evaluate("""async (index) => {
-                        %s
-                        const app = findVueProxy(['activeNames']) || findVueProxy(['loadCourseData']);
-                        if (!app) return false;
-                        const val = app.activeNames || app.value || app.expanded;
-                        const items = document.querySelectorAll('.van-collapse-item');
-                        const item = items[index];
-                        if (!item) return false;
-                        const name = item.getAttribute('name') || String(index);
-                        const normalizedName = /^\\d+$/.test(name) ? Number(name) : name;
-                        if (Array.isArray(val) && !val.includes(name) && !val.includes(normalizedName)) {
-                            val.push(name);
-                            if (app.activeNames !== undefined) app.activeNames = [...val];
-                            else if (app.value !== undefined) app.value = [...val];
-                        } else if (app.activeNames !== undefined) {
-                            app.activeNames = normalizedName;
-                        } else if (app.value !== undefined) {
-                            app.value = normalizedName;
-                        }
-                        try {
-                            if (typeof app.onCollapseChange === 'function') {
-                                const ret = app.onCollapseChange(normalizedName);
-                                if (ret && typeof ret.then === 'function') await ret;
-                            } else if (typeof app.loadCourseData === 'function' && app.categoryList?.[normalizedName]) {
-                                const ret = app.loadCourseData(app.categoryList[normalizedName].categoryCode);
-                                if (ret && typeof ret.then === 'function') await ret;
-                            }
-                            if (typeof app.$nextTick === 'function') await app.$nextTick();
-                        } catch(e) {
-                            return false;
-                        }
-                        return true;
-                    }""" % self._vue_app_finder_js(), i)
-                except Exception:
-                    pass
-
-                if not expanded_via_api:
-                    title_btn.scroll_into_view_if_needed(timeout=3000)
-                    title_btn.click(timeout=5000)
+                self._vue_expand_collapse(i)
                 self.log.info(f"[章节] 盲目展开 #{i}: {title_text}")
 
+                expand_count_map[expand_key] = expand_count_map.get(expand_key, 0) + 1
                 if state:
                     state._expand_count_map = expand_count_map
-                    expand_count_map[expand_key] = (
-                        expand_count_map.get(expand_key, 0) + 1
-                    )
 
-                try:
-                    self._page.wait_for_selector(
-                        SEL_COURSE_LIST_ITEMS, state="attached", timeout=6000
-                    )
-                except Exception:
-                    pass
-                time.sleep(0.5)
+                self._wait_for_collapse_content()
                 return True
         except Exception as e:
             self.log.debug(f"[章节] 盲目展开失败: {e}")
@@ -1009,6 +983,105 @@ class StudyMixin(BaseMixin):
             self.log.debug(f"[分析] 课程结构分析异常: {e}")
         return info
 
+    def _detect_course_archetype(self, frame) -> str:
+        """检测课程 iframe 内的课程类型。
+
+        Returns:
+            'standard'   — 有 nonstrMap + callApinext (A01-A13, DA, A26 等)
+            'animate'    — 使用 animate.public.js / sdk.js，无 callApinext (A14)
+            'webpack'    — webpack 打包，PageController 导航 (A23, A32, A33)
+            'simple'     — 只有 finishWxCourse，无额外追踪
+        """
+        try:
+            result = frame.evaluate("""() => {
+                const hasCallApinext = typeof callApinext === 'function';
+                const hasNonstrMap = typeof nonstrMap !== 'undefined' && nonstrMap instanceof Map;
+                const hasPageController = typeof PageController === 'function'
+                    || document.querySelector('.page-content-common') !== null;
+                const hasAnimatePublic = typeof animatePublic !== 'undefined'
+                    || document.querySelector('script[src*="animate.public"]') !== null
+                    || document.querySelector('.item-animation') !== null;
+                return {
+                    callApinext: hasCallApinext,
+                    nonstrMap: hasNonstrMap,
+                    pageController: hasPageController,
+                    animatePublic: hasAnimatePublic,
+                };
+            }""")
+            if result:
+                if result.get("callApinext") and result.get("nonstrMap"):
+                    return "standard"
+                if result.get("pageController"):
+                    return "webpack"
+                if result.get("animatePublic"):
+                    return "animate"
+        except Exception:
+            pass
+        return "simple"
+
+    def _has_inline_quiz(self, frame) -> bool:
+        """检测课程是否有内嵌答题页面 (page-aq)。"""
+        try:
+            return frame.evaluate(
+                "() => document.querySelectorAll('[class*=\"page-aq\"]').length > 0"
+            )
+        except Exception:
+            return False
+
+    def _handle_inline_quiz(self, frame) -> bool:
+        """处理课程内嵌答题页面 (page-aq)。
+
+        课程的 item.js 中定义了 slFn()/slFn2()/Btnat() 等答题函数，
+        通过对比选中的 radio value 与预设答案来判断对错。
+
+        策略：检测到 page-aq 页面后，尝试调用课程自带的答题逻辑，
+        或直接选择第一个选项并点击确认/下一题按钮。
+        """
+        try:
+            result = frame.evaluate("""() => {
+                // 检查当前是否在答题页面
+                const aqPages = document.querySelectorAll('[class*="page-aq"]');
+                if (aqPages.length === 0) return { hasQuiz: false };
+
+                let answered = 0;
+                for (const page of aqPages) {
+                    if (!page.classList.contains('page-active')
+                        && !page.classList.contains('active')
+                        && getComputedStyle(page).display === 'none') continue;
+
+                    // 尝试调用课程自带的答题函数
+                    if (typeof slFn === 'function') { try { slFn(); answered++; continue; } catch(e) {} }
+                    if (typeof slFn2 === 'function') { try { slFn2(); answered++; continue; } catch(e) {} }
+                    if (typeof Btnat === 'function') { try { Btnat(); answered++; continue; } catch(e) {} }
+
+                    // 回退：选择第一个 radio 并点击确认按钮
+                    const radios = page.querySelectorAll('input[type="radio"]');
+                    if (radios.length > 0 && !radios[0].checked) {
+                        radios[0].click();
+                    }
+                    // 点击确认/下一题按钮
+                    const btns = page.querySelectorAll('.btn-ce, .btn-next, .btn-at, button');
+                    for (const btn of btns) {
+                        const txt = (btn.textContent || '').trim();
+                        const r = btn.getBoundingClientRect();
+                        if (r.width > 0 && r.height > 0 && /确[认定]|下一[题步]|提交/.test(txt)) {
+                            btn.click();
+                            answered++;
+                            break;
+                        }
+                    }
+                }
+                return { hasQuiz: true, answered };
+            }""")
+            if result and result.get("hasQuiz"):
+                count = result.get("answered", 0)
+                if count > 0:
+                    self.log.info(f"[答题] 处理了 {count} 个内嵌答题页面")
+                    return True
+        except Exception as e:
+            self.log.debug(f"[答题] 内嵌答题处理异常: {e}")
+        return False
+
     def _call_apicenext(self, frame, nextprev: str, finish: int, nonstr_map: dict) -> bool:
         """调用 callApinext 追踪课程步骤进度。
 
@@ -1291,275 +1364,6 @@ class StudyMixin(BaseMixin):
             self.log.warning(f"[评论] 返回失败: {e}")
             return False
 
-    def _try_finish_course(self, frame) -> dict:
-        """尝试调用 finishWxCourse() / callApinext() 完成课程。
-
-        根据 sdk.js 逻辑 (finishWxCourse — 旧版 API):
-        - 成功 (code=0/1) + csCom=true → 跳转评论页 weiban.mycourse.cn/#/comment
-        - 成功 (code=0/1) + csCom!=true → 显示完成弹窗 .pop-jsv
-        - 失败 → alert('发送完成失败')
-        - csCapt=true → 先验证码再调用后端
-
-        根据 apicenext.js 逻辑 (callApinext — 新版 API):
-        - 通过 jupiterapi/api/statusercourse/v1/next 追踪步骤
-        - finished=1 标记课程完成，finished=2 仅记录进度
-        - 对于使用 callApinext 的课程，仅调用 finishWxCourse() 可能不够
-
-        Returns:
-            dict: {
-                'completed': bool,  # 课程是否真正完成
-                'need_captcha': bool,  # 是否需要验证码
-                'detached': bool,  # iframe 是否已分离（跳转到评论页）
-            }
-        """
-        try:
-            iframe_url = frame.url or ""
-            self.log.info("[完成] 调用 finishWxCourse() / callApinext()...")
-            self.log.debug(f"[完成] iframe URL: {iframe_url[:80]}")
-
-            result = frame.evaluate("""() => {
-                // 等待脚本加载完成（sdk.js / apicenext.js 可能延迟加载）
-                return new Promise((resolve) => {
-                    const start = Date.now();
-                    const waitForScripts = () => {
-                        const hasFinishWxCourse = typeof finishWxCourse === 'function';
-                        const hasCallApinext = typeof callApinext === 'function';
-                        // finishWxCourse 是真正完成课程的函数，优先使用
-                        if (hasFinishWxCourse) {
-                            doComplete(true, hasCallApinext, resolve);
-                            return;
-                        }
-                        // sdk.js 未加载（wx.js 外部脚本阻塞），使用直接 API 调用
-                        // callApinext 仅用于页面追踪，不能完成课程
-                        if (Date.now() - start >= 3000) {
-                            doComplete(false, hasCallApinext, resolve);
-                            return;
-                        }
-                        setTimeout(waitForScripts, 300);
-                    };
-                    waitForScripts();
-                });
-
-                function doComplete(hasFinishWxCourse, hasCallApinext, resolve) {
-                    const originalAlert = window.alert;
-                    let alertMsg = '';
-                    let apiResponse = null;
-
-                    window.alert = (msg) => { alertMsg = msg; };
-
-                    // 拦截 XHR 响应以获取 finishWxCourse() 的实际 API 结果
-                    // 因为 alert() 被拦截后 JS 会继续执行 redirect，
-                    // 仅靠 alert 消息或 frame 分离无法判断服务端是否真正完成
-                    const origOpen = XMLHttpRequest.prototype.open;
-                    const origSend = XMLHttpRequest.prototype.send;
-                    XMLHttpRequest.prototype.open = function(method, url, ...args) {
-                        this._url = url;
-                        return origOpen.call(this, method, url, ...args);
-                    };
-                    XMLHttpRequest.prototype.send = function(...args) {
-                        this.addEventListener('load', function() {
-                            try {
-                                if (this._url && (
-                                    this._url.includes('finishWxCourse') ||
-                                    this._url.includes('finish') ||
-                                    this._url.includes('complete') ||
-                                    this._url.includes('usercourse')
-                                )) {
-                                    apiResponse = { url: this._url, status: this.status, text: this.responseText.substring(0, 500) };
-                                }
-                            } catch(e) {}
-                        });
-                        return origSend.call(this, ...args);
-                    };
-
-                    const checkCompletion = () => {
-                        window.alert = originalAlert;
-                        XMLHttpRequest.prototype.open = origOpen;
-                        XMLHttpRequest.prototype.send = origSend;
-
-                        // 检查是否显示完成弹窗
-                        const popJs = document.querySelector('.pop-jsv');
-                        if (popJs) { const r = popJs.getBoundingClientRect(); if (r.width > 0 && r.height > 0) {
-                            resolve({ completed: true, need_captcha: false, popup: true });
-                            return;
-                        } }
-
-                        // 检查是否有验证码弹窗（排除预加载的隐藏容器）
-                        const captchaContainer = document.querySelector('#tcaptcha_transform_dy');
-                        if (captchaContainer) {
-                            const cs = (captchaContainer.getAttribute('style') || '').toLowerCase();
-                            const isActive = !cs.includes('opacity: 0') && !cs.includes('opacity:0')
-                                && !cs.includes('top: -1e+06') && !cs.includes('top:-1e+06');
-                            if (isActive) {
-                                resolve({ completed: false, need_captcha: true });
-                                return;
-                            }
-                        }
-
-                        // 检查 XHR 响应判断服务端结果
-                        if (apiResponse) {
-                            try {
-                                const data = JSON.parse(apiResponse.text);
-                                if (data.code === 0 || data.code === 1 || data.code === '0' || data.code === '1') {
-                                    resolve({ completed: true, need_captcha: false, apiSuccess: true });
-                                    return;
-                                }
-                            } catch(e) {
-                                // 非 JSON 响应，检查文本
-                                if (apiResponse.text.includes('"code":0') || apiResponse.text.includes('"code":1')) {
-                                    resolve({ completed: true, need_captcha: false, apiSuccess: true });
-                                    return;
-                                }
-                            }
-                            resolve({ completed: false, need_captcha: false, reason: 'API 返回失败: ' + apiResponse.text.substring(0, 200) });
-                            return;
-                        }
-
-                        // 检查是否失败（alert 消息）
-                        if (alertMsg.includes('失败')) {
-                            resolve({ completed: false, need_captcha: false, reason: alertMsg });
-                            return;
-                        }
-
-                        // 默认：未完成但无错误
-                        resolve({ completed: false, need_captcha: false });
-                    };
-
-                    // 从 iframe URL 提取参数，用于直接调用 finish API（fallback）
-                    function getQueryParam(name) {
-                        const m = window.location.search.match(new RegExp('(^|&)' + name + '=([^&]*)(&|$)', 'i'));
-                        return m ? decodeURIComponent(m[2]) : null;
-                    }
-
-                    function directFinishAPI() {
-                        const userCourseId = getQueryParam('userCourseId');
-                        const tenantCode = getQueryParam('tenantCode');
-                        const weiban = getQueryParam('weiban');
-                        const lyra = getQueryParam('lyra');
-                        const source = getQueryParam('source');
-
-                        if (!userCourseId) return;
-
-                        let url = '';
-                        if (weiban !== 'weiban') {
-                            if (lyra === 'lyra') {
-                                url = 'https://lyra.mycourse.cn/lyraapi/study/course/finish.api';
-                            } else {
-                                url = 'https://open.mycourse.cn/proteus/usercourse/finish.do';
-                            }
-                        } else if (source === 'moon') {
-                            url = 'https://moon.mycourse.cn/moonapi/api/study/activity/microCourse/v1/finishedCourse';
-                        } else {
-                            url = 'https://weiban.mycourse.cn/pharos/usercourse/v2/' + userCourseId + '.do';
-                        }
-
-                        // 尝试 JSONP（与 sdk.js 的 $.ajax jsonp 模式一致）
-                        const callbackName = '_finishCb_' + Date.now();
-                        const script = document.createElement('script');
-                        const params = 'userCourseId=' + encodeURIComponent(userCourseId)
-                            + '&tenantCode=' + encodeURIComponent(tenantCode)
-                            + '&callback=' + callbackName;
-                        script.src = url + (url.includes('?') ? '&' : '?') + params;
-                        window[callbackName] = function(data) {
-                            apiResponse = { url: url, status: 200, text: JSON.stringify(data) };
-                            delete window[callbackName];
-                            try { document.head.removeChild(script); } catch(e) {}
-                        };
-                        script.onerror = function() {
-                            delete window[callbackName];
-                            try { document.head.removeChild(script); } catch(e) {}
-                            // JSONP 失败，尝试 XHR POST（lyra 等非 JSONP 接口）
-                            try {
-                                const xhr = new XMLHttpRequest();
-                                xhr.open('POST', url, true);
-                                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-                                xhr.onload = function() {
-                                    apiResponse = { url: url, status: xhr.status, text: xhr.responseText.substring(0, 500) };
-                                };
-                                xhr.onerror = function() {};
-                                xhr.send('userCourseId=' + encodeURIComponent(userCourseId) + '&tenantCode=' + encodeURIComponent(tenantCode));
-                            } catch(e) {}
-                        };
-                        document.head.appendChild(script);
-                    }
-
-                    try {
-                        // 确保 pageNums >= 4（反作弊检查）
-                        // pageNums 是 let 变量，不能通过 window.pageNums 修改
-                        try {
-                            if (typeof pageNums !== 'undefined' && pageNums < 4) {
-                                pageNums = 4;
-                            }
-                        } catch(e) {}
-
-                        if (hasFinishWxCourse) {
-                            // 正常路径：调用 sdk.js 定义的 finishWxCourse()
-                            finishWxCourse();
-                        } else {
-                            // fallback：finishWxCourse 不可用（sdk.js 未加载），
-                            // 直接调用 finish API
-                            directFinishAPI();
-                        }
-
-                        // 轮询等待完成状态（弹窗/跳转），最多 8 秒
-                        let elapsed = 0;
-                        const poll = () => {
-                            const popJs = document.querySelector('.pop-jsv');
-                            if (popJs) { const r = popJs.getBoundingClientRect(); if (r.width > 0 && r.height > 0) {
-                                window.alert = originalAlert;
-                                XMLHttpRequest.prototype.open = origOpen;
-                                XMLHttpRequest.prototype.send = origSend;
-                                resolve({ completed: true, need_captcha: false, popup: true });
-                                return;
-                            } }
-                            elapsed += 500;
-                            if (elapsed >= 8000) {
-                                checkCompletion();
-                                return;
-                            }
-                            setTimeout(poll, 500);
-                        };
-                        setTimeout(poll, 1000);
-                    } catch (e) {
-                        window.alert = originalAlert;
-                        XMLHttpRequest.prototype.open = origOpen;
-                        XMLHttpRequest.prototype.send = origSend;
-                        resolve({ completed: false, need_captcha: false, reason: e.message });
-                    }
-                }
-            }""")
-
-            reason = result.get("reason", "")
-            if result.get("completed"):
-                if result.get("popup"):
-                    self.log.info("[完成] 后端成功 - 显示完成弹窗")
-                else:
-                    self.log.info("[完成] 后端成功")
-            elif result.get("need_captcha"):
-                self.log.info("[完成] 需要验证码")
-            elif reason:
-                self.log.warning(f"[完成] 后端返回失败: {reason}")
-            else:
-                self.log.debug("[完成] 继续学习中...")
-
-            return result
-
-        except Exception as e:
-            err_msg = str(e).lower()
-            if "frame was detached" in err_msg or "has been closed" in err_msg:
-                # Frame 分离是客户端行为（course JS redirect to /comment），
-                # 不能作为服务端完成的判断依据。finishWxCourse() 失败时
-                # 同样会触发 frame 分离（因为 alert 被拦截后 JS 继续执行 redirect）。
-                self.log.info("[完成] iframe 已分离（客户端行为，不代表服务端完成）")
-                return {
-                    "completed": False,
-                    "need_captcha": False,
-                    "detached": True,
-                }
-
-            self.log.warning(f"[完成] finishWxCourse() 调用异常: {e}")
-            return {"completed": False, "need_captcha": False}
-
     def _handle_captcha_if_needed(self, frame) -> bool:
         """检测并处理验证码。
 
@@ -1670,40 +1474,16 @@ class StudyMixin(BaseMixin):
         except Exception:
             return False
 
-    def _finish_course_via_api(self, frame) -> bool:
-        """直接调用 finish API 完成课程（sdk.js 未加载时的 fallback）。"""
-        self.log.info("[完成] 尝试直接调用 finish API...")
-        try:
-            result = self._try_finish_course(frame)
-            if result.get("completed"):
-                self.log.info("[完成] 直接 API 调用成功")
-                if result.get("popup"):
-                    self._return_from_comment_page()
-                return True
-            if result.get("need_captcha"):
-                self.log.info("[完成] 需要验证码")
-                if self._handle_captcha_if_needed(frame):
-                    result = self._try_finish_course(frame)
-                    if result.get("completed"):
-                        return True
-        except Exception as e:
-            if self._is_frame_detached_error(e):
-                self.log.info("[完成] frame 分离 → 课程完成")
-                self._return_from_comment_page()
-                return True
-            self.log.debug(f"[完成] 直接 API 调用异常: {e}")
-        self.log.warning("[完成] 课程未完成")
-        return False
-
     def _trigger_img_text_completion(self, frame, title: str) -> bool:
-        """通过直接调用 callApinext + finishWxCourse 完成课程。
+        """完成课程播放。根据课程类型选择不同策略。
 
-        简化流程：
-        1. 提取 nonstrMap（步骤追踪令牌，嵌入在 item.js 中）
-        2. 分析课程结构获取页数
-        3. 对每一页调用 callApinext("next", 2, nonstrMap)
-        4. 等待至少 study_time 秒
-        5. 调用 finishWxCourse() 完成课程
+        课程类型:
+        - standard: 有 nonstrMap + callApinext，逐页调用 API 追踪步骤
+        - animate:  无 callApinext，通过 btn-next 模拟点击翻页
+        - webpack:  PageController 导航，通过 btn-next 模拟点击翻页
+        - simple:   只有 finishWxCourse，等待学时后直接完成
+
+        所有类型都会处理内嵌答题页面 (page-aq)。
         """
         try:
             if not frame:
@@ -1722,21 +1502,25 @@ class StudyMixin(BaseMixin):
             # 1. 抑制课程弹窗
             self._suppress_course_alert(frame)
 
-            # 2. 提取 nonstrMap（apicenext.js 步骤追踪令牌）
+            # 2. 检测课程类型
+            archetype = self._detect_course_archetype(frame)
+            has_quiz = self._has_inline_quiz(frame)
+            self.log.info(f"[播放] 课程类型: {archetype}, 内嵌答题: {has_quiz}")
+
+            # 3. 提取 nonstrMap（apicenext.js 步骤追踪令牌）
             nonstr_map = self._extract_nonstr_map(frame)
             self._course_nonstr_map = nonstr_map
 
-            # 3. 分析课程结构获取页数
+            # 4. 分析课程结构获取页数
             course_info = self._analyze_course_structure(frame)
             total_pages = course_info.get("total_pages", 0)
             if total_pages <= 0:
-                # 回退：至少调用 4 次（满足 pageNums >= 4 的反作弊要求）
                 total_pages = 4
                 self.log.info(f"[播放] 未检测到页面数，使用默认 {total_pages} 页")
             else:
                 self.log.info(f"[播放] 检测到 {total_pages} 页")
 
-            # 4. 设置 API 响应拦截
+            # 5. 设置 API 响应拦截
             api_results = {"steps": 0, "finished": False}
 
             def _on_course_response(response):
@@ -1759,45 +1543,30 @@ class StudyMixin(BaseMixin):
             self._page.on("response", _on_course_response)
 
             try:
-                # 5. 逐页调用 callApinext("next", 2, nonstrMap)
-                if nonstr_map:
-                    self.log.info(f"[播放] 开始调用 callApinext，共 {total_pages} 页")
-                    for i in range(total_pages):
-                        if self._check_course_completed(frame):
-                            self.log.info("[播放] 课程已自动完成")
-                            return True
-                        expected_steps = api_results["steps"] + 1
-                        self._call_apicenext(frame, "next", 2, nonstr_map)
-                        # 同步递增课程内部计数器
-                        try:
-                            frame.evaluate("""() => {
-                                try { if (typeof pageNums !== 'undefined') pageNums++; } catch(e) {}
-                                try { if (typeof sumClick !== 'undefined') sumClick++; } catch(e) {}
-                                try { if (typeof atsum !== 'undefined') atsum++; } catch(e) {}
-                            }""")
-                        except Exception:
-                            pass
-                        # 等待服务端响应，避免请求堆积导致 finishWxCourse 时步骤未处理完
-                        for _ in range(30):  # 最多等 3 秒
-                            if api_results["steps"] >= expected_steps:
-                                break
-                            time.sleep(0.1)
-                        elapsed = int(time.time() - start_time)
-                        self.log.info(
-                            f"[推进] callApinext {i + 1}/{total_pages} "
-                            f"({elapsed}s/{min_study_time}s)"
-                        )
+                if archetype == "standard" and nonstr_map:
+                    # ── 标准课程：逐页调用 callApinext ──
+                    self._complete_standard_course(
+                        frame, nonstr_map, total_pages,
+                        api_results, start_time, min_study_time
+                    )
                 else:
-                    self.log.info("[播放] 无 nonstrMap，跳过 callApinext 调用")
+                    # ── animate/webpack/simple：通过 btn-next 点击翻页 ──
+                    self._complete_by_clicking_pages(
+                        frame, total_pages, start_time, min_study_time
+                    )
 
-                # 6. 等待至少 study_time 秒
+                # 处理内嵌答题页面
+                if has_quiz:
+                    self._handle_inline_quiz(frame)
+
+                # 等待至少 study_time 秒
                 elapsed = time.time() - start_time
                 remaining = min_study_time - elapsed
                 if remaining > 0:
                     self.log.info(f"[等待] 等待剩余学时 {int(remaining)} 秒")
                     time.sleep(remaining)
 
-                # 7. 调用 finishWxCourse() 完成课程
+                # 调用 finishWxCourse() 完成课程
                 return self._finish_course_at_end(frame, api_results)
 
             finally:
@@ -1813,6 +1582,114 @@ class StudyMixin(BaseMixin):
                 return True
             self.log.error(f"[播放] 异常退出: {str(e)}")
             return False
+
+    def _complete_standard_course(
+        self, frame, nonstr_map: dict, total_pages: int,
+        api_results: dict, start_time: float, min_study_time: int
+    ) -> None:
+        """标准课程完成流程：逐页调用 callApinext 追踪步骤。"""
+        self.log.info(f"[播放] 开始调用 callApinext，共 {total_pages} 页")
+        for i in range(total_pages):
+            if self._check_course_completed(frame):
+                self.log.info("[播放] 课程已自动完成")
+                return
+            expected_steps = api_results["steps"] + 1
+            self._call_apicenext(frame, "next", 2, nonstr_map)
+            # 同步递增课程内部计数器
+            try:
+                frame.evaluate("""() => {
+                    try { if (typeof pageNums !== 'undefined') pageNums++; } catch(e) {}
+                    try { if (typeof sumClick !== 'undefined') sumClick++; } catch(e) {}
+                    try { if (typeof atsum !== 'undefined') atsum++; } catch(e) {}
+                }""")
+            except Exception:
+                pass
+            # 等待服务端响应
+            for _ in range(30):
+                if api_results["steps"] >= expected_steps:
+                    break
+                time.sleep(0.1)
+            elapsed = int(time.time() - start_time)
+            self.log.info(
+                f"[推进] callApinext {i + 1}/{total_pages} "
+                f"({elapsed}s/{min_study_time}s)"
+            )
+
+    def _complete_by_clicking_pages(
+        self, frame, total_pages: int,
+        start_time: float, min_study_time: int
+    ) -> None:
+        """非标准课程完成流程：通过 btn-next 模拟点击翻页。
+
+        适用于 animate (A14)、webpack (A23/A32/A33) 等无 callApinext 的课程。
+        这些课程的页面导航依赖 DOM 点击事件（BtnFn / PageController._btnNextPrevClick）。
+        """
+        self.log.info(f"[播放] 点击翻页模式，共 {total_pages} 页")
+
+        # 先点击 start 按钮进入课程
+        try:
+            clicked_start = frame.evaluate("""() => {
+                const btn = document.querySelector('.btn-start, .page-start .btn-next');
+                if (btn) { btn.click(); return true; }
+                return false;
+            }""")
+            if clicked_start:
+                self.log.debug("[播放] 点击了开始按钮")
+                time.sleep(1)
+        except Exception:
+            pass
+
+        for i in range(total_pages):
+            if self._check_course_completed(frame):
+                self.log.info("[播放] 课程已自动完成")
+                return
+
+            # 处理内嵌答题
+            self._handle_inline_quiz(frame)
+
+            # 点击下一题/下一页按钮
+            try:
+                clicked = frame.evaluate("""() => {
+                    // 优先点击当前活跃页面的 btn-next
+                    const activePage = document.querySelector('.page-active, .page-item[style*="display: block"]');
+                    if (activePage) {
+                        const btn = activePage.querySelector('.btn-next, .btn-next-end');
+                        if (btn) { btn.click(); return 'page-btn'; }
+                    }
+                    // 回退：全局 btn-next
+                    const btns = document.querySelectorAll('.btn-next, .btn-next-end');
+                    for (const btn of btns) {
+                        const r = btn.getBoundingClientRect();
+                        if (r.width > 0 && r.height > 0) { btn.click(); return 'global-btn'; }
+                    }
+                    // 回退：btn-ce（课程内答题确认按钮）
+                    const ce = document.querySelector('.btn-ce');
+                    if (ce) { const r = ce.getBoundingClientRect(); if (r.width > 0 && r.height > 0) { ce.click(); return 'btn-ce'; } }
+                    return null;
+                }""")
+                if clicked:
+                    self.log.debug(f"[播放] 点击翻页 {i + 1}/{total_pages} ({clicked})")
+                else:
+                    self.log.debug(f"[播放] 未找到翻页按钮 {i + 1}/{total_pages}")
+            except Exception:
+                pass
+
+            # 同步递增课程内部计数器
+            try:
+                frame.evaluate("""() => {
+                    try { if (typeof pageNums !== 'undefined') pageNums++; } catch(e) {}
+                    try { if (typeof sumClick !== 'undefined') sumClick++; } catch(e) {}
+                    try { if (typeof atsum !== 'undefined') atsum++; } catch(e) {}
+                }""")
+            except Exception:
+                pass
+
+            time.sleep(1.5)
+            elapsed = int(time.time() - start_time)
+            self.log.info(
+                f"[推进] 点击翻页 {i + 1}/{total_pages} "
+                f"({elapsed}s/{min_study_time}s)"
+            )
 
     def _finish_course_at_end(self, frame, api_results: dict) -> bool:
         """Consolidated course completion flow at the end of the course loop.
@@ -1850,9 +1727,26 @@ class StudyMixin(BaseMixin):
         if self._check_monitor_guard(frame):
             self.log.info(
                 "[完成] finishWxCourse 被 monitor.js 守卫（null），"
-                "需要继续点击更多页面"
+                "尝试点击更多页面解除守卫"
             )
-            return False
+            # monitor.js 要求足够的 btn-next 点击次数才恢复 finishWxCourse
+            for _ in range(10):
+                try:
+                    frame.evaluate("""() => {
+                        const btn = document.querySelector('.btn-next, .btn-next-end');
+                        if (btn) btn.click();
+                        try { if (typeof pageNums !== 'undefined') pageNums++; } catch(e) {}
+                        try { if (typeof sumClick !== 'undefined') sumClick++; } catch(e) {}
+                    }""")
+                except Exception:
+                    pass
+                time.sleep(0.5)
+                if not self._check_monitor_guard(frame):
+                    self.log.info("[完成] monitor.js 守卫已解除")
+                    break
+            if self._check_monitor_guard(frame):
+                self.log.warning("[完成] monitor.js 守卫仍未解除")
+                return False
 
         # ── Step 4: Call finishWxCourse() ──
         self.log.info("[完成] 调用 finishWxCourse()...")
@@ -2172,48 +2066,7 @@ class StudyMixin(BaseMixin):
                     )
 
                     if not expanded:
-                        # 优先通过 Vue collapse API 展开，回退到 click
-                        expanded_via_api = False
-                        try:
-                            expanded_via_api = self._page.evaluate("""async (index) => {
-                                %s
-                                const app = findVueProxy(['activeNames']) || findVueProxy(['loadCourseData']);
-                                if (!app) return false;
-                                const val = app.activeNames || app.value || app.expanded;
-                                const items = document.querySelectorAll('.van-collapse-item');
-                                const item = items[index];
-                                if (!item) return false;
-                                const name = item.getAttribute('name') || String(index);
-                                const normalizedName = /^\\d+$/.test(name) ? Number(name) : name;
-                                if (Array.isArray(val) && !val.includes(name) && !val.includes(normalizedName)) {
-                                    val.push(name);
-                                    if (app.activeNames !== undefined) app.activeNames = [...val];
-                                    else if (app.value !== undefined) app.value = [...val];
-                                } else if (app.activeNames !== undefined) {
-                                    app.activeNames = normalizedName;
-                                } else if (app.value !== undefined) {
-                                    app.value = normalizedName;
-                                }
-                                try {
-                                    if (typeof app.onCollapseChange === 'function') {
-                                        const ret = app.onCollapseChange(normalizedName);
-                                        if (ret && typeof ret.then === 'function') await ret;
-                                    } else if (typeof app.loadCourseData === 'function' && app.categoryList?.[normalizedName]) {
-                                        const ret = app.loadCourseData(app.categoryList[normalizedName].categoryCode);
-                                        if (ret && typeof ret.then === 'function') await ret;
-                                    }
-                                    if (typeof app.$nextTick === 'function') await app.$nextTick();
-                                } catch(e) {
-                                    return false;
-                                }
-                                return true;
-                            }""" % self._vue_app_finder_js(), i)
-                        except Exception:
-                            pass
-
-                        if not expanded_via_api:
-                            collapse_title_elem.scroll_into_view_if_needed(timeout=2000)
-                            collapse_title_elem.click(timeout=5000)
+                        self._vue_expand_collapse(i)
                         time.sleep(1.5)
                         self.log.debug(f"[定位] 已展开章节 {i}")
 

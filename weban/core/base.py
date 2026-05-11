@@ -74,18 +74,20 @@ class BaseMixin:
         try:
             page = self._page
 
-            # 使用 is_visible() 而非 count()，避免匹配到隐藏的残留元素
-            # （如交卷后 .quest-stem 可能仍在 DOM 中但不可见）
-            if page.locator(".quest-stem, .quest-option-item").first.is_visible():
-                return PageContext.EXAM_QUESTION
-
+            # 先检测结果页，再检测答题页：
+            # ExamResult.vue 复用了 .quest-stem / .quest-option-item，
+            # 如果先检测答题页会把结果页误判为答题页。
             # 不使用 .score / .score-num 等过于宽泛的选择器，
-            # 因为题目页面也可能存在含这些类名的 UI 元素，
-            # 导致误判为结果页，造成答题循环异常退出。
-            if page.locator(
-                ".exam-score, .result-score, .score-text"
-            ).first.is_visible():
+            # 因为题目页面也可能存在含这些类名的 UI 元素。
+            result_score = page.locator(".exam-score, .result-score, .score-text")
+            if result_score.count() > 0 and result_score.first.is_visible():
                 return PageContext.EXAM_RESULT
+
+            # 检测答题页：支持 ExamPage.vue (.quest-stem) 和 QuestionPage.vue (.answerPg-container-title)
+            if page.locator(
+                ".quest-stem, .quest-option-item, .answerPg-container-title"
+            ).first.is_visible():
+                return PageContext.EXAM_QUESTION
 
             if page.locator(".exam-item, .exam-list").first.is_visible():
                 return PageContext.EXAM_LIST
