@@ -303,3 +303,6 @@ config.json
 answer/*
 !answer/answer.py
 !answer/answer.json
+
+.claude
+src/
