@@ -1,8 +1,10 @@
+import hashlib
 import json
 import time
-from base64 import urlsafe_b64decode, urlsafe_b64encode
+from base64 import b64encode, urlsafe_b64decode, urlsafe_b64encode
 from random import choice, randint
 from typing import Any, Dict
+from uuid import uuid4
 
 import requests
 from Crypto.Cipher import AES
@@ -596,30 +598,55 @@ class WeBanAPI:
         response = self.session.post(check_url, params=params, data=data, timeout=self.timeout)
         return handle_response(response)
 
-    def finish_by_token(self, user_course_id: str, token: str | None = None, course_type: str | None = "weiban") -> str:
+    def finish_by_token(self, user_course_id: str, token: str | None = None, course_type: str | None = "weiban", unique_no: str | None = None) -> Dict[str, Any]:
         """
         通过 userCourseId 或验证码 token 完成课程
         :param user_course_id: 用户课程 ID
-        :param token: 用户课程 ID 或验证码 token
-        :param course_type: 课程类型 weiban, lyra, open, moon
+        :param token: 验证码 token（如有）
+        :param course_type: 课程类型 weiban, open, moon
+        :param unique_no: UUID，来自 apinext 接口
         :return:
-        jQuery341002461326005930642_1747119073594({"msg":"ok","code":"0","detailCode":"0"})
+        {"msg": "ok", "code": "0", "detailCode": "0"}
         """
         url = f"{self.baseurl}/pharos/usercourse/v2/{token or user_course_id}.do"
-        params = {
-            "callback": f"jQuery3210{''.join(choice('123456789') for _ in range(15))}_{int(self.get_timestamp(13,0))}",
+        data = {
             "userCourseId": user_course_id,
             "tenantCode": self.tenant_code,
-            "_": int(self.get_timestamp(13, 0)),
         }
+        if unique_no:
+            data["uniqueNo"] = unique_no
 
         if course_type == "open":
             url = f"https://open.mycourse.cn/proteus/usercourse/finish.do"
         elif course_type == "moon":
             url = f"https://moon.mycourse.cn/moonapi/api/study/activity/microCourse/v1/finishedCourse"
 
-        response = self.session.get(url, params=params, timeout=self.timeout)
-        return response.text
+        for attempt in range(3):
+            if course_type == "weiban":
+                # weiban 走 jQuery JSONP（GET + callback 参数）
+                ts = self.get_timestamp(13, 0)
+                params = {**data, "callback": f"jQuery{ts}_{ts}", "_": int(ts)}
+                response = self.session.get(url, params=params, timeout=self.timeout)
+            else:
+                response = self.session.post(url, data=data, timeout=self.timeout)
+            try:
+                result = response.json()
+            except json.JSONDecodeError:
+                text = response.text
+                start = text.find("(")
+                end = text.rfind(")")
+                if start != -1 and end != -1:
+                    text = text[start + 1:end]
+                try:
+                    result = json.loads(text)
+                except json.JSONDecodeError:
+                    return {"raw": response.text}
+            # 10018 = 服务器未就绪，等待后重试
+            if result.get("detailCode") == "10018" and attempt < 2:
+                time.sleep(3)
+                continue
+            return result
+        return result
 
     def finish_lyra(self, user_activity_id: str) -> Dict[str, Any]:
         """
@@ -1035,7 +1062,7 @@ class WeBanAPI:
           "(       )是麻醉诱导常用的药物之一。": {
             "optionList": [
               {
-                "content": "“依托咪酯”",
+                "content": ""依托咪酯"",
                 "isCorrect": 1
               }
             ],
@@ -1043,4 +1070,130 @@ class WeBanAPI:
           }
         }
         """
-        return requests.get(f"https://ghfast.top/https://github.com/hangone/WeBan/raw/refs/heads/main/answer/answer.json", timeout=self.timeout).text
+        return self.session.get(f"https://ghfast.top/https://github.com/hangone/WeBan/raw/refs/heads/main/answer/answer.json", timeout=self.timeout).text
+
+    def apinext(self, user_course_id: str, course_id: str, user_project_id: str, step: int = 0, finish: int = 2, nonstr: str = "", unique_no: str | None = None) -> Dict[str, Any]:
+        """
+        学习进度追踪接口（apinext）
+        部分课程需要调用此接口记录翻页和完成状态
+        :param user_course_id: 用户课程 ID
+        :param course_id: 课程 ID
+        :param user_project_id: 用户项目 ID
+        :param step: 步骤编号
+        :param finish: 1=完成, 2=翻页中
+        :param nonstr: 从 item.js 的 nonstrMap 中提取的字符串
+        :param unique_no: UUID，同一课程应保持一致
+        :return:
+        {
+          "code": 200,
+          "message": "操作成功",
+          "status": 200,
+          "data": true,
+          "v": "Resp",
+          "success": true
+        }
+        """
+        data = {
+            "userCourseId": user_course_id,
+            "uniqueNo": unique_no or str(uuid4()),
+            "userId": self.user["userId"],
+            "courseId": course_id,
+            "userProjectId": user_project_id,
+            "finished": finish,
+            "step": step,
+            "nonstr": nonstr,
+            "tenantCode": self.tenant_code,
+        }
+        key = b"KkGv9d8E5jYb2xHwL3ZqRpXoNt6MmSge"
+        iv = key[:16]
+        cipher = AES.new(key, AES.MODE_CBC, iv)
+        padded = pad(json.dumps(data, separators=(",", ":")).encode(), AES.block_size)
+        # JS: Base64(Utf8.parse(Base64(ciphertext))) = 双重 Base64 编码
+        encrypted_b64 = b64encode(b64encode(cipher.encrypt(padded))).decode()
+        url = f"{self.baseurl}/jupiterapi/api/statusercourse/v1/next"
+        response = self.session.post(url, json={"data": encrypted_b64}, timeout=self.timeout)
+        return handle_response(response)
+
+    def _mercury_request(self, params: dict) -> Dict[str, Any]:
+        """mercuryprovider 通用请求：合并标准参数、签名、发送"""
+        standard = {
+            "appKey": "00000001",
+            "format": "json",
+            "v": "1.0",
+            "timestamp": self.get_timestamp(),
+            "clientId": "pharos",
+        }
+        merged = {**standard, **params}
+        secret_key = "75uet0kwvnc90xo"
+        sign_str = secret_key
+        for k in sorted(merged.keys()):
+            sign_str += k + str(merged[k])
+        sign_str += secret_key
+        merged["sign"] = hashlib.sha1(sign_str.encode()).hexdigest().upper()
+        response = self.session.post("https://resource.mycourse.cn/mercuryprovider/router", data=merged, timeout=self.timeout)
+        return handle_response(response)
+
+    def list_question(self, course_id: str) -> Dict[str, Any]:
+        """
+        获取课后习题列表（course_id 为 resourceId UUID）
+        :return:
+        {
+          "code": "0",
+          "data": {
+            "viewpointQuestionList": [
+              {
+                "id": "${uuid}",
+                "type": 2,
+                "score": 0,
+                "title": "你认为哪种方式更能丰富自己的小金库呢？",
+                "sequence": 1,
+                "optionList": [
+                  {"id": "${uuid}", "content": "日息5%保本高息理财", "sequence": 1, "isCorrect": 2},
+                  {"id": "${uuid}", "content": "国企内部理财", "sequence": 2, "isCorrect": 2},
+                  {"id": "${uuid}", "content": "影视投资分红", "sequence": 3, "isCorrect": 2},
+                  {"id": "${uuid}", "content": "都不要", "sequence": 4, "isCorrect": 2}
+                ]
+              }
+            ],
+            "examQuestionList": [
+              {
+                "id": "${uuid}",
+                "type": 1,
+                "score": 0,
+                "title": "任何形式的刷单都是违法行为，这种说法正确吗？",
+                "sequence": 0,
+                "optionList": [
+                  {"id": "${uuid}", "content": "正确", "sequence": 1, "isCorrect": 2},
+                  {"id": "${uuid}", "content": "错误", "sequence": 2, "isCorrect": 2}
+                ]
+              }
+            ]
+          },
+          "detailCode": "0"
+        }
+        """
+        return self._mercury_request({"service": "mercury.microlecture.listQuestion", "id": course_id})
+
+    def save_exam_question(self, course_id: str, question_id: str, answers: str, source: str = "WEIBAN") -> Dict[str, Any]:
+        """
+        提交课后习题答案
+        :return:
+        {
+          "code": "0",
+          "data": {
+            "isRight": 1,
+            "analysis": "<p>无论是刷单返利、刷信誉、刷流水...全部属于违法行为...</p>",
+            "answerLabel": "-A"
+          },
+          "detailCode": "0"
+        }
+        """
+        return self._mercury_request({
+            "service": "mercury.microlecture.saveExamQuestion",
+            "courseId": course_id,
+            "questionId": question_id,
+            "answers": answers,
+            "userId": self.user["userId"],
+            "tenantCode": self.tenant_code,
+            "source": source,
+        })
