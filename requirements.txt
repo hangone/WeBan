@@ -1,4 +1,5 @@
 ddddocr==1.6.1
 loguru==0.7.3
+playwright==1.59.0
 pycryptodome==3.23.0
 requests==2.32.5
