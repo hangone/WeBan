@@ -2,7 +2,7 @@ import hashlib
 import json
 import time
 from base64 import b64encode, urlsafe_b64decode, urlsafe_b64encode
-from random import choice, randint
+from random import randint
 from typing import Any, Dict
 from uuid import uuid4
 
@@ -747,6 +747,54 @@ class WeBanAPI:
             "tenantCode": self.tenant_code,
             "userId": self.user["userId"],
             "userExamPlanId": user_exam_plan_id,
+        }
+        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
+        return handle_response(response)
+
+    def exam_check(self, user_exam_plan_id: str, randstr: str, ticket: str) -> Dict[str, Any]:
+        """
+        无感验证码校验（考试前）—— appId: 190330343
+        调用 exam/check.do 验证，成功后才可以 exam_start_paper
+        :param user_exam_plan_id: 用户考试计划 ID
+        :param randstr: 腾讯验证码 randstr
+        :param ticket: 腾讯验证码 ticket
+        :return:
+        {"code":"0","detailCode":"0"}
+        """
+        url = f"{self.baseurl}/pharos/exam/check.do"
+        params = {"timestamp": self.get_timestamp()}
+        data = {
+            "tenantCode": self.tenant_code,
+            "userId": self.user["userId"],
+            "userExamPlanId": user_exam_plan_id,
+            "randstr": randstr,
+            "ticket": ticket,
+        }
+        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
+        return handle_response(response)
+
+    def course_check(self, user_course_id: str, user_project_id: str, course_id: str, randstr: str, ticket: str) -> Dict[str, Any]:
+        """
+        验证码校验（课程完成时）—— appId: 195119536
+        调用 pharos/usercourse/check.do 获取完课 token
+        :param user_course_id: 用户课程 ID
+        :param user_project_id: 用户项目 ID
+        :param course_id: 课程 ID
+        :param randstr: 腾讯验证码 randstr
+        :param ticket: 腾讯验证码 ticket
+        :return:
+        {"code":"0","data":"${token}","detailCode":"0"}
+        """
+        url = f"{self.baseurl}/pharos/usercourse/check.do"
+        params = {"timestamp": self.get_timestamp()}
+        data = {
+            "tenantCode": self.tenant_code,
+            "userId": self.user["userId"],
+            "userCourseId": user_course_id,
+            "userProjectId": user_project_id,
+            "courseId": course_id,
+            "randstr": randstr,
+            "ticket": ticket,
         }
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
         return handle_response(response)

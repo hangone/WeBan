@@ -3,7 +3,6 @@ import os
 import sys
 import time
 import webbrowser
-from random import randint
 from typing import Any, Dict, Optional, TYPE_CHECKING, Union
 from urllib.parse import parse_qs, urlparse
 from uuid import uuid4
@@ -13,6 +12,7 @@ import re
 import threading
 
 from api import WeBanAPI
+from captcha import CaptchaHandler
 
 if TYPE_CHECKING:
     from ddddocr import DdddOcr
@@ -49,6 +49,19 @@ class WeBanClient:
             self.api.set_tenant_code(self.tenant_code)
         else:
             raise ValueError("学校代码获取失败，请检查学校全称是否正确")
+        self._captcha_handler = None
+
+    @property
+    def captcha_handler(self):
+        """延迟初始化 CaptchaHandler（需要 login 后才有 token）"""
+        if self._captcha_handler is None:
+            self._captcha_handler = CaptchaHandler(
+                tenant_code=self.tenant_code,
+                user_id=self.api.user["userId"],
+                token=self.api.user["token"],
+                log=self.log,
+            )
+        return self._captcha_handler
 
     @staticmethod
     def get_project_type(project_category: int) -> str:
@@ -219,7 +232,6 @@ class WeBanClient:
         for task in my_project:
             project_prefix = task["projectName"]
             self.log.info(f"开始处理任务：{project_prefix}")
-            need_capt = []
 
             # 获取学习进度
             self.get_progress(task["userProjectId"], project_prefix)
@@ -230,6 +242,7 @@ class WeBanClient:
                 if categories.get("code") != "0":
                     self.log.error(f"获取 {choose_type[1]} 分类失败：{categories}")
                     continue
+
                 for category in categories.get("data", []):
                     category_prefix = f"{choose_type[1]} {project_prefix}/{category['categoryName']}"
                     self.log.info(f"开始处理 {category_prefix}")
@@ -266,11 +279,8 @@ class WeBanClient:
                             continue
 
                         course_url = self.api.get_course_url(course["resourceId"], task["userProjectId"])["data"] + "&weiban=weiban"
+                        self.log.info(f"{course_prefix} URL: {course_url}")
                         query = parse_qs(urlparse(course_url).query)
-                        if query.get("csCapt", [None])[0] == "true":
-                            self.log.warning(f"课程需要验证码，暂时无法处理...")
-                            need_capt.append(course_prefix)
-                            continue
 
                         # 从 URL 中提取课程代码，解析 item.js
                         course_code = ""
@@ -318,19 +328,29 @@ class WeBanClient:
                         else:
                             token = None
                             if query.get("csCapt", [None])[0] == "true":
-                                self.log.warning(f"课程需要验证码，暂时无法处理...")
-                                need_capt.append(course_prefix)
-                                continue
+                                # 通过 Playwright 让用户手动完成滑块验证码 (appId: 195119536)
+                                try:
+                                    captcha_result = self.captcha_handler.handle_course_captcha(course_url=course_url,)
+                                    check_res = self.api.course_check(
+                                        course["userCourseId"],
+                                        task["userProjectId"],
+                                        course["resourceId"],
+                                        captcha_result["randstr"],
+                                        captcha_result["ticket"],
+                                    )
+                                    if check_res.get("code", -1) != "0":
+                                        self.log.error(f"课程验证码校验失败：{check_res}")
+                                        continue
+                                    token = check_res.get("data", "")
+                                    self.log.success(f"课程验证码校验通过，token: {token}")
+                                except Exception as e:
+                                    self.log.error(f"课程验证码处理异常: {e}")
+                                    continue
                             res = self.api.finish_by_token(course["userCourseId"], token, unique_no=unique_no)
                             if res.get("code", "-1") != "0":
                                 self.log.error(f"{course_prefix} 完成失败：{res}")
 
                         self.log.success(f"{course_prefix} 完成")
-
-            if need_capt:
-                self.log.warning(f"以下课程需要验证码，请手动完成：")
-                for c in need_capt:
-                    self.log.warning(f" - {c}")
 
             self.log.success(f"{project_prefix} 课程学习完成")
 
@@ -404,6 +424,22 @@ class WeBanClient:
                 question_num = prepare_paper["questionNum"]
                 self.log.info(f"考试信息：用户：{prepare_paper['realName']}，ID：{prepare_paper['userIDLabel']}，题目数：{question_num}，试卷总分：{prepare_paper['paperScore']}，限时 {prepare_paper['answerTime']} 分钟")
                 per_time = use_time // prepare_paper["questionNum"]
+
+                # 处理无感验证码 (appId: 190330343)
+                try:
+                    captcha_result = self.captcha_handler.handle_exam_captcha(user_exam_plan_id)
+                    check_res = self.api.exam_check(
+                        user_exam_plan_id,
+                        captcha_result["randstr"],
+                        captcha_result["ticket"],
+                    )
+                    if check_res.get("code", -1) != "0":
+                        self.log.error(f"无感验证码校验失败：{check_res}")
+                        continue
+                    self.log.success("无感验证码校验通过")
+                except Exception as e:
+                    self.log.error(f"无感验证码处理异常: {e}")
+                    continue
 
                 # 获取考试题目
                 exam_paper = self.api.exam_start_paper(user_exam_plan_id)
@@ -488,6 +524,7 @@ class WeBanClient:
     def parse_item_js(self, course_code: str) -> Dict[str, Any]:
         """
         解析课程的 item.js，提取 nonstrMap 和页面信息
+        nonstr_map 从 item.js 提取，page_count 从课程 HTML 提取（更准确）
         :param course_code: 课程代码（如 DA0309018）
         :return: {"nonstr_map": {step: str}, "has_exam": bool, "page_count": int}
         """
@@ -505,10 +542,17 @@ class WeBanClient:
                 result["nonstr_map"] = {int(step): val for step, val in entries}
             # 检查是否有课后习题
             result["has_exam"] = "saveExamQuestion" in content or "listQuestions" in content
-            # 提取页面数（从 BtnFn 调用推断）
-            pages = re.findall(r'\.page-(\d+)', content)
-            if pages:
-                result["page_count"] = max(int(p) for p in pages)
+
+            # --- 提取页面数 ---
+            # 从课程 HTML 中提取 .page-N 类名（最准确，HTML 包含所有页面）
+            # 页面编号从 0 开始，page_count = max(N)
+            html_url = f"https://mcwk.mycourse.cn/course/{course_code}/{course_code}.html"
+            html_resp = self.api.session.get(html_url, timeout=10)
+            if html_resp.status_code == 200:
+                html_pages = re.findall(r'page-(\d+)', html_resp.text)
+                if html_pages:
+                    result["page_count"] = max(int(p) for p in html_pages)
+
         except Exception as e:
             self.log.warning(f"解析 item.js 失败：{e}")
         return result
@@ -539,7 +583,7 @@ class WeBanClient:
                     self.log.info(f"apinext [{step}/{total_step}] finish=2 已发送")
                 except Exception as e:
                     self.log.warning(f"apinext [{step}/{total_step}] finish=2 失败：{e}")
-                time.sleep(1)
+                time.sleep(0.5)
             self.log.info(f"apinext 中间步骤全部发送完毕")
         else:
             # 发送完成标记（finish=1），step = total_step + 1
