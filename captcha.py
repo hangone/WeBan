@@ -1,13 +1,13 @@
 """
 腾讯验证码处理模块
 - 无感验证码 (appId: 190330343): 考试前自动处理，无用户交互（entry: weiban.mycourse.cn）
-- 滑块验证码 (appId: 195119536): 课程完成时，通过 Playwright 打开浏览器让用户手动处理（entry: mcwk.mycourse.cn/course/）
+- 滑块验证码 (appId: 195119536): 课程完成时，通过浏览器让用户手动处理（entry: mcwk.mycourse.cn/course/）
 """
 
 import json
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
-from playwright.sync_api import sync_playwright
+from DrissionPage import Chromium, ChromiumOptions
 
 # 腾讯验证码 SDK 地址
 TCAPTCHA_SDK_URL = "https://turing.captcha.qcloud.com/TJCaptcha.js"
@@ -22,7 +22,7 @@ COURSE_ENTRY_URL = "https://mcwk.mycourse.cn/"
 
 
 class CaptchaHandler:
-    """通过 Playwright 处理腾讯验证码"""
+    """通过浏览器处理腾讯验证码"""
 
     def __init__(self, tenant_code: str, user_id: str, token: str, log) -> None:
         self.tenant_code = tenant_code
@@ -30,78 +30,71 @@ class CaptchaHandler:
         self.token = token
         self.log = log
 
-    def _build_page(self, entry_url: str) -> Any:
+    def _build_page(self, entry_url: str):
         """
-        启动 Playwright 浏览器，注入 localStorage 认证信息，导航到目标页面
+        启动浏览器，注入 localStorage 认证信息，导航到目标页面
+        auto_port() 确保每个浏览器实例使用独立端口和临时用户目录，线程安全
         :param entry_url: 触发验证码的入口页面 URL
-        :return: (playwright, browser, page)
+        :return: (Chromium, ChromiumTab) 元组
         """
-        p = sync_playwright().start()
-        browser = p.chromium.launch(headless=False)
-
-        context = browser.new_context()
-        page = context.new_page()
+        co = ChromiumOptions().auto_port()
+        browser = Chromium(co)
+        tab = browser.latest_tab
 
         # 先导航到站点以建立域名上下文，然后注入 localStorage 认证
         self.log.info(f"正在打开验证码入口页面: {entry_url}")
-        page.goto(entry_url, wait_until="domcontentloaded", timeout=30000)
+        tab.get(entry_url, timeout=30)
 
         # 注入 localStorage user 字段（网站使用 localStorage 认证）
-        page.evaluate(f"""
-            () => {{
-                const user = {{
-                    userId: '{self.user_id}',
-                    token: '{self.token}',
-                    tenantCode: '{self.tenant_code}',
-                }};
-                localStorage.setItem('user', JSON.stringify(user));
-            }}
+        tab.run_js(f"""
+            const user = {{
+                userId: '{self.user_id}',
+                token: '{self.token}',
+                tenantCode: '{self.tenant_code}',
+            }};
+            localStorage.setItem('user', JSON.stringify(user));
         """)
 
         # 刷新页面使 localStorage 生效
-        page.goto(entry_url, wait_until="domcontentloaded", timeout=30000)
-        page.wait_for_timeout(3000)
+        tab.get(entry_url, timeout=30)
+        tab.wait(3)
 
         # 确保 TCaptcha SDK 已加载
-        page.evaluate(f"""
-            () => {{
-                if (typeof TencentCaptcha === 'undefined') {{
-                    const script = document.createElement('script');
-                    script.src = '{TCAPTCHA_SDK_URL}';
-                    script.async = false;
-                    document.head.appendChild(script);
-                }}
+        tab.run_js(f"""
+            if (typeof TencentCaptcha === 'undefined') {{
+                const script = document.createElement('script');
+                script.src = '{TCAPTCHA_SDK_URL}';
+                script.async = false;
+                document.head.appendChild(script);
             }}
         """)
-        page.wait_for_timeout(2000)
+        tab.wait(2)
 
-        return p, browser, page
+        return browser, tab
 
-    def _run_captcha(self, page: Any, app_id: str) -> Dict[str, str]:
+    def _run_captcha(self, tab, app_id: str) -> Dict[str, str]:
         """
         在页面上运行腾讯验证码，返回 randstr 和 ticket
-        :param page: Playwright page 对象
+        :param tab: ChromiumTab 对象
         :param app_id: 腾讯验证码 appId
         :return: {"randstr": "...", "ticket": "..."}
         """
-        result_json = page.evaluate(f"""
-            () => {{
-                return new Promise((resolve, reject) => {{
-                    const captcha = new TencentCaptcha('{app_id}', (res) => {{
-                        if (res.ret === 0) {{
-                            resolve(JSON.stringify({{randstr: res.randstr, ticket: res.ticket}}));
-                        }} else if (res.ret === 2) {{
-                            reject(new Error('用户主动关闭了验证码'));
-                        }} else {{
-                            reject(new Error('验证码验证失败: ret=' + res.ret));
-                        }}
-                    }}, {{
-                        userLanguage: 'zh-cn',
-                        loading: false,
-                    }});
-                    captcha.show();
+        result_json = tab.run_async_js(f"""
+            return new Promise((resolve, reject) => {{
+                const captcha = new TencentCaptcha('{app_id}', (res) => {{
+                    if (res.ret === 0) {{
+                        resolve(JSON.stringify({{randstr: res.randstr, ticket: res.ticket}}));
+                    }} else if (res.ret === 2) {{
+                        reject(new Error('用户主动关闭了验证码'));
+                    }} else {{
+                        reject(new Error('验证码验证失败: ret=' + res.ret));
+                    }}
+                }}, {{
+                    userLanguage: 'zh-cn',
+                    loading: false,
                 }});
-            }}
+                captcha.show();
+            }});
         """)
 
         return json.loads(result_json)
@@ -114,19 +107,15 @@ class CaptchaHandler:
         :param user_exam_plan_id: 用户考试计划 ID
         :return: {"randstr": "...", "ticket": "..."}
         """
-        self.log.info("正在通过 Playwright 处理无感验证码 (appId: 190330343)...")
-        p, browser, page = self._build_page(EXAM_ENTRY_URL)
+        self.log.info("正在处理无感验证码 (appId: 190330343)...")
+        browser, tab = self._build_page(EXAM_ENTRY_URL)
 
         try:
-            result = self._run_captcha(page, EXAM_CAPTCHA_APP_ID)
+            result = self._run_captcha(tab, EXAM_CAPTCHA_APP_ID)
             self.log.success("无感验证码自动通过")
             return result
-        except Exception as e:
-            self.log.error(f"无感验证码处理失败: {e}")
-            raise
         finally:
-            browser.close()
-            p.stop()
+            browser.quit()
 
     def handle_course_captcha(
         self,
@@ -145,15 +134,11 @@ class CaptchaHandler:
         self.log.info("=" * 50)
 
         entry_url = course_url or COURSE_ENTRY_URL
-        p, browser, page = self._build_page(entry_url)
+        browser, tab = self._build_page(entry_url)
 
         try:
-            result = self._run_captcha(page, COURSE_CAPTCHA_APP_ID)
+            result = self._run_captcha(tab, COURSE_CAPTCHA_APP_ID)
             self.log.success("验证码手动验证完成")
             return result
-        except Exception as e:
-            self.log.error(f"验证码处理失败: {e}")
-            raise
         finally:
-            browser.close()
-            p.stop()
+            browser.quit()
