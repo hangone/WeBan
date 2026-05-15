@@ -328,7 +328,7 @@ class WeBanClient:
                         else:
                             token = None
                             if query.get("csCapt", [None])[0] == "true":
-                                # 通过 Playwright 让用户手动完成滑块验证码 (appId: 195119536)
+                                # 通过浏览器让用户手动完成滑块验证码 (appId: 195119536)
                                 try:
                                     captcha_result = self.captcha_handler.handle_course_captcha(course_url=course_url,)
                                     check_res = self.api.course_check(
