@@ -33,11 +33,12 @@ def clean_text(text):
 class WeBanClient:
     _stdin_lock = threading.Lock()
 
-    def __init__(self, tenant_name: str, account: str | None = None, password: str | None = None, user: Dict[str, str] | None = None, log=logger) -> None:
+    def __init__(self, tenant_name: str, account: str | None = None, password: str | None = None, user: Dict[str, str] | None = None, log=logger, browser_path: str | None = None) -> None:
         self.log = log
         self.tenant_name = tenant_name.strip()
         self.study_time = 20
         self.ocr = self.get_ocr_instance()
+        self.browser_path = browser_path
         if user and all([user.get("userId"), user.get("token")]):
             self.api = WeBanAPI(user=user)
         elif all([self.tenant_name, account, password]):
@@ -60,6 +61,7 @@ class WeBanClient:
                 user_id=self.api.user["userId"],
                 token=self.api.user["token"],
                 log=self.log,
+                browser_path=self.browser_path,
             )
         return self._captcha_handler
 
@@ -214,9 +216,6 @@ class WeBanClient:
             return
 
         my_project = my_project.get("data", [])
-        if not my_project:
-            self.log.error(f"获取任务列表失败")
-
         completion = self.api.list_completion()
         if completion.get("code", -1) != "0":
             self.log.error(f"获取模块完成情况失败：{completion}")
@@ -245,31 +244,17 @@ class WeBanClient:
 
                 for category in categories.get("data", []):
                     category_prefix = f"{choose_type[1]} {project_prefix}/{category['categoryName']}"
-                    self.log.info(f"开始处理 {category_prefix}")
                     if not restudy_time and category["finishedNum"] >= category["totalNum"]:
-                        self.log.success(f"{category_prefix} 已完成")
                         continue
-
-                    # 获取学习进度
-                    progress = self.get_progress(task["userProjectId"], project_prefix, False)
-                    if not restudy_time and progress[choose_type[3]] >= progress[choose_type[2]]:
-                        self.log.info(f"{category_prefix} 已达到要求，跳过")
-                        break
 
                     courses = self.api.list_course(task["userProjectId"], category["categoryCode"], choose_type[0])
                     for course in courses.get("data", []):
                         course_prefix = f"{category_prefix}/{course['resourceName']}"
-                        # 获取学习进度
-                        progress = self.get_progress(task["userProjectId"], category_prefix)
-                        if not restudy_time and progress[choose_type[3]] >= progress[choose_type[2]]:
-                            self.log.info(f"{category_prefix} 已达到要求，跳过")
-                            break
 
-                        self.log.info(f"开始处理课程：{course_prefix}")
                         if not restudy_time and course["finished"] == 1:
-                            self.log.success(f"{course_prefix} 已完成")
                             continue
 
+                        self.log.info(f"开始处理课程：{course_prefix}")
                         self.api.study(course["resourceId"], task["userProjectId"])
                         if self.api.get_simple_config().get("data", {}).get("isControlSource") == 1:
                             self.log.warning(f"检测到课程需网页端处理（isControlSource=1），建议前往网页版登录处理一下")
