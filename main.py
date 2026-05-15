@@ -40,6 +40,7 @@ def run_account(config, account_index):
     restudy_time = int(config.get("restudy_time", 0))
     exam = config.get("exam", True)
     exam_use_time = int(config.get("exam_use_time", 250))
+    browser_path = config.get("browser_path", None)
 
     if user.get("tenantName"):
         tenant_name = user["tenantName"]
@@ -50,10 +51,10 @@ def run_account(config, account_index):
 
         if all([tenant_name, user.get("userId"), user.get("token")]):
             log.info(f"使用 Token 登录")
-            client = WeBanClient(tenant_name, user=user, log=log)
+            client = WeBanClient(tenant_name, user=user, log=log, browser_path=browser_path)
         elif all([tenant_name, account, password]):
             log.info(f"使用密码登录")
-            client = WeBanClient(tenant_name, account, password, log=log)
+            client = WeBanClient(tenant_name, account, password, log=log, browser_path=browser_path)
         else:
             log.error(f"缺少必要的配置信息, (tenant_name, account, password) or (tenant_name, userId, token)")
             return False
