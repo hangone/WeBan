@@ -1,4 +1,5 @@
 import os
+import subprocess
 import sys
 import threading
 import tomllib
@@ -21,9 +22,9 @@ config_path = os.path.join(base_path, "config.toml")
 config_example_path = os.path.join(base_path, "config.example.toml")
 logs_dir = os.path.join(base_path, "logs")
 
-# 远程模板下载地址（GitHub raw + ghfast.top 加速代理）
+# 远程模板下载地址
 CONFIG_EXAMPLE_URL = (
-    "https://ghfast.top/https://github.com/hangone/WeBan/raw/refs/heads/main/"
+    "https://github.com/hangone/WeBan/raw/refs/heads/main/"
     "config.example.toml"
 )
 
@@ -49,10 +50,46 @@ logger.add(
 sync_lock = threading.Lock()
 
 
+# ── 工具函数 ──────────────────────────────────────────────
+
+def open_editor(path: str):
+    """打开系统编辑器编辑指定文件"""
+    editor = os.environ.get("EDITOR")
+    try:
+        if sys.platform == "win32":
+            subprocess.Popen(["notepad", path])
+        elif sys.platform == "darwin":
+            if editor:
+                subprocess.Popen([editor, path])
+            else:
+                subprocess.Popen(["open", "-t", path])
+        else:
+            if editor:
+                subprocess.Popen([editor, path])
+            else:
+                subprocess.Popen(["xdg-open", path])
+    except FileNotFoundError:
+        logger.warning(f"无法打开编辑器，请手动编辑文件: {path}")
+        return
+    try:
+        input("编辑完成后按回车键继续...")
+    except Exception:
+        pass
+
+
+def is_account_valid(account: dict) -> bool:
+    """检查账号是否有效：tenant_name 非空 AND (username 非空 OR (user_id 非空 AND token 非空))"""
+    tenant_name = account.get("tenant_name", "").strip()
+    username = account.get("username", "").strip()
+    user_id = account.get("user_id", "").strip()
+    token = account.get("token", "").strip()
+    return bool(tenant_name) and (bool(username) or (bool(user_id) and bool(token)))
+
+
 # ── 配置加载 ──────────────────────────────────────────────
 
 def load_config() -> dict:
-    """加载 config.toml，不存在则下载远程模板"""
+    """加载 config.toml，不存在则下载远程模板并打开编辑器"""
     if not os.path.exists(config_path):
         logger.info("config.toml 不存在，正在下载远程模板...")
         downloaded = False
@@ -61,7 +98,7 @@ def load_config() -> dict:
             resp.raise_for_status()
             with open(config_path, "w", encoding="utf-8") as f:
                 f.write(resp.text)
-            logger.success(f"远程模板已下载到 {config_path}，请填写配置后重新运行")
+            logger.success(f"远程模板已下载到 {config_path}")
             downloaded = True
         except Exception as e:
             logger.error(f"下载远程模板失败: {e}")
@@ -69,9 +106,17 @@ def load_config() -> dict:
         if not downloaded and os.path.exists(config_example_path):
             import shutil
             shutil.copy(config_example_path, config_path)
-            logger.success(f"已从本地模板创建 {config_path}，请填写配置后重新运行")
+            logger.success(f"已从本地模板创建 {config_path}")
 
-        sys.exit(0)
+        if os.path.exists(config_path):
+            logger.info("正在打开配置文件，请填写账号信息后保存...")
+            open_editor(config_path)
+            # 重新加载
+            with open(config_path, "rb") as f:
+                return tomllib.load(f)
+        else:
+            logger.error("无法创建配置文件")
+            sys.exit(1)
 
     with open(config_path, "rb") as f:
         return tomllib.load(f)
@@ -231,10 +276,37 @@ if __name__ == "__main__":
         global_settings = config.get("settings", {})
         accounts = config.get("account", [])
 
-        if not accounts:
-            logger.error("没有找到有效的账号配置（请检查 config.toml 中 [[account]] 段落）")
-            exit(1)
+        # 过滤有效账号
+        valid_accounts = [a for a in accounts if is_account_valid(a)]
 
+        if not valid_accounts:
+            logger.warning("没有找到有效的账号配置，正在打开配置文件...")
+            open_editor(config_path)
+            # 重新加载并检查
+            config = load_config()
+            global_settings = config.get("settings", {})
+            accounts = config.get("account", [])
+            valid_accounts = [a for a in accounts if is_account_valid(a)]
+            if not valid_accounts:
+                logger.error("仍然没有有效的账号配置，请检查 config.toml")
+                sys.exit(1)
+
+        # 单账号时提示是否更换
+        if len(valid_accounts) == 1:
+            acct = valid_accounts[0]
+            acct_name = acct.get("username") or acct.get("user_id") or acct.get("tenant_name", "")
+            choice = input(f"当前账号：{acct_name}，是否更换账号？(y/N，默认N): ").strip().lower()
+            if choice == "y":
+                open_editor(config_path)
+                config = load_config()
+                global_settings = config.get("settings", {})
+                accounts = config.get("account", [])
+                valid_accounts = [a for a in accounts if is_account_valid(a)]
+                if not valid_accounts:
+                    logger.error("没有有效的账号配置")
+                    sys.exit(1)
+
+        accounts = valid_accounts
         logger.info(f"共加载到 {len(accounts)} 个账号")
 
         # 是否多线程

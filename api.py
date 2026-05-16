@@ -49,8 +49,8 @@ def handle_response(response: requests.Response) -> Dict[str, Any]:
 
 class WeBanAPI:
 
-    # 题库下载地址（GitHub raw + ghfast.top 加速代理）
-    ANSWER_URL = "https://ghfast.top/https://github.com/hangone/WeBan/raw/refs/heads/main/answer/answer.json"
+    # 题库下载地址
+    ANSWER_URL = "https://github.com/hangone/WeBan/raw/refs/heads/main/answer/answer.json"
 
     def __init__(self, tenant_code: str | None = None, account: str | None = None,
                  password: str | None = None, user: Dict[str, str] | None = None,

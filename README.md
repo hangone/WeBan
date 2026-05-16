@@ -12,11 +12,6 @@
 
 从 [Releases](https://github.com/hangone/WeBan/releases) 下载单文件运行，根据提示输入信息。
 
-| 类型    | 镜像下载地址                                                                                           | Github 下载地址                                                                        |
-| ------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
-| Windows | [镜像下载地址](https://ghfast.top/https://github.com/hangone/WeBan/releases/latest/download/WeBan.exe) | [Github 下载地址](https://github.com/hangone/WeBan/releases/latest/download/WeBan.exe) |
-| Linux   | [镜像下载地址](https://ghfast.top/https://github.com/hangone/WeBan/releases/latest/download/WeBan)     | [Github 下载地址](https://github.com/hangone/WeBan/releases/latest/download/WeBan)     |
-
 ## 配置说明
 
 软件使用 `config.toml` 配置文件（首次运行会自动从远程下载模板）。账号级配置可覆盖全局设置。
