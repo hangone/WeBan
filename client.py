@@ -283,8 +283,9 @@ class WeBanClient:
         url += f"&userId={self.api.user['userId']}"
         url += f"&courseId={course['resourceId']}"
         url += f"&userName={self.api.user.get('userName', self.api.user.get('realName', ''))}"
+        link = course.get("praiseNum", "")
         url += (
-            "&projectType=special&projectId=undefined&protocol=true&link=undefined"
+            f"&projectType=special&projectId=undefined&protocol=true&link={link}"
             "&weiban=weiban&certificateId=undefined&userActivityState=undefined"
             "&step=undefined&index=undefined&viewStep=undefined"
         )
