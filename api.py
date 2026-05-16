@@ -459,6 +459,38 @@ class WeBanAPI:
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
         return handle_response(response)
 
+    def list_valve(self) -> Dict[str, Any]:
+        """获取项目页功能开关，浏览器进入项目页时会调用。"""
+        url = f"{self.baseurl}/pharos/index/listValve.do"
+        params = {"timestamp": self.get_timestamp()}
+        data = {"tenantCode": self.tenant_code, "userId": self.user["userId"]}
+        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
+        return handle_response(response)
+
+    def get_next_task(self, user_project_id: str) -> Dict[str, Any]:
+        """获取项目下一步状态，浏览器进入项目页时会调用。"""
+        url = f"{self.baseurl}/pharos/project/getNextTask.do"
+        params = {"timestamp": self.get_timestamp()}
+        data = {
+            "tenantCode": self.tenant_code,
+            "userId": self.user["userId"],
+            "userProjectId": user_project_id,
+        }
+        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
+        return handle_response(response)
+
+    def get_project_simple(self, user_project_id: str) -> Dict[str, Any]:
+        """获取项目基础模式信息，浏览器进入项目页时会调用。"""
+        url = f"{self.baseurl}/pharos/project/getSimple.do"
+        params = {"timestamp": self.get_timestamp()}
+        data = {
+            "tenantCode": self.tenant_code,
+            "userId": self.user["userId"],
+            "userProjectId": user_project_id,
+        }
+        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
+        return handle_response(response)
+
     def list_category(self, user_project_id: str, choose_type: int = 3) -> Dict[str, Any]:
         """
         获取课程分类列表
@@ -525,6 +557,23 @@ class WeBanAPI:
             "userProjectId": user_project_id,
             "chooseType": choose_type,
             "categoryCode": category_code,
+        }
+        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
+        return handle_response(response)
+
+    def init_index(self, user_project_id: str) -> Dict[str, Any]:
+        """
+        初始化课程索引（开始学习前调用，模拟浏览器行为）
+        :param user_project_id: 用户项目 ID
+        :return:
+        {"code":"0","detailCode":"0"}
+        """
+        url = f"{self.baseurl}/pharos/usercourse/initIndex.do"
+        params = {"timestamp": self.get_timestamp()}
+        data = {
+            "tenantCode": self.tenant_code,
+            "userId": self.user["userId"],
+            "userProjectId": user_project_id,
         }
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
         return handle_response(response)
@@ -598,13 +647,14 @@ class WeBanAPI:
         response = self.session.post(check_url, params=params, data=data, timeout=self.timeout)
         return handle_response(response)
 
-    def finish_by_token(self, user_course_id: str, token: str | None = None, course_type: str | None = "weiban", unique_no: str | None = None) -> Dict[str, Any]:
+    def finish_by_token(self, user_course_id: str, token: str | None = None, course_type: str | None = "weiban", unique_no: str | None = None, referer: str | None = None) -> Dict[str, Any]:
         """
         通过 userCourseId 或验证码 token 完成课程
         :param user_course_id: 用户课程 ID
         :param token: 验证码 token（如有）
         :param course_type: 课程类型 weiban, open, moon
         :param unique_no: UUID，来自 apinext 接口
+        :param referer: HTTP Referer 头，模拟浏览器行为
         :return:
         {"msg": "ok", "code": "0", "detailCode": "0"}
         """
@@ -621,11 +671,13 @@ class WeBanAPI:
         elif course_type == "moon":
             url = f"https://moon.mycourse.cn/moonapi/api/study/activity/microCourse/v1/finishedCourse"
 
-        for attempt in range(3):
+        retry_delays = (3, 6, 10, 15, 20)
+        for attempt in range(len(retry_delays) + 1):
             if course_type == "weiban":
                 # weiban 走 jQuery JSONP（GET + callback 参数）
-                ts = self.get_timestamp(13, 0)
-                params = {**data, "callback": f"jQuery{ts}_{ts}", "_": int(ts)}
+                ts = int(self.get_timestamp(13, 0))
+                callback = f"jQuery3410{randint(10**15, 10**16 - 1)}_{ts}"
+                params = {**data, "callback": callback, "_": ts + 1}
                 response = self.session.get(url, params=params, timeout=self.timeout)
             else:
                 response = self.session.post(url, data=data, timeout=self.timeout)
@@ -641,12 +693,11 @@ class WeBanAPI:
                     result = json.loads(text)
                 except json.JSONDecodeError:
                     return {"raw": response.text}
-            # 10018 = 服务器未就绪，等待后重试
-            if result.get("detailCode") == "10018" and attempt < 2:
-                time.sleep(3)
+            # 10018 = 服务端还未完成 apinext 进度落库，等待后重试完课接口。
+            if result.get("detailCode") == "10018" and attempt < len(retry_delays):
+                time.sleep(retry_delays[attempt])
                 continue
             return result
-        return result
 
     def finish_lyra(self, user_activity_id: str) -> Dict[str, Any]:
         """
@@ -1221,6 +1272,26 @@ class WeBanAPI:
         }
         """
         return self._mercury_request({"service": "mercury.microlecture.listQuestion", "id": course_id})
+
+    def save_question(self, course_id: str, question_id: str, answers: str, source: str = "WEIBAN") -> Dict[str, Any]:
+        """
+        提交课中观点题答案 (mercury.microlecture.saveQuestion)
+        :return:
+        {
+          "code": "0",
+          "data": {"isRight": 1, "analysis": "", "answerLabel": "-A"},
+          "detailCode": "0"
+        }
+        """
+        return self._mercury_request({
+            "service": "mercury.microlecture.saveQuestion",
+            "courseId": course_id,
+            "questionId": question_id,
+            "answers": answers,
+            "userId": self.user["userId"],
+            "tenantCode": self.tenant_code,
+            "source": source,
+        })
 
     def save_exam_question(self, course_id: str, question_id: str, answers: str, source: str = "WEIBAN") -> Dict[str, Any]:
         """
