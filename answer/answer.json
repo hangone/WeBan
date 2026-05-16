@@ -29,6 +29,190 @@
     ],
     "type": 1
   },
+  "下列行为中，不属于毒品犯罪相关危害行为的是：": {
+  "optionList": [
+    {
+      "content": "非法种植罂粟等毒品原植物",
+      "isCorrect": 2
+    },
+    {
+      "content": "主动前往戒毒机构自愿戒毒",
+      "isCorrect": 1
+    },
+    {
+      "content": "为毒品犯罪分子转移毒品赃款",
+      "isCorrect": 2
+    }
+  ],
+  "type": 1
+},
+"下列关于海啸防范的核心思路，表述正确的是：": {
+  "optionList": [
+    {
+      "content": "海啸无法预测，只能在发生后快速躲避",
+      "isCorrect": 2
+    },
+    {
+      "content": "利用海啸预警的相关基础，提前预测海啸发生情况",
+      "isCorrect": 1
+    }
+  ],
+  "type": 1
+},
+"你失恋了，觉得特别苦闷难熬：": {
+  "optionList": [
+    {
+      "content": "有人邀请你用毒品，你觉得反正生不如死，爱怎样怎样吧，就接受了",
+      "isCorrect": 2
+    },
+    {
+      "content": "时间会抚平一切。你去寻求朋友、家人或心理老师的帮助",
+      "isCorrect": 1
+    }
+  ],
+  "type": 1
+},
+"关于海啸的威力描述，说法正确的是：": {
+  "optionList": [
+    {
+      "content": "传播速度600-1000公里/小时，能掀起10-40米高巨浪",
+      "isCorrect": 1
+    },
+    {
+      "content": "传播速度100-200公里/小时，仅能掀起3-5米高巨浪",
+      "isCorrect": 2
+    }
+  ],
+  "type": 1
+},
+"下列关于毒品犯罪严重性的说法，正确的是：": {
+  "optionList": [
+    {
+      "content": "只要不亲自吸毒，帮忙运输毒品也没关系",
+      "isCorrect": 2
+    },
+    {
+      "content": "容留他人吸毒会触犯刑法，需承担法律责任",
+      "isCorrect": 1
+    },
+    {
+      "content": "少量制造毒品无需承担法律后果",
+      "isCorrect": 2
+    }
+  ],
+  "type": 1
+},
+"若强迫他人吸食、注射毒品，该行为的法律定性是：": {
+  "optionList": [
+    {
+      "content": "仅违反校园纪律",
+      "isCorrect": 2
+    },
+    {
+      "content": "构成毒品犯罪行为",
+      "isCorrect": 1
+    },
+    {
+      "content": "属于普通民事纠纷",
+      "isCorrect": 2
+    }
+  ],
+  "type": 1
+},
+"下列哪种情况，属于海啸来临前的异常征兆？": {
+  "optionList": [
+    {
+      "content": "潮水反常涨落、海平面显著下降",
+      "isCorrect": 1
+    },
+    {
+      "content": "海面风平浪静，无任何波动",
+      "isCorrect": 2
+    }
+  ],
+  "type": 1
+},
+"实施下列哪项行为，会被认定为毒品犯罪行为：": {
+  "optionList": [
+    {
+      "content": "容留他人在宿舍吸食毒品",
+      "isCorrect": 1
+    },
+    {
+      "content": "偶尔观看毒品科普纪录片",
+      "isCorrect": 2
+    },
+    {
+      "content": "发现室友吸毒后主动举报",
+      "isCorrect": 2
+    }
+  ],
+  "type": 1
+},
+"下列行为中，属于毒品犯罪相关违法犯罪行为的是：": {
+  "optionList": [
+    {
+      "content": "包庇毒品犯罪分子并为其隐瞒行踪",
+      "isCorrect": 1
+    },
+    {
+      "content": "主动参与校园禁毒宣传活动",
+      "isCorrect": 2
+    },
+    {
+      "content": "配合公安机关开展禁毒排查工作",
+      "isCorrect": 2
+    }
+  ],
+  "type": 1
+},
+"关于吸毒行为的法律性质，下列说法正确体现其危害性的是：": {
+  "optionList": [
+    {
+      "content": "属于刑事犯罪行为",
+      "isCorrect": 2
+    },
+    {
+      "content": "属于治安管理违法行为",
+      "isCorrect": 1
+    },
+    {
+      "content": "仅为道德层面的过错",
+      "isCorrect": 2
+    }
+  ],
+  "type": 1
+},
+"引诱、教唆未成年人吸食、注射毒品，从法律惩处角度看，其后果是：": {
+  "optionList": [
+    {
+      "content": "处罚程度与教唆成年人一致",
+      "isCorrect": 2
+    },
+    {
+      "content": "会被依法从重处罚",
+      "isCorrect": 1
+    },
+    {
+      "content": "仅需进行口头批评教育",
+      "isCorrect": 2
+    }
+  ],
+  "type": 1
+},
+"在海边观潮时若发现潮水反常涨落、海平面显著下降、巨浪袭来，正确的做法是：": {
+  "optionList": [
+    {
+      "content": "原地停留观看，拍摄记录",
+      "isCorrect": 2
+    },
+    {
+      "content": "快速撤离岸边，并大声呼喊提醒他人",
+      "isCorrect": 1
+    }
+  ],
+  "type": 1
+},
   "(    )、磷、钾等单质固体物质着火后先熔融，后燃烧。": {
     "optionList": [
       {
