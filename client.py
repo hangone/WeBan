@@ -4,7 +4,7 @@ import sys
 import time
 import webbrowser
 from typing import Any, Dict, Optional, TYPE_CHECKING, Union
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlparse, urljoin
 from uuid import uuid4
 
 from loguru import logger
@@ -23,7 +23,6 @@ else:
     base_path = os.path.dirname(os.path.abspath(__file__))
 answer_dir = os.path.join(base_path, "answer")
 answer_path = os.path.join(answer_dir, "answer.json")
-
 
 def clean_text(text):
     # 只保留字母、数字和汉字，自动去除所有符号和空格
@@ -151,8 +150,8 @@ class WeBanClient:
     def login(self) -> Dict | None:
         if self.api.user.get("userId"):
             return self.api.user
-        retry_limit = 3
-        for i in range(retry_limit + 2):
+        retry_limit = 10
+        for i in range(retry_limit + 3):
             if i > 0:
                 self.log.warning(f"登录失败，正在重试 {i}/{retry_limit+2} 次")
             verify_time = self.api.get_timestamp(13, 0)
@@ -190,7 +189,7 @@ class WeBanClient:
             break
         return None
 
-    def run_study(self, study_time: int = 20, restudy_time: int = 0) -> None:
+    def run_study(self, study_time: int, restudy_time: int) -> None:
         if study_time:
             self.study_time = study_time
 
@@ -263,7 +262,14 @@ class WeBanClient:
                             self.log.success(f"{course_prefix} 完成")
                             continue
 
-                        course_url = self.api.get_course_url(course["resourceId"], task["userProjectId"])["data"] + "&weiban=weiban"
+                        course_url = self.api.get_course_url(course["resourceId"], task["userProjectId"])["data"]
+                        # 补全 URL 参数，匹配浏览器实际访问的格式
+                        course_url += f"&userProjectId={task['userProjectId']}"
+                        course_url += f"&userId={self.api.user['userId']}"
+                        course_url += f"&courseId={course['resourceId']}"
+                        course_url += f"&userName={self.api.user.get('userName', self.api.user.get('realName', ''))}"
+                        course_url += "&projectType=special&projectId=undefined&protocol=true&link=undefined"
+                        course_url += "&weiban=weiban&certificateId=undefined&userActivityState=undefined&step=undefined&index=undefined&viewStep=undefined"
                         self.log.info(f"{course_prefix} URL: {course_url}")
                         query = parse_qs(urlparse(course_url).query)
 
@@ -273,22 +279,30 @@ class WeBanClient:
                         code_match = re.search(r'/course/([^/]+)/', url_path)
                         if code_match:
                             course_code = code_match.group(1)
-                        item_info = self.parse_item_js(course_code) if course_code else {"nonstr_map": {}, "has_exam": False}
-
-                        sleep = 0
-                        while sleep < self.study_time:
-                            if sleep % 60 == 0:
-                                self.log.info(f"{course_prefix} 等待 {self.study_time - sleep} 秒，模拟学习中...")
-                            time.sleep(1)
-                            sleep += 1
+                        item_info = self.parse_item_js(course_code) if course_code else {"nonstr_map": {}, "has_exam": False, "total_step": 0}
 
                         # 生成 uniqueNo，apinext 和 finish 共用同一个
                         unique_no = str(uuid4())
 
-                        # 浏览器流程：apinext finish=2 → 课后习题 → apinext finish=1 → finish_by_token
                         nonstr_map = item_info.get("nonstr_map", {})
-                        page_count = item_info.get("page_count", 0)
-                        total_step = page_count or (max(nonstr_map.keys()) if nonstr_map else 0)
+                        total_step = item_info.get("total_step", 0)
+                        if total_step:
+                            self.log.info(f"total_step={total_step} (来源: {item_info.get('total_step_source', '未知')})")
+
+                        # 初始化课程索引，模拟浏览器行为
+                        self.api.init_index(task["userProjectId"])
+
+                        # 保存并设置浏览器一致的请求头
+                        orig_headers = {}
+                        for h in ["Referer", "Origin", "Accept"]:
+                            orig_headers[h] = self.api.session.headers.get(h, "")
+                        self.api.session.headers["Referer"] = "https://mcwk.mycourse.cn/"
+                        self.api.session.headers["Origin"] = "https://mcwk.mycourse.cn"
+                        self.api.session.headers["Accept"] = "application/json, text/javascript, */*; q=0.01"
+
+                        # 浏览器流程：list_question → apinext finish=2 → 课后习题 → apinext finish=1 → finish_by_token
+                        if item_info.get("has_exam"):
+                            self.api.list_question(course["resourceId"])
 
                         # 中间翻页心跳
                         if total_step:
@@ -302,9 +316,15 @@ class WeBanClient:
                         # 完成标记
                         if total_step:
                             self.handle_apinext(course["userCourseId"], course["resourceId"], task["userProjectId"], nonstr_map, total_step, unique_no=unique_no, finish=1)
+                            time.sleep(2)
+
+                        # 恢复原始请求头
+                        for h, v in orig_headers.items():
+                            if v:
+                                self.api.session.headers[h] = v
 
                         # 完课接口
-                        if query.get("lyra", [None])[0] == "lyra":  # 安全实训
+                        if query.get("lyra", [None])[0] == "lyra":
                             res = self.api.finish_lyra(query.get("userActivityId", [None])[0])
                         elif query.get("weiban", [None])[0] != "weiban":
                             res = self.api.finish_by_token(course["userCourseId"], course_type="open")
@@ -313,9 +333,8 @@ class WeBanClient:
                         else:
                             token = None
                             if query.get("csCapt", [None])[0] == "true":
-                                # 通过浏览器让用户手动完成滑块验证码 (appId: 195119536)
                                 try:
-                                    captcha_result = self.captcha_handler.handle_course_captcha(course_url=course_url,)
+                                    captcha_result = self.captcha_handler.handle_course_captcha(course_url=course_url)
                                     check_res = self.api.course_check(
                                         course["userCourseId"],
                                         task["userProjectId"],
@@ -331,11 +350,14 @@ class WeBanClient:
                                 except Exception as e:
                                     self.log.error(f"课程验证码处理异常: {e}")
                                     continue
-                            res = self.api.finish_by_token(course["userCourseId"], token, unique_no=unique_no)
-                            if res.get("code", "-1") != "0":
-                                self.log.error(f"{course_prefix} 完成失败：{res}")
+                            res = self.api.finish_by_token(course["userCourseId"], token, unique_no=unique_no, referer=course_url)
+
+                        if res.get("code", "-1") != "0":
+                            self.log.error(f"{course_prefix} 完成失败：{res}")
+                            continue
 
                         self.log.success(f"{course_prefix} 完成")
+                        self.get_progress(task["userProjectId"], project_prefix)
 
             self.log.success(f"{project_prefix} 课程学习完成")
 
@@ -508,83 +530,197 @@ class WeBanClient:
 
     def parse_item_js(self, course_code: str) -> Dict[str, Any]:
         """
-        解析课程的 item.js，提取 nonstrMap 和页面信息
-        nonstr_map 从 item.js 提取，page_count 从课程 HTML 提取（更准确）
-        :param course_code: 课程代码（如 DA0309018）
-        :return: {"nonstr_map": {step: str}, "has_exam": bool, "page_count": int}
-        """
-        result = {"nonstr_map": {}, "has_exam": False, "page_count": 0}
-        try:
-            url = f"https://mcwk.mycourse.cn/course/{course_code}/js/item.js"
-            resp = self.api.session.get(url, timeout=10)
-            if resp.status_code != 200:
-                return result
-            content = resp.text
-            # 提取 nonstrMap
-            match = re.search(r'const\s+nonstrMap\s*=\s*new\s+Map\(\[([\s\S]*?)\]\)', content)
-            if match:
-                entries = re.findall(r'\[(\d+),\s*[\'"]([^\'"]+)[\'"]\]', match.group(1))
-                result["nonstr_map"] = {int(step): val for step, val in entries}
-            # 检查是否有课后习题
-            result["has_exam"] = "saveExamQuestion" in content or "listQuestions" in content
+        解析课程 JS，提取 nonstrMap/pageIdMap 和页面信息。
+        total_step = finish=2 的 apinext 调用次数，即 finish=1 的 step - 1。
 
-            # --- 提取页面数 ---
-            # 从课程 HTML 中提取 .page-N 类名（最准确，HTML 包含所有页面）
-            # 页面编号从 0 开始，page_count = max(N)
+        优先级：
+        1. item.js 中的注释（如 ]);//16 → total_step = 16-1 = 15）
+        2. nonstrMap 推导（用于没有注释的课程）
+        3. HTML 中 btn-next 页面数
+
+        :param course_code: 课程代码
+        :return: {"nonstr_map": {step: str}, "has_exam": bool, "total_step": int, "total_step_source": str}
+        """
+        result = {"nonstr_map": {}, "has_exam": False, "total_step": 0, "total_step_source": ""}
+
+        def _extract_map(content: str) -> dict:
+            for pattern in [
+                r'(?:const|var|let)\s+nonstrMap\s*=\s*new\s+Map\(\[([\s\S]*?)\]\)',
+                r'(?:const|var|let)\s+pageIdMap\s*=\s*new\s+Map\(\[([\s\S]*?)\]\)',
+            ]:
+                match = re.search(pattern, content)
+                if match:
+                    entries = re.findall(r'\[(\d+),\s*[\'"]([^\'"]+)[\'"]\]', match.group(1))
+                    if entries:
+                        return {int(step): val for step, val in entries}
+            for m in re.finditer(r'new\s+Map\(\[([\s\S]*?)\]\)', content):
+                entries = re.findall(r'\[(\d+),\s*[\'"]([^\'"]+)[\'"]\]', m.group(1))
+                if entries:
+                    return {int(step): val for step, val in entries}
+            return {}
+
+        def _check_exam(content: str) -> bool:
+            return "saveExamQuestion" in content or "listQuestions" in content
+
+        def _extract_finish_step_comment(content: str) -> int:
+            """从 nonstrMap 后面的注释提取 finish step，如 ]);//16"""
+            match = re.search(r'(?:const|var|let)\s+\w+\s*=\s*new\s+Map\(\[[\s\S]*?\]\)\s*;?\s*//\s*(\d+)', content)
+            if match:
+                return int(match.group(1))
+            match = re.search(r'new\s+Map\(\[[\s\S]*?\]\)\s*;?\s*//\s*(\d+)', content)
+            return int(match.group(1)) if match else 0
+
+        def _count_btn_next_pages(html: str) -> int:
+            """统计 HTML 中包含 .btn-next 的 page-item 页面数（去重）"""
+            seen_pages = set()
+            for m in re.finditer(r'<[^>]*\bclass="[^"]*\bbtn-next\b[^"]*"', html):
+                pos = m.start()
+                preceding = html[:pos]
+                section_matches = list(re.finditer(r'<section\b[^>]*class="([^"]*\bpage-item\b[^"]*)"', preceding))
+                if section_matches:
+                    classes = section_matches[-1].group(1).split()
+                    if {'page-start', 'page-end', 'page-success', 'page-fail'} & set(classes):
+                        continue
+                    page_match = re.search(r'page-(\d+)', section_matches[-1].group(1))
+                    if page_match:
+                        seen_pages.add(int(page_match.group(1)))
+            return len(seen_pages)
+
+        def _fetch_text(url: str) -> str:
+            try:
+                resp = self.api.session.get(url, timeout=10)
+                if resp.status_code == 200:
+                    return resp.text
+            except Exception:
+                pass
+            return ""
+
+        try:
             html_url = f"https://mcwk.mycourse.cn/course/{course_code}/{course_code}.html"
-            html_resp = self.api.session.get(html_url, timeout=10)
-            if html_resp.status_code == 200:
-                html_pages = re.findall(r'page-(\d+)', html_resp.text)
-                if html_pages:
-                    result["page_count"] = max(int(p) for p in html_pages)
+            html = _fetch_text(html_url)
+
+            script_urls = [
+                urljoin(html_url, src)
+                for src in re.findall(r'<script\b[^>]*\bsrc=["\']([^"\']+)["\']', html)
+                if "item.js" in src or f"{course_code}.js" in src
+            ]
+            script_urls.extend([
+                f"https://mcwk.mycourse.cn/course/{course_code}/js/item.js",
+                f"https://mcwk.mycourse.cn/course/{course_code}/build/js/{course_code}.js",
+            ])
+
+            seen_urls: set[str] = set()
+            finish_step_from_comment = 0
+            for item_url in script_urls:
+                if item_url in seen_urls:
+                    continue
+                seen_urls.add(item_url)
+                content = _fetch_text(item_url)
+                if not content:
+                    continue
+                result["nonstr_map"] = _extract_map(content)
+                result["has_exam"] = result["has_exam"] or _check_exam(content)
+                finish_step_from_comment = _extract_finish_step_comment(content)
+                if result["nonstr_map"] or result["has_exam"]:
+                    break
+
+            # 推导 total_step（finish=2 的调用次数）
+            if finish_step_from_comment:
+                result["total_step"] = finish_step_from_comment - 1
+                result["total_step_source"] = f"item.js comment finish_step={finish_step_from_comment}"
+            elif result["nonstr_map"]:
+                max_key = max(result["nonstr_map"].keys())
+                result["total_step"] = max_key + 2
+                result["total_step_source"] = f"nonstrMap max key {max_key} + 2"
+            elif html:
+                btn_pages = _count_btn_next_pages(html)
+                if btn_pages:
+                    result["total_step"] = btn_pages
+                    result["total_step_source"] = f"html btn-next pages count={btn_pages}"
 
         except Exception as e:
-            self.log.warning(f"解析 item.js 失败：{e}")
+            self.log.warning(f"解析课程 JS 失败：{e}")
         return result
 
-    def handle_apinext(self, user_course_id: str, course_id: str, user_project_id: str, nonstr_map: Dict[int, str], total_step: int, unique_no: str = None, finish: int = 2) -> str:
+    def handle_apinext(self, user_course_id: str, course_id: str, user_project_id: str, nonstr_map: Dict[int, str], total_step: int, unique_no: str = "", finish: int = 2, step_delay: float = 1) -> str:
         """
         调用 apinext 接口模拟翻页学习过程
         :param user_course_id: 用户课程 ID
         :param course_id: 课程 ID
         :param user_project_id: 用户项目 ID
-        :param nonstr_map: 从 item.js 提取的 nonstrMap（稀疏映射，仅部分 step 有 nonstr）
+        :param nonstr_map: 从课程 JS 提取的 Map（稀疏映射，仅部分 step 有 nonstr）
         :param total_step: 总步数（finish=2 的次数；finish=1 会发 total_step + 1）
-        :param unique_no: 复用的 UUID，为 None 时自动生成
-        :param finish: 2=中间步骤, 1=完成（仅发送 finish=1）
-        :return: UUID（用于 finish 接口）
+        :param unique_no: 复用的 UUID
+        :param finish: 2=中间步骤, 1=完成
+        :param step_delay: 每次 apinext 前等待秒数，模拟浏览器翻页/播放间隔
+        :return: UUID
         """
-        if unique_no is None:
+        if unique_no == "":
             unique_no = str(uuid4())
         if not total_step:
             return unique_no
         if finish == 2:
-            # 发送中间步骤（模拟翻页）
-            self.log.info(f"apinext 开始发送中间步骤，共 {total_step} 步，uniqueNo={unique_no[:8]}...")
+            self.log.info(f"apinext 发送中间步骤，共 {total_step} 步")
             for step in range(1, total_step + 1):
+                if step_delay:
+                    time.sleep(step_delay)
                 nonstr = nonstr_map.get(step, "")
                 try:
-                    self.api.apinext(user_course_id, course_id, user_project_id, step=step, finish=2, nonstr=nonstr, unique_no=unique_no)
+                    resp = self.api.apinext(user_course_id, course_id, user_project_id, step=step, finish=2, nonstr=nonstr, unique_no=unique_no)
                     self.log.info(f"apinext [{step}/{total_step}] finish=2 已发送")
+                    if not resp.get("success"):
+                        self.log.warning(f"apinext [{step}/{total_step}] 返回异常：{resp}")
                 except Exception as e:
-                    self.log.warning(f"apinext [{step}/{total_step}] finish=2 失败：{e}")
-                time.sleep(0.5)
-            self.log.info(f"apinext 中间步骤全部发送完毕")
+                    self.log.warning(f"apinext [{step}/{total_step}] 失败：{e}")
         else:
-            # 发送完成标记（finish=1），step = total_step + 1
-            self.log.info(f"apinext 发送完成标记 finish=1，step={total_step + 1}，uniqueNo={unique_no[:8]}...")
+            if step_delay:
+                time.sleep(step_delay)
             try:
-                self.api.apinext(user_course_id, course_id, user_project_id, step=total_step + 1, finish=1, nonstr="", unique_no=unique_no)
-                self.log.info("apinext 完成标记已发送")
+                resp = self.api.apinext(user_course_id, course_id, user_project_id, step=total_step + 1, finish=1, nonstr="", unique_no=unique_no)
+                if not resp.get("success"):
+                    self.log.warning(f"apinext 完成请求返回异常：{resp}")
+                self.log.info(f"apinext 完成标记 step={total_step + 1} finish=1 已发送")
             except Exception as e:
                 self.log.warning(f"apinext 完成请求失败：{e}")
-            time.sleep(2)
         return unique_no
+
+    def _answer_question(self, question: dict, answers_json: Dict, course_id: str, save_func, source: str) -> bool:
+        """答题通用逻辑，返回是否通过题库命中"""
+        title = clean_text(question.get("title", ""))
+        question_id = question.get("id", "")
+        option_list = question.get("optionList", [])
+        if not option_list:
+            return False
+
+        answer_ids = []
+        if title in answers_json:
+            correct_contents = answers_json[title]
+            answer_ids = [opt["id"] for opt in option_list if clean_text(opt["content"]) in correct_contents]
+
+        if answer_ids:
+            save_func(course_id, question_id, json.dumps(answer_ids), source)
+            return True
+
+        # 题库没有，先提交第一个选项获取 answerLabel
+        wrong_answer = [option_list[0]["id"]]
+        res = save_func(course_id, question_id, json.dumps(wrong_answer), source)
+        data = res.get("data", {})
+        # 观点题返回的是投票统计列表，无 answerLabel，直接结束
+        if isinstance(data, list):
+            return False
+        answer_label = data.get("answerLabel", "")
+        if answer_label:
+            correct_letters = {ch for ch in answer_label.replace("-", "") if ch.isalpha()}
+            if correct_letters:
+                letter_to_opt = {chr(65 + idx): opt for idx, opt in enumerate(option_list)}
+                answer_ids = [letter_to_opt[l]["id"] for l in correct_letters if l in letter_to_opt]
+                if answer_ids:
+                    save_func(course_id, question_id, json.dumps(answer_ids), source)
+        return False
 
     def handle_exam_questions(self, course_id: str, answers_json: Dict, course_prefix: str, source: str = "WEIBAN") -> None:
         """
-        处理课后习题
-        先查题库，没有则提交一次获取 answerLabel，再用正确答案重新提交
+        处理课中观点题和课后习题
         :param course_id: 课程 ID（resourceId UUID）
         :param answers_json: 题库数据
         :param course_prefix: 课程名称前缀（用于日志）
@@ -593,48 +729,28 @@ class WeBanClient:
         try:
             res = self.api.list_question(course_id)
             data = res.get("data", {})
+
+            # 课中观点题 (mercury.microlecture.saveQuestion)
+            viewpoint_list = data.get("viewpointQuestionList", [])
+            if viewpoint_list:
+                self.log.info(f"{course_prefix} 发现 {len(viewpoint_list)} 道课中观点题")
+                for i, question in enumerate(viewpoint_list):
+                    hit = self._answer_question(question, answers_json, course_id, self.api.save_question, source)
+                    status = "题库命中" if hit else "已提交"
+                    self.log.info(f"{course_prefix} 观点题 {i+1}/{len(viewpoint_list)} {status}")
+                    time.sleep(0.5)
+
+            # 课后习题 (mercury.microlecture.saveExamQuestion)
             exam_list = data.get("examQuestionList", [])
-            if not exam_list:
-                return
-            self.log.info(f"{course_prefix} 发现 {len(exam_list)} 道课后习题")
-            for i, question in enumerate(exam_list):
-                title = clean_text(question.get("title", ""))
-                question_id = question.get("id", "")
-                option_list = question.get("optionList", [])
-                if not option_list:
-                    continue
-
-                # 先从题库查找答案
-                answer_ids = []
-                if title in answers_json:
-                    correct_contents = answers_json[title]
-                    answer_ids = [opt["id"] for opt in option_list if clean_text(opt["content"]) in correct_contents]
-
-                if answer_ids:
-                    self.api.save_exam_question(course_id, question_id, json.dumps(answer_ids), source)
-                    self.log.info(f"{course_prefix} 习题 {i+1}/{len(exam_list)} 题库命中，已作答")
-                else:
-                    # 题库没有，先提交第一个选项获取 answerLabel
-                    wrong_answer = [option_list[0]["id"]]
-                    res = self.api.save_exam_question(course_id, question_id, json.dumps(wrong_answer), source)
-                    answer_label = res.get("data", {}).get("answerLabel", "")
-                    if answer_label:
-                        correct_letters = set()
-                        for ch in answer_label.replace("-", ""):
-                            if ch.isalpha():
-                                correct_letters.add(ch)
-                        if correct_letters:
-                            letter_to_opt = {chr(65 + idx): opt for idx, opt in enumerate(option_list)}
-                            answer_ids = [letter_to_opt[l]["id"] for l in correct_letters if l in letter_to_opt]
-                            if answer_ids:
-                                self.api.save_exam_question(course_id, question_id, json.dumps(answer_ids), source)
-                                self.log.info(f"{course_prefix} 习题 {i+1}/{len(exam_list)} 通过 answerLabel 获取答案，已作答")
-                                time.sleep(0.5)
-                                continue
-                    self.log.info(f"{course_prefix} 习题 {i+1}/{len(exam_list)} 已提交")
-                time.sleep(0.5)
+            if exam_list:
+                self.log.info(f"{course_prefix} 发现 {len(exam_list)} 道课后习题")
+                for i, question in enumerate(exam_list):
+                    hit = self._answer_question(question, answers_json, course_id, self.api.save_exam_question, source)
+                    status = "题库命中" if hit else "已提交"
+                    self.log.info(f"{course_prefix} 习题 {i+1}/{len(exam_list)} {status}")
+                    time.sleep(0.5)
         except Exception as e:
-            self.log.warning(f"{course_prefix} 处理课后习题失败：{e}")
+            self.log.warning(f"{course_prefix} 处理习题失败：{e}")
 
     def record_answer(self, user_exam_plan_id: str, question_id: str, per_time: int, answers_ids: list, exam_plan_id: str) -> bool:
         """

@@ -1,7 +1,7 @@
 """
 腾讯验证码处理模块
 - 无感验证码 (appId: 190330343): 考试前自动处理，无用户交互（entry: weiban.mycourse.cn）
-- 滑块验证码 (appId: 195119536): 课程完成时，通过浏览器让用户手动处理（entry: mcwk.mycourse.cn/course/）
+- 图片点选验证码 (appId: 195119536): 课程完成时，通过浏览器让用户手动处理（entry: mcwk.mycourse.cn/course/）
 """
 
 import json
@@ -18,7 +18,7 @@ TCAPTCHA_SDK_URL = "https://turing.captcha.qcloud.com/TJCaptcha.js"
 
 # 验证码 appId
 EXAM_CAPTCHA_APP_ID = "190330343"    # 无感验证码（考试）
-COURSE_CAPTCHA_APP_ID = "195119536"  # 滑块验证码（课程完成）
+COURSE_CAPTCHA_APP_ID = "195119536"  # 图片点选验证码（课程完成）
 
 # 默认入口页面
 EXAM_ENTRY_URL = "https://weiban.mycourse.cn/#/course"
@@ -118,7 +118,7 @@ class CaptchaHandler:
 
         # 先导航到站点以建立域名上下文，然后注入 localStorage 认证
         self.log.info(f"正在打开验证码入口页面: {entry_url}")
-        tab.get(entry_url, timeout=30)
+        tab.get(entry_url, timeout=600)
 
         # 注入 localStorage user 字段（网站使用 localStorage 认证）
         tab.run_js(f"""
@@ -189,7 +189,7 @@ class CaptchaHandler:
 
         try:
             result = self._run_captcha(tab, EXAM_CAPTCHA_APP_ID)
-            self.log.success("无感验证码自动通过")
+            self.log.success("已获取无感验证码")
             return result
         finally:
             browser.quit()
@@ -199,15 +199,15 @@ class CaptchaHandler:
         course_url: Optional[str] = None,
     ) -> Dict[str, str]:
         """
-        处理课程完成时的滑块验证码 (appId: 195119536)
-        会弹出浏览器窗口，需要用户手动完成滑块验证
+        处理课程完成时的图片点选验证码 (appId: 195119536)
+        会弹出浏览器窗口，需要用户手动完成图片点选验证
         入口页面: mcwk.mycourse.cn/course/{course_code}/{course_code}.html
         :param course_url: 课程页面 URL（如 https://mcwk.mycourse.cn/course/DA0309018/DA0309018.html）
         :return: {"randstr": "...", "ticket": "..."}
         """
         self.log.info("=" * 50)
         self.log.warning("需要手动完成验证码！正在打开浏览器...")
-        self.log.info("请在浏览器窗口中完成滑块验证，完成后程序将自动继续")
+        self.log.info("请在浏览器窗口中完成图片点选验证，完成后程序将自动继续")
         self.log.info("=" * 50)
 
         entry_url = course_url or COURSE_ENTRY_URL
