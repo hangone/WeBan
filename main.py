@@ -1,10 +1,11 @@
-import json
 import os
 import sys
 import threading
+import tomllib
 import traceback
 from concurrent.futures import as_completed, ThreadPoolExecutor
 
+import requests
 from loguru import logger
 
 from client import WeBanClient
@@ -15,180 +16,274 @@ if getattr(sys, "frozen", False):
     base_path = os.path.dirname(sys.executable)
 else:
     base_path = os.path.dirname(os.path.abspath(__file__))
-log_path = os.path.join(base_path, "weban.log")
-config_path = os.path.join(base_path, "config.json")
 
-# 日志
+config_path = os.path.join(base_path, "config.toml")
+config_example_path = os.path.join(base_path, "config.example.toml")
+logs_dir = os.path.join(base_path, "logs")
+
+# 远程模板下载地址（GitHub raw + ghfast.top 加速代理）
+CONFIG_EXAMPLE_URL = (
+    "https://ghfast.top/https://github.com/hangone/WeBan/raw/refs/heads/main/"
+    "config.example.toml"
+)
+
+# ── 日志 ──
 logger.remove()
 logger = logger.bind(account="系统")
-log_format = "<green>{time:YYYY-MM-DD HH:mm:ss}</green>|<level>{level:<7}</level>|<blue>{extra[account]}</blue>|<cyan>{message}</cyan>"
+log_format = (
+    "<green>{time:YYYY-MM-DD HH:mm:ss}</green>|"
+    "<level>{level:<7}</level>|"
+    "<blue>{extra[account]}</blue>|"
+    "<cyan>{message}</cyan>"
+)
 logger.add(sink=sys.stdout, colorize=True, format=log_format)
-logger.add(log_path, encoding="utf-8", format=log_format, retention="1 days")
+
+os.makedirs(logs_dir, exist_ok=True)
+logger.add(
+    os.path.join(logs_dir, "weban.log"),
+    encoding="utf-8", format=log_format,
+    retention="7 days",
+)
 
 # 同步锁，防止同时读写题库
 sync_lock = threading.Lock()
 
 
-def run_account(config, account_index):
-    """运行单个账号的任务"""
-    tenant_name = config.get("tenant_name", "").strip()
-    account = config.get("account", "").strip()
-    password = config.get("password", "").strip()
-    user = config.get("user", {})
-    study = config.get("study", True)
-    study_time = int(config.get("study_time", 20))
-    restudy_time = int(config.get("restudy_time", 0))
-    exam = config.get("exam", True)
-    exam_use_time = int(config.get("exam_use_time", 250))
-    browser_path = config.get("browser_path", None)
+# ── 配置加载 ──────────────────────────────────────────────
 
-    if user.get("tenantName"):
-        tenant_name = user["tenantName"]
+def load_config() -> dict:
+    """加载 config.toml，不存在则下载远程模板"""
+    if not os.path.exists(config_path):
+        logger.info("config.toml 不存在，正在下载远程模板...")
+        downloaded = False
+        try:
+            resp = requests.get(CONFIG_EXAMPLE_URL, timeout=30)
+            resp.raise_for_status()
+            with open(config_path, "w", encoding="utf-8") as f:
+                f.write(resp.text)
+            logger.success(f"远程模板已下载到 {config_path}，请填写配置后重新运行")
+            downloaded = True
+        except Exception as e:
+            logger.error(f"下载远程模板失败: {e}")
+
+        if not downloaded and os.path.exists(config_example_path):
+            import shutil
+            shutil.copy(config_example_path, config_path)
+            logger.success(f"已从本地模板创建 {config_path}，请填写配置后重新运行")
+
+        sys.exit(0)
+
+    with open(config_path, "rb") as f:
+        return tomllib.load(f)
+
+
+# ── 账号级日志过滤器 ─────────────────────────────────────────
+
+def _make_account_filter(account_name: str):
+    """返回一个 loguru filter，只放行 extra[account] == account_name 的日志记录"""
+    def filter_fn(record: dict) -> bool:
+        return record["extra"].get("account") == account_name
+    return filter_fn
+
+
+# ── 单个账号执行 ────────────────────────────────────────────
+
+def run_account(account_config: dict, global_settings: dict, account_index: int) -> bool:
+    """运行单个账号的任务
+
+    :param account_config: [[account]] 的字典
+    :param global_settings: [settings] 的字典
+    :param account_index: 账号序号
+    :return: 成功返回 True，失败返回 False
+    """
+
+    def get_setting(key, default=None):
+        """账号级优先，回退到全局设置"""
+        val = account_config.get(key)
+        if val is not None and val != "":
+            return val
+        return global_settings.get(key, default)
+
+    # 必填字段（password 默认为 username）
+    tenant_name = account_config.get("tenant_name", "").strip()
+    username = account_config.get("username", "").strip()
+    password = account_config.get("password", "") or username
+    user_id = account_config.get("user_id", "")
+    token_val = account_config.get("token", "")
+
+    # 账号标识（用于日志文件夹名）
+    account_name = username or user_id or f"account_{account_index}"
+
+    # 合并设置（账号级优先，回退到全局）
+    study_mode = get_setting("study_mode", "true")
+    exam_mode = get_setting("exam_mode", "true")
+    random_answer = get_setting("random_answer", True)
+    study_time = int(get_setting("study_time", 20))
+    exam_question_time = get_setting("exam_question_time", "3,3")
+    exam_submit_match_rate = int(get_setting("exam_submit_match_rate", 90))
+    browser_path = get_setting("browser_path", "") or None
+    debug = get_setting("debug", False)
+
+    # 为该账号创建专属日志文件夹
+    account_log_dir = os.path.join(logs_dir, account_name)
+    os.makedirs(account_log_dir, exist_ok=True)
+    account_log_path = os.path.join(account_log_dir, "weban.log")
+
+    # 添加只属于该账号的日志 sink
+    account_filter = _make_account_filter(account_name)
+    handler_id = logger.add(
+        account_log_path, encoding="utf-8", format=log_format,
+        retention="7 days", filter=account_filter,
+    )
+
+    log = logger.bind(account=account_name)
 
     try:
-        log = logger.bind(account=account or user.get("userId"))
-        log.info(f"开始执行")
-
-        if all([tenant_name, user.get("userId"), user.get("token")]):
-            log.info(f"使用 Token 登录")
-            client = WeBanClient(tenant_name, user=user, log=log, browser_path=browser_path)
-        elif all([tenant_name, account, password]):
-            log.info(f"使用密码登录")
-            client = WeBanClient(tenant_name, account, password, log=log, browser_path=browser_path)
+        # ── 构建客户端 ──
+        if token_val and user_id:
+            # Token 登录（优先）
+            user = {"userId": user_id, "token": token_val}
+            log.info("使用 Token 登录")
+            client = WeBanClient(tenant_name, user=user, log=log, browser_path=browser_path, debug=debug)
+        elif tenant_name and username:
+            # 密码登录 — password 默认为 username
+            log.info("使用密码登录")
+            client = WeBanClient(
+                tenant_name, username, password, log=log, browser_path=browser_path, debug=debug,
+            )
         else:
-            log.error(f"缺少必要的配置信息, (tenant_name, account, password) or (tenant_name, userId, token)")
+            log.error(
+                "缺少必要的配置信息: 需要填写 tenant_name 和 username，"
+                "或 tenant_name + user_id + token"
+            )
             return False
 
         if not client.login():
-            log.error(f"登录失败")
+            log.error("登录失败")
             return False
 
-        log.info(f"登录成功，开始同步答案")
+        log.info("登录成功，开始同步答案")
         with sync_lock:
             client.sync_answers()
+
+        # ── 学习 ──
+        study = study_mode != "false"
 
         if study:
-            log.info(f"开始学习 (每个任务时长: {study_time}秒)")
-            client.run_study(study_time, restudy_time)
+            mode_desc = {"true": "正常", "force": "强制重新学习"}.get(study_mode, study_mode)
+            log.info(f"开始学习 (模式: {mode_desc}, 每个任务时长: {study_time}秒)")
+            client.run_study(study_time, study_mode)
+        else:
+            log.info("学习模式已关闭，跳过所有学习任务")
 
+        # ── 考试 ──
+        exam = exam_mode != "false"
         if exam:
-            log.info(f"开始考试 (总时长: {exam_use_time}秒)")
-            client.run_exam(exam_use_time)
+            mode_desc = {
+                "true": "正常",
+                "perfect": "追求满分",
+                "force": "强制重考",
+            }.get(exam_mode, exam_mode)
+            log.info(f"开始考试 (模式: {mode_desc})")
+            client.run_exam(
+                exam_mode=exam_mode,
+                random_answer=random_answer,
+                exam_question_time=exam_question_time,
+                exam_submit_match_rate=exam_submit_match_rate,
+            )
+        else:
+            log.info("考试模式已关闭，跳过所有考试任务")
 
-        log.info(f"最终同步答案")
+        # ── 最终同步 ──
+        log.info("最终同步答案")
         with sync_lock:
             client.sync_answers()
 
-        log.success(f"执行完成")
+        log.success("执行完成")
         return True
 
     except PermissionError as e:
-        logger.error(f"权限错误: {e}")
+        log.error(f"权限错误: {e}")
         return False
-
     except RuntimeError as e:
-        logger.error(f"运行时错误: {e}")
+        log.error(f"运行时错误: {e}")
         return False
-
     except ValueError as e:
-        logger.error(f"参数错误: {e}")
+        log.error(f"参数错误: {e}")
         return False
-
     except Exception as e:
-        logger.error(f"运行失败: {e}")
+        log.error(f"运行失败: {e}")
         traceback.print_exc(file=sys.stderr)
         return False
+    finally:
+        logger.remove(handler_id)
 
 
-def create_initial_config() -> list[dict]:
-    """创建初始配置文件"""
-    logger.error("config.json 文件不存在，请填写信息")
-    tenant_name = input("请填写学校名称: ").strip()
-    client = WeBanClient(tenant_name=tenant_name, log=logger)
-    tenant_config = client.api.get_tenant_config()
-    if tenant_config.get("code", -1) != "0":
-        logger.error(f"未找到学校 {tenant_name} 的配置，请检查学校名称是否正确")
-        exit(1)
-    prompt = tenant_config["data"]
-    logger.info(prompt.get("popPrompt", ""))
-    account = input(f"账号{prompt.get('userNamePrompt', '请输入')}：").strip()
-    password = input(f"密码{prompt.get('passwordPrompt', '请输入')}：").strip()
-
-    configs = [{"tenant_name": tenant_name, "account": account, "password": password, "study": True, "user": {"userId": "", "token": ""}, "study_time": 20, "restudy_time": 0, "exam": True, "exam_use_time": 250}]
-
-    with open(config_path, "w", encoding="utf-8") as f:
-        f.write(json.dumps(configs, indent=2, ensure_ascii=False))
-
-    return configs
-
+# ── 入口 ────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     try:
         logger.info(f"程序启动，当前版本：{VERSION}")
-        logger.info(f"程序更新地址：https://github.com/hangone/WeBan")
+        logger.info("程序更新地址：https://github.com/hangone/WeBan")
 
         # 加载配置文件
-        try:
-            configs = json.load(open(config_path, encoding="utf-8"))
-        except FileNotFoundError:
-            configs = create_initial_config()
-        except json.JSONDecodeError:
-            logger.error("config.json 文件格式错误，请检查")
+        config = load_config()
+        global_settings = config.get("settings", {})
+        accounts = config.get("account", [])
+
+        if not accounts:
+            logger.error("没有找到有效的账号配置（请检查 config.toml 中 [[account]] 段落）")
             exit(1)
 
-        if not configs:
-            logger.error("没有找到有效的账号配置")
-            exit(1)
+        logger.info(f"共加载到 {len(accounts)} 个账号")
 
-        logger.info(f"共加载到 {len(configs)} 个账号")
+        # 是否多线程
+        max_workers = min(len(accounts), int(global_settings.get("max_workers", 5)))
 
-        # 询问是否使用多线程
-        use_multithread = True
-        if len(configs) > 1:
-            choice = input(f"检测到 {len(configs)} 个账号，是否同时运行？(Y/n，默认Y): ").strip().lower()
+        if len(accounts) > 1:
+            choice = input(
+                f"检测到 {len(accounts)} 个账号，是否同时运行？(Y/n，默认Y): "
+            ).strip().lower()
             use_multithread = choice != "n"
+        else:
+            use_multithread = False
 
-        if use_multithread and len(configs) > 1:
-            # 多线程执行
-            max_workers = min(len(configs), 5)  # 限制最大线程数为5
+        if use_multithread and len(accounts) > 1:
             logger.info(f"使用多线程模式，最大并发数: {max_workers}")
-
             success_count = 0
             failed_count = 0
 
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                # 提交所有任务
-                future_to_account = {executor.submit(run_account, config, i): (config, i) for i, config in enumerate(configs)}
+                future_to_account = {
+                    executor.submit(run_account, cfg, global_settings, i): (cfg, i)
+                    for i, cfg in enumerate(accounts)
+                }
 
-                # 等待所有任务完成
                 for future in as_completed(future_to_account):
-                    config, account_index = future_to_account[future]
+                    cfg, idx = future_to_account[future]
                     try:
-                        success = future.result()
-                        if success:
+                        if future.result():
                             success_count += 1
                         else:
                             failed_count += 1
                     except Exception as e:
-                        logger.error(f"[账号 {account_index+1}] 线程执行异常: {e}")
+                        logger.error(f"[账号 {idx + 1}] 线程执行异常: {e}")
                         failed_count += 1
 
             logger.info(f"所有账号执行完成！成功: {success_count}，失败: {failed_count}")
-
         else:
-            # 单线程执行（原有逻辑）
             logger.info("使用单线程模式，逐个执行")
             success_count = 0
             failed_count = 0
 
-            for i, config in enumerate(configs):
-                success = run_account(config, i)
-                if success:
+            for i, cfg in enumerate(accounts):
+                if run_account(cfg, global_settings, i):
                     success_count += 1
                 else:
                     failed_count += 1
 
             logger.info(f"所有账号执行完成！成功: {success_count}，失败: {failed_count}")
+
     except KeyboardInterrupt:
         print("用户终止")
     except Exception as e:
@@ -197,5 +292,5 @@ if __name__ == "__main__":
 
     try:
         input("按回车键退出")
-    except:
+    except Exception:
         pass

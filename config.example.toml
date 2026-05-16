@@ -1,0 +1,62 @@
+# WeBan 配置文件
+
+[settings]
+# 学习模式：
+# false = 不学习，跳过所有学习任务
+# true  = 正常学习，默认跳过已完成内容
+# force = 强制学习，已完成内容也会重新学习，全部学完后继续循环
+study_mode = "true"
+
+# 考试模式：
+# false = 不考试，跳过所有考试任务
+# true  = 正常考试，已及格/已完成的考试默认跳过
+# perfect = 达到满分为止，如果只剩一次考试机会且题库无法完全匹配则会停止
+# force = 强制考试，即使已及格也继续参加考试，除非没有考试机会了
+exam_mode = "perfect"
+
+# 遇到题库中没有的题目时是否随机作答：
+# true  = 单选随机，多选全选
+# false = 在终端中等待手动输入答案
+random_answer = true
+
+# 每个学习任务的最少停留时长（秒）
+# 过快不会记录学习进度，数值越大越稳妥，但整体耗时也会越长
+study_time = 30
+
+# 每道考试题的答题等待时长（秒）
+# 格式："基础等待时间,随机等待上限"
+exam_question_time = "3,3"
+
+# 允许提交试卷的最低题库匹配率（百分比）
+# 当匹配率低于此值且 random_answer = false 时，程序会放弃交卷
+exam_submit_match_rate = 90
+
+# 多账号并发时允许的最大线程数
+# 实际并发数 = min(账号数, max_workers)
+max_workers = 5
+
+# 浏览器可执行文件路径
+# 留空则自动检测系统中已安装的 Chrome
+# macOS 示例: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+# Windows 示例: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+browser_path = ""
+
+# 是否启用调试日志
+# 开启后会输出更多日志，比如请求体和响应体，验证码图片等
+debug = false
+
+[[account]]
+# 学校名称（必填）
+tenant_name = ""
+# 用户名
+username = ""
+# 密码（默认和用户名一样）
+password = ""
+
+# 支持在账号级别覆盖全局设置，例如：
+# 登录方式 2：Token (可选，优先使用)
+# tenant_name = ""
+# user_id = ""
+# token = ""
+# 支持在账号级别覆盖全局设置，例如：
+# study_mode = "force"

@@ -293,11 +293,9 @@ poetry.toml
 # LSP config files
 pyrightconfig.json
 
-# verify code files
-verify_code.png
-
 # config
 config.json
+config.toml
 
 # answer
 answer/*
@@ -306,3 +304,4 @@ answer/*
 
 .claude
 src/
+logs/

@@ -3,6 +3,7 @@ import os
 import sys
 import time
 import webbrowser
+from random import randint
 from typing import Any, Dict, Optional, TYPE_CHECKING, Union
 from urllib.parse import parse_qs, urlparse, urljoin
 from uuid import uuid4
@@ -162,6 +163,7 @@ class WeBanClient:
         user: Dict[str, str] | None = None,
         log=logger,
         browser_path: str | None = None,
+        debug: bool = False,
     ) -> None:
         """
         :param tenant_name: 学校全称
@@ -170,18 +172,19 @@ class WeBanClient:
         :param user: 已有用户凭据 {"userId": ..., "token": ...}，提供则跳过登录
         :param log: logger 实例
         :param browser_path: 浏览器可执行文件路径，用于验证码处理
+        :param debug: 是否启用调试日志
         """
         self.log = log
         self.tenant_name = tenant_name.strip()
-        self.study_time = 20
+        self.study_time = 30
         self.ocr = self.get_ocr_instance()
         self.browser_path = browser_path
         if user and all([user.get("userId"), user.get("token")]):
-            self.api = WeBanAPI(user=user)
+            self.api = WeBanAPI(user=user, debug=debug, log=log)
         elif all([self.tenant_name, account, password]):
-            self.api = WeBanAPI(account=account, password=password)
+            self.api = WeBanAPI(account=account, password=password, debug=debug, log=log)
         else:
-            self.api = WeBanAPI()
+            self.api = WeBanAPI(debug=debug, log=log)
         self.tenant_code = self.get_tenant_code()
         if self.tenant_code:
             self.api.set_tenant_code(self.tenant_code)
@@ -391,22 +394,22 @@ class WeBanClient:
                 continue
             if self.api.user.get("userId"):
                 return self.api.user
-            self.log.error(f"登录出错，请检查 config.json 内账号密码，或删除文件后重试: {res}")
+            self.log.error(f"登录出错，请检查 config.toml 内账号密码，或删除文件后重试: {res}")
             break
         return None
 
     # ---- study --------------------------------------------------------------
 
-    def run_study(self, study_time: int, restudy_time: int) -> None:
+    def run_study(self, study_time: int, study_mode: str = "true") -> None:
         """主学习流程入口：遍历所有项目 → 分类 → 课程，逐门学习
         :param study_time: 每门课学习秒数（0 使用默认值 20）
-        :param restudy_time: 重新学习秒数（非 0 则忽略完成状态，全部重新学习）
+        :param study_mode: 学习模式，"force" 时忽略完成状态全部重新学习
         """
         if study_time:
             self.study_time = study_time
 
-        if restudy_time:
-            self.study_time = restudy_time
+        force_restudy = study_mode == "force"
+        if force_restudy:
             self.log.info(f"重新学习模式已开启，所有课程将重新学习，每门课程学习 {self.study_time} 秒")
 
         answers_json = self._load_answers_json(warn_on_fail=True)
@@ -447,42 +450,53 @@ class WeBanClient:
 
                 for category in categories.get("data", []):
                     category_prefix = f"{choose_type[1]} {project_prefix}/{category['categoryName']}"
-                    if not restudy_time and category["finishedNum"] >= category["totalNum"]:
+                    if not force_restudy and category["finishedNum"] >= category["totalNum"]:
                         continue
 
                     courses = self.api.list_course(
                         task["userProjectId"], category["categoryCode"], choose_type[0]
                     )
                     for course in courses.get("data", []):
-                        if not restudy_time and int(course.get("finished", 0)) == 1:
+                        if not force_restudy and int(course.get("finished", 0)) == 1:
                             continue
                         self._study_one_course(
                             course, task, category_prefix, project_prefix,
-                            answers_json, restudy_time,
+                            answers_json, force_restudy,
                         )
 
             self.log.success(f"{project_prefix} 课程学习完成")
 
     def _study_one_course(
         self, course: dict, task: dict, category_prefix: str,
-        project_prefix: str, answers_json: dict, restudy_time: int,
+        project_prefix: str, answers_json: dict, force_restudy: bool,
     ) -> None:
         """处理单门课程：有 apinext 的走翻页流程，没 apinext 的直接答题+完课"""
         course_prefix = f"{category_prefix}/{course['resourceName']}"
 
-        if not restudy_time and int(course.get("finished", 0)) == 1:
+        if not force_restudy and int(course.get("finished", 0)) == 1:
             return
 
         self.log.info(f"学习： {course_prefix}")
+        progress_before = self.get_progress(task["userProjectId"], project_prefix, output=False)
+        finished_before = 0
+        if progress_before.get("code", -1) == "0":
+            d = progress_before["data"]
+            finished_before = d["requiredFinishedNum"] + d["pushFinishedNum"] + d["optionalFinishedNum"]
         self.api.study(course["resourceId"], task["userProjectId"])
         study_start = time.time()
 
         if "userCourseId" not in course:
             self.log.success(f"{course_prefix} 完成")
+            progress_after = self.get_progress(task["userProjectId"], project_prefix)
+            if progress_after.get("code", -1) == "0":
+                d = progress_after["data"]
+                finished_after = d["requiredFinishedNum"] + d["pushFinishedNum"] + d["optionalFinishedNum"]
+                if finished_after <= finished_before:
+                    self.log.warning(f"{course_prefix}：完课成功但进度未更新，请手动检查")
             return
 
         course_url = self._build_course_url(course, task)
-        self.log.info(f"{course_prefix}：{course_url}")
+        self.log.info(f"{course_prefix}：{course_url.split('?')[0]}")
         query = parse_qs(urlparse(course_url).query)
         source_str = get_source_str(query)
 
@@ -558,7 +572,12 @@ class WeBanClient:
             return
 
         self.log.success(f"{course_prefix} 完成")
-        self.get_progress(task["userProjectId"], project_prefix)
+        progress_after = self.get_progress(task["userProjectId"], project_prefix)
+        if progress_after.get("code", -1) == "0":
+            d = progress_after["data"]
+            finished_after = d["requiredFinishedNum"] + d["pushFinishedNum"] + d["optionalFinishedNum"]
+            if finished_after <= finished_before:
+                self.log.warning(f"{course_prefix}：完课成功但进度未更新，请手动检查")
 
     def _finish_course(
         self, course: dict, task: dict, query: dict, course_url: str, unique_no: str,
@@ -604,13 +623,36 @@ class WeBanClient:
 
     # ---- exam ---------------------------------------------------------------
 
-    def run_exam(self, use_time: int = 250):
+    def run_exam(
+        self,
+        exam_mode: str = "true",
+        random_answer: bool = True,
+        exam_question_time: str = "3,3",
+        exam_submit_match_rate: int = 90,
+    ):
         """考试主入口
 
         流程：加载题库 → 遍历项目/计划 → 无感验证码 → 获取试卷 →
-        手动作答（无题库答案的题）→ 自动作答（有题库答案的题）→ 提交试卷。
-        :param use_time: 考试总用时（秒），按题目数均分到每题
+        作答（根据 random_answer 决定手动/自动）→ 提交试卷。
+
+        :param exam_mode: 考试模式
+            - "false": 跳过所有考试
+            - "true": 正常考试，已及格/已完成的考试默认跳过
+            - "perfect": 达到满分为止，只剩一次机会且题库无法完全匹配则停止
+            - "force": 强制考试，即使已及格也继续，除非没有考试机会
+        :param random_answer: True=单选随机多选全选，False=终端手动输入
+        :param exam_question_time: 每道题答题等待时长 "基础时间,随机上限"（秒）
+        :param exam_submit_match_rate: 允许提交的最低题库匹配率（%）
         """
+        # 解析每题等待时间
+        try:
+            parts = exam_question_time.split(",")
+            question_base_time = int(parts[0])
+            question_random_upper = int(parts[1]) if len(parts) > 1 else 0
+        except (ValueError, IndexError):
+            question_base_time = 3
+            question_random_upper = 3
+
         answers_json = self._load_answers_json()
 
         projects = self.api.list_my_project()
@@ -642,15 +684,41 @@ class WeBanClient:
             exam_plans = exam_plans["data"]
 
             for plan in exam_plans:
-                if plan["examFinishNum"] != 0:
-                    choice = self._prompt(
-                        f"考试项目 {project['projectName']}/{plan['examPlanName']} "
-                        f"最高成绩 {plan['examScore']} 分。已考试次数 {plan['examFinishNum']} 次，"
-                        f"还剩 {plan['examOddNum']} 次。需要重考吗(y/N)？"
-                    ).lower()
-                    if choice != "y":
-                        self.log.info(f"不重考项目 {project['projectName']}")
-                        continue
+                plan_name = f"{project['projectName']}/{plan['examPlanName']}"
+                exam_odd_num = plan.get("examOddNum", 0)
+                exam_finish_num = plan.get("examFinishNum", 0)
+                exam_score = plan.get("examScore", 0)
+                pass_score = plan.get("passScore", 0)
+
+                # ── 根据 exam_mode 判断是否跳过 ──
+                if exam_odd_num <= 0:
+                    self.log.info(f"{plan_name} 无剩余考试机会，跳过")
+                    continue
+
+                if exam_mode == "true" and exam_finish_num > 0 and exam_score >= pass_score:
+                    self.log.info(
+                        f"{plan_name} 已及格 ({exam_score}分 >= {pass_score}分)，跳过"
+                    )
+                    continue
+
+                if exam_mode == "perfect" and exam_score >= 100:
+                    self.log.info(f"{plan_name} 已满分 ({exam_score}分)，跳过")
+                    continue
+
+                # perfect 模式：只剩 1 次机会时，检查题库是否能全覆盖
+                if exam_mode == "perfect" and exam_odd_num <= 1:
+                    # 先获取题目列表检查匹配率
+                    warning_msg = (
+                        f"{plan_name} 只剩 {exam_odd_num} 次考试机会，"
+                        f"但 perfect 模式需要满分"
+                    )
+                    self.log.warning(warning_msg)
+
+                if exam_mode == "true" and exam_finish_num > 0:
+                    self.log.info(
+                        f"{plan_name} 已完成 {exam_finish_num} 次，"
+                        f"最高 {exam_score} 分，继续考试以争取更好成绩"
+                    )
 
                 user_exam_plan_id = plan["id"]
                 exam_plan_id = plan["examPlanId"]
@@ -658,8 +726,7 @@ class WeBanClient:
                 before_paper = self.api.exam_before_paper(plan["id"])
                 if before_paper.get("code", -1) != "0":
                     self.log.error(
-                        f"考试项目 {project['projectName']}/{plan['examPlanName']} "
-                        f"获取考试记录失败：{before_paper}"
+                        f"考试项目 {plan_name} 获取考试记录失败：{before_paper}"
                     )
 
                 prepare_paper = self.api.exam_prepare_paper(user_exam_plan_id)
@@ -673,7 +740,6 @@ class WeBanClient:
                     f"题目数：{question_num}，试卷总分：{prepare_paper['paperScore']}，"
                     f"限时 {prepare_paper['answerTime']} 分钟"
                 )
-                per_time = use_time // prepare_paper["questionNum"]
 
                 # 无感验证码
                 try:
@@ -694,8 +760,8 @@ class WeBanClient:
                     self.log.error(f"获取考试题目失败：{exam_paper}")
                     if exam_paper.get("detailCode") == "10018":
                         self.log.warning(
-                            f"考试项目 {project['projectName']}/{plan['examPlanName']} "
-                            f"需要手动处理，请在网站上开启一次考试后重试"
+                            f"考试项目 {plan_name} 需要手动处理，"
+                            f"请在网站上开启一次考试后重试"
                         )
                     continue
 
@@ -706,66 +772,111 @@ class WeBanClient:
                     target = have_answer if clean_text(question["title"]) in answers_json else no_answer
                     target.append(question)
 
+                match_rate = (
+                    len(have_answer) / len(question_list) * 100
+                    if question_list else 0
+                )
                 self.log.info(
                     f"题目总数：{question_num}，有答案的题目数：{len(have_answer)}，"
-                    f"无答案的题目数：{len(no_answer)}"
+                    f"无答案的题目数：{len(no_answer)}，题库匹配率：{match_rate:.1f}%"
                 )
 
-                # 手动作答
+                # perfect 模式：匹配率不足且 random_answer=False 时警告
+                if exam_mode == "perfect" and match_rate < 100:
+                    if not random_answer:
+                        self.log.warning(
+                            f"题库匹配率 {match_rate:.1f}% 不足 100%，"
+                            f"perfect 模式下手动作答可能存在风险"
+                        )
+
+                # 检查提交匹配率
+                if match_rate < exam_submit_match_rate and not random_answer:
+                    self.log.error(
+                        f"题库匹配率 {match_rate:.1f}% 低于阈值 {exam_submit_match_rate}%，"
+                        f"且 random_answer=false，放弃交卷"
+                    )
+                    continue
+
+                # ── 处理无答案题目 ──
                 for i, question in enumerate(no_answer):
-                    self.log.info(f"[{i}/{len(no_answer)}]题目不在题库中或选项不同，请手动选择答案")
-                    print(f"题目类型：{question['typeLabel']}，题目标题：{question['title']}")
-                    for j, opt in enumerate(question["optionList"]):
-                        print(f"{j + 1}. {opt['content']}")
+                    type_label = question.get("typeLabel", "未知")
+                    if random_answer:
+                        # 自动随机作答：单选随机选一个，多选全选
+                        answers_ids = self._auto_select_answer(question)
+                        use_time = question_base_time + randint(0, question_random_upper)
+                        self.log.info(
+                            f"[{i + 1}/{len(no_answer)}] 随机作答 "
+                            f"({type_label})，等待 {use_time}s: "
+                            f"{question['title'][:40]}..."
+                        )
+                        time.sleep(use_time)
+                    else:
+                        # 手动输入
+                        self.log.info(
+                            f"[{i + 1}/{len(no_answer)}] 题目不在题库中，请手动选择答案"
+                        )
+                        print(f"题目类型：{type_label}，题目标题：{question['title']}")
+                        for j, opt in enumerate(question["optionList"]):
+                            print(f"{j + 1}. {opt['content']}")
 
-                    opt_count = len(question["optionList"])
-                    start_time = time.time()
-                    answers_ids = []
+                        opt_count = len(question["optionList"])
+                        start_time = time.time()
+                        answers_ids = []
 
-                    while not answers_ids:
-                        answer = self._prompt(
-                            f"[{self.api.user.get('realName', '未知')}] "
-                            "请输入答案序号（多个选项用英文逗号分隔，如 1,2,3,4）："
-                        ).replace(" ", "").replace("，", ",")
-                        candidates = [ans.strip() for ans in answer.split(",") if ans.strip()]
-                        if all(ans.isdigit() and 1 <= int(ans) <= opt_count for ans in candidates):
-                            answers_ids = [
-                                question["optionList"][int(ans) - 1]["id"]
-                                for ans in candidates
-                            ]
-                            for ans in candidates:
-                                self.log.info(
-                                    f"选择答案：{ans}，"
-                                    f"内容：{question['optionList'][int(ans) - 1]['content']}"
+                        while not answers_ids:
+                            answer = self._prompt(
+                                f"[{self.api.user.get('realName', '未知')}] "
+                                "请输入答案序号（多个选项用英文逗号分隔，如 1,2,3,4）："
+                            ).replace(" ", "").replace("，", ",")
+                            candidates = [ans.strip() for ans in answer.split(",") if ans.strip()]
+                            if all(ans.isdigit() and 1 <= int(ans) <= opt_count for ans in candidates):
+                                answers_ids = [
+                                    question["optionList"][int(ans) - 1]["id"]
+                                    for ans in candidates
+                                ]
+                                for ans in candidates:
+                                    self.log.info(
+                                        f"选择答案：{ans}，"
+                                        f"内容：{question['optionList'][int(ans) - 1]['content']}"
+                                    )
+                            else:
+                                self.log.error(
+                                    "输入无效，请重新输入（序号需为数字且在选项范围内）"
                                 )
-                        else:
-                            self.log.error(
-                                "输入无效，请重新输入（序号需为数字且在选项范围内）"
-                            )
+
+                        use_time = round(time.time() - start_time)
 
                     self.log.info("正在提交当前答案")
-                    end_time = time.time()
                     if not self.record_answer(
                         user_exam_plan_id, question["id"],
-                        round(end_time - start_time), answers_ids, exam_plan_id,
+                        use_time, answers_ids, exam_plan_id,
                     ):
                         raise RuntimeError(f"答题失败，请重新考试：{question}")
 
-                # 题库作答
-                self.log.info(f"手动答题结束，开始答题库中的题目，共 {len(have_answer)} 道题目")
+                # ── 题库作答 ──
+                if have_answer:
+                    self.log.info(
+                        f"开始答题库中的题目，共 {len(have_answer)} 道题目"
+                    )
                 for i, question in enumerate(have_answer):
-                    self.log.info(f"[{i}/{len(have_answer)}]题目在题库中，开始答题")
-                    self.log.info(f"题目类型：{question['typeLabel']}，题目标题：{question['title']}")
+                    self.log.info(
+                        f"[{i + 1}/{len(have_answer)}] 题目在题库中，开始答题"
+                    )
+                    self.log.info(
+                        f"题目类型：{question['typeLabel']}，"
+                        f"题目标题：{question['title']}"
+                    )
                     answers = answers_json[clean_text(question["title"])]
                     answers_ids = [
                         opt["id"]
                         for opt in question["optionList"]
                         if clean_text(opt["content"]) in answers
                     ]
-                    self.log.info(f"等待 {per_time} 秒，模拟答题中...")
-                    time.sleep(per_time)
+                    use_time = question_base_time + randint(0, question_random_upper)
+                    self.log.info(f"等待 {use_time} 秒，模拟答题中...")
+                    time.sleep(use_time)
                     if not self.record_answer(
-                        user_exam_plan_id, question["id"], per_time + 1,
+                        user_exam_plan_id, question["id"], use_time,
                         answers_ids, exam_plan_id,
                     ):
                         raise RuntimeError(f"答题失败，请重新考试：{question}")
@@ -774,7 +885,9 @@ class WeBanClient:
                 submit_res = self.api.exam_submit_paper(user_exam_plan_id)
                 if submit_res.get("code", -1) != "0":
                     raise RuntimeError(f"提交试卷失败，请重新考试：{submit_res}")
-                self.log.success(f"试卷提交成功，考试完成，成绩：{submit_res['data']['score']} 分")
+                self.log.success(
+                    f"试卷提交成功，考试完成，成绩：{submit_res['data']['score']} 分"
+                )
 
     # ---- item.js parsing ----------------------------------------------------
 
@@ -912,6 +1025,23 @@ class WeBanClient:
             except Exception as e:
                 self.log.warning(f"apinext 完成请求失败：{e}")
         return unique_no
+
+    @staticmethod
+    def _auto_select_answer(question: dict) -> list:
+        """自动选择答案：单选随机选一个，多选全选
+
+        :param question: 题目数据（含 type 和 optionList）
+        :return: 选中选项的 ID 列表
+        """
+        option_list = question.get("optionList", [])
+        if not option_list:
+            return []
+        question_type = question.get("type", 1)
+        if question_type == 2:
+            # 多选题 → 全选
+            return [opt["id"] for opt in option_list]
+        # 单选题 → 随机选一个
+        return [option_list[randint(0, len(option_list) - 1)]["id"]]
 
     def _answer_question(
         self, question: dict, answers_json: Dict, course_id: str, save_func, source: str,
