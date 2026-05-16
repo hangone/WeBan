@@ -13,7 +13,7 @@ jobs:
   create-release:
     runs-on: ubuntu-latest
     steps:
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           draft: true
   build:
@@ -21,37 +21,70 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
+        os: [windows-latest, ubuntu-latest, macos-13, macos-latest]
         include:
           - os: windows-latest
-            pyinstaller-ext: .exe
+            platform: windows
+            arch: x64
+            ext: .exe
           - os: ubuntu-latest
-            pyinstaller-ext: "_linux"
+            platform: linux
+            arch: x64
+            ext: ""
+          - os: macos-13
+            platform: macos
+            arch: x64
+            ext: ""
           - os: macos-latest
-            pyinstaller-ext: "_macos"
+            platform: macos
+            arch: arm64
+            ext: ""
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
         with:
-          python-version: "3.12"
-          cache: "pip"
+          version: "3.12"
+          cache-python: "true"
 
-      - name: Install dependencies
+      - name: Build online executable (default)
         run: |
-          pip install pyinstaller loguru pycryptodome requests
+          uvx pyfuze . \
+            --entry main.py \
+            --pyproject pyproject.toml \
+            --include answer \
+            --unzip-path WeBan \
+            --mode online \
+            --uv-install-script-windows https://mirror.nju.edu.cn/astral-sh/uv/install.ps1 \
+            --uv-install-script-unix https://mirror.nju.edu.cn/astral-sh/uv/install.sh \
+            --env INSTALLER_DOWNLOAD_URL=https://mirror.nju.edu.cn/github-release/astral-sh/uv \
+            --env UV_PYTHON_INSTALL_MIRROR=https://mirror.nju.edu.cn/github-release/astral-sh/python-build-standalone \
+            --env UV_DEFAULT_INDEX=https://mirror.nju.edu.cn/pypi/web/simple \
+            --output-name WeBan-${{ steps.version.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}
 
-      - name: Build base executable
-        run: pyinstaller -F main.py -n WeBan${{ matrix.pyinstaller-ext }}
+      - name: Build bundle executable
+        run: |
+          uvx pyfuze . \
+            --entry main.py \
+            --pyproject pyproject.toml \
+            --include answer \
+            --unzip-path WeBan \
+            --mode bundle \
+            --output-name WeBan-${{ steps.version.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}-bundle
 
       - name: Upload release assets
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         if: startsWith(github.ref, 'refs/tags/')
         with:
           draft: false
           files: |
-            dist/WeBan${{ matrix.pyinstaller-ext }}
+            dist/WeBan-${{ steps.version.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }}
+            dist/WeBan-${{ steps.version.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}-bundle${{ matrix.ext }}
           generate_release_notes: true

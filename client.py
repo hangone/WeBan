@@ -19,7 +19,8 @@ if TYPE_CHECKING:
     from ddddocr import DdddOcr
 
 if getattr(sys, "frozen", False):
-    base_path = os.path.dirname(sys.executable)
+    # pyfuze: sys.executable 指向解压后的 Python，需用 argv[0] 定位原始可执行文件
+    base_path = os.path.dirname(os.path.abspath(sys.argv[0]))
 else:
     base_path = os.path.dirname(os.path.abspath(__file__))
 answer_dir = os.path.join(base_path, "answer")

@@ -14,7 +14,8 @@ from client import WeBanClient
 VERSION = "v3.6.0"
 
 if getattr(sys, "frozen", False):
-    base_path = os.path.dirname(sys.executable)
+    # pyfuze: sys.executable 指向解压后的 Python，需用 argv[0] 定位原始可执行文件
+    base_path = os.path.dirname(os.path.abspath(sys.argv[0]))
 else:
     base_path = os.path.dirname(os.path.abspath(__file__))
 
