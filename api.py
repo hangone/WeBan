@@ -13,7 +13,8 @@ from requests.adapters import HTTPAdapter, Retry
 
 
 def create_retry_session(baseurl) -> requests.Session:
-    retry = Retry(total=5, backoff_factor=1, status_forcelist=[429, 500, 502, 503, 504], allowed_methods=["GET", "POST"])
+    retry = Retry(total=5, backoff_factor=1, status_forcelist=[429, 500, 502, 503, 504],
+                  allowed_methods=["GET", "POST"])
     session = requests.Session()
     session.mount("https://", HTTPAdapter(max_retries=retry))
     session.headers = {
@@ -22,22 +23,15 @@ def create_retry_session(baseurl) -> requests.Session:
         "Accept": "application/json, text/plain, */*",
         "Accept-Language": "zh-CN,zh;q=0.5",
         "Accept-Encoding": "gzip, deflate, br",
-        "Dnt": "1",
-        "Sec-Gpc": "1",
-        "Sec-Fetch-Dest": "script",
-        "Sec-Fetch-Mode": "no-cors",
-        "Sec-Fetch-Site": "same-site",
+        "Dnt": "1", "Sec-Gpc": "1",
+        "Sec-Fetch-Dest": "script", "Sec-Fetch-Mode": "no-cors", "Sec-Fetch-Site": "same-site",
         "Te": "trailers",
     }
     return session
 
 
 def handle_response(response: requests.Response) -> Dict[str, Any]:
-    """
-    处理接口响应
-    :param response: 接口响应
-    :return: 处理后的结果
-    """
+    """处理接口响应"""
     if response.status_code != 200:
         if response.status_code == 403:
             raise PermissionError("Token 无效，不允许同时登录，请重试")
@@ -46,21 +40,25 @@ def handle_response(response: requests.Response) -> Dict[str, Any]:
         print(f"请求失败：{response.status_code} {response.text}")
         return {}
     try:
-        response_data = response.json()
+        return response.json()
     except json.JSONDecodeError:
         print(f"响应内容不是有效的 JSON：{response.text}")
         return {}
-    return response_data
 
 
 class WeBanAPI:
 
-    def __init__(self, tenant_code: str | None = None, account: str | None = None, password: str | None = None, user: Dict[str, str] | None = None, timeout: int | tuple = (9.05, 15), session: requests.Session | None = None):
+    # 题库下载地址（GitHub raw + ghfast.top 加速代理）
+    ANSWER_URL = "https://ghfast.top/https://github.com/hangone/WeBan/raw/refs/heads/main/answer/answer.json"
+
+    def __init__(self, tenant_code: str | None = None, account: str | None = None,
+                 password: str | None = None, user: Dict[str, str] | None = None,
+                 timeout: int | tuple = (9.05, 15), session: requests.Session | None = None):
         self.account = account
         self.password = password
         self.tenant_code = tenant_code
         self.baseurl = "https://weiban.mycourse.cn"
-        self.timeout = timeout  # 连接超时和读取超时
+        self.timeout = timeout
         self.session = session or create_retry_session(self.baseurl)
         self.user = user or {"userId": "", "token": ""}
         self.session.headers["X-Token"] = self.user["token"]
@@ -68,30 +66,91 @@ class WeBanAPI:
     @staticmethod
     def get_timestamp(int_len: int = 10, frac_len: int = 3) -> str:
         """
-        获取当前时间戳，单位为毫秒，保留三位小数
+        获取当前时间戳，单位为毫秒，默认保留三位小数
         :param int_len: 整数部分长度
         :param frac_len: 小数部分长度
         :return:
         1234567890.123
         """
         t = str(time.time_ns())
-        return f"{t[:int_len]}.{t[int_len:int_len+frac_len]}" if frac_len else t[:int_len]
+        return f"{t[:int_len]}.{t[int_len:int_len + frac_len]}" if frac_len else t[:int_len]
 
     @staticmethod
     def encrypt(data) -> str:
         """
-        AES加密
+        用固定密钥 wbs512+ECB 模式加密登录请求体
         :param data: json 字符串
         :return: base64 编码的加密字符串
         """
         key = urlsafe_b64decode("d2JzNTEyAAAAAAAAAAAAAA==")  # wbs512
-        return urlsafe_b64encode(AES.new(key, AES.MODE_ECB).encrypt(pad(data.encode(), AES.block_size))).decode()
+        return urlsafe_b64encode(
+            AES.new(key, AES.MODE_ECB).encrypt(pad(data.encode(), AES.block_size))
+        ).decode()
+
+    # ========================================================================
+    # 核心请求辅助方法
+    # ========================================================================
+
+    def _post(self, endpoint: str, data: dict | None = None,
+              timestamp_args: tuple | None = None) -> Dict[str, Any]:
+        """
+        通用 POST 请求，封装所有端点共用的模板代码。
+        自动拼接 baseurl、timestamp 置入 query、注入 tenantCode 到 body。
+        如果 userId 已设置（登录后），自动注入 userId。
+        :param endpoint: 接口路径（如 "/pharos/exam/startPaper.do"）
+        :param data: POST body（dict），会自动补 tenantCode/userId
+        :param timestamp_args: 传递给 get_timestamp 的参数，用以控制 ts 小数位数长度（如 (10,1)）
+        :return: 接口返回的 JSON dict
+        """
+        url = f"{self.baseurl}{endpoint}"
+        if timestamp_args:
+            ts = self.get_timestamp(*timestamp_args)
+        else:
+            ts = self.get_timestamp()
+        params = {"timestamp": ts}
+        if data is None:
+            data = {}
+        data.setdefault("tenantCode", self.tenant_code)
+        if self.user.get("userId"):
+            data.setdefault("userId", self.user["userId"])
+        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
+        return handle_response(response)
+
+    def _mercury_request(self, params: dict) -> Dict[str, Any]:
+        """
+        mercuryprovider 通用请求。会将 appKey/format/v/timestamp/clientId 标准参数与传入 params 合并，
+        按 key 字母序拼接成 sign_str，用固定密钥 75uet0kwvnc90xo 做包装式 SHA1 签名。
+        :param params: service/id 等业务参数 dict
+        :return: mercuryprovider 返回的 JSON
+        """
+        standard = {
+            "appKey": "00000001",
+            "format": "json",
+            "v": "1.0",
+            "timestamp": self.get_timestamp(),
+            "clientId": "pharos",
+        }
+        merged = {**standard, **params}
+        secret_key = "75uet0kwvnc90xo"
+        # 签名算法：secret + 按 key 升序拼接 keyvalue + secret，再做 SHA1 转大写
+        sign_str = secret_key
+        for k in sorted(merged.keys()):
+            sign_str += k + str(merged[k])
+        sign_str += secret_key
+        merged["sign"] = hashlib.sha1(sign_str.encode()).hexdigest().upper()
+        response = self.session.post(
+            "https://resource.mycourse.cn/mercuryprovider/router",
+            data=merged, timeout=self.timeout)
+        return handle_response(response)
+
+    # ========================================================================
+    # 登录相关
+    # ========================================================================
 
     def set_tenant_code(self, tenant_code: str):
-        """
-        设置学校代码
+        """设置学校代码
         :param tenant_code: 学校代码
-        :return:
+        :return: 学校代码
         """
         self.tenant_code = tenant_code
 
@@ -114,8 +173,8 @@ class WeBanAPI:
         }
         """
         url = f"{self.baseurl}/pharos/login/getTenantListWithLetter.do"
-        params = {"timestamp": self.get_timestamp()}
-        response = self.session.post(url, params=params, timeout=self.timeout)
+        response = self.session.post(url, params={"timestamp": self.get_timestamp()},
+                                     timeout=self.timeout)
         return handle_response(response)
 
     def get_tenant_config(self, tenant_code: str | None = None) -> Dict[str, Any]:
@@ -151,13 +210,10 @@ class WeBanAPI:
         """
         获取简单配置
         :param tenant_code: 学校代码
-        :return:
+        :return: 简单配置 dict
         """
-        url = f"{self.baseurl}/pharos/tenantconfig/getSimpleConfig.do"
-        params = {"timestamp": self.get_timestamp()}
-        data = {"tenantCode": tenant_code or self.tenant_code, "userId": self.user["userId"]}
-        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return handle_response(response)
+        return self._post("/pharos/tenantconfig/getSimpleConfig.do",
+                          {"tenantCode": tenant_code or self.tenant_code})
 
     def get_help(self, tenant_code: str | None = None) -> Dict[str, Any]:
         """
@@ -171,17 +227,13 @@ class WeBanAPI:
             "detailCode": "0"
         }
         """
-        url = f"{self.baseurl}/pharos/login/getHelp.do"
-        params = {"timestamp": self.get_timestamp()}
-        data = {"tenantCode": tenant_code or self.tenant_code}
-        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return handle_response(response)
+        return self._post("/pharos/login/getHelp.do",
+                          {"tenantCode": tenant_code or self.tenant_code})
 
     def rand_letter_image(self, verify_time: str | None) -> bytes:
-        """
-        获取验证码图片
-        :return:
-        images bytes
+        """获取验证码图片
+        :param verify_time: 验证码时间戳
+        :return: 验证码图片字节
         """
         url = f"{self.baseurl}/pharos/login/randLetterImage.do"
         params = {"time": verify_time or self.get_timestamp(frac_len=0)}
@@ -190,9 +242,9 @@ class WeBanAPI:
 
     def login(self, verify_code: str, verify_time: int | None) -> Dict[str, Any]:
         """
-        登录
-        :param verify_code: 验证码
-        :param verify_time: 验证码时间戳
+        登录，请求体经 AES-ECB 加密后发送。成功后自动将 token、userId 存入 self.user 并更新 X-Token 头。
+        :param verify_code: 用户输入的验证码
+        :param verify_time: 验证码获取时间戳（秒级整数）
         :return:
         {
           "code": "0",
@@ -232,22 +284,28 @@ class WeBanAPI:
           "detailCode": "0"
         }
         """
-        url = f"{self.baseurl}/pharos/login/login.do"
-        params = {"timestamp": self.get_timestamp()}
-        data = {
+        payload = {
             "keyNumber": self.account,
             "password": self.password,
             "tenantCode": self.tenant_code,
             "time": verify_time or int(self.get_timestamp(frac_len=0)),
             "verifyCode": verify_code,
         }
-        encrypt_data = self.encrypt(json.dumps(data, separators=(",", ":")))
-        response = self.session.post(url, params=params, data={"data": encrypt_data}, timeout=self.timeout)
-        if response.json().get("data", {}).get("token", None):
-            self.user = response.json()["data"]
+        encrypted = self.encrypt(json.dumps(payload, separators=(",", ":")))
+        response = self.session.post(
+            f"{self.baseurl}/pharos/login/login.do",
+            params={"timestamp": self.get_timestamp()},
+            data={"data": encrypted}, timeout=self.timeout)
+        result = handle_response(response)
+        if result.get("data", {}).get("token"):
+            self.user = result["data"]
             self.session.headers["X-Token"] = self.user["token"]
             self.password = None
-        return handle_response(response)
+        return result
+
+    # ========================================================================
+    # 首页 / 项目
+    # ========================================================================
 
     def list_completion(self) -> Dict[str, Any]:
         """
@@ -291,11 +349,7 @@ class WeBanAPI:
           "detailCode": "0"
         }
         """
-        url = f"{self.baseurl}/pharos/index/listCompletion.do"
-        params = {"timestamp": self.get_timestamp()}
-        data = {"tenantCode": self.tenant_code, "userId": self.user["userId"]}
-        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return handle_response(response)
+        return self._post("/pharos/index/listCompletion.do")
 
     def lab_index(self) -> Dict[str, Any]:
         """
@@ -331,16 +385,12 @@ class WeBanAPI:
           "detailCode": "0"
         }
         """
-        url = f"{self.baseurl}/pharos/lab/index.do"
-        params = {"timestamp": self.get_timestamp(10, 1)}
-        data = {"tenantCode": self.tenant_code, "userId": self.user["userId"]}
-        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return handle_response(response)
+        # 该端点要求 timestamp 带 1 位小数（如 1234567890.1）
+        return self._post("/pharos/lab/index.do", timestamp_args=(10, 1))
 
     def list_study_task(self) -> Dict[str, Any]:
-        """
-        获取学习任务列表
-        :return:
+        """获取学习任务列表
+        :return: 学习任务列表 dict
         {
           "code": "0",
           "data": {
@@ -375,17 +425,13 @@ class WeBanAPI:
           "detailCode": "0"
         }
         """
-        url = f"{self.baseurl}/pharos/index/listStudyTask.do"
-        params = {"timestamp": self.get_timestamp()}
-        data = {"tenantCode": self.tenant_code, "userId": self.user["userId"]}
-        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return handle_response(response)
+        return self._post("/pharos/index/listStudyTask.do")
 
     def list_my_project(self, ended: int = 2) -> Dict[str, Any]:
         """
-        获取我的项目列表，和 list_study_task 几乎相同
-        :param ended: 1:进行中 2:已结束
-        :return:
+        获取我的项目列表。
+        :param ended: 1=已结束, 2=未结束/进行中（默认 2）
+        :return: 项目列表 dict，data 字段为项目数组
         {
           "code": "0",
           "data": [
@@ -410,17 +456,12 @@ class WeBanAPI:
           "detailCode": "0"
         }
         """
-        url = f"{self.baseurl}/pharos/index/listMyProject.do"
-        params = {"timestamp": self.get_timestamp()}
-        data = {"tenantCode": self.tenant_code, "userId": self.user["userId"], "ended": ended}
-        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return handle_response(response)
+        return self._post("/pharos/index/listMyProject.do", {"ended": ended})
 
     def show_progress(self, user_project_id: str) -> Dict[str, Any]:
-        """
-        获取学习任务进度
-        :param user_project_id: 用户项目ID
-        :return:
+        """获取学习任务进度
+        :param user_project_id: 用户项目 ID
+        :return: 进度 dict
         {
           "code": "0",
           "data": {
@@ -449,54 +490,40 @@ class WeBanAPI:
           "detailCode": "0"
         }
         """
-        url = f"{self.baseurl}/pharos/project/showProgress.do"
-        params = {"timestamp": self.get_timestamp()}
-        data = {
-            "tenantCode": self.tenant_code,
-            "userId": self.user["userId"],
-            "userProjectId": user_project_id,
-        }
-        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return handle_response(response)
+        return self._post("/pharos/project/showProgress.do",
+                          {"userProjectId": user_project_id})
 
     def list_valve(self) -> Dict[str, Any]:
-        """获取项目页功能开关，浏览器进入项目页时会调用。"""
-        url = f"{self.baseurl}/pharos/index/listValve.do"
-        params = {"timestamp": self.get_timestamp()}
-        data = {"tenantCode": self.tenant_code, "userId": self.user["userId"]}
-        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return handle_response(response)
+        """获取项目页功能开关
+        :return: 功能开关 dict
+        """
+        return self._post("/pharos/index/listValve.do")
 
     def get_next_task(self, user_project_id: str) -> Dict[str, Any]:
-        """获取项目下一步状态，浏览器进入项目页时会调用。"""
-        url = f"{self.baseurl}/pharos/project/getNextTask.do"
-        params = {"timestamp": self.get_timestamp()}
-        data = {
-            "tenantCode": self.tenant_code,
-            "userId": self.user["userId"],
-            "userProjectId": user_project_id,
-        }
-        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return handle_response(response)
+        """获取项目下一步状态
+        :param user_project_id: 用户项目 ID
+        :return: 下一步状态 dict
+        """
+        return self._post("/pharos/project/getNextTask.do",
+                          {"userProjectId": user_project_id})
 
     def get_project_simple(self, user_project_id: str) -> Dict[str, Any]:
-        """获取项目基础模式信息，浏览器进入项目页时会调用。"""
-        url = f"{self.baseurl}/pharos/project/getSimple.do"
-        params = {"timestamp": self.get_timestamp()}
-        data = {
-            "tenantCode": self.tenant_code,
-            "userId": self.user["userId"],
-            "userProjectId": user_project_id,
-        }
-        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return handle_response(response)
+        """获取项目基础模式信息
+        :param user_project_id: 用户项目 ID
+        :return: 项目基础信息 dict
+        """
+        return self._post("/pharos/project/getSimple.do",
+                          {"userProjectId": user_project_id})
+
+    # ========================================================================
+    # 课程
+    # ========================================================================
 
     def list_category(self, user_project_id: str, choose_type: int = 3) -> Dict[str, Any]:
-        """
-        获取课程分类列表
-        :param user_project_id: 用户项目ID
-        :param choose_type: PushCourse(1,"推送课"),OptionalCourse(2,"自选课"),RequiredCourse(3,"必修课")
-        :return:
+        """获取课程分类列表
+        :param user_project_id: 用户项目 ID
+        :param choose_type: 课程类型（1=推送课, 2=自选课, 3=必修课）
+        :return: 课程分类列表 dict
         {
           "code": "0",
           "data": [
@@ -511,24 +538,16 @@ class WeBanAPI:
           ]
         }
         """
-        url = f"{self.baseurl}/pharos/usercourse/listCategory.do"
-        params = {"timestamp": self.get_timestamp()}
-        data = {
-            "tenantCode": self.tenant_code,
-            "userId": self.user["userId"],
-            "userProjectId": user_project_id,
-            "chooseType": choose_type,
-        }
-        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return handle_response(response)
+        return self._post("/pharos/usercourse/listCategory.do",
+                          {"userProjectId": user_project_id, "chooseType": choose_type})
 
-    def list_course(self, user_project_id: str, category_code: str, choose_type: int = 3) -> Dict[str, Any]:
-        """
-        获取课程列表
-        :param user_project_id: 用户项目ID
-        :param category_code: 课程分类代码
-        :param choose_type: PushCourse(1,"推送课"),OptionalCourse(2,"自选课"),RequiredCourse(3,"必修课")
-        :return:
+    def list_course(self, user_project_id: str, category_code: str,
+                    choose_type: int = 3) -> Dict[str, Any]:
+        """获取课程列表
+        :param user_project_id: 用户项目 ID
+        :param category_code: 分类代码
+        :param choose_type: 课程类型（1=推送课, 2=自选课, 3=必修课）
+        :return: 课程列表 dict
         {
           "code": "0",
           "data": [
@@ -549,173 +568,144 @@ class WeBanAPI:
           ]
         }
         """
-        url = f"{self.baseurl}/pharos/usercourse/listCourse.do"
-        params = {"timestamp": self.get_timestamp()}
-        data = {
-            "tenantCode": self.tenant_code,
-            "userId": self.user["userId"],
-            "userProjectId": user_project_id,
-            "chooseType": choose_type,
-            "categoryCode": category_code,
-        }
-        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return handle_response(response)
+        return self._post("/pharos/usercourse/listCourse.do",
+                          {"userProjectId": user_project_id, "chooseType": choose_type,
+                           "categoryCode": category_code})
 
     def init_index(self, user_project_id: str) -> Dict[str, Any]:
-        """
-        初始化课程索引（开始学习前调用，模拟浏览器行为）
+        """初始化课程索引（开始学习前调用，模拟浏览器行为）
         :param user_project_id: 用户项目 ID
-        :return:
+        :return: 初始化结果 dict
         {"code":"0","detailCode":"0"}
         """
-        url = f"{self.baseurl}/pharos/usercourse/initIndex.do"
-        params = {"timestamp": self.get_timestamp()}
-        data = {
-            "tenantCode": self.tenant_code,
-            "userId": self.user["userId"],
-            "userProjectId": user_project_id,
-        }
-        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return handle_response(response)
+        return self._post("/pharos/usercourse/initIndex.do",
+                          {"userProjectId": user_project_id})
 
     def study(self, course_id: str, user_project_id: str) -> Dict[str, Any]:
-        """
-        开始学习课程
-        :param course_id: 课程ID
-        :param user_project_id: 用户项目ID
-        :return:
+        """开始学习课程
+        :param course_id: 课程 ID
+        :param user_project_id: 用户项目 ID
+        :return: 学习结果 dict
         {
             "code":"0",
             "detailCode":"0"
         }
         """
-        url = f"{self.baseurl}/pharos/usercourse/study.do"
-        params = {"timestamp": self.get_timestamp()}
-        data = {
-            "tenantCode": self.tenant_code,
-            "userId": self.user["userId"],
-            "courseId": course_id,
-            "userProjectId": user_project_id,
-        }
-        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return handle_response(response)
+        return self._post("/pharos/usercourse/study.do",
+                          {"courseId": course_id, "userProjectId": user_project_id})
 
     def get_course_url(self, course_id: str, user_project_id: str) -> Dict[str, Any]:
-        """
-        获取课程链接
-        :param course_id: 课程ID
-        :param user_project_id: 用户项目ID
-        :return:
+        """获取课程链接
+        :param course_id: 课程 ID
+        :param user_project_id: 用户项目 ID
+        :return: 课程链接 dict
         {
             "code":"0",
             "data":"https://mcwk.mycourse.cn/course/A11072/A11072.html?userCourseId=&tenantCode=&type=1&csComm=true&csCapt=true",
             "detailCode":"0"
         }
         """
-        url = f"{self.baseurl}/pharos/usercourse/getCourseUrl.do"
-        params = {"timestamp": self.get_timestamp()}
-        data = {
-            "tenantCode": self.tenant_code,
-            "userId": self.user["userId"],
-            "courseId": course_id,
-            "userProjectId": user_project_id,
-        }
-        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return handle_response(response)
+        return self._post("/pharos/usercourse/getCourseUrl.do",
+                          {"courseId": course_id, "userProjectId": user_project_id})
 
     def invoke_captcha(self, user_course_id: str, user_project_id: str) -> Dict[str, Any]:
         """
-        通过验证码获取完成 token
-        :param user_course_id: 用户课程ID
-        :param user_project_id: 用户项目ID
-        :return:
+        通过验证码获取完成 token。
+        不走 OCR —— 验证码是"找出正确汉字"，但后端仅校验坐标，
+        所以直接用固定坐标 +-5px 随机抖动暴力猜测，实测可过。
+        :param user_course_id: 用户课程 ID
+        :param user_project_id: 用户项目 ID
+        :return: 包含完成 token 的 dict
         {"code":"0",data:{"methodToken",""}}
         """
         fetch_url = f"{self.baseurl}/pharos/usercourse/getCaptcha.do"
         check_url = f"{self.baseurl}/pharos/usercourse/checkCaptcha.do"
         params = {
-            "userCourseId": user_course_id,
-            "userProjectId": user_project_id,
-            "userId": self.user["userId"],
-            "tenantCode": self.tenant_code,
+            "userCourseId": user_course_id, "userProjectId": user_project_id,
+            "userId": self.user["userId"], "tenantCode": self.tenant_code,
         }
-        response = self.session.get(fetch_url, params=params, timeout=self.timeout)  # {"captcha":{"num":3,"questionId":"${uuid}","imageUrl":"${url}"}}
+        response = self.session.get(fetch_url, params=params, timeout=self.timeout)
         params["questionId"] = handle_response(response).get("captcha", {}).get("questionId", "")
-        coordinates = [{"x": x + randint(-5, 5), "y": y + randint(-5, 5)} for x, y in [(207, 436), (67, 424), (141, 427)]]
-        data = {"coordinateXYs": json.dumps(coordinates, separators=(",", ":"))}
+        # 三组固定基准坐标 + 随机 ±5px 抖动，服务端容差校验
+        coords = [{"x": x + randint(-5, 5), "y": y + randint(-5, 5)}
+                  for x, y in [(207, 436), (67, 424), (141, 427)]]
+        data = {"coordinateXYs": json.dumps(coords, separators=(",", ":"))}
         time.sleep(3)
         response = self.session.post(check_url, params=params, data=data, timeout=self.timeout)
         return handle_response(response)
 
-    def finish_by_token(self, user_course_id: str, token: str | None = None, course_type: str | None = "weiban", unique_no: str | None = None, referer: str | None = None) -> Dict[str, Any]:
+    def finish_by_token(self, user_course_id: str, token: str | None = None,
+                        course_type: str | None = "weiban",
+                        unique_no: str | None = None,
+                        referer: str | None = None) -> Dict[str, Any]:
         """
-        通过 userCourseId 或验证码 token 完成课程
+        通过 userCourseId 或验证码 token 完成课程。
         :param user_course_id: 用户课程 ID
-        :param token: 验证码 token（如有）
-        :param course_type: 课程类型 weiban, open, moon
-        :param unique_no: UUID，来自 apinext 接口
-        :param referer: HTTP Referer 头，模拟浏览器行为
-        :return:
-        {"msg": "ok", "code": "0", "detailCode": "0"}
+        :param token: 验证码获取的 token，weiban 模式会替代 URL 中的 id
+        :param course_type: 决定接口——"weiban"（JSONP GET，需绕过跨域）、"open"（POST）、"moon"（POST）
+        :param unique_no: 微课专用唯一标识
+        :param referer: 课程来源
+        :return: 完成结果 dict
+        JSONP 模式是因为 weiban 服务端返回 callback 包裹而非 JSON，前端通过 <script> 标签跨域拉取。
+        detailCode=10018 表示服务端进度尚未落库，采用指数退避重试（3/6/10/15/20 秒，最多 6 次）。
         """
-        url = f"{self.baseurl}/pharos/usercourse/v2/{token or user_course_id}.do"
-        data = {
-            "userCourseId": user_course_id,
-            "tenantCode": self.tenant_code,
-        }
+        data = {"userCourseId": user_course_id, "tenantCode": self.tenant_code}
         if unique_no:
             data["uniqueNo"] = unique_no
 
         if course_type == "open":
-            url = f"https://open.mycourse.cn/proteus/usercourse/finish.do"
+            url = "https://open.mycourse.cn/proteus/usercourse/finish.do"
         elif course_type == "moon":
-            url = f"https://moon.mycourse.cn/moonapi/api/study/activity/microCourse/v1/finishedCourse"
+            url = "https://moon.mycourse.cn/moonapi/api/study/activity/microCourse/v1/finishedCourse"
+        else:
+            url = f"{self.baseurl}/pharos/usercourse/v2/{token or user_course_id}.do"
 
-        retry_delays = (3, 6, 10, 15, 20)
-        for attempt in range(len(retry_delays) + 1):
-            if course_type == "weiban":
-                # weiban 走 jQuery JSONP（GET + callback 参数）
+        is_jsonp = course_type not in ("open", "moon")
+        for attempt in range(6):
+            if is_jsonp:
                 ts = int(self.get_timestamp(13, 0))
-                callback = f"jQuery3410{randint(10**15, 10**16 - 1)}_{ts}"
-                params = {**data, "callback": callback, "_": ts + 1}
-                response = self.session.get(url, params=params, timeout=self.timeout)
+                cb = f"jQuery3410{randint(10 ** 15, 10 ** 16 - 1)}_{ts}"
+                response = self.session.get(url,
+                                            params={**data, "callback": cb, "_": ts + 1},
+                                            timeout=self.timeout)
             else:
                 response = self.session.post(url, data=data, timeout=self.timeout)
             try:
                 result = response.json()
             except json.JSONDecodeError:
                 text = response.text
-                start = text.find("(")
-                end = text.rfind(")")
-                if start != -1 and end != -1:
-                    text = text[start + 1:end]
+                s, e = text.find("("), text.rfind(")")
+                if s != -1 and e != -1:
+                    text = text[s + 1:e]
                 try:
                     result = json.loads(text)
                 except json.JSONDecodeError:
                     return {"raw": response.text}
-            # 10018 = 服务端还未完成 apinext 进度落库，等待后重试完课接口。
-            if result.get("detailCode") == "10018" and attempt < len(retry_delays):
-                time.sleep(retry_delays[attempt])
+            if result.get("detailCode") == "10018" and attempt < 5:
+                time.sleep((3, 6, 10, 15, 20)[attempt])
                 continue
             return result
+        return {}  # unreachable, satisfies type checker
 
     def finish_lyra(self, user_activity_id: str) -> Dict[str, Any]:
-        """
-        完成安全实训
+        """完成安全实训（Lyra 独立微服务，不走 _post 统一入口）
         :param user_activity_id: 用户活动 ID
-        :return:
+        :return: 完成结果 dict
         {"msg":"ok","code":"0","detailCode":"0"}
         """
-        url = f"https://lyra.mycourse.cn/lyraapi/study/course/finish.api"
-        data = {"userActivityId": user_activity_id}
-        response = self.session.post(url, data=data, timeout=self.timeout)
+        response = self.session.post(
+            "https://lyra.mycourse.cn/lyraapi/study/course/finish.api",
+            data={"userActivityId": user_activity_id}, timeout=self.timeout)
         return handle_response(response)
 
+    # ========================================================================
+    # 考试
+    # ========================================================================
+
     def exam_list_plan(self, user_project_id: str) -> Dict[str, Any]:
-        """
-        获取考试计划列表
-        :param user_project_id: 用户课程 ID
-        :return:
+        """获取考试计划列表
+        :param user_project_id: 用户项目 ID
+        :return: 考试计划列表 dict
         {
           "code": "0",
           "data": [
@@ -742,21 +732,13 @@ class WeBanAPI:
           "detailCode": "0"
         }
         """
-        url = f"{self.baseurl}/pharos/exam/listPlan.do"
-        params = {"timestamp": self.get_timestamp()}
-        data = {
-            "tenantCode": self.tenant_code,
-            "userId": self.user["userId"],
-            "userProjectId": user_project_id,
-        }
-        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return handle_response(response)
+        return self._post("/pharos/exam/listPlan.do",
+                          {"userProjectId": user_project_id})
 
     def exam_before_paper(self, user_exam_plan_id: str) -> Dict[str, Any]:
-        """
-        获取是否有未提交的答案
+        """获取是否有未提交的答案
         :param user_exam_plan_id: 用户考试计划 ID
-        :return:
+        :return: 未提交答案信息 dict
         {
           "code": "0",
           "data": {
@@ -765,21 +747,13 @@ class WeBanAPI:
           "detailCode": "0"
         }
         """
-        url = f"{self.baseurl}/pharos/exam/beforePaper.do"
-        params = {"timestamp": self.get_timestamp()}
-        data = {
-            "tenantCode": self.tenant_code,
-            "userId": self.user["userId"],
-            "userExamPlanId": user_exam_plan_id,
-        }
-        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return handle_response(response)
+        return self._post("/pharos/exam/beforePaper.do",
+                          {"userExamPlanId": user_exam_plan_id})
 
     def exam_prepare_paper(self, user_exam_plan_id: str) -> Dict[str, Any]:
-        """
-        准备考试
+        """准备考试
         :param user_exam_plan_id: 用户考试计划 ID
-        :return:
+        :return: 考试准备结果 dict
         {
           "code": "0",
           "data": {
@@ -792,93 +766,61 @@ class WeBanAPI:
           "detailCode": "0"
         }
         """
-        url = f"{self.baseurl}/pharos/exam/preparePaper.do"
-        params = {"timestamp": self.get_timestamp()}
-        data = {
-            "tenantCode": self.tenant_code,
-            "userId": self.user["userId"],
-            "userExamPlanId": user_exam_plan_id,
-        }
-        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return handle_response(response)
+        return self._post("/pharos/exam/preparePaper.do",
+                          {"userExamPlanId": user_exam_plan_id})
 
-    def exam_check(self, user_exam_plan_id: str, randstr: str, ticket: str) -> Dict[str, Any]:
-        """
-        无感验证码校验（考试前）—— appId: 190330343
-        调用 exam/check.do 验证，成功后才可以 exam_start_paper
+    def exam_check(self, user_exam_plan_id: str, randstr: str,
+                   ticket: str) -> Dict[str, Any]:
+        """无感验证码校验（考试前），appId: 190330343
         :param user_exam_plan_id: 用户考试计划 ID
-        :param randstr: 腾讯验证码 randstr
-        :param ticket: 腾讯验证码 ticket
-        :return:
+        :param randstr: 验证码随机串
+        :param ticket: 验证码票据
+        :return: 校验结果 dict
         {"code":"0","detailCode":"0"}
         """
-        url = f"{self.baseurl}/pharos/exam/check.do"
-        params = {"timestamp": self.get_timestamp()}
-        data = {
-            "tenantCode": self.tenant_code,
-            "userId": self.user["userId"],
-            "userExamPlanId": user_exam_plan_id,
-            "randstr": randstr,
-            "ticket": ticket,
-        }
-        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return handle_response(response)
+        return self._post("/pharos/exam/check.do",
+                          {"userExamPlanId": user_exam_plan_id,
+                           "randstr": randstr, "ticket": ticket})
 
-    def course_check(self, user_course_id: str, user_project_id: str, course_id: str, randstr: str, ticket: str) -> Dict[str, Any]:
-        """
-        验证码校验（课程完成时）—— appId: 195119536
-        调用 pharos/usercourse/check.do 获取完课 token
+    def course_check(self, user_course_id: str, user_project_id: str,
+                     course_id: str, randstr: str, ticket: str) -> Dict[str, Any]:
+        """验证码校验（课程完成时），appId: 195119536
         :param user_course_id: 用户课程 ID
         :param user_project_id: 用户项目 ID
         :param course_id: 课程 ID
-        :param randstr: 腾讯验证码 randstr
-        :param ticket: 腾讯验证码 ticket
-        :return:
+        :param randstr: 验证码随机串
+        :param ticket: 验证码票据
+        :return: 校验结果 dict
         {"code":"0","data":"${token}","detailCode":"0"}
-        """
-        url = f"{self.baseurl}/pharos/usercourse/check.do"
-        params = {"timestamp": self.get_timestamp()}
-        data = {
-            "tenantCode": self.tenant_code,
-            "userId": self.user["userId"],
-            "userCourseId": user_course_id,
-            "userProjectId": user_project_id,
-            "courseId": course_id,
-            "randstr": randstr,
-            "ticket": ticket,
-        }
-        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return handle_response(response)
 
-    def exam_check_verify_code(self, user_exam_plan_id: str, verfy_code: str, verify_time: int | None) -> Dict[str, Any]:
         """
-        检查考试验证码
+        return self._post("/pharos/usercourse/check.do",
+                          {"userCourseId": user_course_id,
+                           "userProjectId": user_project_id,
+                           "courseId": course_id,
+                           "randstr": randstr, "ticket": ticket})
+
+    def exam_check_verify_code(self, user_exam_plan_id: str, verfy_code: str,
+                               verify_time: int | None) -> Dict[str, Any]:
+        """检查考试验证码
         :param user_exam_plan_id: 用户考试计划 ID
         :param verfy_code: 验证码
-        :param verify_time: 验证码 13 位时间戳
-        :return:
+        :param verify_time: 验证码时间戳
+        :return: 校验结果 dict
         {
           "code": "0",
           "detailCode": "0"
         }
         """
-        url = f"{self.baseurl}/pharos/exam/checkVerifyCode.do"
-        params = {"timestamp": self.get_timestamp()}
-        data = {
-            "tenantCode": self.tenant_code,
-            "userId": self.user["userId"],
-            "time": verify_time or int(self.get_timestamp(frac_len=0)),
-            "userExamPlanId": user_exam_plan_id,
-            "verifyCode": verfy_code,
-        }
-        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return handle_response(response)
+        return self._post("/pharos/exam/checkVerifyCode.do",
+                          {"userExamPlanId": user_exam_plan_id,
+                           "time": verify_time or int(self.get_timestamp(frac_len=0)),
+                           "verifyCode": verfy_code})
 
     def exam_start_paper(self, user_exam_plan_id: str) -> Dict[str, Any]:
-        """
-        开始考试
+        """开始考试，返回试卷题目列表（data 字段含 questionList 数组，每题有 questionId/answerIds 等字段）
         :param user_exam_plan_id: 用户考试计划 ID
-        :return:
+        :return: 试卷题目列表 dict
         {
           "code": "0",
           "data": {
@@ -933,50 +875,36 @@ class WeBanAPI:
           "detailCode": "0"
         }
         """
-        url = f"{self.baseurl}/pharos/exam/startPaper.do"
-        params = {"timestamp": self.get_timestamp()}
-        data = {
-            "tenantCode": self.tenant_code,
-            "userId": self.user["userId"],
-            "userExamPlanId": user_exam_plan_id,
-        }
-        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return handle_response(response)
+        return self._post("/pharos/exam/startPaper.do",
+                          {"userExamPlanId": user_exam_plan_id})
 
-    def exam_record_question(self, user_exam_plan_id: str, question_id: str, use_time: int, answer_ids: list | None, exam_plan_id: str) -> Dict[str, Any]:
-        """
-        记录考试答案
+    def exam_record_question(self, user_exam_plan_id: str, question_id: str,
+                             use_time: int, answer_ids: list | None,
+                             exam_plan_id: str) -> Dict[str, Any]:
+        """记录考试答案
         :param user_exam_plan_id: 用户考试计划 ID
         :param question_id: 题目 ID
-        :param use_time: 本题用时，单位为秒
-        :param answer_ids: 答案 ID, 列表形式
+        :param use_time: 答题用时（秒）
+        :param answer_ids: 答案 ID 列表
         :param exam_plan_id: 考试计划 ID
-        :return:
+        :return: 记录结果 dict
         {
           "code": "0",
           "detailCode": "0"
         }
         """
-        url = f"{self.baseurl}/pharos/exam/recordQuestion.do"
-        params = {"timestamp": self.get_timestamp()}
         data = {
-            "tenantCode": self.tenant_code,
-            "userId": self.user["userId"],
-            "userExamPlanId": user_exam_plan_id,
-            "questionId": question_id,
-            "useTime": use_time,
-            "examPlanId": exam_plan_id,
+            "userExamPlanId": user_exam_plan_id, "questionId": question_id,
+            "useTime": use_time, "examPlanId": exam_plan_id,
         }
         if answer_ids:
             data["answerIds"] = ",".join(answer_ids)
-        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return handle_response(response)
+        return self._post("/pharos/exam/recordQuestion.do", data)
 
     def exam_submit_paper(self, user_exam_plan_id: str) -> Dict[str, Any]:
-        """
-        提交考试
+        """提交考试
         :param user_exam_plan_id: 用户考试计划 ID
-        :return:
+        :return: 提交结果 dict
         {
           "code": "0",
           "data": {
@@ -992,21 +920,13 @@ class WeBanAPI:
           "detailCode": "0"
         }
         """
-        url = f"{self.baseurl}/pharos/exam/submitPaper.do"
-        params = {"timestamp": self.get_timestamp()}
-        data = {
-            "tenantCode": self.tenant_code,
-            "userId": self.user["userId"],
-            "userExamPlanId": user_exam_plan_id,
-        }
-        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return handle_response(response)
+        return self._post("/pharos/exam/submitPaper.do",
+                          {"userExamPlanId": user_exam_plan_id})
 
     def exam_fresh_paper(self, user_exam_plan_id: str) -> Dict[str, Any]:
-        """
-        重置考试题目
+        """重置考试题目
         :param user_exam_plan_id: 用户考试计划 ID
-        :return:
+        :return: 刷新结果 dict
         {
           "code": "0",
           "data": {
@@ -1045,22 +965,14 @@ class WeBanAPI:
           "detailCode": "0"
         }
         """
-        url = f"{self.baseurl}/pharos/exam/freshPaper.do"
-        params = {"timestamp": self.get_timestamp()}
-        data = {
-            "tenantCode": self.tenant_code,
-            "userId": self.user["userId"],
-            "userExamPlanId": user_exam_plan_id,
-        }
-        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return handle_response(response)
+        return self._post("/pharos/exam/freshPaper.do",
+                          {"userExamPlanId": user_exam_plan_id})
 
     def exam_review_paper(self, user_exam_id: str, is_retake: int = 2) -> Dict[str, Any]:
-        """
-        查看考试结果
+        """查看考试结果
         :param user_exam_id: 用户考试 ID
-        :param is_retake: 是否重考，1：是，2：否
-        :return:
+        :param is_retake: 1=补考, 2=正常考试
+        :return: 考试结果 dict
         {
           "code": "0",
           "data": {
@@ -1099,64 +1011,41 @@ class WeBanAPI:
           "detailCode": "0"
         }
         """
-        url = f"{self.baseurl}/pharos/exam/reviewPaper.do"
-        params = {"timestamp": self.get_timestamp()}
-        data = {
-            "tenantCode": self.tenant_code,
-            "userId": self.user["userId"],
-            "userExamId": user_exam_id,
-            "isRetake": is_retake,
-        }
-        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return handle_response(response)
+        return self._post("/pharos/exam/reviewPaper.do",
+                          {"userExamId": user_exam_id, "isRetake": is_retake})
 
     def exam_list_history(self, exam_plan_id: str, exam_type: int) -> Dict[str, Any]:
-        """
-        获取考试历史记录
+        """获取考试历史记录
         :param exam_plan_id: 考试计划 ID
         :param exam_type: 考试类型
-        :return:
+        :return: 考试历史列表 dict
         {
           "code": "0",
-          "data": [
-            {
-              "id": "${uuid}",
-              "examPlanId": "${uuid}",
-              "examPlanName": "结课考试",
-              "answerNum": 5,
-              "answerTime": 60,
-              "passScore": 80,
-              "isRetake": 2,
-              "examType": 2,
-              "isAssessment": 1,
-              "startTime": "2025-02-21 00:00:00",
-              "endTime": "2025-02-26 23:59:59",
-              "examFinishNum": 1,
-              "examOddNum": 4,
-              "examScore": 86,
-              "examTimeState": 3,
-              "displayState": 1,
-              "prompt": ""
-            }
-          ],
+          "data": {
+            "examHistoryList": [
+              {
+                "examId": "${uuid}",
+                "examName": "2025级硕士生实验室安全教育",
+                "examType": 1,
+                "examTime": "2025-10-12",
+                "examScore": 100,
+                "examStatus": 2
+              }
+            ]
+          },
           "detailCode": "0"
         }
         """
-        url = f"{self.baseurl}/pharos/exam/listHistory.do"
-        params = {"timestamp": self.get_timestamp()}
-        data = {
-            "tenantCode": self.tenant_code,
-            "userId": self.user["userId"],
-            "examPlanId": exam_plan_id,
-            "examType": exam_type,
-        }
-        response = self.session.post(url, params=params, data=data, timeout=self.timeout)
-        return handle_response(response)
+        return self._post("/pharos/exam/listHistory.do",
+                          {"examPlanId": exam_plan_id, "examType": exam_type})
+
+    # ========================================================================
+    # 题库与进度
+    # ========================================================================
 
     def download_answer(self) -> str:
-        """
-        下载最新题库
-        :return:
+        """下载最新题库
+        :return: 题库 JSON 字符串
         {
           "(       )是麻醉诱导常用的药物之一。": {
             "optionList": [
@@ -1169,20 +1058,21 @@ class WeBanAPI:
           }
         }
         """
-        return self.session.get(f"https://ghfast.top/https://github.com/hangone/WeBan/raw/refs/heads/main/answer/answer.json", timeout=self.timeout).text
+        return self.session.get(self.ANSWER_URL, timeout=self.timeout).text
 
-    def apinext(self, user_course_id: str, course_id: str, user_project_id: str, step: int = 0, finish: int = 2, nonstr: str = "", unique_no: str | None = None) -> Dict[str, Any]:
+    def apinext(self, user_course_id: str, course_id: str, user_project_id: str,
+                step: int = 0, finish: int = 2, nonstr: str = "",
+                unique_no: str | None = None) -> Dict[str, Any]:
         """
-        学习进度追踪接口（apinext）
-        部分课程需要调用此接口记录翻页和完成状态
+        学习进度追踪接口，部分课程需要此接口记录翻页和完成状态。
         :param user_course_id: 用户课程 ID
         :param course_id: 课程 ID
         :param user_project_id: 用户项目 ID
-        :param step: 步骤编号
+        :param step: 当前页码（翻一页调一次）
         :param finish: 1=完成, 2=翻页中
-        :param nonstr: 从 item.js 的 nonstrMap 中提取的字符串
-        :param unique_no: UUID，同一课程应保持一致
-        :return:
+        :param nonstr: 扩展字段
+        :param unique_no: 微课专用唯一标识
+        :return: 进度记录结果 dict
         {
           "code": 200,
           "message": "操作成功",
@@ -1207,35 +1097,18 @@ class WeBanAPI:
         iv = key[:16]
         cipher = AES.new(key, AES.MODE_CBC, iv)
         padded = pad(json.dumps(data, separators=(",", ":")).encode(), AES.block_size)
-        # JS: Base64(Utf8.parse(Base64(ciphertext))) = 双重 Base64 编码
+        # 双重 Base64：仿 JS 前端 CryptoJS.enc.Base64.stringify(CryptoJS.enc.Utf8.parse(Base64(ciphertext)))
+        # 后端先做 atob 再 AES-CBC 解密，因此需要两次编码
         encrypted_b64 = b64encode(b64encode(cipher.encrypt(padded))).decode()
-        url = f"{self.baseurl}/jupiterapi/api/statusercourse/v1/next"
-        response = self.session.post(url, json={"data": encrypted_b64}, timeout=self.timeout)
-        return handle_response(response)
-
-    def _mercury_request(self, params: dict) -> Dict[str, Any]:
-        """mercuryprovider 通用请求：合并标准参数、签名、发送"""
-        standard = {
-            "appKey": "00000001",
-            "format": "json",
-            "v": "1.0",
-            "timestamp": self.get_timestamp(),
-            "clientId": "pharos",
-        }
-        merged = {**standard, **params}
-        secret_key = "75uet0kwvnc90xo"
-        sign_str = secret_key
-        for k in sorted(merged.keys()):
-            sign_str += k + str(merged[k])
-        sign_str += secret_key
-        merged["sign"] = hashlib.sha1(sign_str.encode()).hexdigest().upper()
-        response = self.session.post("https://resource.mycourse.cn/mercuryprovider/router", data=merged, timeout=self.timeout)
+        response = self.session.post(
+            f"{self.baseurl}/jupiterapi/api/statusercourse/v1/next",
+            json={"data": encrypted_b64}, timeout=self.timeout)
         return handle_response(response)
 
     def list_question(self, course_id: str) -> Dict[str, Any]:
-        """
-        获取课后习题列表（course_id 为 resourceId UUID）
-        :return:
+        """获取课后习题列表（course_id 为 resourceId UUID）
+        :param course_id: 课程 ID（resourceId UUID）
+        :return: 习题列表 dict
         {
           "code": "0",
           "data": {
@@ -1271,12 +1144,17 @@ class WeBanAPI:
           "detailCode": "0"
         }
         """
-        return self._mercury_request({"service": "mercury.microlecture.listQuestion", "id": course_id})
+        return self._mercury_request(
+            {"service": "mercury.microlecture.listQuestion", "id": course_id})
 
-    def save_question(self, course_id: str, question_id: str, answers: str, source: str = "WEIBAN") -> Dict[str, Any]:
-        """
-        提交课中观点题答案 (mercury.microlecture.saveQuestion)
-        :return:
+    def save_question(self, course_id: str, question_id: str, answers: str,
+                      source: str = "WEIBAN") -> Dict[str, Any]:
+        """提交课中观点题答案
+        :param course_id: 课程 ID
+        :param question_id: 题目 ID
+        :param answers: 答案内容
+        :param source: 来源（默认 WEIBAN）
+        :return: 提交结果 dict
         {
           "code": "0",
           "data": {"isRight": 1, "analysis": "", "answerLabel": "-A"},
@@ -1285,17 +1163,18 @@ class WeBanAPI:
         """
         return self._mercury_request({
             "service": "mercury.microlecture.saveQuestion",
-            "courseId": course_id,
-            "questionId": question_id,
-            "answers": answers,
-            "userId": self.user["userId"],
-            "tenantCode": self.tenant_code,
+            "courseId": course_id, "questionId": question_id, "answers": answers,
+            "userId": self.user["userId"], "tenantCode": self.tenant_code,
             "source": source,
         })
 
-    def save_exam_question(self, course_id: str, question_id: str, answers: str, source: str = "WEIBAN") -> Dict[str, Any]:
-        """
-        提交课后习题答案
+    def save_exam_question(self, course_id: str, question_id: str, answers: str,
+                           source: str = "WEIBAN") -> Dict[str, Any]:
+        """提交课后习题答案
+        :param course_id: 课程 ID
+        :param question_id: 题目 ID
+        :param answers: 答案内容
+        :param source: 来源（默认 WEIBAN）
         :return:
         {
           "code": "0",
@@ -1309,10 +1188,7 @@ class WeBanAPI:
         """
         return self._mercury_request({
             "service": "mercury.microlecture.saveExamQuestion",
-            "courseId": course_id,
-            "questionId": question_id,
-            "answers": answers,
-            "userId": self.user["userId"],
-            "tenantCode": self.tenant_code,
+            "courseId": course_id, "questionId": question_id, "answers": answers,
+            "userId": self.user["userId"], "tenantCode": self.tenant_code,
             "source": source,
         })
