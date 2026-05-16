@@ -9,6 +9,7 @@ from uuid import uuid4
 import requests
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
+from loguru import logger
 from requests.adapters import HTTPAdapter, Retry
 
 
@@ -53,7 +54,8 @@ class WeBanAPI:
 
     def __init__(self, tenant_code: str | None = None, account: str | None = None,
                  password: str | None = None, user: Dict[str, str] | None = None,
-                 timeout: int | tuple = (9.05, 15), session: requests.Session | None = None):
+                 timeout: int | tuple = (9.05, 15), session: requests.Session | None = None,
+                 debug: bool = False, log=logger):
         self.account = account
         self.password = password
         self.tenant_code = tenant_code
@@ -62,6 +64,8 @@ class WeBanAPI:
         self.session = session or create_retry_session(self.baseurl)
         self.user = user or {"userId": "", "token": ""}
         self.session.headers["X-Token"] = self.user["token"]
+        self.debug = debug
+        self.log = log
 
     @staticmethod
     def get_timestamp(int_len: int = 10, frac_len: int = 3) -> str:
@@ -113,7 +117,11 @@ class WeBanAPI:
         data.setdefault("tenantCode", self.tenant_code)
         if self.user.get("userId"):
             data.setdefault("userId", self.user["userId"])
+        if self.debug:
+            self.log.debug(f"POST {endpoint} | params={params} | data={data}")
         response = self.session.post(url, params=params, data=data, timeout=self.timeout)
+        if self.debug:
+            self.log.debug(f"POST {endpoint} | status={response.status_code} | response={response.text}")
         return handle_response(response)
 
     def _mercury_request(self, params: dict) -> Dict[str, Any]:
@@ -138,9 +146,13 @@ class WeBanAPI:
             sign_str += k + str(merged[k])
         sign_str += secret_key
         merged["sign"] = hashlib.sha1(sign_str.encode()).hexdigest().upper()
+        if self.debug:
+            self.log.debug(f"mercury {merged.get('service', '')} | data={merged}")
         response = self.session.post(
             "https://resource.mycourse.cn/mercuryprovider/router",
             data=merged, timeout=self.timeout)
+        if self.debug:
+            self.log.debug(f"mercury {merged.get('service', '')} | status={response.status_code} | response={response.text}")
         return handle_response(response)
 
     # ========================================================================
@@ -292,10 +304,14 @@ class WeBanAPI:
             "verifyCode": verify_code,
         }
         encrypted = self.encrypt(json.dumps(payload, separators=(",", ":")))
+        if self.debug:
+            self.log.debug(f"POST /pharos/login/login.do | data={{data: {encrypted[:50]}...}}")
         response = self.session.post(
             f"{self.baseurl}/pharos/login/login.do",
             params={"timestamp": self.get_timestamp()},
             data={"data": encrypted}, timeout=self.timeout)
+        if self.debug:
+            self.log.debug(f"POST /pharos/login/login.do | status={response.status_code} | response={response.text}")
         result = handle_response(response)
         if result.get("data", {}).get("token"):
             self.user = result["data"]
@@ -1100,9 +1116,13 @@ class WeBanAPI:
         # 双重 Base64：仿 JS 前端 CryptoJS.enc.Base64.stringify(CryptoJS.enc.Utf8.parse(Base64(ciphertext)))
         # 后端先做 atob 再 AES-CBC 解密，因此需要两次编码
         encrypted_b64 = b64encode(b64encode(cipher.encrypt(padded))).decode()
+        if self.debug:
+            self.log.debug(f"POST /jupiterapi/api/statusercourse/v1/next | step={step} finish={finish}")
         response = self.session.post(
             f"{self.baseurl}/jupiterapi/api/statusercourse/v1/next",
             json={"data": encrypted_b64}, timeout=self.timeout)
+        if self.debug:
+            self.log.debug(f"POST /jupiterapi/api/statusercourse/v1/next | status={response.status_code} | response={response.text}")
         return handle_response(response)
 
     def list_question(self, course_id: str) -> Dict[str, Any]:
