@@ -62,9 +62,7 @@ jobs:
         shell: bash
         run: |
           uvx pyfuze . \
-            --entry main.py \
             --pyproject pyproject.toml \
-            --include answer \
             --mode online \
             --uv-install-script-windows https://gh-proxy.com/https://github.com/astral-sh/uv/releases/latest/download/uv-installer.ps1 \
             --uv-install-script-unix https://gh-proxy.com/https://github.com/astral-sh/uv/releases/latest/download/uv-installer.sh \
@@ -77,10 +75,7 @@ jobs:
         shell: bash
         run: |
           uvx pyfuze . \
-            --entry main.py \
             --pyproject pyproject.toml \
-            --include answer \
-            --mode bundle \
             --output-name WeBan-${{ steps.version.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}-bundle${{ matrix.ext }}
 
       - name: Upload release assets
