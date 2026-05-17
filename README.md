@@ -10,7 +10,19 @@
 
 ## 使用
 
-从 [Releases](https://github.com/hangone/WeBan/releases) 下载单文件运行，根据提示输入信息。
+从 [Releases](https://github.com/hangone/WeBan/releases/latest) 下载文件运行，根据提示输入信息。下载缓慢可以用 [https://gh-proxy.com/](https://gh-proxy.com/) 加速下载。
+
+### 构建产物
+
+- **Online 模式**：体积小，首次运行需联网下载依赖
+- **Bundle 模式**：体积大，完全打包依赖运行
+
+| 平台 | Online（默认） | Bundle（打包） |
+|------|---------------|---------------|
+| Windows x64 | [WeBan-3.7.0-windows-x64.exe](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.0-windows-x64.exe) | [WeBan-3.7.0-windows-x64-bundle.exe](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.0-windows-x64-bundle.exe) |
+| Linux x64 | [WeBan-3.7.0-linux-x64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.0-linux-x64) | [WeBan-3.7.0-linux-x64-bundle](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.0-linux-x64-bundle) |
+| macOS arm64 | [WeBan-3.7.0-macos-arm64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.0-macos-arm64) | [WeBan-3.7.0-macos-arm64-bundle](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.0-macos-arm64-bundle) |
+| macOS x64 | [WeBan-3.7.0-macos-x64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.0-macos-x64) | [WeBan-3.7.0-macos-x64-bundle](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.0-macos-x64-bundle) |
 
 ## 配置说明
 
