@@ -50,7 +50,7 @@ def handle_response(response: requests.Response) -> Dict[str, Any]:
 class WeBanAPI:
 
     # 题库下载地址
-    ANSWER_URL = "https://github.com/hangone/WeBan/raw/refs/heads/main/answer/answer.json"
+    ANSWER_URL = "https://gh-proxy.com/https://github.com/hangone/WeBan/raw/refs/heads/main/answer/answer.json"
 
     def __init__(self, tenant_code: str | None = None, account: str | None = None,
                  password: str | None = None, user: Dict[str, str] | None = None,

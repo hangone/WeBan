@@ -24,7 +24,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-13, macos-latest]
+        os: [windows-latest, ubuntu-latest, macos-15-intel, macos-latest]
         include:
           - os: windows-latest
             platform: windows
@@ -34,7 +34,7 @@ jobs:
             platform: linux
             arch: x64
             ext: ""
-          - os: macos-13
+          - os: macos-15-intel
             platform: macos
             arch: x64
             ext: ""
@@ -49,6 +49,7 @@ jobs:
 
       - name: Extract version from tag
         id: version
+        shell: bash
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
       - name: Install uv
@@ -66,9 +67,9 @@ jobs:
             --include answer \
             --unzip-path WeBan \
             --mode online \
-            --uv-install-script-windows https://mirror.nju.edu.cn/astral-sh/uv/install.ps1 \
-            --uv-install-script-unix https://mirror.nju.edu.cn/astral-sh/uv/install.sh \
-            --env INSTALLER_DOWNLOAD_URL=https://mirror.nju.edu.cn/github-release/astral-sh/uv \
+            --uv-install-script-windows https://gh-proxy.com/https://github.com/astral-sh/uv/releases/latest/download/uv-installer.ps1 \
+            --uv-install-script-unix https://gh-proxy.com/https://github.com/astral-sh/uv/releases/latest/download/uv-installer.sh \
+            --env INSTALLER_DOWNLOAD_URL=https://gh-proxy.com/https://github.com/astral-sh/uv/releases/latest/download \
             --env UV_PYTHON_INSTALL_MIRROR=https://mirror.nju.edu.cn/github-release/astral-sh/python-build-standalone \
             --env UV_DEFAULT_INDEX=https://mirror.nju.edu.cn/pypi/web/simple \
             --output-name WeBan-${{ steps.version.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}

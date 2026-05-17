@@ -25,7 +25,7 @@ logs_dir = os.path.join(base_path, "logs")
 
 # 远程模板下载地址
 CONFIG_EXAMPLE_URL = (
-    "https://github.com/hangone/WeBan/raw/refs/heads/main/"
+    "https://gh-proxy.com/https://github.com/hangone/WeBan/raw/refs/heads/main/"
     "config.example.toml"
 )
 
