@@ -10,9 +10,31 @@
 
 ## 使用
 
-从 [Releases](https://github.com/hangone/WeBan/releases/latest) 下载文件运行，根据提示输入信息。下载缓慢可以用 [https://gh-proxy.com/](https://gh-proxy.com/) 加速下载。
+### 源码运行
+
+1. 安装 Python 3（可选使用 [uv](https://github.com/astral-sh/uv)）和 Git
+
+2. 克隆本仓库
+
+```bash
+git clone --depth 1 https://github.com/hangone/WeBan
+```
+
+3. 安装依赖
+
+```bash
+pip install -r requirements.txt # 或 uv sync
+```
+
+4. 运行
+
+```bash
+python main.py # 或 uv run main.py
+```
 
 ### 构建产物
+
+从 [Releases](https://github.com/hangone/WeBan/releases/latest) 下载文件运行，根据提示输入信息。下载缓慢可以用 [https://gh-proxy.com/](https://gh-proxy.com/) 加速下载。
 
 - **Online 模式**：体积小，首次运行需联网下载依赖
 - **Bundle 模式**：体积大，完全打包依赖运行
@@ -84,46 +106,6 @@ password = ""
 # study_mode = "force"
 ```
 
-### Token 登录
-
-部分学校无法直接登录，可使用 Token 方式：
-
-1. 在电脑浏览器登录微伴平台
-2. 按 F12 打开开发者工具，找到 **本地存储 (Local Storage)**
-3. 复制 `user` 和 `token` 的值到配置文件：
-
-```toml
-[[account]]
-tenant_name = "学校名称"
-user_id = "从 Local Storage -> user 中获取"
-token = "从 Local Storage -> token 中获取"
-```
-
-![chrome](images/chrome.png)
-![firefox](images/firefox.png)
-
-## 源码运行
-
-1. 安装 Python 3（可选使用 [uv](https://github.com/astral-sh/uv)）和 Git
-
-2. 克隆本仓库
-
-```bash
-git clone --depth 1 https://github.com/hangone/WeBan
-```
-
-3. 安装依赖
-
-```bash
-pip install -r requirements.txt # 或 uv sync
-```
-
-4. 运行
-
-```bash
-python main.py # 或 uv run main.py
-```
-
 ## 功能特性
 
 - **课程学习**：自动遍历项目 → 分类 → 课程，模拟翻页、答题、等待学习时长后完课
@@ -152,7 +134,8 @@ python main.py # 或 uv run main.py
 
 - ### 学习
 
-1. 有腾讯云验证码的还不支持自动完成，会弹出浏览器窗口手动操作
+1. 学习时长太低不会计入进度
+2. 有腾讯云验证码的还不支持自动完成，会弹出浏览器窗口手动操作
 2. 学习进度不更新可能是被风控，遇到了需要验证码的课程，请去网页上完成一次后重试
 
 - ### 考试
