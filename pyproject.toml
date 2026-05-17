@@ -5,9 +5,9 @@ description = "auto finish weiban"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "ddddocr==1.6.1",
-    "loguru==0.7.3",
-    "DrissionPage>=4.0",
-    "pycryptodome==3.23.0",
-    "requests==2.32.5",
+    "ddddocr>=1.6.1",
+    "drissionpage>=4.1.1.2",
+    "loguru>=0.7.3",
+    "pycryptodome>=3.23.0",
+    "requests>=2.34.2",
 ]
