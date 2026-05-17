@@ -313,6 +313,18 @@ class BaseMixin:
             }
         """
 
+    @staticmethod
+    def _vue_js(code: str) -> str:
+        """将 Vue 查找工具函数注入到给定的 JS 代码片段中。
+
+        用法：
+            self._page.evaluate(self._vue_js('''() => { ... }'''))
+
+        代替原来的:
+            self._page.evaluate(self._vue_js('''...''')
+        """
+        return code % BaseMixin._vue_app_finder_js() if '%s' in code else code
+
     def _extract_project_overview(self) -> dict[str, Any]:
         """从页面提取项目汇总信息。
 

@@ -537,7 +537,7 @@ class ExamMixin(BaseMixin):
                     // 排除答题卡自身文本（含"答题卡"关键词的 sheet）
                     if (cls.includes('sheet') && txt.includes('答题卡')) continue;
                     // 检测结算/交卷弹窗特征
-                    if (/未作答.*道题|道题.*未作答|确认交卷|交卷确认/.test(txt)) {
+                    if (/未作答.*道题|道题.*未作答|确认交卷|交卷确认|确认提交|提交试卷|已完成.*题目|全部答[完毕]|是否.*交卷/.test(txt)) {
                         return { found: true, text: txt.substring(0, 120) };
                     }
                 }
@@ -590,15 +590,38 @@ class ExamMixin(BaseMixin):
             return False
 
     def _wait_and_advance(self, q_time: int, q_offset: int) -> bool:
-        """随机等待后跳到下一题。"""
+        """随机等待后跳到下一题。
+
+        Returns:
+            True 表示已到最后一题且无法继续前进（应结束答题）。
+        """
         delay = random.randint(q_time, q_time + q_offset) if q_offset > 0 else q_time
         if delay > 0:
             time.sleep(delay)
-        return self._advance_to_next_question()
+        advanced = self._advance_to_next_question()
+        if not advanced:
+            # 确认是否因为到了最后一题而无法前进
+            total = self._read_total_questions_from_indicator()
+            current = self._get_current_question_index()
+            if total > 0 and current >= total:
+                self.log.info(
+                    f"[答题] 已在最后一题 ({current}/{total})，停止前进"
+                )
+                return True  # 信号：已到末尾
+        return False
 
     def _advance_to_next_question(self) -> bool:
         """Playwright click 下一题按钮。"""
         if not self._page:
+            return False
+
+        # ── 0. 检查是否已在最后一题 ──
+        total = self._read_total_questions_from_indicator()
+        current = self._get_current_question_index()
+        if total > 0 and current >= total:
+            self.log.info(
+                f"[下一题] 已在最后一题 ({current}/{total})，不再尝试前进，准备交卷"
+            )
             return False
 
         prev_title = ""
@@ -633,6 +656,11 @@ class ExamMixin(BaseMixin):
                 if self._wait_for_question_change(prev_title, prev_indicator, 8):
                     return True
                 self.log.warning("[下一题] 按钮已点击但题目未变化")
+
+                # 检查是否因为已到最后一题而弹出了确认交卷弹窗
+                if self._detect_and_dismiss_submit_confirm_sheet():
+                    self.log.info("[下一题] 检测到交卷确认弹窗，判定已答完所有题目")
+                    return False
             else:
                 self.log.warning("[下一题] 按钮不可见")
         except Exception as e:
@@ -644,6 +672,51 @@ class ExamMixin(BaseMixin):
             self.log.warning("[下一题] 答题卡跳转也失败")
         return result
 
+    def _detect_and_dismiss_submit_confirm_sheet(self) -> bool:
+        """检测并关闭"确认交卷"弹窗（已答完所有题目时出现）。
+
+        Returns:
+            True 表示检测到了交卷确认弹窗；False 表示没有。
+        """
+        if not self._page:
+            return False
+        try:
+            result = self._page.evaluate("""() => {
+                function isTrulyVisible(el) {
+                    if (!el) return false;
+                    const r = el.getBoundingClientRect();
+                    if (r.width === 0 && r.height === 0) return false;
+                    const s = getComputedStyle(el);
+                    if (s.display === 'none' || s.visibility === 'hidden') return false;
+                    return true;
+                }
+
+                // 检测 confirm-sheet（交卷确认弹窗）
+                const sheets = document.querySelectorAll('.confirm-sheet');
+                for (const sheet of sheets) {
+                    if (!isTrulyVisible(sheet)) continue;
+                    const txt = (sheet.textContent || '').trim();
+                    // 匹配交卷相关的弹窗文本
+                    if (/确认交卷|交卷确认|确认提交|提交试卷|已完成.*题目|全部.*答/.test(txt)) {
+                        // 尝试点击"取消"/"继续作答"/"返回"按钮关闭弹窗
+                        const cancelBtn = Array.from(
+                            sheet.querySelectorAll('button, .mint-button, .van-button, a')
+                        ).find((el) => {
+                            const t = (el.textContent || '').trim();
+                            return /取消|继续作答|返回|暂不|退出/.test(t) && isTrulyVisible(el);
+                        });
+                        if (cancelBtn) {
+                            cancelBtn.click();
+                        }
+                        return true;
+                    }
+                }
+                return false;
+            }""")
+            return bool(result)
+        except Exception:
+            return False
+
     def _jump_via_answer_card(self, prev_title: str, prev_indicator: str, target_num: int | None = None) -> bool:
         """通过答题卡跳转到指定题号（默认下一题）。"""
         if not self._page:
@@ -652,6 +725,14 @@ class ExamMixin(BaseMixin):
         if target_num is None:
             current_idx = self._get_current_question_index()
             target_num = current_idx + 1
+
+        # 验证目标题号是否在有效范围内
+        total = self._read_total_questions_from_indicator()
+        if total > 0 and target_num > total:
+            self.log.info(
+                f"[答题卡跳转] 目标题号 {target_num} 超出总题数 {total}，不再跳转"
+            )
+            return False
 
         self.log.debug(f"[答题卡跳转] 目标题号: {target_num}")
 
@@ -1259,11 +1340,7 @@ class ExamMixin(BaseMixin):
         expected_total = fixed_total_questions if fixed_total_questions > 0 else 0
         if expected_total <= 0:
             expected_total = self._read_total_questions_from_indicator()
-        max_questions = (
-            min(max(expected_total * 10, expected_total + 20), 5000)
-            if expected_total > 0
-            else 500
-        )
+        max_questions = (min(expected_total + 20, 500) if expected_total > 0 else 200)
 
         # 非随机模式：先预扫描所有题目，让用户批量选择未匹配的
         if not rand:
@@ -1360,7 +1437,9 @@ class ExamMixin(BaseMixin):
                         self.log.warning("[答题] 下一题推进失败，改为跳转到首个未作答题")
                         same_count = 0
                     else:
-                        time.sleep(0.2)
+                        # 两种推进方式均失败，重置计数器避免死循环
+                        same_count = 0
+                        time.sleep(0.5)
                 continue
             same_count = 0
             last_title = title
@@ -1436,10 +1515,12 @@ class ExamMixin(BaseMixin):
                             for i in range(options_count)
                         ]
                         self.log.info(f"[匹配] 题库命中 → 已选: {labels}\n" + "\n".join(lines))
-                        self._wait_and_advance(q_time, q_offset)
+                        if self._wait_and_advance(q_time, q_offset):
+                            break
                     else:
                         self.log.warning("[答题] 选项点击失败，跳过本题")
-                        self._wait_and_advance(q_time, q_offset)
+                        if self._wait_and_advance(q_time, q_offset):
+                            break
                         continue
                 else:
                     self.log.warning(
@@ -1461,7 +1542,8 @@ class ExamMixin(BaseMixin):
                         "[随机] 题库无答案，随机选 A\n"
                         + "\n".join(f"    {chr(65 + i)}. {opt_texts[i]}" for i in range(min(options_count, 6)))
                     )
-                    self._wait_and_advance(q_time, q_offset)
+                    if self._wait_and_advance(q_time, q_offset):
+                        break
                     continue
 
                 self.log.warning(
@@ -1471,14 +1553,16 @@ class ExamMixin(BaseMixin):
 
                 if self._interactive_answering(title, options, options_count, opt_texts):
                     matched += 1
-                    self._wait_and_advance(q_time, q_offset)
+                    if self._wait_and_advance(q_time, q_offset):
+                        break
                     continue
 
                 # 兜底：必须选一个答案再前进，否则 QuestionPage 会拦截
                 self.log.info("[兜底] 随机选择，避免未作答拦截")
                 self._click_first_option()
                 self._verify_and_fix_selection(options, 0)
-                self._wait_and_advance(q_time, q_offset)
+                if self._wait_and_advance(q_time, q_offset):
+                    break
 
         if self._page and self._page.is_closed():
             self.log.warning("[答题] 页面已关闭，判定答题未完成")

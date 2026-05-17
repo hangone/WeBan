@@ -430,6 +430,9 @@ class AuthMixin(BaseMixin):
                         submit_loc.first.click(force=True)
                     else:
                         self._page.keyboard.press("Enter")
+
+                    # 等待服务端响应，避免立即轮询导致识别异常
+                    time.sleep(2)
                 except Exception as e:
                     self.log.warning(f"自动填写表单失败: {e}")
 
@@ -504,6 +507,8 @@ class AuthMixin(BaseMixin):
                                         else:
                                             self._page.keyboard.press("Enter")
                                         _last_reported.discard(msg)
+                                        # 等待服务端处理验证码重试结果
+                                        time.sleep(1.5)
                 except Exception:
                     pass
                 self._auth_event.wait(

@@ -1,5 +1,4 @@
 import re
-import json
 import time
 from typing import TYPE_CHECKING, Any, List, Dict
 
@@ -925,19 +924,149 @@ class StudyMixin(BaseMixin):
         return {}
 
     def _analyze_course_structure(self, frame) -> dict:
-        """提取课程页数和 nonstrMap 令牌。
+        """提取课程页数、nonstrMap、JS 资源和 CSS 导航选择器。
+
+        分析课程 HTML 中的三种关键文件：
+        1. .html — 获取引入的 JS：sdk.js (finishWxCourse)、item.js、apicenext.js
+        2. sdk.js — 调用 finishWxCourse；仅 URL 含 csCapt=true 时才弹出点选验证码
+        3. apicenext.js — 按 item.js 定义调用 callApinext("next")
 
         Returns:
             dict: {
-                'total_pages':   int   — .page-item 元素数量
-                'nonstr_map':    dict  — apicenext 步骤追踪令牌
+                'total_pages':      int   — .page-item 元素数量
+                'nonstr_map':       dict  — apicenext 步骤追踪令牌
+                'has_sdk_js':       bool  — sdk.js 是否存在
+                'has_apicenext_js': bool  — apicenext.js 是否存在
+                'has_item_js':      bool  — item.js 是否存在
+                'nav_selectors':    list  — 页面导航按钮 CSS 选择器
+                'quiz_selectors':   list  — 答题按钮 CSS 选择器
+                'end_selectors':    list  — 末页/完成按钮 CSS 选择器
+                'captcha_expected': bool  — URL 含 csCapt=true 且 weiban=weiban
             }
         """
         info = {
             'total_pages': 0,
             'nonstr_map': {},
+            'has_sdk_js': False,
+            'has_apicenext_js': False,
+            'has_item_js': False,
+            'nav_selectors': [],
+            'quiz_selectors': [],
+            'end_selectors': [],
+            'captcha_expected': False,
         }
         try:
+            # 提取 JS 资源信息和页面结构
+            js_info = frame.evaluate("""() => {
+                const scripts = document.querySelectorAll('script[src]');
+                const result = {
+                    hasSdkJs: false,
+                    hasApicenextJs: false,
+                    hasItemJs: false,
+                    navSelectors: [],
+                    quizSelectors: [],
+                    endSelectors: [],
+                    captchaExpected: false,
+                };
+
+                // 检测引入的 JS 文件
+                for (const s of scripts) {
+                    const src = (s.getAttribute('src') || '').toLowerCase();
+                    if (/sdk\\.js/.test(src)) result.hasSdkJs = true;
+                    if (/apicenext\\.js/.test(src)) result.hasApicenextJs = true;
+                    if (/item\\.js/.test(src)) result.hasItemJs = true;
+                }
+
+                // 检测内联脚本中的函数定义（webpack 场景）
+                const inlineScripts = document.querySelectorAll('script:not([src])');
+                for (const s of inlineScripts) {
+                    const text = s.textContent || '';
+                    if (text.includes('finishWxCourse')) result.hasSdkJs = true;
+                    if (text.includes('callApinext')) result.hasApicenextJs = true;
+                }
+
+                // 从 HTML 提取导航/答题/结束按钮选择器
+                const allElements = document.querySelectorAll('[class*="btn-"]');
+                const seenClasses = new Set();
+                for (const el of allElements) {
+                    const cls = (el.className || '').trim();
+                    if (!cls || seenClasses.has(cls)) continue;
+                    seenClasses.add(cls);
+
+                    // 导航按钮: btn-next, btn-start, btn-prev 等
+                    if (/\\bbtn-(next|start|prev|base|next-prev|next2)\\b/.test(cls)) {
+                        const sel = '.' + cls.split(/\\s+/).filter(c => /\\bbtn-/.test(c)).join('.');
+                        if (!result.navSelectors.includes(sel)) {
+                            result.navSelectors.push(sel);
+                        }
+                    }
+                    // 答题按钮: btn-at, btn-af, btn-ce
+                    if (/\\bbtn-(at|af|ce)\\b/.test(cls)) {
+                        const sel = '.' + cls.split(/\\s+/).filter(c => /\\bbtn-/.test(c)).join('.');
+                        if (!result.quizSelectors.includes(sel)) {
+                            result.quizSelectors.push(sel);
+                        }
+                    }
+                    // 结束按钮: btn-next-end
+                    if (/\\bbtn-next-end\\b/.test(cls)) {
+                        const sel = '.' + cls.split(/\\s+/).filter(c => /\\bbtn-/.test(c)).join('.');
+                        if (!result.endSelectors.includes(sel)) {
+                            result.endSelectors.push(sel);
+                        }
+                    }
+                }
+
+                // 检测 captcha 触发条件：URL 需同时含 csCapt=true 和 weiban=weiban
+                const href = window.location.href.toLowerCase();
+                result.captchaExpected = /cscapt=true/.test(href) && /weiban=weiban/.test(href);
+
+                // 精确计数各类导航按钮（用于确定 callApinext 中间调用次数）
+                result.btnNextCount = document.querySelectorAll('.btn-next').length;
+                result.btnStartCount = document.querySelectorAll('.btn-start').length;
+                result.btnCeCount = document.querySelectorAll('.btn-ce').length;
+                result.btnAtCount = document.querySelectorAll('.btn-at').length;
+                result.btnNextEndCount = document.querySelectorAll('.btn-next-end').length;
+                // slFn 提交按钮：class 含 "btn-aq-" 但排除 btn-at/btn-af
+                // （因为 btn-aq-item 中含 "btn-aq-" 子串，btn-at/btn-af 也有 btn-aq-item class）
+                result.btnAqCount = Array.from(
+                    document.querySelectorAll('[class*="btn-aq-"]')
+                ).filter(function(el) {
+                    var cls = el.className || '';
+                    return !/\bbtn-at\b/.test(cls) && !/\bbtn-af\b/.test(cls);
+                }).length;
+
+                return result;
+            }""")
+
+            if js_info:
+                info['has_sdk_js'] = bool(js_info.get('hasSdkJs'))
+                info['has_apicenext_js'] = bool(js_info.get('hasApicenextJs'))
+                info['has_item_js'] = bool(js_info.get('hasItemJs'))
+                info['nav_selectors'] = js_info.get('navSelectors', [])
+                info['quiz_selectors'] = js_info.get('quizSelectors', [])
+                info['end_selectors'] = js_info.get('endSelectors', [])
+                info['captcha_expected'] = bool(js_info.get('captchaExpected'))
+                # 从 HTML 按钮数量计算 callApinext 中间调用次数
+                btn_next  = int(js_info.get('btnNextCount', 0))
+                btn_start = int(js_info.get('btnStartCount', 0))
+                btn_ce    = int(js_info.get('btnCeCount', 0))
+                btn_at    = int(js_info.get('btnAtCount', 0))
+                btn_next_end = int(js_info.get('btnNextEndCount', 0))
+                btn_aq    = int(js_info.get('btnAqCount', 0))
+                info['btn_counts'] = {
+                    'next': btn_next, 'start': btn_start, 'ce': btn_ce,
+                    'at': btn_at, 'next_end': btn_next_end, 'aq': btn_aq,
+                }
+                # 中间调用数 = btn-next（每个触发 finish=2）
+                #             + btn-start（BtnFn 触发 finish=2）
+                #             + btn-ce（BtnFn 触发 finish=2）
+                #             + btn-aq-*（slFn 提交触发 finish=2）
+                #             + (btn-at - 1)（最后一个 btn-at 是末页，不计入中间）
+                intermediate = (btn_next + btn_start + btn_ce + btn_aq
+                                + max(0, btn_at - 1))
+                info['intermediate_btn_count'] = intermediate if intermediate > 0 else 0
+
+            # 提取页面数和 nonstrMap
             page_classes = frame.evaluate(
                 "() => Array.from(document.querySelectorAll('.page-item')).map(el => (el.className || '').trim())"
             )
@@ -945,16 +1074,25 @@ class StudyMixin(BaseMixin):
             info['total_pages'] = normalize_page_item_count(page_classes or [])
             info['nonstr_map'] = self._extract_nonstr_map(frame)
 
-            if raw_total and raw_total != info['total_pages']:
-                self.log.info(
-                    f"[分析] 页数={info['total_pages']} (原始 {raw_total}) "
-                    f"nonstrMap={len(info['nonstr_map'])}个"
-                )
-            else:
-                self.log.info(
-                    f"[分析] 页数={info['total_pages']} "
-                    f"nonstrMap={len(info['nonstr_map'])}个"
-                )
+            # 日志输出
+            btn_c = info.get('btn_counts', {})
+            self.log.info(
+                f"[分析] 页数={info['total_pages']} (原始 {raw_total}) "
+                f"中间步骤={info.get('intermediate_btn_count', 0)} "
+                f"(btn-next={btn_c.get('next',0)} start={btn_c.get('start',0)} "
+                f"ce={btn_c.get('ce',0)} aq={btn_c.get('aq',0)} at={btn_c.get('at',0)}) | "
+                f"nonstrMap={len(info['nonstr_map'])}个 | "
+                f"SDK={'✓' if info['has_sdk_js'] else '✗'} "
+                f"apicenext={'✓' if info['has_apicenext_js'] else '✗'} "
+                f"captcha={'✓' if info['captcha_expected'] else '✗'}"
+            )
+            if info['nav_selectors']:
+                self.log.debug(f"[分析] 导航选择器: {info['nav_selectors']}")
+            if info['quiz_selectors']:
+                self.log.debug(f"[分析] 答题选择器: {info['quiz_selectors']}")
+            if info['end_selectors']:
+                self.log.debug(f"[分析] 结束选择器: {info['end_selectors']}")
+
         except Exception as e:
             self.log.debug(f"[分析] 课程结构分析异常: {e}")
         return info
@@ -1015,56 +1153,174 @@ class StudyMixin(BaseMixin):
     def _handle_inline_quiz(self, frame) -> bool:
         """处理课程内嵌答题页面 (page-aq)。
 
-        课程的 item.js 中定义了 slFn()/slFn2()/Btnat() 等答题函数，
-        通过对比选中的 radio value 与预设答案来判断对错。
+        item.js 通过 slFn() 定义答题逻辑，答案硬编码在 slFn 调用的参数中。
+        页面上 label 内含 dtyn.png 图片的选项也是正确答案的视觉提示。
 
-        策略：检测到 page-aq 页面后，尝试调用课程自带的答题逻辑，
-        或直接选择第一个选项并点击确认/下一题按钮。
+        处理流程：
+        1. 从 script 源码解析 slFn 定义，提取每题答案
+        2. 对每个活动答题页 (page-aq*)：选中正确选项 → 点击提交按钮
+        3. 若到达正确结果页 (page-at*)：点击 btn-at 继续
+        4. 若到达错误结果页 (page-af*)：点击 btn-af 返回重答
         """
+        import json as _json
+
         try:
-            result = frame.evaluate("""() => {
-                // 检查当前是否在答题页面
-                const aqPages = document.querySelectorAll('[class*="page-aq"]');
-                if (aqPages.length === 0) return { hasQuiz: false };
-
-                let answered = 0;
-                for (const page of aqPages) {
-                    if (!page.classList.contains('page-active')
-                        && !page.classList.contains('active')
-                        && getComputedStyle(page).display === 'none') continue;
-
-                    // 尝试调用课程自带的答题函数
-                    if (typeof slFn === 'function') { try { slFn(); answered++; continue; } catch(e) {} }
-                    if (typeof slFn2 === 'function') { try { slFn2(); answered++; continue; } catch(e) {} }
-                    if (typeof Btnat === 'function') { try { Btnat(); answered++; continue; } catch(e) {} }
-
-                    // 回退：选择第一个 radio 并点击确认按钮
-                    const radios = page.querySelectorAll('input[type="radio"]');
-                    if (radios.length > 0 && !radios[0].checked) {
-                        radios[0].click();
-                    }
-                    // 点击确认/下一题按钮
-                    const btns = page.querySelectorAll('.btn-ce, .btn-next, .btn-at, button');
-                    for (const btn of btns) {
-                        const txt = (btn.textContent || '').trim();
-                        const r = btn.getBoundingClientRect();
-                        if (r.width > 0 && r.height > 0 && /确[认定]|下一[题步]|提交/.test(txt)) {
-                            btn.click();
-                            answered++;
-                            break;
-                        }
+            # 1. 从 script 标签中解析 slFn 答案定义
+            #    slFn 格式：slFn(btnSel, "input[name='aiXX']:checked", atSel, afSel, [answers...])
+            #    或带额外参数：slFn(btnSel, ..., [answers], nextBtnSel, pageSel)
+            quiz_meta = frame.evaluate("""() => {
+                const answers = {};
+                for (const script of document.querySelectorAll('script')) {
+                    const text = script.textContent || '';
+                    if (!text.includes('slFn')) continue;
+                    // 匹配 slFn 调用，提取按钮选择器、input name、答案数组
+                    const re = /slFn\\s*\\(\\s*["']([^"']+)["']\\s*,\\s*["']input\\[name=['"](ai\\w+)['"]\\]([^"']*)['"\\]\\s*,\\s*["']([^"']+)["']\\s*,\\s*["']([^"']+)["']\\s*,\\s*(\\[[^\\]]+\\])/g;
+                    let m;
+                    while ((m = re.exec(text)) !== null) {
+                        const btnSel   = m[1];
+                        const name     = m[2];
+                        const atSel    = m[4];
+                        const afSel    = m[5];
+                        const arrText  = m[6];
+                        try {
+                            const vals = JSON.parse(arrText.replace(/'/g, '"'));
+                            if (!answers[name]) {
+                                answers[name] = { btnSel, atSel, afSel, values: vals };
+                            }
+                        } catch(e) {}
                     }
                 }
-                return { hasQuiz: true, answered };
+                const aqCount = document.querySelectorAll('[class*="page-aq"]').length;
+                return { answers, aqCount };
             }""")
-            if result and result.get("hasQuiz"):
-                count = result.get("answered", 0)
-                if count > 0:
-                    self.log.info(f"[答题] 处理了 {count} 个内嵌答题页面")
-                    return True
+
+            if not quiz_meta or not quiz_meta.get('aqCount', 0):
+                return False
+
+            answers = quiz_meta.get('answers', {})
+            self.log.debug(f"[答题] 解析到 slFn 答案: {answers}")
+
+            # 2. 逐轮处理答题/结果页，最多循环 20 次避免死循环
+            for attempt in range(20):
+                state = frame.evaluate(f"""() => {{
+                    const answersMap = {_json.dumps(answers)};
+
+                    // 确定当前活动页面类型
+                    const active = document.querySelector('.page-active, .page-item[style*="display: block"]');
+                    if (!active) return {{ type: 'none' }};
+                    const cls = active.className || '';
+
+                    // 末页/倒计时页 → 课程结束
+                    if (/page-end|page-reciprocal/.test(cls)) return {{ type: 'end' }};
+
+                    // page-at* (正确结果页) → 点击 btn-at 继续
+                    if (/page-at/.test(cls)) {{
+                        const btn = active.querySelector('.btn-at, .btn-next, a[class*="btn"]');
+                        if (btn) btn.click();
+                        return {{ type: 'at', clicked: !!btn }};
+                    }}
+
+                    // page-af* (错误结果页) → 点击 btn-af 返回重答
+                    if (/page-af/.test(cls)) {{
+                        const btn = active.querySelector('.btn-af, .btn-prev, a[class*="btn"]');
+                        if (btn) btn.click();
+                        return {{ type: 'af', clicked: !!btn }};
+                    }}
+
+                    // page-aq* (答题页) → 选答案并提交
+                    if (!/page-aq/.test(cls)) return {{ type: 'other', cls }};
+
+                    const inputs = active.querySelectorAll('input[name]');
+                    if (!inputs.length) return {{ type: 'aq-no-input', cls }};
+
+                    const inputName = inputs[0].getAttribute('name');
+                    const inputType = inputs[0].type;
+
+                    // 确定正确答案值
+                    let correctVals = [];
+                    if (answersMap[inputName]) {{
+                        correctVals = answersMap[inputName].values;
+                    }} else {{
+                        // 降级：dtyn.png 视觉提示（label 内有 img[src*="dtyn"] 的选项）
+                        for (const lbl of active.querySelectorAll('label')) {{
+                            if (lbl.querySelector('img[src*="dtyn"]')) {{
+                                const inp = lbl.querySelector('input');
+                                if (inp) correctVals.push(inp.value);
+                            }}
+                        }}
+                    }}
+                    // 再降级：选全部（select-all 题型）
+                    if (!correctVals.length) {{
+                        inputs.forEach(inp => correctVals.push(inp.value));
+                    }}
+
+                    // 先取消所有已选
+                    inputs.forEach(inp => {{ inp.checked = false; }});
+                    // 选中正确选项
+                    let selectedCount = 0;
+                    inputs.forEach(inp => {{
+                        if (correctVals.includes(inp.value)) {{
+                            inp.checked = true;
+                            selectedCount++;
+                        }}
+                    }});
+
+                    // 点击提交按钮
+                    // 策略 1：用 slFn 定义的 btnSel
+                    let submitted = false;
+                    const meta = answersMap[inputName];
+                    if (meta && meta.btnSel) {{
+                        // btnSel 可能是 ".page-aq01 label"（点任意 label）或 ".btn-aq-01"
+                        const candidates = document.querySelectorAll(meta.btnSel);
+                        if (candidates.length) {{
+                            candidates[candidates.length - 1].click();  // 点最后一个
+                            submitted = true;
+                        }}
+                    }}
+                    // 策略 2：找页面内 class 含 btn-aq 的按钮
+                    if (!submitted) {{
+                        const btns = active.querySelectorAll('[class*="btn-aq"]:not([class*="btn-aq-item"])');
+                        if (btns.length) {{ btns[0].click(); submitted = true; }}
+                    }}
+                    // 策略 3：点页面内任意可见 a/button
+                    if (!submitted) {{
+                        for (const el of active.querySelectorAll('a, button')) {{
+                            const r = el.getBoundingClientRect();
+                            if (r.width > 0 && r.height > 0) {{ el.click(); submitted = true; break; }}
+                        }}
+                    }}
+
+                    return {{
+                        type: 'aq',
+                        inputName,
+                        correctVals,
+                        selectedCount,
+                        submitted,
+                        cls,
+                    }};
+                }}""")
+
+                if not state:
+                    break
+
+                stype = state.get('type', 'none')
+
+                if stype in ('none', 'end', 'other'):
+                    break
+
+                self.log.debug(f"[答题] 第 {attempt+1} 轮: type={stype} detail={state}")
+                time.sleep(0.5)
+
+                if stype == 'aq' and not state.get('submitted'):
+                    # 提交失败，停止
+                    self.log.debug("[答题] 无法提交，停止")
+                    break
+
+            return True
+
         except Exception as e:
             self.log.debug(f"[答题] 内嵌答题处理异常: {e}")
-        return False
+            return False
 
     def _call_apicenext(
         self, frame, nextprev: str, finish: int, nonstr_map: dict | None
@@ -1156,139 +1412,28 @@ class StudyMixin(BaseMixin):
             except Exception:
                 pass
 
-    def _handle_quiz_via_api(self, frame) -> bool:
-        """直接调用课程 JS API 完成答题，不模拟点击。
-
-        优先级：getQuestions + saveExamQuestion/saveQuestions。
-        适用于 Type 6 课程（DA0416068 等），也兼容 Type 2/3（slFn/slFn2）。
-        """
-        try:
-            has_api = frame.evaluate("""() => typeof getQuestions === 'function'
-                && (typeof saveExamQuestion === 'function' || typeof saveQuestions === 'function')""")
-            if not has_api:
-                return False
-
-            self.log.info("[答题API] 检测到服务端答题 API，直接调用")
-
-            raw = frame.evaluate("""() => {
-                return new Promise((resolve, reject) => {
-                    getQuestions().then(function(res) {
-                        const data = (typeof res === 'string' ? JSON.parse(res) : res).data || {};
-                        resolve({
-                            viewpoint: data.viewpointQuestionList || [],
-                            exam: data.examQuestionList || []
-                        });
-                    }).catch(function(e) { reject(e.message); });
-                });
-            }""")
-
-            if not raw:
-                return False
-
-            viewpoint = raw.get("viewpoint", [])
-            exam = raw.get("exam", [])
-
-            if not viewpoint and not exam:
-                self.log.info("[答题API] 无题目")
-                return True
-
-            # ── 课中观点题（仅提交，无对错）──
-            for q in viewpoint:
-                qid = q.get("id")
-                opts = q.get("optionList", [])
-                if not qid or not opts:
-                    continue
-                first_answer = json.dumps([opts[0]["id"]])
-                self.log.info(f"[答题API] 观点题 {qid[:8]}... → 提交")
-                try:
-                    frame.evaluate(f"""() => {{
-                        return new Promise((resolve) => {{
-                            saveQuestions('{first_answer}', '{qid}')
-                                .then(function(r) {{ resolve(JSON.stringify(r)); }})
-                                .catch(function() {{ resolve(null); }});
-                        }});
-                    }}""")
-                except Exception:
-                    pass
-
-            # ── 课后考试题（逐题试到正确）──
-            all_answered = True
-            for idx, q in enumerate(exam):
-                qid = q.get("id")
-                opts = q.get("optionList", [])
-                qtype = q.get("type", 1)
-                if not qid or not opts:
-                    continue
-
-                opt_ids = [o["id"] for o in opts]
-                type_name = "单选" if qtype == 1 else "多选"
-                self.log.info(
-                    f"[答题API] 考试题 {idx+1}/{len(exam)} ({type_name}, {len(opt_ids)} 选项)"
-                )
-
-                answered = False
-                if qtype == 1:
-                    for oid in opt_ids:
-                        ans_json = json.dumps([oid])
-                        result = frame.evaluate(f"""() => {{
-                            return new Promise((resolve) => {{
-                                saveExamQuestion('{ans_json}', '{qid}')
-                                    .then(function(r) {{ resolve(r); }})
-                                    .catch(function() {{ resolve(null); }});
-                            }});
-                        }}""")
-                        if result and result.get("isRight") == 1:
-                            self.log.info("[答题API] ✓ 正确")
-                            answered = True
-                            break
-                        time.sleep(0.3)
-                else:
-                    # 多选：先试全部，再逐个排除
-                    combos = [opt_ids]
-                    for oid in opt_ids:
-                        combo = [o for o in opt_ids if o != oid]
-                        if combo:
-                            combos.append(combo)
-                    for combo in combos:
-                        ans_json = json.dumps(combo)
-                        result = frame.evaluate(f"""() => {{
-                            return new Promise((resolve) => {{
-                                saveExamQuestion('{ans_json}', '{qid}')
-                                    .then(function(r) {{ resolve(r); }})
-                                    .catch(function() {{ resolve(null); }});
-                            }});
-                        }}""")
-                        if result and result.get("isRight") == 1:
-                            self.log.info(f"[答题API] ✓ 正确 ({len(combo)} 项)")
-                            answered = True
-                            break
-                        time.sleep(0.3)
-
-                if not answered:
-                    all_answered = False
-                    self.log.warning(f"[答题API] 题目 {idx+1} 未能找到正确答案")
-
-            self.log.info(f"[答题API] 全部 {len(exam)} 题处理完毕")
-            # 不设 _quiz_api_done，允许后续回退到 DOM 答题路径
-            return all_answered
-
-        except Exception as e:
-            self.log.debug(f"[答题API] 异常: {e}")
-            return False
 
 
     def _suppress_course_alert(self, frame) -> None:
-        """抑制课程反作弊 alert。"""
+        """抑制课程弹窗，包括 alert/confirm 和各种反作弊提示。"""
         try:
             frame.evaluate("""() => {
-                const orig = window.alert;
+                const _origAlert = window.alert;
+                const _origConfirm = window.confirm;
+                // 拦截所有 alert：记录日志后静默吞掉
                 window.alert = (msg) => {
-                    if (!msg) return;
-                    const text = String(msg);
-                    if (text.includes('刷课') || text.includes('请学完') || text.includes('请重新学习')) return;
-                    orig(msg);
+                    console.log("[WeBan] alert suppressed:", String(msg || "").substring(0, 120));
                 };
-                setTimeout(() => { window.alert = orig; }, 60000);
+                // 拦截 confirm 弹窗：始终返回 true（确认）
+                window.confirm = (msg) => {
+                    console.log("[WeBan] confirm suppressed:", String(msg || "").substring(0, 120));
+                    return true;
+                };
+                // 60 秒后恢复原始函数
+                setTimeout(() => {
+                    window.alert = _origAlert;
+                    window.confirm = _origConfirm;
+                }, 60000);
             }""")
         except Exception:
             pass
@@ -1313,7 +1458,7 @@ class StudyMixin(BaseMixin):
 
             # 优先：Vue Router back()
             try:
-                navigated = self._page.evaluate("""() => {
+                navigated = self._page.evaluate(self._vue_js("""() => {
                     %s
                     const app = findVueProxy(['$router']) || findVueProxy(null);
                     if (app && app.$router) {
@@ -1321,7 +1466,7 @@ class StudyMixin(BaseMixin):
                         return true;
                     }
                     return false;
-                }""" % self._vue_app_finder_js())
+                }"""))
                 if navigated:
                     self.log.info("[评论] Vue Router back()")
                     return True
@@ -1353,18 +1498,32 @@ class StudyMixin(BaseMixin):
     def _handle_captcha_if_needed(self, frame) -> bool:
         """检测并处理验证码。
 
+        sdk.js 中的 finishWxCourse() 仅在以下两个条件同时满足时触发 TencentCaptcha：
+        1. URL 参数 csCapt=true
+        2. URL 参数 weiban=weiban
+        其他情况无点选验证码，不要误判。
+
         Returns:
             True: 验证码处理成功或不需要验证码
             False: 验证码处理失败
         """
         try:
-            # 验证码容器在 mcwk 页面预加载，仅当 URL 含 cscapt=true 时才需要处理
+            # 仅当 URL 同时含 csCapt=true 和 weiban=weiban 时才需要处理验证码
+            # sdk.js: if (weiban === WEIBAN && csCapt === 'true') { ... captcha ... }
             frame_url = (frame.url or "").lower()
-            if "cscapt=true" not in frame_url:
+            has_cscapt_true = "cscapt=true" in frame_url
+            has_weiban_weiban = "weiban=weiban" in frame_url
+
+            if not has_cscapt_true or not has_weiban_weiban:
+                # 无验证码触发条件，无需处理
+                if has_cscapt_true and not has_weiban_weiban:
+                    self.log.debug("[验证码] csCapt=true 但 weiban≠weiban，不会弹出验证码")
                 return True
 
             # 检查是否有可见的验证码元素
-            # 主验证码图片元素
+            # 腾讯验证码容器 #tcaptcha_transform_dy 在所有页面预加载，
+            # 但通过 opacity:0 + top:-1e+06px 隐藏。仅当 url 含 csCapt=true
+            # 且 finishWxCourse() 已被调用时才真正可见
             captcha_selectors = [
                 ".tencent-captcha-dy__verify-bg-img",
                 ".tencent-captcha-dy__verify-img-area img",
@@ -1394,6 +1553,8 @@ class StudyMixin(BaseMixin):
                 else:
                     self.log.warning("[验证码] 验证码处理失败")
                     return False
+            else:
+                self.log.debug("[验证码] URL 含 csCapt=true 但未检测到可见验证码元素")
         except Exception as e:
             self.log.debug(f"[验证码] 检测异常: {e}")
         return True
@@ -1487,18 +1648,24 @@ class StudyMixin(BaseMixin):
             has_quiz = self._has_inline_quiz(frame)
             self.log.info(f"[播放] 课程类型: {archetype}, 内嵌答题: {has_quiz}")
 
-            # 3. 提取 nonstrMap（apicenext.js 步骤追踪令牌）
-            nonstr_map = self._extract_nonstr_map(frame)
-            self._course_nonstr_map = nonstr_map
-
-            # 4. 分析课程结构获取页数
+            # 3. 分析课程结构（页数、JS 资源、nonstrMap、CSS 选择器、captcha 条件）
             course_info = self._analyze_course_structure(frame)
             total_pages = course_info.get("total_pages", 0)
+            has_apicenext = course_info.get("has_apicenext_js", False)
+            captcha_expected = course_info.get("captcha_expected", False)
+
             if total_pages <= 0:
                 total_pages = 4
                 self.log.info(f"[播放] 未检测到页面数，使用默认 {total_pages} 页")
             else:
                 self.log.info(f"[播放] 检测到 {total_pages} 页")
+
+            # 4. 根据 JS 资源决定推进策略
+            if not has_apicenext:
+                self.log.info(
+                    "[播放] 无 apicenext.js，仅使用 finishWxCourse 完成课程"
+                    + (" (预期弹出点选验证码)" if captcha_expected else "")
+                )
 
             # 5. 设置 API 响应拦截
             api_results = {"steps": 0, "finished": False}
@@ -1523,9 +1690,9 @@ class StudyMixin(BaseMixin):
             self._page.on("response", _on_course_response)
 
             try:
-                # 统一采用 nextapi/callApinext 推进流程，不走逐页点击。
+                # 统一采用 nextapi/callApinext 推进流程
                 self._complete_standard_course(
-                    frame, nonstr_map, total_pages,
+                    frame, course_info,
                     api_results, start_time, min_study_time
                 )
 
@@ -1540,9 +1707,9 @@ class StudyMixin(BaseMixin):
                     self.log.info(f"[等待] 等待剩余学时 {int(remaining)} 秒")
                     time.sleep(remaining)
 
-                # 到达末页后，优先触发页面原生完课逻辑
+                # 到达末页后，触发页面原生完课逻辑
                 return self._finish_course_at_end(
-                    frame, api_results, total_pages, nonstr_map
+                    frame, api_results, course_info
                 )
 
             finally:
@@ -1560,17 +1727,71 @@ class StudyMixin(BaseMixin):
             return False
 
     def _complete_standard_course(
-        self, frame, nonstr_map: dict, total_pages: int,
+        self, frame, course_info: dict,
         api_results: dict, start_time: float, min_study_time: int
     ) -> None:
-        """统一课程推进流程：逐页调用 nextapi/callApinext 追踪步骤。"""
-        self.log.info(f"[播放] nextapi 推进模式，共 {total_pages} 页")
-        for i in range(total_pages):
+        """统一课程推进流程：逐页调用 nextapi/callApinext 追踪步骤。
+
+        使用从 HTML 动态提取的导航选择器。
+        """
+        nonstr_map = course_info.get("nonstr_map", {})
+        total_pages = course_info.get("total_pages", 0)
+        # 优先使用从 HTML 按钮计数推算的中间步骤数（精确匹配 item.js 定义）
+        intermediate_btn_count = course_info.get("intermediate_btn_count", 0)
+        loop_count = intermediate_btn_count if intermediate_btn_count > 0 else total_pages
+        has_apicenext = course_info.get("has_apicenext_js", False)
+        nav_selectors = course_info.get("nav_selectors", [])
+        if not nav_selectors:
+            nav_selectors = [".btn-next", ".btn-start", ".btn-ce", ".btn-prev"]
+        nav_sel_list = ", ".join(nav_selectors)
+
+        self.log.info(
+            f"[播放] nextapi 推进模式，中间步骤={loop_count} "
+            f"(HTML 按钮={intermediate_btn_count}, 总页数={total_pages})"
+        )
+        self.log.debug(f"[播放] 导航选择器: {nav_sel_list}")
+        # 对于 monitor.js 守卫：预先对所有 .btn-next 分发点击事件解除守卫
+        # monitor.js 只监听 .btn-next 的 click（capture=true）来递增 sum
+        # 注意：这也会触发 item.js 的导航处理，但 apicenext 的 nextnummax 守卫
+        # 会防止重复步骤被发送到服务器
+        if self._check_monitor_guard(frame):
+            self.log.debug("[播放] 检测到 monitor.js 守卫，预分发 .btn-next 点击解除守卫")
+            try:
+                frame.evaluate("""() => {
+                    const btns = document.querySelectorAll('.btn-next');
+                    btns.forEach(btn => {
+                        btn.dispatchEvent(new MouseEvent('click', {
+                            bubbles: true, cancelable: true, view: window
+                        }));
+                    });
+                }""")
+                time.sleep(0.2)
+            except Exception:
+                pass
+
+        for i in range(loop_count):
             if self._check_course_completed(frame):
                 self.log.info("[播放] 课程已自动完成")
                 return
+            # 检查 monitor guard：若仍活跃则尝试点击一个可见按钮
+            if self._check_monitor_guard(frame):
+                self.log.debug("[播放] monitor guard 仍活跃，尝试单次点击")
+                try:
+                    frame.evaluate(f"""() => {{
+                        const btns = document.querySelectorAll("{nav_sel_list}");
+                        for (const btn of btns) {{
+                            const r = btn.getBoundingClientRect();
+                            if (r.width > 0 && r.height > 0) {{ btn.click(); break; }}
+                        }}
+                        if (typeof sumClick !== "undefined") sumClick++;
+                    }}""")
+                except Exception:
+                    pass
+
             expected_steps = api_results["steps"] + 1
-            api_called = self._call_apicenext(frame, "next", 2, nonstr_map)
+            api_called = False
+            if has_apicenext:
+                api_called = self._call_apicenext(frame, "next", 2, nonstr_map)
             # 同步递增课程内部计数器
             try:
                 frame.evaluate("""() => {
@@ -1588,22 +1809,39 @@ class StudyMixin(BaseMixin):
                     time.sleep(0.1)
             elapsed = int(time.time() - start_time)
             self.log.info(
-                f"[推进] nextapi {i + 1}/{total_pages} "
+                f"[推进] nextapi {i + 1}/{loop_count} "
                 f"({elapsed}s/{min_study_time}s)"
             )
 
     def _finish_course_at_end(
-        self, frame, api_results: dict, total_pages: int, nonstr_map: dict | None
+        self, frame, api_results: dict, course_info: dict
     ) -> bool:
         """End-of-course completion flow using nextapi + finishWxCourse.
 
+        根据 item.js 定义的模式：
+        - 末页 .btn-at 点击 → finishWxCourse() + callApinext("next", 1, nonstrMap)
+        - sdk.js 仅需 finishWxCourse；csCapt=true 时弹出点选验证码
+        - apicenext.js 存在时需额外调用 callApinext
+
         1. Check if already completed (popup / comment page / API response)
         2. Ensure pageNums >= total_pages (anti-cheat guard)
-        3. Try to trigger native end-page button (btn-next-end, btn-at, etc.)
-        4. If native button exists, call final nextapi with finish=1
+        3. Try to trigger native end-page buttons using dynamic selectors
+        4. Call final nextapi with finish=1 (if apicenext present)
         5. Call finishWxCourse() via frame.evaluate
-        6. Wait for completion signals: .pop-jsv popup, frame detach, or API response
+        6. Handle captcha if csCapt=true (only when both conditions met)
+        7. Wait for completion signals: .pop-jsv popup, frame detach, or API response
         """
+        nonstr_map = course_info.get("nonstr_map", {})
+        total_pages = course_info.get("total_pages", 0)
+        has_apicenext = course_info.get("has_apicenext_js", False)
+        end_selectors = course_info.get("end_selectors", [])
+
+        # 构建末页按钮选择器（动态 + 回退）
+        all_end_selectors = list(end_selectors)
+        for sel in [".btn-next-end", ".btn-at", ".btn-ce"]:
+            if sel not in all_end_selectors:
+                all_end_selectors.append(sel)
+        end_sel_list = ", ".join(all_end_selectors)
         # ── Step 1: Already completed? ──
         if self._check_course_completed(frame):
             return True
@@ -1625,45 +1863,65 @@ class StudyMixin(BaseMixin):
         except Exception:
             pass
 
-        # ── Step 3: Try to trigger native end-page button ──
-        # 一些课程在末页有 btn-next-end / btn-at（答题确认）/ 自定义完课按钮
+        # ── Step 3: 尝试触发原生末页按钮 ──
+        # item.js 末页按钮的处理逻辑：
+        #   btn-next-end: callApinext("next", 1) 立即执行 + setTimeout(finishWxCourse, 2000)
+        #   最后 btn-at:  callApinext("next", 1, nonstrMap) 立即执行 + setTimeout(finishWxCourse, 2000)
+        # 因此：如果原生点击成功，callApinext 和 finishWxCourse 均由 JS 自行处理
+        btn_clicked = False
         try:
-            clicked = frame.evaluate("""() => {
-                const endBtns = [
-                    '.btn-next-end',    // 通用末页按钮
-                    '.btn-at',          // 答题页结束按钮
-                    'button:contains("完成")',
-                ];
-                for (const sel of endBtns) {
-                    let btn = null;
-                    try {
-                        if (sel.includes('contains')) {
-                            const text = sel.match(/"([^"]+)"/)[1];
-                            btn = Array.from(document.querySelectorAll('button, a, [class*="btn"]'))
-                                .find(e => e.textContent.includes(text));
-                        } else {
-                            btn = document.querySelector(sel);
-                        }
-                    } catch(e) {}
-                    
-                    if (btn) {
-                        const r = btn.getBoundingClientRect();
-                        if (r.width > 0 && r.height > 0) {
-                            btn.click();
-                            return { clicked: true, selector: sel };
-                        }
-                    }
-                }
-                return { clicked: false };
-            }""")
+            clicked = frame.evaluate(f"""() => {{
+                const endBtns = document.querySelectorAll("{end_sel_list}");
+                for (const btn of endBtns) {{
+                    const r = btn.getBoundingClientRect();
+                    if (r.width > 0 && r.height > 0) {{
+                        btn.click();
+                        return {{ clicked: true, selector: btn.className }};
+                    }}
+                }}
+                return {{ clicked: false }};
+            }}""")
             if clicked and clicked.get("clicked"):
+                btn_clicked = True
                 self.log.info(f"[完成] 触发末页按钮: {clicked.get('selector')}")
-                time.sleep(1)
         except Exception as e:
             self.log.debug(f"[完成] 末页按钮触发异常: {e}")
 
-        # ── Step 4: Call final nextapi with finish=1 (if available) ──
-        if nonstr_map and total_pages > 0:
+        if btn_clicked:
+            # 原生按钮已点击：
+            # JS 会立即调用 callApinext("next", 1) 并在 2s 后调用 finishWxCourse()
+            # 我们只需等待 JS 执行完成，不再重复调用
+            self.log.info("[完成] 等待原生 JS 执行 finishWxCourse（~2s 延迟）...")
+            time.sleep(2.5)
+            # 处理可能弹出的验证码（finishWxCourse 触发）
+            self._handle_captcha_if_needed(frame)
+            # 等待完成信号
+            for poll_round in range(20):
+                if self._check_course_completed(frame):
+                    self.log.info("[完成] 原生按钮触发课程完成")
+                    return True
+                try:
+                    pop_visible = frame.evaluate("""() => {
+                        const pop = document.querySelector('.pop-jsv');
+                        if (pop) {
+                            const r = pop.getBoundingClientRect();
+                            if (r.width > 0 && r.height > 0) return true;
+                        }
+                        return false;
+                    }""")
+                    if pop_visible:
+                        self.log.info("[完成] 检测到完成弹窗 pop-jsv（原生触发）")
+                        return True
+                except Exception:
+                    pass
+                time.sleep(0.5)
+            # 原生按钮触发后未检测到完成弹窗，降级走后续流程
+            self.log.debug("[完成] 原生触发后未检测到弹窗，降级手动调用")
+
+        # ── Step 4: 手动调用 callApinext("next", 1) ──
+        # 仅在原生按钮未成功点击时才需要（避免重复步骤）
+        # item.js 模式：callApinext("next", 1, nonstrMap) 立即执行（finish=1 信号）
+        if not btn_clicked and has_apicenext and total_pages > 0:
             try:
                 self._call_apicenext(frame, "next", 1, nonstr_map)
                 self.log.debug("[完成] 已发送最终 nextapi 信号 (finish=1)")
@@ -1671,71 +1929,93 @@ class StudyMixin(BaseMixin):
             except Exception as e:
                 self.log.debug(f"[完成] 最终 nextapi 异常: {e}")
 
-        # ── Step 5: Call finishWxCourse() ──
+        # ── Step 5: 调用 finishWxCourse() + 处理验证码 ──
+        # sdk.js 的 finishWxCourse()：
+        #   仅 weiban=weiban 且 csCapt=true 时触发 TencentCaptcha 点选验证码
+        #   其他情况直接发送完成请求，无验证码
         self.log.info("[完成] 调用 finishWxCourse()...")
-        try:
-            result = frame.evaluate("""() => {
-                return new Promise((resolve) => {
-                    if (typeof finishWxCourse !== 'function') {
-                        resolve({ ok: false, reason: 'finishWxCourse is not a function' });
-                        return;
-                    }
+        finish_ok = False
+        finish_reason = ""
+        max_finish_retries = 3
+        for finish_attempt in range(max_finish_retries):
+            if finish_attempt > 0:
+                retry_delay = 2 + finish_attempt * 2
+                self.log.info(f"[完成] finishWxCourse 重试 {finish_attempt}/{max_finish_retries - 1}，等待 {retry_delay}s...")
+                time.sleep(retry_delay)
 
-                    const originalAlert = window.alert;
-                    let alertMsg = '';
-                    window.alert = (msg) => { alertMsg = msg || ''; };
-
-                    try {
-                        finishWxCourse();
-                    } catch(e) {
-                        window.alert = originalAlert;
-                        resolve({ ok: false, reason: e.message });
-                        return;
-                    }
-
-                    // Poll for completion signals, up to 8 seconds
-                    let elapsed = 0;
-                    const poll = () => {
-                        // Check .pop-jsv popup
-                        const pop = document.querySelector('.pop-jsv');
-                        if (pop) { const r = pop.getBoundingClientRect(); if (r.width > 0 && r.height > 0) {
-                            window.alert = originalAlert;
-                            resolve({ ok: true, popup: true });
-                            return;
-                        } }
-                        elapsed += 500;
-                        if (elapsed >= 8000) {
-                            window.alert = originalAlert;
-                            if (alertMsg.includes('失败')) {
-                                resolve({ ok: false, reason: alertMsg });
-                            } else {
-                                resolve({ ok: false, reason: 'timeout' });
+            # 检查 monitor guard 是否仍在阻止完成
+            if self._check_monitor_guard(frame):
+                self.log.warning("[完成] monitor guard 阻止 finishWxCourse，尝试额外点击")
+                for click_i in range(5):
+                    try:
+                        frame.evaluate("""() => {
+                            const btns = document.querySelectorAll(".btn-next, .btn-start, .btn-ce, .btn-next-end");
+                            for (const btn of btns) {
+                                const r = btn.getBoundingClientRect();
+                                if (r.width > 0 && r.height > 0) { btn.click(); break; }
                             }
-                            return;
-                        }
-                        setTimeout(poll, 500);
-                    };
-                    setTimeout(poll, 1000);
-                });
-            }""")
+                        }""")
+                    except Exception:
+                        break
+                    time.sleep(0.3)
+                    if not self._check_monitor_guard(frame):
+                        self.log.info("[完成] monitor guard 已解除")
+                        break
+                if self._check_monitor_guard(frame):
+                    self.log.warning("[完成] monitor guard 未能解除，finishWxCourse 可能为 null")
 
-            if result and result.get("ok"):
-                if result.get("popup"):
-                    self.log.info("[完成] finishWxCourse 成功 - 显示完成弹窗")
-                else:
+            # 5a. 调用 finishWxCourse()（可能触发 captcha.show()）
+            try:
+                has_func = frame.evaluate("typeof finishWxCourse === 'function'")
+                if not has_func:
+                    self.log.warning("[完成] finishWxCourse 不是函数")
+                    break
+                frame.evaluate("finishWxCourse()")
+                self.log.debug("[完成] finishWxCourse 已调用")
+            except Exception as e:
+                if self._is_frame_detached_error(e):
+                    self.log.info("[完成] frame 已分离 → 课程 JS 已完成流程")
+                    self._return_from_comment_page()
+                    return True
+                finish_reason = str(e)
+                self.log.debug(f"[完成] finishWxCourse 调用异常: {e}")
+                continue
+
+            # 5b. 处理 finishWxCourse 触发的验证码（csCapt=true 时）
+            time.sleep(1)
+            captcha_handled = self._handle_captcha_if_needed(frame)
+            if captcha_handled:
+                self.log.info("[完成] 验证码已处理，等待 JS 回调完成...")
+            else:
+                self.log.debug("[完成] 无需验证码，继续等待完成信号")
+
+            # 5c. 等待完成弹窗
+            for poll_round in range(16):
+                if self._check_course_completed(frame):
                     self.log.info("[完成] finishWxCourse 成功")
-                return True
+                    finish_ok = True
+                    break
+                try:
+                    pop_visible = frame.evaluate("""() => {
+                        const pop = document.querySelector('.pop-jsv');
+                        if (pop) { const r = pop.getBoundingClientRect(); if (r.width > 0 && r.height > 0) return true; }
+                        return false;
+                    }""")
+                    if pop_visible:
+                        self.log.info("[完成] 检测到完成弹窗 pop-jsv")
+                        finish_ok = True
+                        break
+                except Exception:
+                    pass
+                time.sleep(0.5)
+            if finish_ok:
+                break
 
-            reason = (result or {}).get("reason", "unknown")
-            if reason:
-                self.log.debug(f"[完成] finishWxCourse 未成功: {reason}")
+        if finish_ok:
+            return True
 
-        except Exception as e:
-            if self._is_frame_detached_error(e):
-                self.log.info("[完成] frame 已分离 → 课程 JS 已完成流程")
-                self._return_from_comment_page()
-                return True
-            self.log.debug(f"[完成] finishWxCourse 调用异常: {e}")
+        if finish_reason:
+            self.log.warning(f"[完成] finishWxCourse 失败 (原因: {finish_reason})，共尝试 {max_finish_retries} 次")
 
         # ── Step 6: Final check — frame detach / completion state ──
         time.sleep(2)
@@ -1757,6 +2037,31 @@ class StudyMixin(BaseMixin):
     # 课程完成与返回
     # ========================================================================
 
+    def _vue_router_back(self, label: str = "") -> bool:
+        """尝试 Vue Router back()，失败则回退到 history.back()。"""
+        if not self._page:
+            return False
+        try:
+            navigated = self._page.evaluate(self._vue_js("""() => {
+                %s
+                const app = findVueProxy(['$router']) || findVueProxy(null);
+                if (app && app.$router) { app.$router.back(); return true; }
+                return false;
+            }"""))
+            if navigated:
+                self.log.debug(f"[导航] Vue Router back() {label}".strip())
+                time.sleep(1)
+                return True
+        except Exception:
+            pass
+        try:
+            self._page.evaluate("() => { history.back(); }")
+            self.log.debug(f"[导航] history.back() {label}".strip())
+            time.sleep(1)
+            return True
+        except Exception:
+            return False
+
     def _return_to_chapter_list(self) -> bool:
         """返回章节列表。优先使用 Vue Router / history.back()，回退到 click。"""
         if not self._page or self._page.is_closed():
@@ -1768,7 +2073,25 @@ class StudyMixin(BaseMixin):
                 return True
 
             if ctx == PageContext.PROJECT_LIST:
-                self.log.debug("[导航] 当前在项目列表页，需要直接导航回课程列表")
+                self.log.debug("[导航] 当前在项目列表页，尝试重新进入项目...")
+                try:
+                    task_block = self._page.locator(SEL_TASK_BLOCK).first
+                    if task_block.count() > 0 and task_block.is_visible():
+                        task_block.click(timeout=5000)
+                        time.sleep(2)
+                        try:
+                            self._page.wait_for_selector(
+                                SEL_COURSE_LIST_WAIT_TARGETS,
+                                state="attached",
+                                timeout=8000,
+                            )
+                        except Exception:
+                            pass
+                        if self._detect_page_context() == PageContext.COURSE_LIST:
+                            self.log.info("[导航] 成功从项目列表进入课程列表")
+                            return True
+                except Exception as e:
+                    self.log.debug(f"[导航] 项目列表恢复异常: {e}")
                 return False
 
             try:
@@ -1787,33 +2110,8 @@ class StudyMixin(BaseMixin):
                         pass
 
                 # 优先使用 Vue Router 导航
-                if self._page:
-                    try:
-                        navigated = self._page.evaluate("""() => {
-                            %s
-                            const app = findVueProxy(['$router']) || findVueProxy(null);
-                            if (app && app.$router) {
-                                app.$router.back();
-                                return true;
-                            }
-                            return false;
-                        }""" % self._vue_app_finder_js())
-                        if navigated:
-                            self.log.debug("[导航] Vue Router back()")
-                            time.sleep(1)
-                            continue
-                    except Exception:
-                        pass
-
-                # 回退: history.back()
-                if self._page:
-                    try:
-                        self._page.evaluate("() => { history.back(); }")
-                        self.log.debug("[导航] history.back()")
-                        time.sleep(1)
-                        continue
-                    except Exception:
-                        pass
+                if self._vue_router_back():
+                    continue
 
                 # 回退: 点击返回按钮
                 if self._page:
@@ -2032,7 +2330,6 @@ class StudyMixin(BaseMixin):
         2. JS 逐页推进 + 等待最小学时
         3. 调用 finishWxCourse() 完成课程
         """
-        self._quiz_api_done = False
         f = self._get_course_runtime_frame()
         if not f:
             self.log.warning("[课程] 未获取到课程框架")
@@ -2201,22 +2498,79 @@ class StudyMixin(BaseMixin):
                         f"[{idx + 1}/{total_tasks}] 播放未完成"
                         f"{', 重试' if course_attempt == 0 else ''}"
                     )
-                    self._return_to_chapter_list()
+                    if not self._return_to_chapter_list():
+                        self.log.debug("[重试] 返回课程列表失败，尝试刷新恢复...")
+                        try:
+                            self._page.reload(
+                                wait_until="domcontentloaded", timeout=15000
+                            )
+                            time.sleep(1)
+                        except Exception:
+                            pass
 
                 if not flow_ok:
                     fail_reason = "课程播放/交互流程未完成"
 
-                if not self._return_to_chapter_list():
+                # 尝试返回课程列表；失败时尝试恢复而非直接中止
+                returned = self._return_to_chapter_list()
+                if not returned:
                     self.log.warning(
-                        f"[{idx + 1}/{total_tasks}] 课后返回课程列表失败，"
-                        f"中止当前批次"
+                        f"[{idx + 1}/{total_tasks}] 课后返回课程列表失败，尝试恢复..."
                     )
-                    if flow_ok:
-                        completed.add(title)
-                        processed_cnt += 1
-                    else:
+                    # 恢复策略：先尝试刷新页面
+                    recovered = False
+                    for recovery_attempt in range(3):
+                        try:
+                            self._page.reload(
+                                wait_until="domcontentloaded", timeout=15000
+                            )
+                            time.sleep(1)
+                            ctx = self._detect_page_context()
+                            if ctx == PageContext.COURSE_LIST:
+                                self.log.info("[恢复] 刷新后回到课程列表")
+                                recovered = True
+                                break
+                            if ctx == PageContext.PROJECT_LIST:
+                                self.log.info("[恢复] 刷新后落在项目列表，尝试重新进入")
+                                # 尝试通过 Vue router 返回
+                                try:
+                                    self._vue_router_back()
+                                    time.sleep(1)
+                                except Exception:
+                                    pass
+                                ctx2 = self._detect_page_context()
+                                if ctx2 == PageContext.COURSE_LIST:
+                                    recovered = True
+                                    break
+                            # 尝试点击导航返回按钮
+                            try:
+                                nav_back = self._page.locator(SEL_NAV_BAR_LEFT).first
+                                if nav_back.count() > 0 and nav_back.is_visible():
+                                    nav_back.click(timeout=5000)
+                                    time.sleep(1)
+                                    if self._detect_page_context() == PageContext.COURSE_LIST:
+                                        recovered = True
+                                        break
+                            except Exception:
+                                pass
+                            time.sleep(1)
+                        except Exception as e:
+                            self.log.debug(f"[恢复] 尝试 {recovery_attempt + 1} 异常: {e}")
+
+                    if recovered:
+                        self.log.info("[恢复] 已恢复到课程列表，跳过当前课程继续")
                         failed.add(title)
-                    break
+                        continue  # 继续处理下一个课程
+                    else:
+                        self.log.warning(
+                            f"[{idx + 1}/{total_tasks}] 恢复失败，中止当前批次"
+                        )
+                        if flow_ok:
+                            completed.add(title)
+                            processed_cnt += 1
+                        else:
+                            failed.add(title)
+                        break
                 if flow_ok:
                     ok = self._verify_course_passed_on_list(title, "img-text")
                     if not ok:

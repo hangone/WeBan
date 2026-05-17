@@ -308,14 +308,28 @@ def locate_with_template(
 
 
 def _binarize_main(gray: np.ndarray) -> np.ndarray:
-    """全局暗色阈值二值化 + 形态学清理。
+    """多阈值二值化合并 + 形态学清理。
 
-    使用 gray<100 作为主阈值，平衡字符笔画捕获和噪声抑制。
+    使用多个暗色阈值分别二值化后合并，提高对不同颜色的字符捕获能力。
+    同时结合自适应阈值和边缘检测兜底。
     """
-    global_bw = (gray < 60).astype(np.uint8) * 255
-    symbol_bw = cv2.morphologyEx(global_bw, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
-    symbol_bw = cv2.morphologyEx(symbol_bw, cv2.MORPH_OPEN, np.ones((2, 2), np.uint8))
-    return symbol_bw
+    h, w = gray.shape[:2]
+    # 多级暗色阈值：从深色到中等深色
+    combined = np.zeros((h, w), dtype=np.uint8)
+    for thresh in (50, 70, 90):
+        bw = (gray < thresh).astype(np.uint8) * 255
+        combined = cv2.bitwise_or(combined, bw)
+
+    # Otsu 自适应阈值作为补充
+    _, otsu_bw = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    combined = cv2.bitwise_or(combined, otsu_bw)
+
+    # 形态学清理
+    kernel_close = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+    combined = cv2.morphologyEx(combined, cv2.MORPH_CLOSE, kernel_close)
+    kernel_open = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2))
+    combined = cv2.morphologyEx(combined, cv2.MORPH_OPEN, kernel_open)
+    return combined
 
 
 def _extract_candidates(symbol_bw: np.ndarray) -> List[dict]:
@@ -326,11 +340,11 @@ def _extract_candidates(symbol_bw: np.ndarray) -> List[dict]:
     candidates = []
     for i in range(1, num_labels):
         x, y, w, h, area = stats[i]
-        if area < 50 or area > 6000:
+        if area < 30 or area > 12000:
             continue
-        if w < 10 or h < 10:
+        if w < 6 or h < 6:
             continue
-        if w / max(h, 1) > 3.0 or h / max(w, 1) > 3.0:
+        if w / max(h, 1) > 4.0 or h / max(w, 1) > 4.0:
             continue
         component_mask = np.where(labels[y : y + h, x : x + w] == i, 255, 0).astype(
             np.uint8
@@ -439,26 +453,36 @@ def detect_captcha(
     all_candidates = _extract_candidates(symbol_bw)
     all_candidates = _merge_nearby_candidates(all_candidates, dist=15)
 
-    # 暗色阈值候选不足时，用自适应阈值 + 黑帽作为补充
-    if len(all_candidates) < 3:
-        h_m, w_m = main_gray.shape
-        k = max(11, (min(h_m, w_m) // 18) * 2 + 1)
-        kernel = np.ones((k, k), np.uint8)
-        blackhat = cv2.morphologyEx(main_gray, cv2.MORPH_BLACKHAT, kernel)
-        _, bw1 = cv2.threshold(blackhat, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        blur = cv2.GaussianBlur(main_gray, (5, 5), 0)
-        bw2 = cv2.adaptiveThreshold(
-            blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 31, 7
-        )
-        edges = cv2.Canny(main_gray, 50, 140)
-        fallback_bw = cv2.bitwise_or(bw1, bw2)
-        fallback_bw = cv2.bitwise_or(fallback_bw, edges)
-        fallback_bw = cv2.morphologyEx(fallback_bw, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
-        fallback_bw = cv2.morphologyEx(fallback_bw, cv2.MORPH_OPEN, np.ones((2, 2), np.uint8))
-        fallback_candidates = _extract_candidates(fallback_bw)
-        fallback_candidates = _merge_nearby_candidates(fallback_candidates, dist=15)
-        if len(fallback_candidates) >= len(all_candidates):
-            all_candidates = fallback_candidates
+    # 始终运行补充二值化，合并结果以提高召回率
+    h_m, w_m = main_gray.shape
+    k = max(11, (min(h_m, w_m) // 18) * 2 + 1)
+    kernel = np.ones((k, k), np.uint8)
+    blackhat = cv2.morphologyEx(main_gray, cv2.MORPH_BLACKHAT, kernel)
+    _, bw1 = cv2.threshold(blackhat, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    blur = cv2.GaussianBlur(main_gray, (5, 5), 0)
+    bw2 = cv2.adaptiveThreshold(
+        blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 31, 7
+    )
+    edges = cv2.Canny(main_gray, 40, 160)
+    fallback_bw = cv2.bitwise_or(bw1, bw2)
+    fallback_bw = cv2.bitwise_or(fallback_bw, edges)
+    fallback_bw = cv2.morphologyEx(fallback_bw, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
+    fallback_bw = cv2.morphologyEx(fallback_bw, cv2.MORPH_OPEN, np.ones((2, 2), np.uint8))
+    fallback_candidates = _extract_candidates(fallback_bw)
+    fallback_candidates = _merge_nearby_candidates(fallback_candidates, dist=15)
+    # 合并主候选和补充候选，去重
+    for fc in fallback_candidates:
+        fc_center = (fc["center"][0], fc["center"][1])
+        # 仅添加不在已有候选附近的补充候选
+        is_new = True
+        for ac in all_candidates:
+            dx = fc_center[0] - ac["center"][0]
+            dy = fc_center[1] - ac["center"][1]
+            if (dx*dx + dy*dy)**0.5 < 20:
+                is_new = False
+                break
+        if is_new:
+            all_candidates.append(fc)
 
     if _DEBUG_SAVE:
         debug_main = main_img.copy()
@@ -547,8 +571,8 @@ def detect_captcha(
                         dx = assigned_pts[a][0] - assigned_pts[b][0]
                         dy = assigned_pts[a][1] - assigned_pts[b][1]
                         dist = (dx * dx + dy * dy) ** 0.5
-                        if dist < 30:
-                            spatial_penalty += (30 - dist) * 8.0
+                        if dist < 20:
+                            spatial_penalty += (20 - dist) * 5.0
                 total += spatial_penalty
 
                 if valid and total < best_total:
@@ -587,14 +611,14 @@ def detect_captcha(
 
     # ---- 对匹配分数差的项，改用多尺度模板匹配兜底 ----
     for i, raw_mask in enumerate(query_raw_masks):
-        # 基础匹配较可靠时不启用模板校正
-        if ordered_points[i] is not None and base_scores[i] < 280:
+        # 基础匹配不可靠时启用模板校正
+        if ordered_points[i] is not None and base_scores[i] < 350:
             continue
 
         score, center = locate_with_template(raw_mask, symbol_bw)
         if center is None:
             continue
-        if score < 0.70:
+        if score < 0.55:
             continue
 
         new_point = center
