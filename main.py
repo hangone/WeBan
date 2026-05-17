@@ -13,13 +13,9 @@ from client import WeBanClient
 
 VERSION = "v3.7.0"
 
-if getattr(sys, "frozen", False):
-    # pyfuze: 优先使用环境变量定位可执行文件目录
-    exe_path = os.environ.get("PYFUZE_EXECUTABLE_PATH")
-    if exe_path:
-        base_path = os.path.dirname(os.path.abspath(exe_path))
-    else:
-        base_path = os.path.dirname(os.path.abspath(sys.argv[0]))
+exe_path = os.environ.get("PYFUZE_EXECUTABLE_PATH")
+if exe_path:
+    base_path = os.path.dirname(os.path.abspath(exe_path))
 else:
     base_path = os.path.dirname(os.path.abspath(__file__))
 
@@ -59,25 +55,19 @@ sync_lock = threading.Lock()
 
 def open_editor(path: str):
     """打开系统编辑器编辑指定文件"""
-    editor = os.environ.get("EDITOR")
+    logger.info(f"配置文件路径: {path}")
     try:
         if sys.platform == "win32":
             subprocess.Popen(["notepad", path])
         elif sys.platform == "darwin":
-            if editor:
-                subprocess.Popen([editor, path])
-            else:
-                subprocess.Popen(["open", "-t", path])
+            subprocess.Popen(["open", "-t", path])
         else:
-            if editor:
-                subprocess.Popen([editor, path])
-            else:
-                subprocess.Popen(["xdg-open", path])
+            subprocess.Popen(["xdg-open", path])
     except FileNotFoundError:
-        logger.warning(f"无法打开编辑器，请手动编辑文件: {path}")
-        return
+        logger.warning("无法打开编辑器，请手动编辑上述文件")
     try:
-        input("编辑完成后按回车键继续...")
+        print("编辑完成后按回车键继续...", flush=True)
+        input()
     except Exception:
         pass
 
