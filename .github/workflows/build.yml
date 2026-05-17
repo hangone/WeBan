@@ -66,6 +66,7 @@ jobs:
             --pyproject pyproject.toml \
             --include answer \
             --unzip-path WeBan \
+            --temp-unzip \
             --mode online \
             --uv-install-script-windows https://gh-proxy.com/https://github.com/astral-sh/uv/releases/latest/download/uv-installer.ps1 \
             --uv-install-script-unix https://gh-proxy.com/https://github.com/astral-sh/uv/releases/latest/download/uv-installer.sh \
@@ -82,8 +83,17 @@ jobs:
             --pyproject pyproject.toml \
             --include answer \
             --unzip-path WeBan \
+            --temp-unzip \
             --mode bundle \
             --output-name WeBan-${{ steps.version.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}-bundle
+
+      - name: Add .exe extension on Windows
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          for f in dist/WeBan-*; do
+            [ -f "$f" ] && mv "$f" "$f.exe"
+          done
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v3
