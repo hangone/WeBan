@@ -55,6 +55,7 @@ jobs:
           cache-python: "true"
 
       - name: Build online executable (default)
+        shell: bash
         run: |
           uvx pyfuze . \
             --entry main.py \
@@ -70,6 +71,7 @@ jobs:
             --output-name WeBan-${{ steps.version.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}
 
       - name: Build bundle executable
+        shell: bash
         run: |
           uvx pyfuze . \
             --entry main.py \
