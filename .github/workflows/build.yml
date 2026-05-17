@@ -9,6 +9,9 @@ on:
 permissions:
   contents: write
 
+env:
+  PYTHONIOENCODING: utf-8
+
 jobs:
   create-release:
     runs-on: ubuntu-latest
