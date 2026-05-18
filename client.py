@@ -311,19 +311,22 @@ class WeBanClient:
         :return: show_progress API 原始响应
         """
         progress = self.api.show_progress(user_project_id)
-        if progress.get("code", -1) == "0":
-            data = progress.get("data", {})
-            required = data["requiredNum"] - data["requiredFinishedNum"]
-            optional = data["optionalNum"] - data["optionalFinishedNum"]
-            push = data["pushNum"] - data["pushFinishedNum"]
-            eta = max(0, self.study_time * (required + optional + push))
+        if progress.get("code", -1) != "0":
             if output:
-                self.log.info(
-                    f"{project_prefix} 进度：必修课：{data['requiredFinishedNum']}/{data['requiredNum']}，"
-                    f"推送课：{data['pushFinishedNum']}/{data['pushNum']}，"
-                    f"自选课：{data['optionalFinishedNum']}/{data['optionalNum']}，"
-                    f"考试：{data['examFinishedNum']}/{data['examNum']}，预计剩余时间：{eta} 秒"
-                )
+                self.log.warning(f"{project_prefix} 获取进度失败：{progress}")
+            return progress
+        data = progress.get("data", {})
+        required = data["requiredNum"] - data["requiredFinishedNum"]
+        optional = data["optionalNum"] - data["optionalFinishedNum"]
+        push = data["pushNum"] - data["pushFinishedNum"]
+        eta = max(0, self.study_time * (required + optional + push))
+        if output:
+            self.log.info(
+                f"{project_prefix} 进度：必修课：{data['requiredFinishedNum']}/{data['requiredNum']}，"
+                f"推送课：{data['pushFinishedNum']}/{data['pushNum']}，"
+                f"自选课：{data['optionalFinishedNum']}/{data['optionalNum']}，"
+                f"考试：{data['examFinishedNum']}/{data['examNum']}，预计剩余时间：{eta} 秒"
+            )
         return progress
 
     # ---- login --------------------------------------------------------------
@@ -432,10 +435,22 @@ class WeBanClient:
                     for course in courses.get("data", []):
                         if not force_restudy and int(course.get("finished", 0)) == 1:
                             continue
+                        course_prefix = f"{category_prefix}/{course['resourceName']}"
+                        progress_before = self.get_progress(task["userProjectId"], project_prefix, output=False)
+                        finished_before = 0
+                        if progress_before.get("code", -1) == "0":
+                            d = progress_before["data"]
+                            finished_before = d["requiredFinishedNum"] + d["pushFinishedNum"] + d["optionalFinishedNum"]
                         self._study_one_course(
                             course, task, category_prefix, project_prefix,
                             answers_json, force_restudy,
                         )
+                        progress_after = self.get_progress(task["userProjectId"], project_prefix)
+                        if progress_after.get("code", -1) == "0":
+                            d = progress_after["data"]
+                            finished_after = d["requiredFinishedNum"] + d["pushFinishedNum"] + d["optionalFinishedNum"]
+                            if finished_after <= finished_before:
+                                self.log.warning(f"{course_prefix}：完课成功但进度未更新，请手动检查")
 
             self.log.success(f"{project_prefix} 课程学习完成")
 
@@ -450,22 +465,11 @@ class WeBanClient:
             return
 
         self.log.info(f"学习： {course_prefix}")
-        progress_before = self.get_progress(task["userProjectId"], project_prefix, output=False)
-        finished_before = 0
-        if progress_before.get("code", -1) == "0":
-            d = progress_before["data"]
-            finished_before = d["requiredFinishedNum"] + d["pushFinishedNum"] + d["optionalFinishedNum"]
         self.api.study(course["resourceId"], task["userProjectId"])
         study_start = time.time()
 
         if "userCourseId" not in course:
             self.log.success(f"{course_prefix} 完成")
-            progress_after = self.get_progress(task["userProjectId"], project_prefix)
-            if progress_after.get("code", -1) == "0":
-                d = progress_after["data"]
-                finished_after = d["requiredFinishedNum"] + d["pushFinishedNum"] + d["optionalFinishedNum"]
-                if finished_after <= finished_before:
-                    self.log.warning(f"{course_prefix}：完课成功但进度未更新，请手动检查")
             return
 
         course_url = self._build_course_url(course, task)
@@ -545,12 +549,6 @@ class WeBanClient:
             return
 
         self.log.success(f"{course_prefix} 完成")
-        progress_after = self.get_progress(task["userProjectId"], project_prefix)
-        if progress_after.get("code", -1) == "0":
-            d = progress_after["data"]
-            finished_after = d["requiredFinishedNum"] + d["pushFinishedNum"] + d["optionalFinishedNum"]
-            if finished_after <= finished_before:
-                self.log.warning(f"{course_prefix}：完课成功但进度未更新，请手动检查")
 
     def _finish_course(
         self, course: dict, task: dict, query: dict, course_url: str, unique_no: str,
