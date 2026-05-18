@@ -1,10 +1,9 @@
 import json
 import os
-import sys
 import time
 import webbrowser
 from random import randint
-from typing import Any, Dict, Optional, TYPE_CHECKING, Union
+from typing import Any, Dict
 from urllib.parse import parse_qs, urlparse, urljoin
 from uuid import uuid4
 
@@ -13,10 +12,7 @@ import re
 import threading
 
 from api import WeBanAPI
-from captcha import CaptchaHandler
-
-if TYPE_CHECKING:
-    from ddddocr import DdddOcr
+from captcha import CaptchaHandler, LoginCaptchaSolver
 
 exe_path = os.environ.get("PYFUZE_EXECUTABLE_PATH")
 if exe_path:
@@ -153,8 +149,6 @@ def _fetch_text(session, url: str) -> str:
 
 class WeBanClient:
     _stdin_lock = threading.Lock()
-    # None → 未初始化; False → ddddocr 不可用; DdddOcr 实例 → 可用
-    _ocr_cache: Optional[Any] = None
 
     def __init__(
         self,
@@ -178,7 +172,6 @@ class WeBanClient:
         self.log = log
         self.tenant_name = tenant_name.strip()
         self.study_time = 30
-        self.ocr = self.get_ocr_instance()
         self.browser_path = browser_path
         if user and all([user.get("userId"), user.get("token")]):
             self.api = WeBanAPI(user=user, debug=debug, log=log)
@@ -253,22 +246,6 @@ class WeBanClient:
         if project_category == 9:
             return "lab"
         return ""
-
-    def get_ocr_instance(self) -> Optional[Union["DdddOcr", None]]:
-        """检查是否安装 ddddocr 库，多次调用返回同一个 DdddOcr 实例
-
-        DdddOcr 初始化开销大（加载模型），因此使用类级别缓存。
-        :return: DdddOcr 实例，不可用时返回 None
-        """
-        if WeBanClient._ocr_cache is None:
-            try:
-                import ddddocr
-
-                WeBanClient._ocr_cache = ddddocr.DdddOcr(show_ad=False)
-            except Exception:
-                self.log.warning("ddddocr 库未安装，自动验证码识别功能将不可用")
-                WeBanClient._ocr_cache = False
-        return WeBanClient._ocr_cache if WeBanClient._ocr_cache is not False else None
 
     def _build_course_url(self, course: dict, task: dict) -> str:
         """根据课程和任务信息构建完整的课程 URL
@@ -367,15 +344,9 @@ class WeBanClient:
                 self.log.warning(f"登录失败，正在重试 {i}/{retry_limit + 2} 次")
             verify_time = self.api.get_timestamp(13, 0)
             verify_image = self.api.rand_letter_image(verify_time)
-            if i < retry_limit and self.ocr:
-                try:
-                    verify_code = self.ocr.classification(verify_image)
-                    self.log.info(f"自动验证码识别结果: {verify_code}")
-                    if len(verify_code) != 4:
-                        self.log.warning("验证码识别失败，正在重试")
-                        continue
-                except Exception as e:
-                    self.log.error(f"验证码识别异常: {e}")
+            if i < retry_limit:
+                verify_code = LoginCaptchaSolver.recognize(verify_image, self.log)
+                if not verify_code:
                     continue
             else:
                 account_id = self.api.account or self.api.user.get("userId") or "unknown"
