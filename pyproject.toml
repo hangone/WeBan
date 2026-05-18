@@ -9,7 +9,7 @@ dependencies = [
     "drissionpage>=4.1.1.2",
     "loguru>=0.7.3",
     "numpy>=1.26.0",
-    "opencv-python>=4.8.0",
+    "opencv-python-headless>=4.8.0",
     "pycryptodome>=3.23.0",
     "requests>=2.34.2",
 ]

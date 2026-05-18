@@ -599,20 +599,25 @@ class CaptchaHandler:
         :param entry_url: 入口页面 URL（必须在腾讯验证码的域名白名单内）
         :param headless: 是否以无头模式运行
         :return: (browser, tab) 元组
+        :raises: 任何页面操作异常时自动关闭浏览器，避免进程泄漏
 
         页面加载两次：第一次建立域名（localStorage 按域名隔离）；
         注入认证后重新加载，使页面能读取到 localStorage 中的登录态。
         """
         self.log.info(f"正在打开验证码入口页面: {entry_url}")
         browser = self._create_browser(headless)
-        tab = browser.latest_tab
-        tab.get(entry_url, timeout=600)               # 第一次：建立域名
-        self._inject_auth(tab)
-        tab.get(entry_url, timeout=30)                # 第二次：读取注入的认证
-        tab.wait(3)
-        self._ensure_captcha_sdk(tab)
-        tab.wait(2)
-        return browser, tab
+        try:
+            tab = browser.latest_tab
+            tab.get(entry_url, timeout=600)             # 第一次：建立域名
+            self._inject_auth(tab)
+            tab.get(entry_url, timeout=30)              # 第二次：读取注入的认证
+            tab.wait(3)
+            self._ensure_captcha_sdk(tab)
+            tab.wait(2)
+            return browser, tab
+        except Exception:
+            browser.quit()
+            raise
 
     # ── 验证码触发 / 等待 ──────────────────────────────
 
@@ -813,6 +818,9 @@ class CaptchaHandler:
         :return: 验证通过时返回 {"randstr": str, "ticket": str}，全部失败返回 None
         """
         for attempt in range(1, max_retry + 1):
+            # 清除上一轮的回调结果，避免 _wait_captcha_result 读到过期值
+            tab.run_js("window.__captchaResult = null;")
+
             if attempt == 1:
                 self._trigger_captcha(tab, app_id)
                 time.sleep(2)
@@ -825,6 +833,20 @@ class CaptchaHandler:
         return None
 
     # ── 公开方法 ────────────────────────────────────────
+
+    def _quit_browser(self, browser: Chromium, label: str = "") -> None:
+        """安全关闭浏览器，捕获退出异常避免掩盖原始错误。
+
+        :param browser: Chromium 实例
+        :param label: 日志标签 (如 "无感验证码"、"自动识别"、"手动验证")
+        """
+        try:
+            browser.quit()
+            if label:
+                self.log.info(f"已关闭浏览器 ({label})")
+        except Exception as exc:
+            if label:
+                self.log.warning(f"关闭浏览器异常 ({label}): {exc}")
 
     def handle_exam_captcha(self, user_exam_plan_id: str) -> Dict[str, str]:
         """处理考试前的无感验证码。
@@ -841,7 +863,7 @@ class CaptchaHandler:
             self.log.success("已获取无感验证码")
             return result
         finally:
-            browser.quit()
+            self._quit_browser(browser, "无感验证码")
 
     def handle_course_captcha(self, course_url: Optional[str] = None) -> Dict[str, str]:
         """处理课程完成时的图片点选验证码。
@@ -861,8 +883,11 @@ class CaptchaHandler:
             if result:
                 self.log.success("验证码自动识别成功")
                 return result
+        except Exception as exc:
+            self.log.warning(f"自动识别异常，将回退到手动: {exc}")
         finally:
-            browser.quit()
+            self._quit_browser(browser, "自动识别")
+        time.sleep(1)  # 等待无头浏览器进程完全退出
 
         # 第二阶段: 打开可见浏览器，让用户手动完成
         self.log.info("=" * 50)
@@ -875,4 +900,4 @@ class CaptchaHandler:
             self.log.success("验证码手动验证完成")
             return result
         finally:
-            browser.quit()
+            self._quit_browser(browser, "手动验证")
