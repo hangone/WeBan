@@ -604,7 +604,7 @@ class CaptchaHandler:
         页面加载两次：第一次建立域名（localStorage 按域名隔离）；
         注入认证后重新加载，使页面能读取到 localStorage 中的登录态。
         """
-        self.log.info(f"正在打开验证码入口页面: {entry_url}")
+        self.log.info("正在打开验证码入口页面")
         browser = self._create_browser(headless)
         try:
             tab = browser.latest_tab
