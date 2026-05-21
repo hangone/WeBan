@@ -3496,6 +3496,19 @@
     ],
     "type": 1
   },
+  "《民法典》总则编规定了民事活动的基本原则和一般性规则。": {
+    "optionList": [
+      {
+        "content": "正确",
+        "isCorrect": 1
+      },
+      {
+        "content": "错误",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "《民法典》既调整财产关系（如合同），也调整人身关系（如婚姻）。": {
     "optionList": [
       {
@@ -5224,6 +5237,27 @@
       },
       {
         "content": "完成或没完成计划时，及时给予自己奖惩。",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "下列哪项会导致民事法律行为无效？": {
+    "optionList": [
+      {
+        "content": "未采用书面形式",
+        "isCorrect": 2
+      },
+      {
+        "content": "违背公序良俗",
+        "isCorrect": 1
+      },
+      {
+        "content": "当事人经验不足",
+        "isCorrect": 2
+      },
+      {
+        "content": "未公证",
         "isCorrect": 2
       }
     ],
@@ -10200,6 +10234,18 @@
       {
         "content": "法律监督机关",
         "isCorrect": 1
+      },
+      {
+        "content": "监察机关",
+        "isCorrect": 2
+      },
+      {
+        "content": "法律检察机关",
+        "isCorrect": 2
+      },
+      {
+        "content": "纪律检察机关",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -11065,6 +11111,10 @@
       {
         "content": "姿势正确省力气，游的快。",
         "isCorrect": 1
+      },
+      {
+        "content": "姿势正确才更费力，才能减肥。",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -13106,6 +13156,27 @@
     ],
     "type": 1
   },
+  "以下哪项不是职场通用的职业道德内涵？": {
+    "optionList": [
+      {
+        "content": "承担工作责任",
+        "isCorrect": 2
+      },
+      {
+        "content": "诚信",
+        "isCorrect": 2
+      },
+      {
+        "content": "以自我为中心",
+        "isCorrect": 1
+      },
+      {
+        "content": "尊重知识产权",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "以下哪项关于加班工资的说法是正确的？": {
     "optionList": [
       {
@@ -13299,6 +13370,27 @@
       },
       {
         "content": "只选择与自己专业完全对口的职业",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "以下哪项行为符合尊重知识产权的职业道德？": {
+    "optionList": [
+      {
+        "content": "使用盗版软件进行工作",
+        "isCorrect": 2
+      },
+      {
+        "content": "在合法的范围内使用知识产权",
+        "isCorrect": 1
+      },
+      {
+        "content": "下载并使用未经授权的音乐作品",
+        "isCorrect": 2
+      },
+      {
+        "content": "将他人的专利产品稍作修改后作为自己的产品销售",
         "isCorrect": 2
       }
     ],
@@ -27839,6 +27931,27 @@
     ],
     "type": 2
   },
+  "如果你在工作中需要使用某项知识产权，但不确定其合法性，你应该怎么做？": {
+    "optionList": [
+      {
+        "content": "直接使用，不考虑其合法性",
+        "isCorrect": 2
+      },
+      {
+        "content": "向相关负责人或专业人士咨询，确保其合法后再使用",
+        "isCorrect": 1
+      },
+      {
+        "content": "只要没人发现，就可以使用",
+        "isCorrect": 2
+      },
+      {
+        "content": "从网络上随意下载一个相似的知识产权使用",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "如果你在暴力袭击中受伤了，你应该选择（）。": {
     "optionList": [
       {
@@ -28771,6 +28884,10 @@
       {
         "content": "头枕",
         "isCorrect": 1
+      },
+      {
+        "content": "安全带",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -34313,6 +34430,10 @@
       {
         "content": "两肘向前，护住双侧太阳穴",
         "isCorrect": 1
+      },
+      {
+        "content": "双手伸开保持平衡",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -35825,6 +35946,10 @@
       {
         "content": "《后汉书》",
         "isCorrect": 2
+      },
+      {
+        "content": "《汉书·霍光传》",
+        "isCorrect": 1
       }
     ],
     "type": 1
@@ -42002,6 +42127,10 @@
       {
         "content": "一千元以下罚款",
         "isCorrect": 1
+      },
+      {
+        "content": "三年以下有期徒刑",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -42689,6 +42818,27 @@
       },
       {
         "content": "勇气",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "根据轨迹交叉原理，物的因素运动轨迹包括哪些？": {
+    "optionList": [
+      {
+        "content": "设计上的缺陷",
+        "isCorrect": 1
+      },
+      {
+        "content": "使用上的缺陷",
+        "isCorrect": 1
+      },
+      {
+        "content": "维修保养的缺陷",
+        "isCorrect": 1
+      },
+      {
+        "content": "作业场所环境的缺陷",
         "isCorrect": 1
       }
     ],
@@ -47206,6 +47356,14 @@
       {
         "content": "第二",
         "isCorrect": 1
+      },
+      {
+        "content": "第一",
+        "isCorrect": 2
+      },
+      {
+        "content": "第三",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -48822,6 +48980,10 @@
       {
         "content": "资源安全是其他领域安全的依托",
         "isCorrect": 1
+      },
+      {
+        "content": "完善社会医疗养老保障体系",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -56727,6 +56889,19 @@
       {
         "content": "正确",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "麻精药品原本是医疗中缓解疼痛、治疗精神疾病的重要药物，但超范围、无医生指导的使用，就是滥用。": {
+    "optionList": [
+      {
+        "content": "正确",
+        "isCorrect": 1
+      },
+      {
+        "content": "错误",
+        "isCorrect": 2
       }
     ],
     "type": 1
