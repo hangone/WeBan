@@ -2084,6 +2084,10 @@
       {
         "content": "泄愤式的“爱国”，保卫不了国家利益、民族尊严，只能授人以柄，损害国家形象。",
         "isCorrect": 1
+      },
+      {
+        "content": "打砸抢烧能让人感受到我们的愤怒和热情。",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -6641,6 +6645,27 @@
     ],
     "type": 2
   },
+  "下面哪些想法、做法和情况容易导致实验室事故？": {
+    "optionList": [
+      {
+        "content": "操作失误",
+        "isCorrect": 1
+      },
+      {
+        "content": "侥幸心理",
+        "isCorrect": 1
+      },
+      {
+        "content": "心理素质差",
+        "isCorrect": 1
+      },
+      {
+        "content": "严格按照操作手册做",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
   "下面哪些想法容易导致实验室事故？": {
     "optionList": [
       {
@@ -7267,7 +7292,7 @@
         "isCorrect": 1
       }
     ],
-    "type": 2
+    "type": 1
   },
   "下面躲避雾霾的方式中错误的是：": {
     "optionList": [
@@ -7678,6 +7703,18 @@
       {
         "content": "尊重当地居民的风俗习惯。",
         "isCorrect": 1
+      },
+      {
+        "content": "谦和有礼貌",
+        "isCorrect": 1
+      },
+      {
+        "content": "尊重当地居民的风俗习惯",
+        "isCorrect": 1
+      },
+      {
+        "content": "随意打探他人隐私",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -14844,6 +14881,19 @@
     ],
     "type": 1
   },
+  "你知道女性较易遭遇的诈骗类型是什么吗？": {
+    "optionList": [
+      {
+        "content": "网购退款诈骗",
+        "isCorrect": 1
+      },
+      {
+        "content": "网络交友诈骗",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "你知道年轻人被骗最多的诈骗类型是什么吗？": {
     "optionList": [
       {
@@ -17063,6 +17113,14 @@
       },
       {
         "content": "发展心理咨询是心理健康的人对未来发展有困惑时做的咨询。",
+        "isCorrect": 1
+      },
+      {
+        "content": "发展心理咨询是心理不健康的人想要发展成健康所做的咨询",
+        "isCorrect": 2
+      },
+      {
+        "content": "发展心理咨询是心理健康的人对未来发展有困惑时做的咨询",
         "isCorrect": 1
       }
     ],
@@ -20390,6 +20448,10 @@
       {
         "content": "查找监控录像",
         "isCorrect": 1
+      },
+      {
+        "content": "自行对可疑人员进行跟踪、盘问、搜查",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -21231,6 +21293,10 @@
       {
         "content": "给同学少量多次补充水分。",
         "isCorrect": 1
+      },
+      {
+        "content": "马上给中暑同学喝冰水",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -23473,6 +23539,23 @@
       {
         "content": "留校察看",
         "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "在咖啡厅里，发现了免费wifi，但是手机显示安全性未知域的提醒，你会怎么做呢？": {
+    "optionList": [
+      {
+        "content": "有免费的wifi当然要上了，没有关系的",
+        "isCorrect": 2
+      },
+      {
+        "content": "应该没事吧，既然有wifi，不至于有什么问题的",
+        "isCorrect": 2
+      },
+      {
+        "content": "既然手机提示了，那还是不连接了，万一出问题就不好了",
+        "isCorrect": 1
       }
     ],
     "type": 1
@@ -31631,6 +31714,10 @@
       {
         "content": "把他们泡到凉水里快速降温。",
         "isCorrect": 2
+      },
+      {
+        "content": "立刻喂退烧药",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -33677,6 +33764,10 @@
       {
         "content": "反击",
         "isCorrect": 1
+      },
+      {
+        "content": "投降",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -42553,6 +42644,10 @@
       {
         "content": "口头批评",
         "isCorrect": 2
+      },
+      {
+        "content": "处五日以上十日以下拘留，可以并处一千元以下罚款",
+        "isCorrect": 1
       }
     ],
     "type": 1
@@ -44588,6 +44683,10 @@
       {
         "content": "用脚乱踹，踹断。",
         "isCorrect": 2
+      },
+      {
+        "content": "拼命挣扎快速往岸边游动",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -44932,6 +45031,10 @@
       {
         "content": "对",
         "isCorrect": 1
+      },
+      {
+        "content": "错",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -45009,6 +45112,10 @@
       },
       {
         "content": "在逃离过程中，用湿毛巾或湿衣服捂住口鼻",
+        "isCorrect": 1
+      },
+      {
+        "content": "优先沿安全通道，向远离火源且无浓烟的方向逃生",
         "isCorrect": 1
       }
     ],
@@ -47112,6 +47219,27 @@
     "type": 1
   },
   "疏散楼梯间是人员竖向疏散的安全通道，需要满足（）": {
+    "optionList": [
+      {
+        "content": "疏散楼梯间应保证人员在楼梯间内疏散时能有较好的光线",
+        "isCorrect": 1
+      },
+      {
+        "content": "疏散楼梯间要尽量采用自然通风",
+        "isCorrect": 1
+      },
+      {
+        "content": "不能利用天然采光和自然通风的疏散楼梯间，需按规范要求设置机械防烟措施",
+        "isCorrect": 1
+      },
+      {
+        "content": "楼梯间的设计要尽量增加布置凸出墙体的物体",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
+  "疏散楼梯间是人员竖向疏散的安全通道，需要满足：": {
     "optionList": [
       {
         "content": "疏散楼梯间应保证人员在楼梯间内疏散时能有较好的光线",
