@@ -7267,7 +7267,7 @@
         "isCorrect": 1
       }
     ],
-    "type": 1
+    "type": 2
   },
   "下面躲避雾霾的方式中错误的是：": {
     "optionList": [
@@ -12021,6 +12021,22 @@
       },
       {
         "content": "不解决实际问题，让求助者自己做决定。",
+        "isCorrect": 1
+      },
+      {
+        "content": "求助者和心理咨询师之间是陌生的",
+        "isCorrect": 1
+      },
+      {
+        "content": "职业保密原则",
+        "isCorrect": 1
+      },
+      {
+        "content": "价值中立原则",
+        "isCorrect": 1
+      },
+      {
+        "content": "不解决实际问题，让求助者自己做决定",
         "isCorrect": 1
       }
     ],
@@ -20789,6 +20805,23 @@
       },
       {
         "content": "动作上",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
+  "可以从哪些方面去识别一个人轻生前的征兆？": {
+    "optionList": [
+      {
+        "content": "言语上，如频繁提及 “活着没意义”",
+        "isCorrect": 1
+      },
+      {
+        "content": "行为上，如突然疏远亲友",
+        "isCorrect": 1
+      },
+      {
+        "content": "作息上，如日常生活作息不规律",
         "isCorrect": 2
       }
     ],
@@ -49159,6 +49192,10 @@
       {
         "content": "网络安全事关人民群众工作生活",
         "isCorrect": 1
+      },
+      {
+        "content": "网络安全事关提高体育竞技比赛观赏性",
+        "isCorrect": 2
       }
     ],
     "type": 2
