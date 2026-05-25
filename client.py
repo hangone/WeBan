@@ -337,7 +337,7 @@ class WeBanClient:
     def login(self) -> Dict | None:
         """登录并获取 token
 
-        重试策略：前 10 次尝试用 ddddocr 自动识别验证码，
+        重试策略：前 10 次尝试用 CNN 模型自动识别验证码，
         失败 10 次后转为手动输入（打开图片浏览器），再额外给 3 次机会。
         :return: 成功返回 self.api.user，失败返回 None
         """
@@ -356,12 +356,14 @@ class WeBanClient:
                     continue
             else:
                 account_id = self.api.account or self.api.user.get("userId") or "unknown"
-                captcha_filename = f"verify_code_{account_id}.png"
-                captcha_path = os.path.abspath(captcha_filename)
-                open(captcha_path, "wb").write(verify_image)
+                captcha_dir = os.path.join(base_path, "logs", account_id)
+                os.makedirs(captcha_dir, exist_ok=True)
+                captcha_path = os.path.join(captcha_dir, "verify_code.png")
+                with open(captcha_path, "wb") as f:
+                    f.write(verify_image)
                 webbrowser.open(f"file://{captcha_path}")
                 verify_code = self._prompt(
-                    f"[{account_id}] 请查看 {captcha_filename} 输入验证码："
+                    f"[{account_id}] 请在 {captcha_path} 查看验证码图片输入验证码："
                 )
                 try:
                     os.remove(captcha_path)
