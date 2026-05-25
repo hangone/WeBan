@@ -7292,7 +7292,7 @@
         "isCorrect": 1
       }
     ],
-    "type": 1
+    "type": 2
   },
   "下面躲避雾霾的方式中错误的是：": {
     "optionList": [
@@ -15089,6 +15089,10 @@
       {
         "content": "砸",
         "isCorrect": 1
+      },
+      {
+        "content": "划",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -15310,6 +15314,10 @@
       {
         "content": "尽量用在玻璃的四角位置",
         "isCorrect": 1
+      },
+      {
+        "content": "直接敲击玻璃正中心",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -35364,6 +35372,10 @@
       {
         "content": "50%",
         "isCorrect": 1
+      },
+      {
+        "content": "70%",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -42085,6 +42097,10 @@
       {
         "content": "立即持续进行腹部冲击，直到异物排出，无需进行背部拍击",
         "isCorrect": 2
+      },
+      {
+        "content": "直接按压胸口帮助排出异物",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -43762,6 +43778,10 @@
       },
       {
         "content": "面色发紫",
+        "isCorrect": 1
+      },
+      {
+        "content": "严重呼吸困难，且喘息声音异常",
         "isCorrect": 1
       }
     ],
