@@ -14,8 +14,6 @@ cssselect==1.4.0
     # via drissionpage
 datarecorder==3.6.2
     # via downloadkit
-ddddocr==1.6.1
-    # via weban
 downloadkit==2.0.7
     # via drissionpage
 drissionpage==4.1.1.2
@@ -36,22 +34,21 @@ lxml==6.1.0
     # via drissionpage
 numpy==2.4.5
     # via
-    #   ddddocr
     #   onnxruntime
     #   opencv-python
     #   opencv-python-headless
 onnxruntime==1.26.0
-    # via ddddocr
+    # via weban
 opencv-python==4.13.0.92 ; sys_platform == 'darwin' or sys_platform == 'win32'
-    # via ddddocr
+    # via weban
 opencv-python-headless==4.13.0.92 ; sys_platform == 'linux'
-    # via ddddocr
+    # via weban
 openpyxl==3.1.5
     # via datarecorder
 packaging==26.2
     # via onnxruntime
 pillow==12.2.0
-    # via ddddocr
+    # via weban
 protobuf==7.34.1
     # via onnxruntime
 psutil==7.2.2

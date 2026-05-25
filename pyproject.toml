@@ -5,11 +5,12 @@ description = "auto finish weiban"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "ddddocr>=1.6.1",
     "drissionpage>=4.1.1.2",
     "loguru>=0.7.3",
     "numpy>=1.26.0",
+    "onnxruntime>=1.26.0",
     "opencv-python-headless>=4.8.0",
+    "pillow>=12.2.0",
     "pycryptodome>=3.23.0",
     "requests>=2.34.2",
 ]

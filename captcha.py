@@ -11,15 +11,19 @@
 """
 
 import json
+import os
 import random
 import time
+from io import BytesIO
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
+import onnxruntime as ort
 import requests
 from DrissionPage import Chromium, ChromiumOptions
+from PIL import Image
 
 # 腾讯验证码 SDK 地址
 TCAPTCHA_SDK_URL = "https://turing.captcha.qcloud.com/TJCaptcha.js"
@@ -446,9 +450,7 @@ def fetch_image(url: str) -> np.ndarray:
     :raises requests.HTTPError: HTTP 请求失败时
     """
     headers = {
-        "User-Agent": ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                       "AppleWebKit/537.36 (KHTML, like Gecko) "
-                       "Chrome/148.0.0.0 Safari/537.36"),
+        "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"),
         "Referer": "https://turing.captcha.qcloud.com/",
     }
     resp = requests.get(url, headers=headers, timeout=10)
@@ -464,9 +466,9 @@ def fetch_image(url: str) -> np.ndarray:
 
 
 class LoginCaptchaSolver:
-    """登录验证码识别 (4 位字母/数字图片，基于 ddddocr)。
+    """登录验证码识别 (4 位字母/数字图片，基于 CNN ONNX 模型)。
 
-    ddddocr 模型加载开销大，使用类级别缓存，多次实例化共享同一个 OCR 引擎。
+    ONNX 模型加载开销大，使用类级别缓存，多次实例化共享同一个推理会话。
 
     示例::
 
@@ -475,29 +477,45 @@ class LoginCaptchaSolver:
             print(f"识别结果: {code}")
     """
 
-    _ocr: Any = None       # DdddOcr 实例或 False (不可用)
+    _ocr: Any = None       # ort.InferenceSession 或 False (不可用)
     _initialized: bool = False
+    _charset = "0123456789abcdefghijklmnopqrstuvwxyz"
+    _idx_to_char = {i: c for c, i in {c: i for i, c in enumerate(_charset)}.items()}
+    _char_size = 28
 
     @classmethod
     def get_ocr(cls, log):
-        """获取 ddddocr 实例 (懒加载，类级别缓存)。
+        """获取 ONNX 推理会话 (懒加载，类级别缓存)。
 
         :param log: 日志记录器
-        :return: DdddOcr 实例，不可用时返回 None
+        :return: InferenceSession 实例，不可用时返回 None
         """
         if not cls._initialized:
             try:
-                import ddddocr
-                cls._ocr = ddddocr.DdddOcr(show_ad=False)
+                exe_path = os.environ.get("PYFUZE_EXECUTABLE_PATH")
+                if exe_path:
+                    base_path = os.path.dirname(os.path.abspath(exe_path))
+                    model_path = Path(base_path) / "captcha_model.onnx"
+                else:
+                    model_path = Path(__file__).parent / "captcha_model.onnx"
+
+                if not model_path.exists():
+                    log.warning(f"验证码模型文件不存在: {model_path}")
+                    cls._ocr = False
+                else:
+                    cls._ocr = ort.InferenceSession(
+                        str(model_path),
+                        providers=["CPUExecutionProvider"],
+                    )
             except Exception:
-                log.warning("ddddocr 库未安装，自动验证码识别功能将不可用")
+                log.warning("onnxruntime 初始化失败，自动验证码识别功能将不可用")
                 cls._ocr = False
             cls._initialized = True
         return cls._ocr if cls._ocr is not False else None
 
     @classmethod
     def recognize(cls, image: bytes, log) -> Optional[str]:
-        """用 ddddocr 识别验证码图片。
+        """用 CNN ONNX 模型识别验证码图片。
 
         :param image: 验证码图片字节 (bytes)
         :param log: 日志记录器
@@ -512,7 +530,24 @@ class LoginCaptchaSolver:
         if not ocr:
             return None
         try:
-            code = ocr.classification(image)
+            img = Image.open(BytesIO(image)).convert("L")
+            arr = np.array(img, dtype=np.uint8)
+            h, w = arr.shape
+            seg_w = w // 4
+
+            input_name = ocr.get_inputs()[0].name
+
+            result = []
+            for i in range(4):
+                char_img = arr[:, i * seg_w:(i + 1) * seg_w if i < 3 else w]
+                resized = np.array(Image.fromarray(char_img).resize(
+                    (cls._char_size, cls._char_size), Image.BILINEAR))
+                inp = (resized.astype(np.float32) / 255.0).reshape(
+                    1, 1, cls._char_size, cls._char_size)
+                out = ocr.run(None, {input_name: inp})[0]
+                result.append(cls._idx_to_char[int(out[0].argmax())])
+
+            code = "".join(result)
             log.info(f"自动验证码识别结果: {code}")
             if len(code) == 4:
                 return code
