@@ -126,17 +126,20 @@ def _count_nav_pages(html: str) -> tuple[int, int]:
     return nav_pages, question_pages
 
 
-def _fetch_text(session, url: str) -> str:
+def _fetch_text(session, url: str, referer: str | None = None) -> str:
     """从 URL 获取文本内容
 
     超时 10 秒，异常时返回空串不中断调用方，
     因为 parse_item_js 中的 JS/HTML 获取是辅助性的，宁可缺也不应阻断学习流程。
-    :param session: requests.Session 实例
+    :param session: LoggingSession 实例
     :param url: 目标 URL
+    :param referer: 自定义 Referer（抓 mcwk 资源时应传课程播放页 URL，
+        否则默认 Referer 为 weiban 根域，资源服务器可能拒绝）
     :return: 响应文本，失败返回空字符串
     """
     try:
-        resp = session.get(url, timeout=10)
+        headers = {"Referer": referer} if referer else None
+        resp = session.get(url, timeout=10, headers=headers)
         return resp.text if resp.status_code == 200 else ""
     except Exception:
         return ""
@@ -334,7 +337,7 @@ class WeBanClient:
     def login(self) -> Dict | None:
         """登录并获取 token
 
-        重试策略：前 10 次尝试用 ddddocr 自动识别验证码，
+        重试策略：前 10 次尝试用 CNN 模型自动识别验证码，
         失败 10 次后转为手动输入（打开图片浏览器），再额外给 3 次机会。
         :return: 成功返回 self.api.user，失败返回 None
         """
@@ -353,12 +356,14 @@ class WeBanClient:
                     continue
             else:
                 account_id = self.api.account or self.api.user.get("userId") or "unknown"
-                captcha_filename = f"verify_code_{account_id}.png"
-                captcha_path = os.path.abspath(captcha_filename)
-                open(captcha_path, "wb").write(verify_image)
+                captcha_dir = os.path.join(base_path, "logs", account_id)
+                os.makedirs(captcha_dir, exist_ok=True)
+                captcha_path = os.path.join(captcha_dir, "verify_code.png")
+                with open(captcha_path, "wb") as f:
+                    f.write(verify_image)
                 webbrowser.open(f"file://{captcha_path}")
                 verify_code = self._prompt(
-                    f"[{account_id}] 请查看 {captcha_filename} 输入验证码："
+                    f"[{account_id}] 请在 {captcha_path} 查看验证码图片输入验证码："
                 )
                 try:
                     os.remove(captcha_path)
@@ -483,7 +488,7 @@ class WeBanClient:
         if code_match:
             course_code = code_match.group(1)
         item_info = (
-            self.parse_item_js(course_code)
+            self.parse_item_js(course_code, course_url=course_url)
             if course_code
             else {"nonstr_map": {}, "has_exam": False, "total_step": 0}
         )
@@ -862,12 +867,16 @@ class WeBanClient:
 
     # ---- item.js parsing ----------------------------------------------------
 
-    def parse_item_js(self, course_code: str) -> Dict[str, Any]:
+    def parse_item_js(self, course_code: str, course_url: str | None = None) -> Dict[str, Any]:
         """解析课程 JS，检测是否使用 apinext 并提取 nonstrMap/total_step。
 
         关键判断：HTML 是否加载 apicenext.js。
         不加载 → 不需要任何 apinext 调用，直接返回 uses_apinext=False。
         加载 → 从 item.js 注释/HTML btn-next 推导 total_step。
+
+        :param course_code: 课程代码（用于拼接 mcwk 资源 URL）
+        :param course_url: 课程播放页 URL，作为抓 mcwk HTML 的 Referer。
+            缺失时 mcwk 资源服务器可能 403。
         """
         result = {
             "uses_apinext": False, "nonstr_map": {}, "has_exam": False,
@@ -876,7 +885,7 @@ class WeBanClient:
 
         try:
             html_url = f"https://mcwk.mycourse.cn/course/{course_code}/{course_code}.html"
-            html = _fetch_text(self.api.session, html_url)
+            html = _fetch_text(self.api.session, html_url, referer=course_url)
             if not html:
                 return result
 
@@ -901,7 +910,8 @@ class WeBanClient:
                 if item_url in seen_urls:
                     continue
                 seen_urls.add(item_url)
-                content = _fetch_text(self.api.session, item_url)
+                # JS 由 HTML 加载，Referer 是 HTML 自身的 URL
+                content = _fetch_text(self.api.session, item_url, referer=html_url)
                 if not content:
                     continue
                 result["nonstr_map"] = _extract_map(content)
