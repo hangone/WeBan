@@ -41,10 +41,10 @@ python main.py # 或 uv run main.py
 
 | 平台 | Online（默认） | Bundle（打包） |
 |------|---------------|---------------|
-| Windows x64 | [WeBan-3.7.0-windows-x64.exe](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.0-windows-x64.exe) | [WeBan-3.7.0-windows-x64-bundle.exe](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.0-windows-x64-bundle.exe) |
-| Linux x64 | [WeBan-3.7.0-linux-x64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.0-linux-x64) | [WeBan-3.7.0-linux-x64-bundle](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.0-linux-x64-bundle) |
-| macOS arm64 | [WeBan-3.7.0-macos-arm64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.0-macos-arm64) | [WeBan-3.7.0-macos-arm64-bundle](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.0-macos-arm64-bundle) |
-| macOS x64 | [WeBan-3.7.0-macos-x64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.0-macos-x64) | [WeBan-3.7.0-macos-x64-bundle](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.0-macos-x64-bundle) |
+| Windows x64 | [WeBan-3.7.1-windows-x64.exe](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.1-windows-x64.exe) | [WeBan-3.7.1-windows-x64-bundle.exe](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.1-windows-x64-bundle.exe) |
+| Linux x64 | [WeBan-3.7.1-linux-x64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.1-linux-x64) | [WeBan-3.7.1-linux-x64-bundle](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.1-linux-x64-bundle) |
+| macOS arm64 | [WeBan-3.7.1-macos-arm64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.1-macos-arm64) | [WeBan-3.7.1-macos-arm64-bundle](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.1-macos-arm64-bundle) |
+| macOS x64 | [WeBan-3.7.1-macos-x64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.1-macos-x64) | [WeBan-3.7.1-macos-x64-bundle](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.1-macos-x64-bundle) |
 
 ## 配置说明
 
