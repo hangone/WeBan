@@ -7,8 +7,8 @@ from typing import Any, Dict
 from uuid import uuid4
 
 import requests
-from Crypto.Cipher import AES
-from Crypto.Util.Padding import pad
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.padding import PKCS7
 from loguru import logger
 from requests.adapters import HTTPAdapter, Retry
 
@@ -129,9 +129,10 @@ class WeBanAPI:
         :return: base64 编码的加密字符串
         """
         key = urlsafe_b64decode("d2JzNTEyAAAAAAAAAAAAAA==")  # wbs512
-        return urlsafe_b64encode(
-            AES.new(key, AES.MODE_ECB).encrypt(pad(data.encode(), AES.block_size))
-        ).decode()
+        padder = PKCS7(algorithms.AES.block_size).padder()
+        padded_data = padder.update(data.encode()) + padder.finalize()
+        encryptor = Cipher(algorithms.AES(key), modes.ECB()).encryptor()
+        return urlsafe_b64encode(encryptor.update(padded_data) + encryptor.finalize()).decode()
 
     # ========================================================================
     # 核心请求辅助方法
@@ -1141,11 +1142,12 @@ class WeBanAPI:
         }
         key = b"KkGv9d8E5jYb2xHwL3ZqRpXoNt6MmSge"
         iv = key[:16]
-        cipher = AES.new(key, AES.MODE_CBC, iv)
-        padded = pad(json.dumps(data, separators=(",", ":")).encode(), AES.block_size)
+        padder = PKCS7(algorithms.AES.block_size).padder()
+        padded = padder.update(json.dumps(data, separators=(",", ":")).encode()) + padder.finalize()
+        encryptor = Cipher(algorithms.AES(key), modes.CBC(iv)).encryptor()
         # 双重 Base64：仿 JS 前端 CryptoJS.enc.Base64.stringify(CryptoJS.enc.Utf8.parse(Base64(ciphertext)))
         # 后端先做 atob 再 AES-CBC 解密，因此需要两次编码
-        encrypted_b64 = b64encode(b64encode(cipher.encrypt(padded))).decode()
+        encrypted_b64 = b64encode(b64encode(encryptor.update(padded) + encryptor.finalize())).decode()
         response = self.session.post(
             f"{self.baseurl}/jupiterapi/api/statusercourse/v1/next",
             json={"data": encrypted_b64}, timeout=self.timeout)
