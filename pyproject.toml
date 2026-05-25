@@ -11,6 +11,6 @@ dependencies = [
     "onnxruntime>=1.26.0",
     "opencv-python-headless>=4.8.0",
     "pillow>=12.2.0",
-    "pycryptodome>=3.23.0",
+    "cryptography>=46.0.3",
     "requests>=2.34.2",
 ]
