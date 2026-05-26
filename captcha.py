@@ -13,6 +13,7 @@
 import json
 import os
 import random
+import threading
 import time
 from io import BytesIO
 from pathlib import Path
@@ -20,7 +21,6 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
-import onnxruntime as ort
 import requests
 from DrissionPage import Chromium, ChromiumOptions
 from PIL import Image
@@ -477,40 +477,40 @@ class LoginCaptchaSolver:
             print(f"识别结果: {code}")
     """
 
-    _ocr: Any = None       # ort.InferenceSession 或 False (不可用)
+    _ocr: Any = None       # cv2.dnn.Net 或 False (不可用)
     _initialized: bool = False
+    _lock = threading.Lock()
     _charset = "0123456789abcdefghijklmnopqrstuvwxyz"
     _idx_to_char = {i: c for c, i in {c: i for i, c in enumerate(_charset)}.items()}
     _char_size = 28
 
     @classmethod
     def get_ocr(cls, log):
-        """获取 ONNX 推理会话 (懒加载，类级别缓存)。
+        """获取 OpenCV DNN Net 实例 (懒加载，类级别缓存)。
 
         :param log: 日志记录器
-        :return: InferenceSession 实例，不可用时返回 None
+        :return: cv2.dnn.Net 实例，不可用时返回 None
         """
         if not cls._initialized:
-            try:
-                exe_path = os.environ.get("PYFUZE_EXECUTABLE_PATH")
-                if exe_path:
-                    base_path = os.path.dirname(os.path.abspath(exe_path))
-                    model_path = Path(base_path) / "captcha_model.onnx"
-                else:
-                    model_path = Path(__file__).parent / "captcha_model.onnx"
+            with cls._lock:
+                if not cls._initialized:
+                    try:
+                        exe_path = os.environ.get("PYFUZE_EXECUTABLE_PATH")
+                        if exe_path:
+                            base_path = os.path.dirname(os.path.abspath(exe_path))
+                            model_path = Path(base_path) / "captcha_model.onnx"
+                        else:
+                            model_path = Path(__file__).parent / "captcha_model.onnx"
 
-                if not model_path.exists():
-                    log.warning(f"验证码模型文件不存在: {model_path}")
-                    cls._ocr = False
-                else:
-                    cls._ocr = ort.InferenceSession(
-                        str(model_path),
-                        providers=["CPUExecutionProvider"],
-                    )
-            except Exception:
-                log.warning("onnxruntime 初始化失败，自动验证码识别功能将不可用")
-                cls._ocr = False
-            cls._initialized = True
+                        if not model_path.exists():
+                            log.warning(f"验证码模型文件不存在: {model_path}")
+                            cls._ocr = False
+                        else:
+                            cls._ocr = cv2.dnn.readNetFromONNX(str(model_path))
+                    except Exception:
+                        log.warning("OpenCV DNN 初始化失败，自动验证码识别功能将不可用")
+                        cls._ocr = False
+                    cls._initialized = True
         return cls._ocr if cls._ocr is not False else None
 
     @classmethod
@@ -535,8 +535,6 @@ class LoginCaptchaSolver:
             h, w = arr.shape
             seg_w = w // 4
 
-            input_name = ocr.get_inputs()[0].name
-
             result = []
             for i in range(4):
                 char_img = arr[:, i * seg_w:(i + 1) * seg_w if i < 3 else w]
@@ -544,7 +542,9 @@ class LoginCaptchaSolver:
                     (cls._char_size, cls._char_size), Image.BILINEAR))
                 inp = (resized.astype(np.float32) / 255.0).reshape(
                     1, 1, cls._char_size, cls._char_size)
-                out = ocr.run(None, {input_name: inp})[0]
+                with cls._lock:
+                    ocr.setInput(inp)
+                    out = ocr.forward()
                 result.append(cls._idx_to_char[int(out[0].argmax())])
 
             code = "".join(result)
