@@ -1,0 +1,14 @@
+__pycache__
+*.pyc
+.git
+.gitignore
+.venv
+.ruff_cache
+.DS_Store
+logs
+config.toml
+dist
+build
+images
+*.md
+LICENSE

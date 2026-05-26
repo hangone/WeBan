@@ -46,6 +46,14 @@ python main.py # 或 uv run main.py
 | macOS arm64 | [WeBan-3.7.1-macos-arm64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.1-macos-arm64) | [WeBan-3.7.1-macos-arm64-bundle](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.1-macos-arm64-bundle) |
 | macOS x64 | [WeBan-3.7.1-macos-x64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.1-macos-x64) | [WeBan-3.7.1-macos-x64-bundle](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.1-macos-x64-bundle) |
 
+### Docker
+
+```bash
+docker run -it --rm -v $(pwd)/config.toml:/app/config.toml -v $(pwd)/logs:/app/logs hangyi/weban
+```
+
+首次使用先从 [config.example.toml](config.example.toml) 复制一份 `config.toml` 并填写账号信息。
+
 ## 配置说明
 
 软件使用 `config.toml` 配置文件（首次运行会自动从远程下载模板）。账号级配置可覆盖全局设置。
