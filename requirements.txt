@@ -53,7 +53,7 @@ protobuf==7.34.1
     # via onnxruntime
 psutil==7.2.2
     # via drissionpage
-cryptography==46.0.7
+pyaes==1.6.1
     # via weban
 requests==2.34.2
     # via
