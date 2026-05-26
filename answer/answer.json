@@ -7418,6 +7418,18 @@
       {
         "content": "拼命狗刨让自己浮起来。",
         "isCorrect": 2
+      },
+      {
+        "content": "憋气、放松，让身体浮起来",
+        "isCorrect": 1
+      },
+      {
+        "content": "拼命狗刨让自己浮起来",
+        "isCorrect": 2
+      },
+      {
+        "content": "高举双手大声呼喊求救",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -7799,6 +7811,18 @@
       },
       {
         "content": "不知道。",
+        "isCorrect": 2
+      },
+      {
+        "content": "是",
+        "isCorrect": 1
+      },
+      {
+        "content": "否",
+        "isCorrect": 2
+      },
+      {
+        "content": "不知道",
         "isCorrect": 2
       }
     ],
@@ -10483,6 +10507,18 @@
       {
         "content": "平躺",
         "isCorrect": 1
+      },
+      {
+        "content": "站立",
+        "isCorrect": 2
+      },
+      {
+        "content": "下蹲",
+        "isCorrect": 2
+      },
+      {
+        "content": "正坐",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -14548,6 +14584,10 @@
       {
         "content": "时间会抚平一切。你去寻求朋友、家人或心理老师的帮助",
         "isCorrect": 1
+      },
+      {
+        "content": "独自消沉封闭自己，不愿与人沟通",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -20671,6 +20711,18 @@
       {
         "content": "不知道。",
         "isCorrect": 2
+      },
+      {
+        "content": "是",
+        "isCorrect": 1
+      },
+      {
+        "content": "否",
+        "isCorrect": 2
+      },
+      {
+        "content": "不知道",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -23471,6 +23523,18 @@
       {
         "content": "你和小伙伴有了不一样的意见，最后决定选择更安全的路线一起走。",
         "isCorrect": 1
+      },
+      {
+        "content": "你和小伙伴有了不一样的意见，决定分头行动",
+        "isCorrect": 2
+      },
+      {
+        "content": "你和小伙伴有了不一样的意见，最后决定选择更安全的路线一起走",
+        "isCorrect": 1
+      },
+      {
+        "content": "擅自攀爬偏僻陡峭区域游玩",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -26407,6 +26471,27 @@
       {
         "content": "其他两个选项皆是。",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "大学生出借自己的电话卡、银行卡给他人使用，可能触犯的罪名是？": {
+    "optionList": [
+      {
+        "content": "诈骗罪",
+        "isCorrect": 2
+      },
+      {
+        "content": "帮助信息网络犯罪活动罪（帮信罪）",
+        "isCorrect": 1
+      },
+      {
+        "content": "盗窃罪",
+        "isCorrect": 2
+      },
+      {
+        "content": "非法经营罪",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -40114,6 +40199,10 @@
       {
         "content": "可能有电线落入",
         "isCorrect": 1
+      },
+      {
+        "content": "容易滑倒",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -40200,6 +40289,23 @@
       {
         "content": "安检查出来，没收并处罚款或拘留",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "有一群同学邀请你去玩耍，他们开始吸食毒品，并且邀请你一起：": {
+    "optionList": [
+      {
+        "content": "既然他们都吸，看起来也没事，那我也玩玩看",
+        "isCorrect": 2
+      },
+      {
+        "content": "坚决拒绝，以后不再和他们来往",
+        "isCorrect": 1
+      },
+      {
+        "content": "委婉推脱，依旧照常相处玩乐",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -43068,6 +43174,10 @@
       {
         "content": "限制人员进入林区",
         "isCorrect": 2
+      },
+      {
+        "content": "限制任何人员进入林区",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -44689,6 +44799,10 @@
       },
       {
         "content": "直立踩水或潜入水中逃跑。",
+        "isCorrect": 2
+      },
+      {
+        "content": "逆着漩涡方向全力奋力游出",
         "isCorrect": 2
       }
     ],
@@ -47493,6 +47607,18 @@
       },
       {
         "content": "不知道。",
+        "isCorrect": 2
+      },
+      {
+        "content": "是",
+        "isCorrect": 1
+      },
+      {
+        "content": "否",
+        "isCorrect": 2
+      },
+      {
+        "content": "不知道",
         "isCorrect": 2
       }
     ],
@@ -55241,6 +55367,18 @@
       {
         "content": "山洞里。",
         "isCorrect": 2
+      },
+      {
+        "content": "空旷孤立的小亭子里",
+        "isCorrect": 1
+      },
+      {
+        "content": "山洞里",
+        "isCorrect": 2
+      },
+      {
+        "content": "楼房里",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -56321,6 +56459,27 @@
     ],
     "type": 1
   },
+  "马斯洛的心理健康10个标准里，包括下面哪几条？": {
+    "optionList": [
+      {
+        "content": "具有一定的学习能力",
+        "isCorrect": 1
+      },
+      {
+        "content": "在不妨碍团体利益的前提下，有效地发挥自己的才能与兴趣爱好",
+        "isCorrect": 1
+      },
+      {
+        "content": "与环境保持接触",
+        "isCorrect": 1
+      },
+      {
+        "content": "生活目标切合实际",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "马蝇效应的提出者是？": {
     "optionList": [
       {
@@ -56671,6 +56830,27 @@
       }
     ],
     "type": 2
+  },
+  "骗子在实施“熟人旅游诱骗”前通常先会怎么做？": {
+    "optionList": [
+      {
+        "content": "直接发送低价旅游广告链接",
+        "isCorrect": 2
+      },
+      {
+        "content": "花较长时间与你建立信任关系",
+        "isCorrect": 1
+      },
+      {
+        "content": "冒充旅行社客服打电话",
+        "isCorrect": 2
+      },
+      {
+        "content": "在社交平台发布虚假招聘信息",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "骗子在实施诈骗之前，往往对你的信息已经有了基本的了解，所以不能轻信任何陌生电话。": {
     "optionList": [
