@@ -7,10 +7,14 @@ from typing import Any, Dict
 from uuid import uuid4
 
 import requests
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.primitives.padding import PKCS7
+import pyaes
 from loguru import logger
 from requests.adapters import HTTPAdapter, Retry
+
+
+def pkcs7_pad(data: bytes, block_size: int = 16) -> bytes:
+    pad_len = block_size - (len(data) % block_size)
+    return data + bytes([pad_len] * pad_len)
 
 
 def handle_response(response: requests.Response) -> Dict[str, Any]:
@@ -129,10 +133,10 @@ class WeBanAPI:
         :return: base64 编码的加密字符串
         """
         key = urlsafe_b64decode("d2JzNTEyAAAAAAAAAAAAAA==")  # wbs512
-        padder = PKCS7(algorithms.AES.block_size).padder()
-        padded_data = padder.update(data.encode()) + padder.finalize()
-        encryptor = Cipher(algorithms.AES(key), modes.ECB()).encryptor()
-        return urlsafe_b64encode(encryptor.update(padded_data) + encryptor.finalize()).decode()
+        padded = pkcs7_pad(data.encode())
+        aes = pyaes.AESModeOfOperationECB(key)
+        encrypted = b"".join(aes.encrypt(padded[i:i+16]) for i in range(0, len(padded), 16))
+        return urlsafe_b64encode(encrypted).decode()
 
     # ========================================================================
     # 核心请求辅助方法
@@ -1142,12 +1146,12 @@ class WeBanAPI:
         }
         key = b"KkGv9d8E5jYb2xHwL3ZqRpXoNt6MmSge"
         iv = key[:16]
-        padder = PKCS7(algorithms.AES.block_size).padder()
-        padded = padder.update(json.dumps(data, separators=(",", ":")).encode()) + padder.finalize()
-        encryptor = Cipher(algorithms.AES(key), modes.CBC(iv)).encryptor()
+        padded = pkcs7_pad(json.dumps(data, separators=(",", ":")).encode())
+        aes = pyaes.AESModeOfOperationCBC(key, iv=iv)
+        encrypted = b"".join(aes.encrypt(padded[i:i+16]) for i in range(0, len(padded), 16))
         # 双重 Base64：仿 JS 前端 CryptoJS.enc.Base64.stringify(CryptoJS.enc.Utf8.parse(Base64(ciphertext)))
         # 后端先做 atob 再 AES-CBC 解密，因此需要两次编码
-        encrypted_b64 = b64encode(b64encode(encryptor.update(padded) + encryptor.finalize())).decode()
+        encrypted_b64 = b64encode(b64encode(encrypted)).decode()
         response = self.session.post(
             f"{self.baseurl}/jupiterapi/api/statusercourse/v1/next",
             json={"data": encrypted_b64}, timeout=self.timeout)
