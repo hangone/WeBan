@@ -49,7 +49,10 @@ python main.py # 或 uv run main.py
 ### Docker
 
 ```bash
-docker run -it --rm -v $(pwd)/config.toml:/app/config.toml -v $(pwd)/logs:/app/logs hangyi/weban
+docker run -it --rm \
+  -v "$PWD/config.toml":/app/config.toml:ro \
+  -v "$PWD/logs":/app/logs \
+  hangyi/weban
 ```
 
 首次使用先从 [config.example.toml](config.example.toml) 复制一份 `config.toml` 并填写账号信息。

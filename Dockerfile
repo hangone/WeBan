@@ -13,14 +13,12 @@ WORKDIR /app
 ENV CHROMIUM_BINARY=/usr/bin/chromium
 
 COPY --chown=appuser:appuser pyproject.toml uv.lock ./
-RUN --mount=type=cache,target=/home/appuser/.cache/uv,uid=1000,gid=1000 \
-    uv sync --frozen --no-dev --no-install-project
+RUN uv sync --frozen --no-dev --no-install-project \
+    && rm -rf ~/.cache/uv
 
 COPY --chown=appuser:appuser *.py .
 COPY --chown=appuser:appuser captcha_model.onnx .
 COPY --chown=appuser:appuser answer/answer.json answer/
 COPY --chown=appuser:appuser config.example.toml .
 
-VOLUME ["/app/logs"]
-
-ENTRYPOINT ["uv", "run", "python", "main.py"]
+ENTRYPOINT ["uv", "run", "main.py"]
