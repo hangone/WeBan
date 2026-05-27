@@ -644,12 +644,14 @@ class CaptchaHandler:
         窗口尺寸 428x818 模拟移动端以匹配腾讯验证码的移动版 UI。
         """
         browser_path = self.browser_path or detect_browser()
+        # 仅在显式设置 WEBAN_NO_SANDBOX 或以 root 运行时禁用沙盒
+        no_sandbox = os.environ.get("WEBAN_NO_SANDBOX", "").lower() in ("1", "true", "yes")
         browser_args = ["--window-size=428,818", "--mute-audio"]
         return await nodriver.start(
             headless=headless,
             browser_executable_path=browser_path or None,
             browser_args=browser_args,
-            sandbox=False,
+            sandbox=not no_sandbox,
         )
 
     async def _inject_auth(self, tab) -> None:
@@ -701,7 +703,7 @@ class CaptchaHandler:
             await tab.sleep(2)
             return browser, tab
         except Exception:
-            browser.stop()
+            self._quit_browser(browser, "页面构建")
             raise
 
     # ── 验证码触发 / 等待 ──────────────────────────────
@@ -933,16 +935,24 @@ class CaptchaHandler:
                 self.log.warning(f"关闭浏览器异常 ({label}): {exc}")
 
     def handle_exam_captcha(self, user_exam_plan_id: str) -> Dict[str, str]:
-        """处理考试前的无感验证码。
+        """处理考试前的无感验证码（同步版本）。
 
         无感模式：验证码在后台自动完成，无需用户交互，因此使用 headless=True。
 
         :param user_exam_plan_id: 考试计划 ID（预留，目前未使用）
         :return: {"randstr": str, "ticket": str} — 验证通过后的凭证
+        :raises RuntimeError: 已在事件循环中调用时，使用 handle_exam_captcha_async 代替
         """
-        return asyncio.run(self._handle_exam_captcha(user_exam_plan_id))
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(self.handle_exam_captcha_async(user_exam_plan_id))
+        raise RuntimeError(
+            "handle_exam_captcha() 无法在已运行的事件循环中调用，请改用 handle_exam_captcha_async()"
+        )
 
-    async def _handle_exam_captcha(self, user_exam_plan_id: str) -> Dict[str, str]:
+    async def handle_exam_captcha_async(self, user_exam_plan_id: str) -> Dict[str, str]:
+        """处理考试前的无感验证码（异步版本）。"""
         self.log.info("正在处理无感验证码")
         browser, tab = await self._build_page(EXAM_ENTRY_URL, headless=True)
         try:
@@ -953,16 +963,24 @@ class CaptchaHandler:
             self._quit_browser(browser, "无感验证码")
 
     def handle_course_captcha(self, course_url: Optional[str] = None) -> Dict[str, str]:
-        """处理课程完成时的图片点选验证码。
+        """处理课程完成时的图片点选验证码（同步版本）。
 
         流程：先以无头模式自动识别 (10 次重试)，全部失败后再打开可见浏览器让用户手动完成。
 
         :param course_url: 课程入口 URL，留空则使用默认的 mcwk.mycourse.cn
         :return: {"randstr": str, "ticket": str} — 验证通过后的凭证
+        :raises RuntimeError: 已在事件循环中调用时，使用 handle_course_captcha_async 代替
         """
-        return asyncio.run(self._handle_course_captcha(course_url))
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(self.handle_course_captcha_async(course_url))
+        raise RuntimeError(
+            "handle_course_captcha() 无法在已运行的事件循环中调用，请改用 handle_course_captcha_async()"
+        )
 
-    async def _handle_course_captcha(self, course_url: Optional[str] = None) -> Dict[str, str]:
+    async def handle_course_captcha_async(self, course_url: Optional[str] = None) -> Dict[str, str]:
+        """处理课程完成时的图片点选验证码（异步版本）。"""
         entry_url = course_url or COURSE_ENTRY_URL
 
         # 第一阶段: 无头自动识别
