@@ -13,77 +13,101 @@ env:
   PYTHONIOENCODING: utf-8
 
 jobs:
-  create-release:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: softprops/action-gh-release@v3
-        with:
-          draft: true
   build:
-    name: Build for ${{ matrix.os }}
+    name: Build ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-latest, macos-15-intel, macos-latest]
-        include:
-          - os: windows-latest
-            platform: windows
-            arch: x64
-            ext: .exe
-          - os: ubuntu-latest
-            platform: linux
-            arch: x64
-            ext: ""
-          - os: macos-15-intel
-            platform: macos
-            arch: x64
-            ext: ""
-          - os: macos-latest
-            platform: macos
-            arch: arm64
-            ext: ""
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - name: Extract version from tag
-        id: version
-        shell: bash
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
+      - uses: astral-sh/setup-uv@v8
         with:
           python-version: "3.12"
-          cache-python: "true"
+          enable-cache: true
 
-      - name: Build online executable (default)
+      - run: uv sync
+
+      - name: Build executable
         shell: bash
         run: |
-          uvx pyfuze . \
-            --pyproject pyproject.toml \
-            --mode online \
-            --uv-install-script-windows https://gh-proxy.com/https://github.com/astral-sh/uv/releases/latest/download/uv-installer.ps1 \
-            --uv-install-script-unix https://gh-proxy.com/https://github.com/astral-sh/uv/releases/latest/download/uv-installer.sh \
-            --env INSTALLER_DOWNLOAD_URL=https://gh-proxy.com/https://github.com/astral-sh/uv/releases/latest/download \
-            --env UV_PYTHON_INSTALL_MIRROR=https://mirror.nju.edu.cn/github-release/astral-sh/python-build-standalone \
-            --env UV_DEFAULT_INDEX=https://mirror.nju.edu.cn/pypi/web/simple \
-            --output-name WeBan-${{ steps.version.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }}
+          os_name=$(echo "${{ runner.os }}" | tr '[:upper:]' '[:lower:]')
+          arch=$(echo "${{ runner.arch }}" | tr '[:upper:]' '[:lower:]')
+          ext=""
+          [[ "${{ runner.os }}" == "Windows" ]] && ext=".exe"
+          name="WeBan-${os_name}-${arch}${ext}"
 
-      - name: Build bundle executable
-        shell: bash
-        run: |
-          uvx pyfuze . \
-            --pyproject pyproject.toml \
-            --output-name WeBan-${{ steps.version.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}-bundle${{ matrix.ext }}
+          sep=$(python -c "import os; print(os.pathsep)")
+          uv run pyinstaller --noconfirm --onefile \
+            --name "$name" \
+            --add-data "captcha_model.onnx${sep}." \
+            --add-data "answer/answer.json${sep}answer" \
+            --add-data "config.example.toml${sep}." \
+            --hidden-import nodriver \
+            --hidden-import loguru \
+            --hidden-import numpy \
+            --hidden-import cv2 \
+            --hidden-import PIL \
+            --collect-submodules nodriver \
+            main.py
 
-      - name: Upload release assets
-        uses: softprops/action-gh-release@v3
-        if: startsWith(github.ref, 'refs/tags/')
+          echo "name=$name" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v7
         with:
-          draft: false
-          files: |
-            dist/WeBan-${{ steps.version.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }}
-            dist/WeBan-${{ steps.version.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}-bundle${{ matrix.ext }}
+          name: ${{ env.name }}
+          path: dist/${{ env.name }}*
+          if-no-files-found: error
+
+  docker:
+    name: Docker multi-arch
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: docker/setup-qemu-action@v4
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - uses: docker/metadata-action@v6
+        id: meta
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/weban
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  release:
+    name: Release
+    needs: [build, docker]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v3
+        with:
+          files: artifacts/*
           generate_release_notes: true

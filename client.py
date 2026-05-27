@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import time
 import webbrowser
 from random import randint
@@ -14,13 +15,15 @@ import threading
 from api import WeBanAPI
 from captcha import CaptchaHandler, LoginCaptchaSolver
 
-exe_path = os.environ.get("PYFUZE_EXECUTABLE_PATH")
-if exe_path:
-    base_path = os.path.dirname(os.path.abspath(exe_path))
+if getattr(sys, "frozen", False):
+    base_path = os.path.dirname(os.path.abspath(sys.executable))
+    bundle_path = sys._MEIPASS
 else:
     base_path = os.path.dirname(os.path.abspath(__file__))
+    bundle_path = base_path
 answer_dir = os.path.join(base_path, "answer")
 answer_path = os.path.join(answer_dir, "answer.json")
+bundle_answer_path = os.path.join(bundle_path, "answer", "answer.json")
 
 
 def clean_text(text):
@@ -225,8 +228,9 @@ class WeBanClient:
         :return: 清洗后的题目标题 → 正确答案内容列表的映射
         """
         answers: dict = {}
+        load_path = answer_path if os.path.exists(answer_path) else bundle_answer_path
         try:
-            with open(answer_path, encoding="utf-8") as f:
+            with open(load_path, encoding="utf-8") as f:
                 for title, options in json.load(f).items():
                     title = clean_text(title)
                     answers.setdefault(title, []).extend(
