@@ -170,7 +170,7 @@ def run_account(account_config: dict, global_settings: dict, ai_config: dict, ac
     os.makedirs(account_log_dir, exist_ok=True)
     account_log_path = os.path.join(account_log_dir, "weban.log")
 
-    # 添加只属于该账号 of 日志 sink
+    # 添加只属于该账号的日志 sink
     account_filter = _make_account_filter(account_name)
     handler_id = logger.add(
         account_log_path, encoding="utf-8", format=log_format,
