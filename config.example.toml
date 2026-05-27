@@ -45,6 +45,20 @@ browser_path = ""
 # 开启后会输出更多日志，比如请求体和响应体，验证码图片等
 debug = false
 
+[ai]
+# 是否启用 AI 搜题功能（当题库无匹配时，优先采用 AI 搜题解答）
+enable = false
+# API 基础路径，例如 OpenAI 官方、DeepSeek、硅基流动等 OpenAI 兼容接口路径
+base_url = "https://api.deepseek.com"
+# AI 服务的 API Key
+api_key = ""
+# 调用的模型名称，如 gpt-4o-mini、deepseek-chat 等
+model = "deepseek-chat"
+# 请求超时时间（秒）
+timeout = 60
+# 请求失败时的最大重试次数
+max_retries = 2
+
 [[account]]
 # 学校名称（必填）
 tenant_name = ""

@@ -128,11 +128,12 @@ def _make_account_filter(account_name: str):
 
 # ── 单个账号执行 ────────────────────────────────────────────
 
-def run_account(account_config: dict, global_settings: dict, account_index: int) -> bool:
+def run_account(account_config: dict, global_settings: dict, ai_config: dict, account_index: int) -> bool:
     """运行单个账号的任务
 
     :param account_config: [[account]] 的字典
     :param global_settings: [settings] 的字典
+    :param ai_config: [ai] 的字典
     :param account_index: 账号序号
     :return: 成功返回 True，失败返回 False
     """
@@ -184,12 +185,16 @@ def run_account(account_config: dict, global_settings: dict, account_index: int)
             # Token 登录（优先）
             user = {"userId": user_id, "token": token_val}
             log.info("使用 Token 登录")
-            client = WeBanClient(tenant_name, user=user, log=log, browser_path=browser_path, debug=debug)
+            client = WeBanClient(
+                tenant_name, user=user, log=log, browser_path=browser_path, debug=debug,
+                ai_config=ai_config,
+            )
         elif tenant_name and username:
             # 密码登录 — password 默认为 username
             log.info("使用密码登录")
             client = WeBanClient(
                 tenant_name, username, password, log=log, browser_path=browser_path, debug=debug,
+                ai_config=ai_config,
             )
         else:
             log.error(
@@ -267,9 +272,15 @@ if __name__ == "__main__":
         logger.info("程序更新地址：https://github.com/hangone/WeBan")
 
         # 加载配置文件
-        config = load_config()
-        global_settings = config.get("settings", {})
-        accounts = config.get("account", [])
+        def load_all_config():
+            config = load_config()
+            return (
+                config.get("settings", {}),
+                config.get("ai", {}),
+                config.get("account", []),
+            )
+
+        global_settings, ai_config, accounts = load_all_config()
 
         # 过滤有效账号
         valid_accounts = [a for a in accounts if is_account_valid(a)]
@@ -277,10 +288,7 @@ if __name__ == "__main__":
         if not valid_accounts:
             logger.warning("没有找到有效的账号配置，正在打开配置文件...")
             open_editor(config_path)
-            # 重新加载并检查
-            config = load_config()
-            global_settings = config.get("settings", {})
-            accounts = config.get("account", [])
+            global_settings, ai_config, accounts = load_all_config()
             valid_accounts = [a for a in accounts if is_account_valid(a)]
             if not valid_accounts:
                 logger.error("仍然没有有效的账号配置，请检查 config.toml")
@@ -293,9 +301,7 @@ if __name__ == "__main__":
             choice = input(f"当前账号：{acct_name}，是否更换账号？(y/N，默认N): ").strip().lower()
             if choice == "y":
                 open_editor(config_path)
-                config = load_config()
-                global_settings = config.get("settings", {})
-                accounts = config.get("account", [])
+                global_settings, ai_config, accounts = load_all_config()
                 valid_accounts = [a for a in accounts if is_account_valid(a)]
                 if not valid_accounts:
                     logger.error("没有有效的账号配置")
@@ -322,7 +328,7 @@ if __name__ == "__main__":
 
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 future_to_account = {
-                    executor.submit(run_account, cfg, global_settings, i): (cfg, i)
+                    executor.submit(run_account, cfg, global_settings, ai_config, i): (cfg, i)
                     for i, cfg in enumerate(accounts)
                 }
 
@@ -344,7 +350,7 @@ if __name__ == "__main__":
             failed_count = 0
 
             for i, cfg in enumerate(accounts):
-                if run_account(cfg, global_settings, i):
+                if run_account(cfg, global_settings, ai_config, i):
                     success_count += 1
                 else:
                     failed_count += 1
