@@ -128,11 +128,12 @@ def _make_account_filter(account_name: str):
 
 # ── 单个账号执行 ────────────────────────────────────────────
 
-def run_account(account_config: dict, global_settings: dict, account_index: int) -> bool:
+def run_account(account_config: dict, global_settings: dict, ai_config: dict, account_index: int) -> bool:
     """运行单个账号的任务
 
     :param account_config: [[account]] 的字典
     :param global_settings: [settings] 的字典
+    :param ai_config: [ai] 的字典
     :param account_index: 账号序号
     :return: 成功返回 True，失败返回 False
     """
@@ -169,7 +170,7 @@ def run_account(account_config: dict, global_settings: dict, account_index: int)
     os.makedirs(account_log_dir, exist_ok=True)
     account_log_path = os.path.join(account_log_dir, "weban.log")
 
-    # 添加只属于该账号的日志 sink
+    # 添加只属于该账号 of 日志 sink
     account_filter = _make_account_filter(account_name)
     handler_id = logger.add(
         account_log_path, encoding="utf-8", format=log_format,
@@ -184,12 +185,16 @@ def run_account(account_config: dict, global_settings: dict, account_index: int)
             # Token 登录（优先）
             user = {"userId": user_id, "token": token_val}
             log.info("使用 Token 登录")
-            client = WeBanClient(tenant_name, user=user, log=log, browser_path=browser_path, debug=debug)
+            client = WeBanClient(
+                tenant_name, user=user, log=log, browser_path=browser_path, debug=debug,
+                ai_config=ai_config,
+            )
         elif tenant_name and username:
             # 密码登录 — password 默认为 username
             log.info("使用密码登录")
             client = WeBanClient(
                 tenant_name, username, password, log=log, browser_path=browser_path, debug=debug,
+                ai_config=ai_config,
             )
         else:
             log.error(
@@ -269,6 +274,7 @@ if __name__ == "__main__":
         # 加载配置文件
         config = load_config()
         global_settings = config.get("settings", {})
+        ai_config = config.get("ai", {})
         accounts = config.get("account", [])
 
         # 过滤有效账号
@@ -280,6 +286,7 @@ if __name__ == "__main__":
             # 重新加载并检查
             config = load_config()
             global_settings = config.get("settings", {})
+            ai_config = config.get("ai", {})
             accounts = config.get("account", [])
             valid_accounts = [a for a in accounts if is_account_valid(a)]
             if not valid_accounts:
@@ -295,6 +302,7 @@ if __name__ == "__main__":
                 open_editor(config_path)
                 config = load_config()
                 global_settings = config.get("settings", {})
+                ai_config = config.get("ai", {})
                 accounts = config.get("account", [])
                 valid_accounts = [a for a in accounts if is_account_valid(a)]
                 if not valid_accounts:
@@ -322,7 +330,7 @@ if __name__ == "__main__":
 
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 future_to_account = {
-                    executor.submit(run_account, cfg, global_settings, i): (cfg, i)
+                    executor.submit(run_account, cfg, global_settings, ai_config, i): (cfg, i)
                     for i, cfg in enumerate(accounts)
                 }
 
@@ -344,7 +352,7 @@ if __name__ == "__main__":
             failed_count = 0
 
             for i, cfg in enumerate(accounts):
-                if run_account(cfg, global_settings, i):
+                if run_account(cfg, global_settings, ai_config, i):
                     success_count += 1
                 else:
                     failed_count += 1
