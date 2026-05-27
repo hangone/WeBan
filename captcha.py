@@ -10,8 +10,10 @@
     4. 输出 3 个按顺序的点击坐标 (相对主图像素)
 """
 
+import asyncio
 import json
 import os
+import platform
 import random
 import threading
 import time
@@ -22,7 +24,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import cv2
 import numpy as np
 import requests
-from DrissionPage import Chromium, ChromiumOptions
+import nodriver
 from PIL import Image
 
 # 腾讯验证码 SDK 地址
@@ -557,8 +559,55 @@ class LoginCaptchaSolver:
         return None
 
 
-# ── CaptchaHandler ────────────────────────────────────
+# ── 浏览器自动检测 ──────────────────────────────────────
 
+
+def detect_browser() -> Optional[str]:
+    """自动检测系统中已安装的 Chrome/Chromium 浏览器路径。
+
+    检查顺序：环境变量 CHROMIUM_BINARY / CHROME_BINARY → 平台默认路径
+    """
+    # 环境变量优先（Docker 等场景）
+    for env_var in ("CHROMIUM_BINARY", "CHROME_BINARY"):
+        path = os.environ.get(env_var, "")
+        if path and os.path.isfile(path):
+            return path
+
+    system = platform.system()
+    candidates: list[str] = []
+    if system == "Darwin":
+        candidates = [
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+            "/Applications/Google Chrome Dev.app/Contents/MacOS/Google Chrome Dev",
+            "/Applications/Chromium.app/Contents/MacOS/Chromium",
+            "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
+            "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+        ]
+    elif system == "Linux":
+        candidates = [
+            "/usr/bin/google-chrome",
+            "/usr/bin/google-chrome-stable",
+            "/usr/bin/chromium",
+            "/usr/bin/chromium-browser",
+            "/snap/bin/chromium",
+        ]
+    elif system == "Windows":
+        local = os.environ.get("LOCALAPPDATA", "")
+        pf = os.environ.get("PROGRAMFILES", "")
+        pf86 = os.environ.get("PROGRAMFILES(X86)", "")
+        candidates = [
+            *[str(Path(p) / "Google/Chrome/Application/chrome.exe")
+              for p in (local, pf, pf86) if p],
+            *[str(Path(p) / "Chromium/Application/chrome.exe")
+              for p in (local, pf, pf86) if p],
+        ]
+    for p in candidates:
+        if os.path.isfile(p):
+            return p
+    return None
+
+
+# ── CaptchaHandler ────────────────────────────────────
 
 class CaptchaHandler:
     """通过浏览器处理腾讯验证码"""
@@ -586,40 +635,42 @@ class CaptchaHandler:
 
     # ── 浏览器 / 页面构建 ──────────────────────────────
 
-    def _create_browser(self, headless: bool = False) -> Chromium:
-        """创建 Chromium 实例。
+    async def _create_browser(self, headless: bool = False) -> nodriver.Browser:
+        """创建 nodriver 浏览器实例。
 
         :param headless: True 时以无头模式运行（无需用户交互）
-        :return: 已配置的 Chromium 对象
+        :return: 已配置的 Browser 对象
 
-        auto_port() 避免端口冲突；窗口尺寸 428x818 模拟移动端以匹配腾讯验证码的移动版 UI。
+        窗口尺寸 428x818 模拟移动端以匹配腾讯验证码的移动版 UI。
         """
-        co = ChromiumOptions().auto_port().mute(True).set_argument('--window-size', '428,818')
-        if headless:
-            co.headless(True)
-        if self.browser_path:
-            co.set_browser_path(self.browser_path)
-        return Chromium(co)
+        browser_path = self.browser_path or detect_browser()
+        browser_args = ["--window-size=428,818", "--mute-audio"]
+        return await nodriver.start(
+            headless=headless,
+            browser_executable_path=browser_path or None,
+            browser_args=browser_args,
+            sandbox=False,
+        )
 
-    def _inject_auth(self, tab) -> None:
+    async def _inject_auth(self, tab) -> None:
         """向页面注入 localStorage 认证信息。
 
-        :param tab: ChromiumTab
+        :param tab: nodriver Tab
 
         .. note:: json.dumps 对含特殊字符的 token 做安全编码，
            避免 JS 代码注入（例如 token 中出现引号或反斜杠时）。
         """
-        tab.run_js(f"""\
+        await tab.evaluate(f"""\
             const user = {json.dumps(self._auth)};
             localStorage.setItem('user', JSON.stringify(user));
         """)
 
-    def _ensure_captcha_sdk(self, tab) -> None:
+    async def _ensure_captcha_sdk(self, tab) -> None:
         """确保页面已加载腾讯验证码 SDK。
 
-        :param tab: ChromiumTab
+        :param tab: nodriver Tab
         """
-        tab.run_js(f"""\
+        await tab.evaluate(f"""\
             if (typeof TencentCaptcha === 'undefined') {{
                 const script = document.createElement('script');
                 script.src = '{TCAPTCHA_SDK_URL}';
@@ -628,7 +679,7 @@ class CaptchaHandler:
             }}
         """)
 
-    def _build_page(self, entry_url: str, headless: bool = False):
+    async def _build_page(self, entry_url: str, headless: bool = False):
         """启动浏览器，注入认证信息，加载 SDK。
 
         :param entry_url: 入口页面 URL（必须在腾讯验证码的域名白名单内）
@@ -640,31 +691,30 @@ class CaptchaHandler:
         注入认证后重新加载，使页面能读取到 localStorage 中的登录态。
         """
         self.log.info("正在打开验证码入口页面")
-        browser = self._create_browser(headless)
+        browser = await self._create_browser(headless)
         try:
-            tab = browser.latest_tab
-            tab.get(entry_url, timeout=600)             # 第一次：建立域名
-            self._inject_auth(tab)
-            tab.get(entry_url, timeout=30)              # 第二次：读取注入的认证
-            tab.wait(3)
-            self._ensure_captcha_sdk(tab)
-            tab.wait(2)
+            tab = await browser.get(entry_url)                 # 第一次：建立域名
+            await self._inject_auth(tab)
+            await tab.get(entry_url)                           # 第二次：读取注入的认证
+            await tab.sleep(3)
+            await self._ensure_captcha_sdk(tab)
+            await tab.sleep(2)
             return browser, tab
         except Exception:
-            browser.quit()
+            browser.stop()
             raise
 
     # ── 验证码触发 / 等待 ──────────────────────────────
 
-    def _trigger_captcha(self, tab, app_id: str) -> None:
+    async def _trigger_captcha(self, tab, app_id: str) -> None:
         """调用腾讯验证码 SDK 弹出验证窗口，结果存入 window.__captchaResult。
 
         :param tab: 浏览器标签页对象
         :param app_id: 腾讯验证码 appId
         """
-        tab.run_js(_SHOW_JS.replace("__APP_ID__", json.dumps(app_id)))
+        await tab.evaluate(_SHOW_JS.replace("__APP_ID__", json.dumps(app_id)))
 
-    def _wait_captcha_result(self, tab, timeout: float = 120.0) -> Dict[str, str]:
+    async def _wait_captcha_result(self, tab, timeout: float = 120.0) -> Dict[str, str]:
         """轮询等待验证码回调结果。
 
         :param tab: 浏览器标签页对象
@@ -676,15 +726,15 @@ class CaptchaHandler:
         """
         deadline = time.time() + timeout
         while time.time() < deadline:
-            res = tab.run_js("return window.__captchaResult;")
+            res = await tab.evaluate("return window.__captchaResult;", return_by_value=True)
             if res:
                 if isinstance(res, dict) and res.get("ret") == 0 and res.get("ticket"):
                     return {"randstr": res["randstr"], "ticket": res["ticket"]}
                 raise RuntimeError(f"验证码未通过: ret={res.get('ret') if isinstance(res, dict) else res}")
-            time.sleep(0.3)
+            await asyncio.sleep(0.3)
         raise RuntimeError("等待验证码回调超时")
 
-    def _run_captcha(self, tab, app_id: str) -> Dict[str, str]:
+    async def _run_captcha(self, tab, app_id: str) -> Dict[str, str]:
         """触发验证码并阻塞等待用户手动完成。
 
         :param tab: 浏览器标签页对象
@@ -692,36 +742,36 @@ class CaptchaHandler:
         :return: {"randstr": str, "ticket": str}
         :raises RuntimeError: 用户关闭验证码或等待超时
         """
-        self._trigger_captcha(tab, app_id)
-        return self._wait_captcha_result(tab)
+        await self._trigger_captcha(tab, app_id)
+        return await self._wait_captcha_result(tab)
 
     # ── 自动识别 ────────────────────────────────────────
 
     @staticmethod
-    def _wait_until(predicate, timeout: float = 10.0, interval: float = 0.3):
+    async def _wait_until(predicate, timeout: float = 10.0, interval: float = 0.3):
         """轮询等待条件为真。
 
-        :param predicate: 无参函数，返回真值时停止等待
+        :param predicate: 无参异步函数，返回真值时停止等待
         :param timeout: 最长等待秒数
         :param interval: 轮询间隔秒数
         :return: predicate 的最后一次返回值
         """
         deadline = time.time() + timeout
         while time.time() < deadline:
-            value = predicate()
+            value = await predicate()
             if value:
                 return value
-            time.sleep(interval)
-        return predicate()
+            await asyncio.sleep(interval)
+        return await predicate()
 
     @staticmethod
-    def _maybe_state(tab):
+    async def _maybe_state(tab):
         """检查验证码图片是否已加载就绪。
 
         :param tab: 浏览器标签页对象
         :return: 包含 bgUrl/ansUrl/bgRect 等字段的 dict，未就绪返回 None
         """
-        s = tab.run_js(_QUERY_JS)
+        s = await tab.evaluate(_QUERY_JS, return_by_value=True)
         if not s:
             return None
         if not (s.get("bgUrl", "").startswith("http") and s.get("ansUrl", "").startswith("http")):
@@ -731,13 +781,13 @@ class CaptchaHandler:
         return s
 
     @staticmethod
-    def _btn_enabled(tab):
+    async def _btn_enabled(tab):
         """检查提交按钮是否已启用。
 
         :param tab: 浏览器标签页对象
         :return: 按钮状态 dict，未启用返回 None
         """
-        s = tab.run_js(_QUERY_JS)
+        s = await tab.evaluate(_QUERY_JS, return_by_value=True)
         if not s:
             return None
         if "--disabled" in (s.get("btnCls") or ""):
@@ -745,23 +795,23 @@ class CaptchaHandler:
         return s
 
     @staticmethod
-    def _click_refresh(tab) -> None:
+    async def _click_refresh(tab) -> None:
         """点击验证码刷新按钮换一组图片。
 
         :param tab: 浏览器标签页对象
         """
-        state = tab.run_js(_QUERY_JS)
+        state = await tab.evaluate(_QUERY_JS, return_by_value=True)
         rect = (state or {}).get("refreshRect")
         if not rect:
             return
         rx = int(rect["x"] + rect["w"] / 2)
         ry = int(rect["y"] + rect["h"] / 2)
-        tab.actions.move_to((rx, ry))
-        time.sleep(0.15)
-        tab.actions.click()
-        time.sleep(1.5)
+        await tab.mouse_move(rx, ry)
+        await asyncio.sleep(0.15)
+        await tab.mouse_click(rx, ry)
+        await asyncio.sleep(1.5)
 
-    def _auto_solve_once(self, tab, attempt: int, save_debug: bool) -> Optional[Dict]:
+    async def _auto_solve_once(self, tab, attempt: int, save_debug: bool) -> Optional[Dict]:
         """单次自动识别尝试：抓图 → 识别 → 点击 → 提交。
 
         :param tab: 浏览器标签页对象
@@ -771,7 +821,7 @@ class CaptchaHandler:
         """
         self.log.info(f"自动识别: 第 {attempt} 次尝试")
 
-        state = self._wait_until(lambda: self._maybe_state(tab), timeout=12)
+        state = await self._wait_until(lambda: self._maybe_state(tab), timeout=12)
         if not state:
             self.log.warning("自动识别: 验证码图片未就绪")
             return None
@@ -810,20 +860,19 @@ class CaptchaHandler:
             viewport_points.append((int(vx), int(vy)))
 
         # 按顺序点击 3 个符号
-        actions = tab.actions
         for idx, (vx, vy) in enumerate(viewport_points, start=1):
             cx = vx + random.randint(-3, 3)
             cy = vy + random.randint(-3, 3)
-            actions.move_to((cx, cy))
-            time.sleep(0.15 + random.random() * 0.15)
-            actions.click()
+            await tab.mouse_move(cx, cy)
+            await asyncio.sleep(0.15 + random.random() * 0.15)
+            await tab.mouse_click(cx, cy)
             self.log.info(f"自动识别: 点击 #{idx} at ({cx}, {cy})")
-            time.sleep(0.25 + random.random() * 0.25)
+            await asyncio.sleep(0.25 + random.random() * 0.25)
 
         # 等待提交按钮启用后点击
-        self._wait_until(lambda: self._btn_enabled(tab), timeout=3)
+        await self._wait_until(lambda: self._btn_enabled(tab), timeout=3)
 
-        final_state = tab.run_js(_QUERY_JS)
+        final_state = await tab.evaluate(_QUERY_JS, return_by_value=True)
         btn_rect = (final_state or {}).get("btnRect") or state["btnRect"]
         if not btn_rect:
             self.log.warning("自动识别: 找不到提交按钮")
@@ -831,18 +880,18 @@ class CaptchaHandler:
 
         bx = int(btn_rect["x"] + btn_rect["w"] / 2)
         by = int(btn_rect["y"] + btn_rect["h"] / 2)
-        actions.move_to((bx, by))
-        time.sleep(0.2)
-        actions.click()
+        await tab.mouse_move(bx, by)
+        await asyncio.sleep(0.2)
+        await tab.mouse_click(bx, by)
 
         # 等待验证码回调
         try:
-            return self._wait_captcha_result(tab, timeout=6)
+            return await self._wait_captcha_result(tab, timeout=6)
         except RuntimeError as exc:
             self.log.warning(f"自动识别: {exc}")
             return None
 
-    def _auto_solve_captcha(self, tab, app_id: str, max_retry: int = 10,
+    async def _auto_solve_captcha(self, tab, app_id: str, max_retry: int = 10,
                             save_debug: bool = False) -> Optional[Dict[str, str]]:
         """尝试自动识别点选验证码，失败时自动刷新重试。
 
@@ -854,29 +903,29 @@ class CaptchaHandler:
         """
         for attempt in range(1, max_retry + 1):
             # 清除上一轮的回调结果，避免 _wait_captcha_result 读到过期值
-            tab.run_js("window.__captchaResult = null;")
+            await tab.evaluate("window.__captchaResult = null;")
 
             if attempt == 1:
-                self._trigger_captcha(tab, app_id)
-                time.sleep(2)
+                await self._trigger_captcha(tab, app_id)
+                await asyncio.sleep(2)
             else:
-                self._click_refresh(tab)
+                await self._click_refresh(tab)
 
-            result = self._auto_solve_once(tab, attempt, save_debug)
+            result = await self._auto_solve_once(tab, attempt, save_debug)
             if result:
                 return result
         return None
 
     # ── 公开方法 ────────────────────────────────────────
 
-    def _quit_browser(self, browser: Chromium, label: str = "") -> None:
+    def _quit_browser(self, browser: nodriver.Browser, label: str = "") -> None:
         """安全关闭浏览器，捕获退出异常避免掩盖原始错误。
 
-        :param browser: Chromium 实例
+        :param browser: nodriver Browser 实例
         :param label: 日志标签 (如 "无感验证码"、"自动识别"、"手动验证")
         """
         try:
-            browser.quit()
+            browser.stop()
             if label:
                 self.log.info(f"已关闭浏览器 ({label})")
         except Exception as exc:
@@ -891,10 +940,13 @@ class CaptchaHandler:
         :param user_exam_plan_id: 考试计划 ID（预留，目前未使用）
         :return: {"randstr": str, "ticket": str} — 验证通过后的凭证
         """
+        return asyncio.run(self._handle_exam_captcha(user_exam_plan_id))
+
+    async def _handle_exam_captcha(self, user_exam_plan_id: str) -> Dict[str, str]:
         self.log.info("正在处理无感验证码")
-        browser, tab = self._build_page(EXAM_ENTRY_URL, headless=True)
+        browser, tab = await self._build_page(EXAM_ENTRY_URL, headless=True)
         try:
-            result = self._run_captcha(tab, EXAM_CAPTCHA_APP_ID)
+            result = await self._run_captcha(tab, EXAM_CAPTCHA_APP_ID)
             self.log.success("已获取无感验证码")
             return result
         finally:
@@ -908,13 +960,16 @@ class CaptchaHandler:
         :param course_url: 课程入口 URL，留空则使用默认的 mcwk.mycourse.cn
         :return: {"randstr": str, "ticket": str} — 验证通过后的凭证
         """
+        return asyncio.run(self._handle_course_captcha(course_url))
+
+    async def _handle_course_captcha(self, course_url: Optional[str] = None) -> Dict[str, str]:
         entry_url = course_url or COURSE_ENTRY_URL
 
         # 第一阶段: 无头自动识别
         self.log.info("正在自动识别验证码...")
-        browser, tab = self._build_page(entry_url, headless=True)
+        browser, tab = await self._build_page(entry_url, headless=True)
         try:
-            result = self._auto_solve_captcha(tab, COURSE_CAPTCHA_APP_ID)
+            result = await self._auto_solve_captcha(tab, COURSE_CAPTCHA_APP_ID)
             if result:
                 self.log.success("验证码自动识别成功")
                 return result
@@ -922,16 +977,16 @@ class CaptchaHandler:
             self.log.warning(f"自动识别异常，将回退到手动: {exc}")
         finally:
             self._quit_browser(browser, "自动识别")
-        time.sleep(1)  # 等待无头浏览器进程完全退出
+        await asyncio.sleep(1)  # 等待无头浏览器进程完全退出
 
         # 第二阶段: 打开可见浏览器，让用户手动完成
         self.log.info("=" * 50)
         self.log.warning("自动识别失败，请手动完成验证码！")
         self.log.info("请在浏览器窗口中完成图片点选验证，完成后程序将自动继续")
         self.log.info("=" * 50)
-        browser, tab = self._build_page(entry_url, headless=False)
+        browser, tab = await self._build_page(entry_url, headless=False)
         try:
-            result = self._run_captcha(tab, COURSE_CAPTCHA_APP_ID)
+            result = await self._run_captcha(tab, COURSE_CAPTCHA_APP_ID)
             self.log.success("验证码手动验证完成")
             return result
         finally:
