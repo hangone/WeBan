@@ -14,6 +14,7 @@ import asyncio
 import json
 import os
 import platform
+import sys
 import random
 import threading
 import time
@@ -497,10 +498,8 @@ class LoginCaptchaSolver:
             with cls._lock:
                 if not cls._initialized:
                     try:
-                        exe_path = os.environ.get("PYFUZE_EXECUTABLE_PATH")
-                        if exe_path:
-                            base_path = os.path.dirname(os.path.abspath(exe_path))
-                            model_path = Path(base_path) / "captcha_model.onnx"
+                        if getattr(sys, "frozen", False):
+                            model_path = Path(sys._MEIPASS) / "captcha_model.onnx"
                         else:
                             model_path = Path(__file__).parent / "captcha_model.onnx"
 
