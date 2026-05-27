@@ -5,7 +5,7 @@ description = "auto finish weiban"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "drissionpage>=4.1.1.2",
+    "nodriver>=0.50",
     "loguru>=0.7.3",
     "numpy>=1.26.0",
     "opencv-python-headless>=4.8.0",
