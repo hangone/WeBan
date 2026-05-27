@@ -11,6 +11,7 @@ USER appuser
 WORKDIR /app
 
 ENV CHROMIUM_BINARY=/usr/bin/chromium
+ENV WEBAN_NO_SANDBOX=1
 
 COPY --chown=appuser:appuser pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project \
