@@ -53,7 +53,11 @@ base_url = "https://api.deepseek.com"
 # AI 服务的 API Key
 api_key = ""
 # 调用的模型名称，如 gpt-4o-mini、deepseek-chat 等
-model = "deepseek-v4-pro"
+model = "deepseek-chat"
+# 请求超时时间（秒）
+timeout = 60
+# 请求失败时的最大重试次数
+max_retries = 2
 
 [[account]]
 # 学校名称（必填）
