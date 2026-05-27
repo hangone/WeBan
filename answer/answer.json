@@ -24609,6 +24609,22 @@
       {
         "content": "骑车前应检查车闸是否完好。",
         "isCorrect": 1
+      },
+      {
+        "content": "可以骑很快",
+        "isCorrect": 2
+      },
+      {
+        "content": "不要频繁使用车铃",
+        "isCorrect": 1
+      },
+      {
+        "content": "可以骑车带人",
+        "isCorrect": 2
+      },
+      {
+        "content": "骑车前应检查车闸是否完好",
+        "isCorrect": 1
       }
     ],
     "type": 2
@@ -47261,6 +47277,14 @@
       },
       {
         "content": "下开上关。",
+        "isCorrect": 2
+      },
+      {
+        "content": "上开下关",
+        "isCorrect": 1
+      },
+      {
+        "content": "下开上关",
         "isCorrect": 2
       }
     ],
