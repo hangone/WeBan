@@ -272,10 +272,15 @@ if __name__ == "__main__":
         logger.info("程序更新地址：https://github.com/hangone/WeBan")
 
         # 加载配置文件
-        config = load_config()
-        global_settings = config.get("settings", {})
-        ai_config = config.get("ai", {})
-        accounts = config.get("account", [])
+        def load_all_config():
+            config = load_config()
+            return (
+                config.get("settings", {}),
+                config.get("ai", {}),
+                config.get("account", []),
+            )
+
+        global_settings, ai_config, accounts = load_all_config()
 
         # 过滤有效账号
         valid_accounts = [a for a in accounts if is_account_valid(a)]
@@ -283,11 +288,7 @@ if __name__ == "__main__":
         if not valid_accounts:
             logger.warning("没有找到有效的账号配置，正在打开配置文件...")
             open_editor(config_path)
-            # 重新加载并检查
-            config = load_config()
-            global_settings = config.get("settings", {})
-            ai_config = config.get("ai", {})
-            accounts = config.get("account", [])
+            global_settings, ai_config, accounts = load_all_config()
             valid_accounts = [a for a in accounts if is_account_valid(a)]
             if not valid_accounts:
                 logger.error("仍然没有有效的账号配置，请检查 config.toml")
@@ -300,10 +301,7 @@ if __name__ == "__main__":
             choice = input(f"当前账号：{acct_name}，是否更换账号？(y/N，默认N): ").strip().lower()
             if choice == "y":
                 open_editor(config_path)
-                config = load_config()
-                global_settings = config.get("settings", {})
-                ai_config = config.get("ai", {})
-                accounts = config.get("account", [])
+                global_settings, ai_config, accounts = load_all_config()
                 valid_accounts = [a for a in accounts if is_account_valid(a)]
                 if not valid_accounts:
                     logger.error("没有有效的账号配置")

@@ -1133,6 +1133,8 @@ class WeBanClient:
         api_key = self.ai_config.get("api_key", "").strip()
         base_url = self.ai_config.get("base_url", "https://api.deepseek.com").strip()
         model = self.ai_config.get("model", "deepseek-v4-pro").strip()
+        timeout = int(self.ai_config.get("timeout", 60))
+        max_retries = int(self.ai_config.get("max_retries", 2))
 
         if not api_key:
             self.log.warning("AI 搜题已启用，但未配置 api_key，跳过 AI 搜题")
@@ -1141,89 +1143,129 @@ class WeBanClient:
         title = question.get("title", "")
         type_label = question.get("typeLabel", "未知")
         options = question.get("optionList", [])
+        opt_count = len(options)
 
-        options_str = "\n".join([f"{idx + 1}. {opt['content']}" for idx, opt in enumerate(options)])
+        options_str = "\n".join([f"{i + 1}. {opt['content']}" for i, opt in enumerate(options)])
 
-        prompt = f"""你是一个在线教育考试答题助手。请根据题目和选项，分析并给出正确答案的选项序号。
+        prompt = f"""你是一个在线教育考试答题助手。请根据题目和选项，给出正确答案。
 
-【题目类型】
-{type_label}
+【题目类型】{type_label}
 
-【题目标题】
-{title}
+【题目】{title}
 
-【备选选项】
+【选项】
 {options_str}
 
-【输出要求】
-1. 如果是单选题或判断题，必须只选择一个最符合的选项。如果是多选题，必须选择所有正确的选项。
-2. 请直接以 JSON 格式输出，不要包含 Markdown 代码块（如 ```json ），也不要包含任何其他多余文本。
-3. JSON 格式如下：
-{{
-  "answers": [1, 3],
-  "reason": "简要的解答理由"
-}}
-4. answers 数组中的数字代表正确选项的 1-based 序号。
+【规则】
+1. 单选题/判断题：answers 只能包含 1 个选项序号
+2. 多选题：answers 包含所有正确选项的序号
+3. 选项序号为 1-based，有效范围：1~{opt_count}
 
-请输出 JSON 结果："""
+【输出格式】严格输出一个 JSON 对象，不要输出任何其他内容：
+{{"answers":[1],"reason":"理由"}}"""
 
-        self.log.info("正在使用 AI 搜题...")
-        self.log.info(f"题目：{title}...")
+        self.log.info(f"AI 搜题：{title[:40]}...")
 
         headers = {
             "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         }
 
         payload = {
             "model": model,
-            "messages": [
-                {"role": "user", "content": prompt}
-            ],
-            "temperature": 0
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0,
+            "response_format": {"type": "json_object"},
         }
 
-        try:
-            url = f"{base_url.rstrip('/')}/chat/completions"
-            resp = self.api.session.post(url, headers=headers, json=payload, timeout=30)
-            resp.raise_for_status()
-            res_data = resp.json()
-            content = res_data["choices"][0]["message"]["content"].strip()
+        url = f"{base_url.rstrip('/')}/chat/completions"
+        content = None
 
-            # 尝试提取和解析 JSON
-            json_str = content
-            if "```" in json_str:
-                match = re.search(r"```(?:json)?\s*(.*?)\s*```", json_str, re.DOTALL)
-                if match:
-                    json_str = match.group(1).strip()
-
-            raw_indices = []
+        for attempt in range(1, max_retries + 1):
             try:
-                ans_data = json.loads(json_str)
-                raw_indices = ans_data.get("answers", [])
-                reason = ans_data.get("reason", "")
-                self.log.info(f"AI 解析成功，理由：{reason}")
-            except Exception:
-                self.log.warning(f"AI 返回非标准 JSON，尝试使用正则提取答案。原始返回：{content}")
-                raw_indices = [int(x) for x in re.findall(r"\b\d+\b", content)]
+                resp = self.api.session.post(url, headers=headers, json=payload, timeout=timeout)
+                resp.raise_for_status()
+                res_data = resp.json()
 
-            # 校验并提取选项 ID
-            valid_ids = []
-            opt_count = len(options)
-            for idx in raw_indices:
-                try:
-                    val = int(idx)
-                    if 1 <= val <= opt_count:
-                        valid_ids.append(options[val - 1]["id"])
-                        self.log.info(f"AI 推荐答案：{val}. {options[val - 1]['content']}")
-                except (ValueError, TypeError):
-                    continue
+                usage = res_data.get("usage", {})
+                if usage:
+                    self.log.debug(
+                        f"AI token 用量 — prompt: {usage.get('prompt_tokens', '?')}, "
+                        f"completion: {usage.get('completion_tokens', '?')}, "
+                        f"total: {usage.get('total_tokens', '?')}"
+                    )
 
-            return valid_ids
+                content = res_data["choices"][0]["message"]["content"].strip()
+                break
 
-        except Exception as e:
-            self.log.error(f"AI 搜题 API 调用异常: {e}")
+            except Exception as e:
+                if attempt < max_retries:
+                    wait = attempt * 2
+                    self.log.warning(f"AI 搜题第 {attempt} 次请求失败，{wait}s 后重试：{e}")
+                    time.sleep(wait)
+                else:
+                    self.log.error(f"AI 搜题请求失败（已重试 {max_retries} 次）：{e}")
+                    return []
+
+        if not content:
             return []
+
+        # 解析 AI 返回的 JSON
+        raw_indices = self._parse_ai_answer(content)
+        if raw_indices is None:
+            self.log.warning(f"AI 返回内容解析失败，原始内容：{content[:200]}")
+            return []
+
+        # 校验并映射为选项 ID
+        valid_ids = []
+        for idx in raw_indices:
+            try:
+                val = int(idx)
+            except (ValueError, TypeError):
+                continue
+            if 1 <= val <= opt_count:
+                valid_ids.append(options[val - 1]["id"])
+                self.log.info(f"AI 推荐：{val}. {options[val - 1]['content']}")
+            else:
+                self.log.warning(f"AI 返回的选项序号 {val} 超出范围 1~{opt_count}，忽略")
+
+        if not valid_ids:
+            self.log.warning("AI 返回的答案未能匹配任何有效选项")
+
+        return valid_ids
+
+    @staticmethod
+    def _parse_ai_answer(content: str) -> list | None:
+        """从 AI 返回内容中提取 answers 序号列表
+
+        :param content: AI 返回的原始文本
+        :return: 答案序号列表，解析失败返回 None
+        """
+        # 去除 markdown 代码块包裹
+        json_str = content
+        if "```" in json_str:
+            match = re.search(r"```(?:json)?\s*(.*?)\s*```", json_str, re.DOTALL)
+            if match:
+                json_str = match.group(1).strip()
+
+        # 方式一：直接解析 JSON
+        try:
+            data = json.loads(json_str)
+            answers = data.get("answers", [])
+            if isinstance(answers, list) and answers:
+                return answers
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+        # 方式二：用正则从文本中提取第一个 {"answers": [...]} 结构
+        match = re.search(r'"answers"\s*:\s*\[([\d\s,]+)\]', json_str)
+        if match:
+            try:
+                return [int(x) for x in match.group(1).split(",") if x.strip()]
+            except (ValueError, TypeError):
+                pass
+
+        return None
 
     # ---- sync answers -------------------------------------------------------
 
