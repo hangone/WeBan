@@ -13,3 +13,8 @@ dependencies = [
     "pyaes>=1.6.1",
     "requests>=2.34.2",
 ]
+
+[dependency-groups]
+dev = [
+    "pyinstaller>=6.0",
+]

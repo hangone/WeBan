@@ -13,11 +13,12 @@ from client import WeBanClient
 
 VERSION = "v3.7.0"
 
-exe_path = os.environ.get("PYFUZE_EXECUTABLE_PATH")
-if exe_path:
-    base_path = os.path.dirname(os.path.abspath(exe_path))
+if getattr(sys, "frozen", False):
+    base_path = os.path.dirname(os.path.abspath(sys.executable))
+    bundle_path = sys._MEIPASS
 else:
     base_path = os.path.dirname(os.path.abspath(__file__))
+    bundle_path = base_path
 
 config_path = os.path.join(base_path, "config.toml")
 config_example_path = os.path.join(base_path, "config.example.toml")
