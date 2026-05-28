@@ -24,7 +24,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --hidden-import loguru \
     --hidden-import numpy \
     --hidden-import cv2 \
-    --hidden-import PIL \
     --collect-submodules nodriver \
     main.py
 
