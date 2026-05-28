@@ -164,6 +164,8 @@ def run_account(account_config: dict, global_settings: dict, ai_config: dict, ac
     exam_question_time = get_setting("exam_question_time", "3,3")
     exam_submit_match_rate = int(get_setting("exam_submit_match_rate", 90))
     browser_path = get_setting("browser_path", "") or None
+    cdp_host = get_setting("cdp_host", "") or None
+    cdp_port = int(get_setting("cdp_port", 0)) or None
     debug = get_setting("debug", False)
 
     # 为该账号创建专属日志文件夹
@@ -187,14 +189,16 @@ def run_account(account_config: dict, global_settings: dict, ai_config: dict, ac
             user = {"userId": user_id, "token": token_val}
             log.info("使用 Token 登录")
             client = WeBanClient(
-                tenant_name, user=user, log=log, browser_path=browser_path, debug=debug,
+                tenant_name, user=user, log=log, browser_path=browser_path,
+                cdp_host=cdp_host, cdp_port=cdp_port, debug=debug,
                 ai_config=ai_config,
             )
         elif tenant_name and username:
             # 密码登录 — password 默认为 username
             log.info("使用密码登录")
             client = WeBanClient(
-                tenant_name, username, password, log=log, browser_path=browser_path, debug=debug,
+                tenant_name, username, password, log=log, browser_path=browser_path,
+                cdp_host=cdp_host, cdp_port=cdp_port, debug=debug,
                 ai_config=ai_config,
             )
         else:

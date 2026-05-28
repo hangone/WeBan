@@ -62,8 +62,24 @@ jobs:
           if-no-files-found: error
 
   docker:
-    name: Docker multi-arch
+    name: Docker ${{ matrix.variant }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: full
+            file: Dockerfile
+            tags: |
+              type=semver,pattern={{version}}
+              type=semver,pattern={{major}}.{{minor}}
+              type=raw,value=latest
+          - variant: slim
+            file: Dockerfile.slim
+            tags: |
+              type=semver,pattern={{version}}-slim
+              type=semver,pattern={{major}}.{{minor}}-slim
+              type=raw,value=slim
     steps:
       - uses: actions/checkout@v6
 
@@ -80,14 +96,12 @@ jobs:
         id: meta
         with:
           images: ${{ secrets.DOCKERHUB_USERNAME }}/weban
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest
+          tags: ${{ matrix.tags }}
 
       - uses: docker/build-push-action@v7
         with:
           context: .
+          file: ${{ matrix.file }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}

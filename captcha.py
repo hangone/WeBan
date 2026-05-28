@@ -610,6 +610,8 @@ class CaptchaHandler:
 
     def __init__(self, tenant_code: str, user_id: str, token: str, log,
                  browser_path: Optional[str] = None,
+                 cdp_host: Optional[str] = None,
+                 cdp_port: Optional[int] = None,
                  debug_dir: Optional[Path] = None) -> None:
         """初始化验证码处理器。
 
@@ -618,6 +620,8 @@ class CaptchaHandler:
         :param token: 认证令牌
         :param log: 日志记录器（需支持 info/warning/success 方法）
         :param browser_path: 浏览器可执行文件路径，留空则自动查找
+        :param cdp_host: CDP 远程调试地址，配合 cdp_port 使用时不启动本地浏览器
+        :param cdp_port: CDP 远程调试端口，配合 cdp_host 使用时不启动本地浏览器
         :param debug_dir: 调试图片保存目录，留空则默认 logs/<user_id>/captcha
         """
         self._auth = {
@@ -627,6 +631,8 @@ class CaptchaHandler:
         }
         self.log = log
         self.browser_path = browser_path
+        self.cdp_host = cdp_host
+        self.cdp_port = cdp_port
         self._debug_dir = debug_dir or Path("logs") / user_id / "captcha"
 
     # ── 浏览器 / 页面构建 ──────────────────────────────
@@ -643,11 +649,16 @@ class CaptchaHandler:
         # 仅在显式设置 WEBAN_NO_SANDBOX 或以 root 运行时禁用沙盒
         no_sandbox = os.environ.get("WEBAN_NO_SANDBOX", "").lower() in ("1", "true", "yes")
         browser_args = ["--window-size=428,818", "--mute-audio"]
+        # CDP 模式下传占位路径，避免 nodriver 查找本地浏览器
+        if self.cdp_host and self.cdp_port:
+            browser_path = browser_path or "cdp"
         return await nodriver.start(
             headless=headless,
             browser_executable_path=browser_path or None,
             browser_args=browser_args,
             sandbox=not no_sandbox,
+            host=self.cdp_host,
+            port=self.cdp_port,
         )
 
     async def _inject_auth(self, tab) -> None:
