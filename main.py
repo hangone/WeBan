@@ -160,7 +160,7 @@ def run_account(account_config: dict, global_settings: dict, ai_config: dict, ac
     study_mode = get_setting("study_mode", "true")
     exam_mode = get_setting("exam_mode", "true")
     random_answer = get_setting("random_answer", True)
-    study_time = int(get_setting("study_time", 20))
+    study_time = get_setting("study_time", "20,10")
     exam_question_time = get_setting("exam_question_time", "3,3")
     exam_submit_match_rate = int(get_setting("exam_submit_match_rate", 90))
     browser_path = get_setting("browser_path", "") or None
@@ -221,7 +221,7 @@ def run_account(account_config: dict, global_settings: dict, ai_config: dict, ac
 
         if study:
             mode_desc = {"true": "正常", "force": "强制重新学习"}.get(study_mode, study_mode)
-            log.info(f"开始学习 (模式: {mode_desc}, 每个任务时长: {study_time}秒)")
+            log.info(f"开始学习 (模式: {mode_desc})")
             client.run_study(study_time, study_mode)
         else:
             log.info("学习模式已关闭，跳过所有学习任务")
