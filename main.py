@@ -10,6 +10,7 @@ import requests
 from loguru import logger
 
 from client import WeBanClient
+from captcha import check_browser_health
 
 VERSION = "v3.7.0"
 
@@ -314,6 +315,17 @@ if __name__ == "__main__":
 
         accounts = valid_accounts
         logger.info(f"共加载到 {len(accounts)} 个账号")
+
+        # 检测浏览器是否可用
+        browser_path = global_settings.get("browser_path", "") or None
+        cdp_host = global_settings.get("cdp_host", "") or None
+        cdp_port = int(global_settings.get("cdp_port", 0)) or None
+        try:
+            resolved = check_browser_health(browser_path, cdp_host, cdp_port)
+            logger.info(f"浏览器检测通过: {resolved}")
+        except RuntimeError as e:
+            logger.error(f"浏览器检测失败: {e}")
+            sys.exit(1)
 
         # 是否多线程
         max_workers = min(len(accounts), int(global_settings.get("max_workers", 5)))
