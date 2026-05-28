@@ -45,8 +45,8 @@ browser_path = ""
 # 在宿主机启动 Chrome 时加上: chrome --remote-debugging-port=9222
 # 然后填写以下两项，nodriver 将通过 CDP 连接该浏览器，不再启动本地浏览器
 # 注意: cdp_host 和 cdp_port 需同时设置才生效
-cdp_host = ""
-cdp_port = 0
+cdp_host = "host.docker.internal"
+cdp_port = 9222
 
 # 是否启用调试日志
 # 开启后会输出更多日志，比如请求体和响应体，验证码图片等
