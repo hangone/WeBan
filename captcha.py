@@ -11,13 +11,17 @@
 """
 
 import asyncio
+import gc
 import json
+import logging
 import os
 import platform
+import subprocess
 import sys
 import random
 import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -25,6 +29,48 @@ import cv2
 import numpy as np
 import requests
 import nodriver
+from nodriver import cdp
+from nodriver.cdp.runtime import DeepSerializedValue
+
+
+def _dsv_to_py(dsv):
+    """将 nodriver 的 DeepSerializedValue 递归转换为 Python 原生类型。"""
+    if isinstance(dsv, DeepSerializedValue):
+        if dsv.type_ == "object" and isinstance(dsv.value, list):
+            return {k: _dsv_to_py(v) for k, v in dsv.value}
+        if dsv.type_ == "array" and isinstance(dsv.value, list):
+            return [_dsv_to_py(item) for item in dsv.value]
+        return dsv.value
+    if isinstance(dsv, dict):
+        t, val = dsv.get("type"), dsv.get("value")
+        if t == "undefined":
+            return None
+        if t == "object" and isinstance(val, list):
+            return {k: _dsv_to_py(v) for k, v in val}
+        if t == "array" and isinstance(val, list):
+            return [_dsv_to_py(item) for item in val]
+        return val
+    return dsv
+
+
+@contextmanager
+def _suppress_asyncio_childwatcher():
+    """抑制 asyncio child watcher 在事件循环关闭后的 'Loop is closed' 警告。
+
+    asyncio.run() 关闭循环后，子进程 transport 和 child watcher 回调
+    在 GC 阶段触发，此时循环已关闭。需要在 GC 完成后再恢复日志级别。
+    """
+    logger = logging.getLogger("asyncio")
+    prev = logger.level
+    logger.setLevel(logging.CRITICAL)
+    try:
+        yield
+    finally:
+        gc.collect()
+        time.sleep(0.1)
+        gc.collect()
+        logger.setLevel(prev)
+
 
 # 腾讯验证码 SDK 地址
 TCAPTCHA_SDK_URL = "https://turing.captcha.qcloud.com/TJCaptcha.js"
@@ -40,7 +86,7 @@ COURSE_ENTRY_URL = "https://mcwk.mycourse.cn/"
 # ── JS 片段（自动识别用）──────────────────────────────
 
 _SHOW_JS = r"""
-    return (function(){
+    (() => {
       window.__captchaResult = null;
       try {
         const captcha = new TencentCaptcha(__APP_ID__, function(res){
@@ -48,13 +94,12 @@ _SHOW_JS = r"""
         }, { userLanguage: 'zh-cn' });
         captcha.show();
         window.__captcha = captcha;
-        return 'ok';
-      } catch(e) { return 'ERROR: ' + String(e); }
+      } catch(e) { window.__captchaResult = 'ERROR: ' + String(e); }
     })();
 """
 
 _QUERY_JS = r"""
-    return (function(){
+    (() => {
       const bg = document.querySelector('.tencent-captcha-dy__verify-bg-img');
       const ans = document.querySelector('.tencent-captcha-dy__header-answer img');
       const btn = document.querySelector('.tencent-captcha-dy__verify-confirm-btn');
@@ -603,6 +648,42 @@ def detect_browser() -> Optional[str]:
     return None
 
 
+def check_browser_health(
+    browser_path: Optional[str] = None,
+    cdp_host: Optional[str] = None,
+    cdp_port: Optional[int] = None,
+) -> str:
+    """检测浏览器是否能正常启动。
+
+    :param browser_path: 浏览器可执行文件路径，留空则自动查找
+    :param cdp_host: CDP 远程调试地址（CDP 模式跳过本地启动检测）
+    :param cdp_port: CDP 远程调试端口
+    :return: 浏览器路径或地址
+    :raises RuntimeError: 浏览器无法启动时
+    """
+    if cdp_host and cdp_port:
+        return f"{cdp_host}:{cdp_port}"
+
+    resolved = browser_path or detect_browser()
+    if not resolved:
+        raise RuntimeError(
+            "未找到浏览器，请安装 Chrome 或设置 browser_path / CHROMIUM_BINARY 环境变量"
+        )
+    try:
+        proc = subprocess.run(
+            [resolved, "--headless=new", "--no-first-run", "--disable-gpu",
+             "--dump-dom", "data:text/html,<h1>ok</h1>"],
+            capture_output=True, timeout=10,
+        )
+        if proc.returncode != 0 and b"ok" not in proc.stdout:
+            raise RuntimeError(f"浏览器启动失败 (exit={proc.returncode}): {proc.stderr.decode()[:200]}")
+    except FileNotFoundError:
+        raise RuntimeError(f"浏览器可执行文件不存在: {resolved}")
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(f"浏览器启动超时: {resolved}")
+    return resolved
+
+
 # ── CaptchaHandler ────────────────────────────────────
 
 class CaptchaHandler:
@@ -637,6 +718,18 @@ class CaptchaHandler:
 
     # ── 浏览器 / 页面构建 ──────────────────────────────
 
+    @staticmethod
+    async def _eval_json(tab, expression: str) -> Optional[dict]:
+        """执行 JS 并将结果转为 Python dict（处理 nodriver 的 RemoteObject 反序列化）。"""
+        res = await tab.evaluate(expression, return_by_value=True)
+        if isinstance(res, cdp.runtime.RemoteObject):
+            if res.deep_serialized_value and res.deep_serialized_value.type_ == "object":
+                return _dsv_to_py(res.deep_serialized_value)
+            return None
+        if isinstance(res, dict):
+            return res
+        return None
+
     async def _create_browser(self, headless: bool = False) -> nodriver.Browser:
         """创建 nodriver 浏览器实例。
 
@@ -646,10 +739,17 @@ class CaptchaHandler:
         窗口尺寸 428x818 模拟移动端以匹配腾讯验证码的移动版 UI。
         """
         browser_path = self.browser_path or detect_browser()
-        # 仅在显式设置 WEBAN_NO_SANDBOX 或以 root 运行时禁用沙盒
         no_sandbox = os.environ.get("WEBAN_NO_SANDBOX", "").lower() in ("1", "true", "yes")
-        browser_args = ["--window-size=428,818", "--mute-audio"]
-        # CDP 模式下传占位路径，避免 nodriver 查找本地浏览器
+        browser_args = [
+            "--window-size=428,818",
+            "--mute-audio",
+            "--disable-extensions",
+            "--disable-default-apps",
+            "--no-first-run",
+            "--disable-infobars",
+        ]
+        if headless:
+            browser_args.append("--headless=new")
         if self.cdp_host and self.cdp_port:
             browser_path = browser_path or "cdp"
         return await nodriver.start(
@@ -665,9 +765,6 @@ class CaptchaHandler:
         """向页面注入 localStorage 认证信息。
 
         :param tab: nodriver Tab
-
-        .. note:: json.dumps 对含特殊字符的 token 做安全编码，
-           避免 JS 代码注入（例如 token 中出现引号或反斜杠时）。
         """
         await tab.evaluate(f"""\
             const user = {json.dumps(self._auth)};
@@ -675,7 +772,7 @@ class CaptchaHandler:
         """)
 
     async def _ensure_captcha_sdk(self, tab) -> None:
-        """确保页面已加载腾讯验证码 SDK。
+        """确保页面已加载腾讯验证码 SDK，轮询等待就绪。
 
         :param tab: nodriver Tab
         """
@@ -687,6 +784,12 @@ class CaptchaHandler:
                 document.head.appendChild(script);
             }}
         """)
+        for _ in range(20):
+            loaded = await tab.evaluate("(() => typeof TencentCaptcha !== 'undefined')()", return_by_value=True)
+            if loaded is True:
+                return
+            await asyncio.sleep(0.5)
+        self.log.warning("腾讯验证码 SDK 加载超时")
 
     async def _build_page(self, entry_url: str, headless: bool = False):
         """启动浏览器，注入认证信息，加载 SDK。
@@ -696,19 +799,23 @@ class CaptchaHandler:
         :return: (browser, tab) 元组
         :raises: 任何页面操作异常时自动关闭浏览器，避免进程泄漏
 
-        页面加载两次：第一次建立域名（localStorage 按域名隔离）；
-        注入认证后重新加载，使页面能读取到 localStorage 中的登录态。
+        先用 about:blank 建立域名（避免加载完整 SPA），注入 localStorage
+        认证后再导航到目标页面。
         """
         self.log.info("正在打开验证码入口页面")
-        browser = await self._create_browser(headless)
+        browser = await asyncio.wait_for(self._create_browser(headless), timeout=30)
         try:
-            tab = await browser.get(entry_url)                 # 第一次：建立域名
+            origin = entry_url.split("#")[0].rstrip("/")
+            tab = await asyncio.wait_for(browser.get(f"{origin}/"), timeout=30)
             await self._inject_auth(tab)
-            await tab.get(entry_url)                           # 第二次：读取注入的认证
-            await tab.sleep(3)
+            self.log.info("正在加载入口页面")
+            await asyncio.wait_for(tab.get(entry_url), timeout=30)
             await self._ensure_captcha_sdk(tab)
-            await tab.sleep(2)
+            self.log.info("页面准备完成")
             return browser, tab
+        except asyncio.TimeoutError:
+            self._quit_browser(browser, "页面构建超时")
+            raise RuntimeError("页面加载超时，请检查网络连接")
         except Exception:
             self._quit_browser(browser, "页面构建")
             raise
@@ -735,11 +842,13 @@ class CaptchaHandler:
         """
         deadline = time.time() + timeout
         while time.time() < deadline:
-            res = await tab.evaluate("return window.__captchaResult;", return_by_value=True)
-            if res:
-                if isinstance(res, dict) and res.get("ret") == 0 and res.get("ticket"):
-                    return {"randstr": res["randstr"], "ticket": res["ticket"]}
-                raise RuntimeError(f"验证码未通过: ret={res.get('ret') if isinstance(res, dict) else res}")
+            res = await self._eval_json(tab, "(() => window.__captchaResult)()")
+            if res is None:
+                await asyncio.sleep(0.3)
+                continue
+            if isinstance(res, dict) and res.get("ret") == 0 and res.get("ticket"):
+                return {"randstr": res["randstr"], "ticket": res["ticket"]}
+            raise RuntimeError(f"验证码未通过: ret={res.get('ret') if isinstance(res, dict) else res}")
             await asyncio.sleep(0.3)
         raise RuntimeError("等待验证码回调超时")
 
@@ -780,7 +889,7 @@ class CaptchaHandler:
         :param tab: 浏览器标签页对象
         :return: 包含 bgUrl/ansUrl/bgRect 等字段的 dict，未就绪返回 None
         """
-        s = await tab.evaluate(_QUERY_JS, return_by_value=True)
+        s = await CaptchaHandler._eval_json(tab, _QUERY_JS)
         if not s:
             return None
         if not (s.get("bgUrl", "").startswith("http") and s.get("ansUrl", "").startswith("http")):
@@ -796,7 +905,7 @@ class CaptchaHandler:
         :param tab: 浏览器标签页对象
         :return: 按钮状态 dict，未启用返回 None
         """
-        s = await tab.evaluate(_QUERY_JS, return_by_value=True)
+        s = await CaptchaHandler._eval_json(tab, _QUERY_JS)
         if not s:
             return None
         if "--disabled" in (s.get("btnCls") or ""):
@@ -809,7 +918,7 @@ class CaptchaHandler:
 
         :param tab: 浏览器标签页对象
         """
-        state = await tab.evaluate(_QUERY_JS, return_by_value=True)
+        state = await CaptchaHandler._eval_json(tab, _QUERY_JS)
         rect = (state or {}).get("refreshRect")
         if not rect:
             return
@@ -881,7 +990,7 @@ class CaptchaHandler:
         # 等待提交按钮启用后点击
         await self._wait_until(lambda: self._btn_enabled(tab), timeout=3)
 
-        final_state = await tab.evaluate(_QUERY_JS, return_by_value=True)
+        final_state = await self._eval_json(tab, _QUERY_JS)
         btn_rect = (final_state or {}).get("btnRect") or state["btnRect"]
         if not btn_rect:
             self.log.warning("自动识别: 找不到提交按钮")
@@ -934,6 +1043,13 @@ class CaptchaHandler:
         :param label: 日志标签 (如 "无感验证码"、"自动识别"、"手动验证")
         """
         try:
+            # 在终止进程前移除 child handler，避免 asyncio child watcher
+            # 在事件循环关闭后尝试回调产生 "Loop is closed" 警告
+            if hasattr(browser, "_process") and browser._process:
+                try:
+                    asyncio.get_event_loop().remove_child_handler(browser._process.pid)
+                except Exception:
+                    pass
             browser.stop()
             if label:
                 self.log.info(f"已关闭浏览器 ({label})")
@@ -953,7 +1069,8 @@ class CaptchaHandler:
         try:
             asyncio.get_running_loop()
         except RuntimeError:
-            return asyncio.run(self.handle_exam_captcha_async(user_exam_plan_id))
+            with _suppress_asyncio_childwatcher():
+                return asyncio.run(self.handle_exam_captcha_async(user_exam_plan_id))
         raise RuntimeError(
             "handle_exam_captcha() 无法在已运行的事件循环中调用，请改用 handle_exam_captcha_async()"
         )
@@ -981,7 +1098,8 @@ class CaptchaHandler:
         try:
             asyncio.get_running_loop()
         except RuntimeError:
-            return asyncio.run(self.handle_course_captcha_async(course_url))
+            with _suppress_asyncio_childwatcher():
+                return asyncio.run(self.handle_course_captcha_async(course_url))
         raise RuntimeError(
             "handle_course_captcha() 无法在已运行的事件循环中调用，请改用 handle_course_captcha_async()"
         )
