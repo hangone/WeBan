@@ -5,15 +5,15 @@ description = "auto finish weiban"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "nodriver>=0.50",
     "loguru>=0.7.3",
-    "numpy>=1.26.0",
-    "opencv-python-headless>=4.8.0",
+    "nodriver>=0.50.3",
+    "numpy>=2.4.6",
+    "opencv-python-headless>=4.13.0.92",
     "pyaes>=1.6.1",
     "requests>=2.34.2",
 ]
 
 [dependency-groups]
 dev = [
-    "pyinstaller>=6.0",
+    "pyinstaller>=6.20.0",
 ]

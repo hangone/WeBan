@@ -288,15 +288,15 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "loguru", specifier = ">=0.7.3" },
-    { name = "nodriver", specifier = ">=0.50" },
-    { name = "numpy", specifier = ">=1.26.0" },
-    { name = "opencv-python-headless", specifier = ">=4.8.0" },
+    { name = "nodriver", specifier = ">=0.50.3" },
+    { name = "numpy", specifier = ">=2.4.6" },
+    { name = "opencv-python-headless", specifier = ">=4.13.0.92" },
     { name = "pyaes", specifier = ">=1.6.1" },
     { name = "requests", specifier = ">=2.34.2" },
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pyinstaller", specifier = ">=6.0" }]
+dev = [{ name = "pyinstaller", specifier = ">=6.20.0" }]
 
 [[package]]
 name = "websockets"
