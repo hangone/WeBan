@@ -50,7 +50,6 @@ jobs:
             --hidden-import loguru \
             --hidden-import numpy \
             --hidden-import cv2 \
-            --hidden-import PIL \
             --collect-submodules nodriver \
             main.py
 

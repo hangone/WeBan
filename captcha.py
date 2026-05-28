@@ -18,7 +18,6 @@ import sys
 import random
 import threading
 import time
-from io import BytesIO
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -26,7 +25,6 @@ import cv2
 import numpy as np
 import requests
 import nodriver
-from PIL import Image
 
 # 腾讯验证码 SDK 地址
 TCAPTCHA_SDK_URL = "https://turing.captcha.qcloud.com/TJCaptcha.js"
@@ -531,16 +529,15 @@ class LoginCaptchaSolver:
         if not ocr:
             return None
         try:
-            img = Image.open(BytesIO(image)).convert("L")
-            arr = np.array(img, dtype=np.uint8)
+            arr = cv2.imdecode(np.frombuffer(image, np.uint8), cv2.IMREAD_GRAYSCALE)
             h, w = arr.shape
             seg_w = w // 4
 
             result = []
             for i in range(4):
                 char_img = arr[:, i * seg_w:(i + 1) * seg_w if i < 3 else w]
-                resized = np.array(Image.fromarray(char_img).resize(
-                    (cls._char_size, cls._char_size), Image.BILINEAR))
+                resized = cv2.resize(char_img, (cls._char_size, cls._char_size),
+                                     interpolation=cv2.INTER_LINEAR)
                 inp = (resized.astype(np.float32) / 255.0).reshape(
                     1, 1, cls._char_size, cls._char_size)
                 with cls._lock:
