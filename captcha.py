@@ -686,7 +686,7 @@ def check_browser_health(
              "--dump-dom", "data:text/html,<h1>ok</h1>"],
             capture_output=True, timeout=10,
         )
-        if proc.returncode != 0 and b"ok" not in proc.stdout:
+        if proc.returncode != 0 or b"ok" not in proc.stdout:
             raise RuntimeError(f"浏览器启动失败 (exit={proc.returncode}): {proc.stderr.decode()[:200]}")
     except FileNotFoundError:
         raise RuntimeError(f"浏览器可执行文件不存在: {resolved}")
