@@ -57,20 +57,39 @@ docker run -it --rm \
   hangyi/weban
 ```
 
-**精简镜像**（无内置浏览器，体积更小，需挂载宿主机浏览器）：
+**精简镜像**（无内置浏览器，需通过 CDP 连接宿主机浏览器）：
 
-```bash
-docker run -it --rm \
-  -v "$PWD/config.toml":/app/config.toml:ro \
-  -v "$PWD/logs":/app/logs \
-  -v "/usr/bin/google-chrome:/usr/bin/chromium:ro" \
-  -e CHROMIUM_BINARY=/usr/bin/chromium \
-  --cap-add=SYS_ADMIN \
-  hangyi/weban:slim
-```
+1. 在宿主机启动 Chrome/Edge 并开启远程调试：
 
-> 将 `/usr/bin/google-chrome` 替换为你系统中 Chrome/Chromium 的实际路径。macOS 示例：
-> `-v "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome:/usr/bin/chromium:ro"`
+   ```bash
+   # Linux
+   google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug
+
+   # macOS
+   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug
+
+   # Windows (PowerShell)
+   & "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir=$env:TEMP\chrome-debug
+   ```
+
+2. 在 `config.toml` 中配置 CDP：
+
+   ```toml
+   cdp_host = "host.docker.internal"
+   cdp_port = 9222
+   ```
+
+3. 启动容器：
+
+   ```bash
+   docker run -it --rm \
+     -v "$PWD/config.toml":/app/config.toml:ro \
+     -v "$PWD/logs":/app/logs \
+     --add-host=host.docker.internal:host-gateway \
+     hangyi/weban:slim
+   ```
+
+> Windows 用户推荐使用精简镜像 + CDP 方式，无需挂载浏览器二进制文件。
 
 首次使用先从 [config.example.toml](config.example.toml) 复制一份 `config.toml` 并填写账号信息。
 
@@ -117,6 +136,12 @@ max_workers = 5
 # 浏览器可执行文件路径
 # 留空则自动检测系统中已安装的 Chrome
 browser_path = ""
+
+# CDP 远程调试（连接已有浏览器实例，适用于 Docker 等场景）
+# 在宿主机启动 Chrome: chrome --remote-debugging-port=9222
+# 填写后通过 CDP 连接，不启动本地浏览器；两项需同时设置
+cdp_host = ""
+cdp_port = 0
 
 # 是否启用调试日志
 # 开启后会输出请求体、响应体等详细信息
