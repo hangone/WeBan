@@ -55,11 +55,14 @@ def _dsv_to_py(dsv):
 
 @contextmanager
 def _suppress_asyncio_childwatcher():
-    """抑制 asyncio child watcher 在事件循环关闭后的 'Loop is closed' 警告。
+    """抑制 asyncio 在事件循环关闭后的子进程相关警告和异常。
 
     asyncio.run() 关闭循环后，子进程 transport 和 child watcher 回调
     在 GC 阶段触发，此时循环已关闭。需要在 GC 完成后再恢复日志级别。
     """
+    import atexit
+    from asyncio.base_subprocess import BaseSubprocessTransport
+
     logger = logging.getLogger("asyncio")
     prev = logger.level
     logger.setLevel(logging.CRITICAL)
@@ -70,6 +73,14 @@ def _suppress_asyncio_childwatcher():
         time.sleep(0.1)
         gc.collect()
         logger.setLevel(prev)
+        # 程序退出时 patch transport 析构，抑制 "Event loop is closed" 异常
+        _orig_del = BaseSubprocessTransport.__del__
+        def _safe_del(self):
+            try:
+                _orig_del(self)
+            except RuntimeError:
+                pass
+        atexit.register(setattr, BaseSubprocessTransport, '__del__', _safe_del)
 
 
 # 腾讯验证码 SDK 地址
