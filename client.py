@@ -183,7 +183,8 @@ class WeBanClient:
         """
         self.log = log
         self.tenant_name = tenant_name.strip()
-        self.study_time = 30
+        self.study_base_time = 20
+        self.study_random_upper = 10
         self.browser_path = browser_path
         self.cdp_host = cdp_host
         self.cdp_port = cdp_port
@@ -219,6 +220,18 @@ class WeBanClient:
                 cdp_port=self.cdp_port,
             )
         return self._captcha_handler
+
+    @staticmethod
+    def _format_duration(seconds: int | float) -> str:
+        """秒数格式化为 XhXXmXXs / XmXXs / Xs"""
+        s = int(seconds)
+        h, rem = divmod(s, 3600)
+        m, sec = divmod(rem, 60)
+        if h:
+            return f"{h}h{m:02d}m{sec:02d}s"
+        if m:
+            return f"{m}m{sec:02d}s"
+        return f"{sec}s"
 
     def _prompt(self, message: str) -> str:
         """线程安全的 input 封装，多线程下避免 input 输出交错
@@ -337,13 +350,14 @@ class WeBanClient:
         required = data["requiredNum"] - data["requiredFinishedNum"]
         optional = data["optionalNum"] - data["optionalFinishedNum"]
         push = data["pushNum"] - data["pushFinishedNum"]
-        eta = max(0, self.study_time * (required + optional + push))
+        eta = max(0, int((self.study_base_time + self.study_random_upper / 2) * (required + optional + push)))
         if output:
+            eta_str = self._format_duration(eta)
             self.log.info(
-                f"{project_prefix} 进度：必修课：{data['requiredFinishedNum']}/{data['requiredNum']}，"
-                f"推送课：{data['pushFinishedNum']}/{data['pushNum']}，"
-                f"自选课：{data['optionalFinishedNum']}/{data['optionalNum']}，"
-                f"考试：{data['examFinishedNum']}/{data['examNum']}，预计剩余时间：{eta} 秒"
+                f"{project_prefix} 进度：必修课 {data['requiredFinishedNum']}/{data['requiredNum']}，"
+                f"推送课 {data['pushFinishedNum']}/{data['pushNum']}，"
+                f"自选课 {data['optionalFinishedNum']}/{data['optionalNum']}，"
+                f"考试 {data['examFinishedNum']}/{data['examNum']}，预计剩余 {eta_str}"
             )
         return progress
 
@@ -396,17 +410,23 @@ class WeBanClient:
 
     # ---- study --------------------------------------------------------------
 
-    def run_study(self, study_time: int, study_mode: str = "true") -> None:
+    def run_study(self, study_time: str, study_mode: str = "true") -> None:
         """主学习流程入口：遍历所有项目 → 分类 → 课程，逐门学习
-        :param study_time: 每门课学习秒数（0 使用默认值 20）
+        :param study_time: 每门课学习时长 "基础时间,随机上限"（秒），如 "20,10"
         :param study_mode: 学习模式，"force" 时忽略完成状态全部重新学习
         """
-        if study_time:
-            self.study_time = study_time
+        # 解析学习时长
+        try:
+            parts = str(study_time).split(",")
+            self.study_base_time = int(parts[0])
+            self.study_random_upper = int(parts[1]) if len(parts) > 1 else 0
+        except (ValueError, IndexError):
+            self.study_base_time = 20
+            self.study_random_upper = 10
 
         force_restudy = study_mode == "force"
         if force_restudy:
-            self.log.info(f"重新学习模式已开启，所有课程将重新学习，每门课程学习 {self.study_time} 秒")
+            self.log.info(f"重新学习模式已开启，所有课程将重新学习，每门课程学习 {self._format_duration(self.study_base_time)}~{self._format_duration(self.study_base_time + self.study_random_upper)}")
 
         answers_json = self._load_answers_json(warn_on_fail=True)
 
@@ -548,9 +568,10 @@ class WeBanClient:
 
         # 3. 确保满足最低学习时长（服务端要求 study 后至少学习 study_time 秒才接受完课）
         elapsed = time.time() - study_start
-        remaining = self.study_time - elapsed
+        study_time = self.study_base_time + randint(0, self.study_random_upper)
+        remaining = study_time - elapsed
         if remaining > 0:
-            self.log.info(f"等待学习时长 {remaining:.0f}s (已用 {elapsed:.0f}s/{self.study_time}s)")
+            self.log.info(f"等待学习时长 {self._format_duration(remaining)} (已用 {self._format_duration(elapsed)}/{self._format_duration(study_time)})")
             time.sleep(remaining)
 
         # 4. apinext finish=1（仅加载 apicenext.js 的课程）
@@ -802,7 +823,7 @@ class WeBanClient:
                         use_time = question_base_time + randint(0, question_random_upper)
                         self.log.info(
                             f"[{i + 1}/{len(no_answer)}] AI 搜题作答成功 "
-                            f"({type_label})，等待 {use_time}s: "
+                            f"({type_label})，等待 {self._format_duration(use_time)}: "
                             f"{question['title'][:40]}..."
                         )
                         time.sleep(use_time)
@@ -812,7 +833,7 @@ class WeBanClient:
                         use_time = question_base_time + randint(0, question_random_upper)
                         self.log.info(
                             f"[{i + 1}/{len(no_answer)}] 随机作答 "
-                            f"({type_label})，等待 {use_time}s: "
+                            f"({type_label})，等待 {self._format_duration(use_time)}: "
                             f"{question['title'][:40]}..."
                         )
                         time.sleep(use_time)
@@ -879,7 +900,7 @@ class WeBanClient:
                         if clean_text(opt["content"]) in answers
                     ]
                     use_time = question_base_time + randint(0, question_random_upper)
-                    self.log.info(f"等待 {use_time} 秒，模拟答题中...")
+                    self.log.info(f"等待 {self._format_duration(use_time)}，模拟答题中...")
                     time.sleep(use_time)
                     if not self.record_answer(
                         user_exam_plan_id, question["id"], use_time,
