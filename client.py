@@ -164,6 +164,8 @@ class WeBanClient:
         user: Dict[str, str] | None = None,
         log=logger,
         browser_path: str | None = None,
+        cdp_host: str | None = None,
+        cdp_port: int | None = None,
         debug: bool = False,
         ai_config: Dict[str, Any] | None = None,
     ) -> None:
@@ -174,6 +176,8 @@ class WeBanClient:
         :param user: 已有用户凭据 {"userId": ..., "token": ...}，提供则跳过登录
         :param log: logger 实例
         :param browser_path: 浏览器可执行文件路径，用于验证码处理
+        :param cdp_host: CDP 远程调试地址
+        :param cdp_port: CDP 远程调试端口
         :param debug: 是否启用调试日志
         :param ai_config: AI 搜题配置
         """
@@ -181,6 +185,8 @@ class WeBanClient:
         self.tenant_name = tenant_name.strip()
         self.study_time = 30
         self.browser_path = browser_path
+        self.cdp_host = cdp_host
+        self.cdp_port = cdp_port
         self.ai_config = ai_config
         if user and all([user.get("userId"), user.get("token")]):
             self.api = WeBanAPI(user=user, debug=debug, log=log)
@@ -209,6 +215,8 @@ class WeBanClient:
                 token=self.api.user["token"],
                 log=self.log,
                 browser_path=self.browser_path,
+                cdp_host=self.cdp_host,
+                cdp_port=self.cdp_port,
             )
         return self._captcha_handler
 
