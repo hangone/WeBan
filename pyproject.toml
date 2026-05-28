@@ -9,7 +9,6 @@ dependencies = [
     "loguru>=0.7.3",
     "numpy>=1.26.0",
     "opencv-python-headless>=4.8.0",
-    "pillow>=12.2.0",
     "pyaes>=1.6.1",
     "requests>=2.34.2",
 ]
