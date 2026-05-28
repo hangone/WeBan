@@ -39,12 +39,12 @@ python main.py # 或 uv run main.py
 - **Online 模式**：体积小，首次运行需联网下载依赖
 - **Bundle 模式**：体积大，完全打包依赖运行
 
-| 平台 | Online（默认） | Bundle（打包） |
+| 平台 | 下载地址 | 镜像下载地址 |
 |------|---------------|---------------|
-| Windows x64 | [WeBan-3.7.1-windows-x64.exe](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.1-windows-x64.exe) | [WeBan-3.7.1-windows-x64-bundle.exe](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.1-windows-x64-bundle.exe) |
-| Linux x64 | [WeBan-3.7.1-linux-x64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.1-linux-x64) | [WeBan-3.7.1-linux-x64-bundle](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.1-linux-x64-bundle) |
-| macOS arm64 | [WeBan-3.7.1-macos-arm64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.1-macos-arm64) | [WeBan-3.7.1-macos-arm64-bundle](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.1-macos-arm64-bundle) |
-| macOS x64 | [WeBan-3.7.1-macos-x64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.1-macos-x64) | [WeBan-3.7.1-macos-x64-bundle](https://github.com/hangone/WeBan/releases/latest/download/WeBan-3.7.1-macos-x64-bundle) |
+| Windows x64 | [WeBan-windows-x64.exe](https://github.com/hangone/WeBan/releases/latest/download/WeBan-windows-x64.exe) | [WeBan-windows-x64.exe](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-windows-x64.exe) |
+| Linux x64 | [WeBan-linux-x64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-linux-x64) | [WeBan-linux-x64](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-linux-x64) |
+| macOS arm64 | [WeBan-macos-arm64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-macos-arm64) | [WeBan-macos-arm64](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-macos-arm64) |
+| macOS x64 | [WeBan-macos-x64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-macos-x64) | [WeBan-macos-x64](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-macos-x64) |
 
 ### Docker
 
