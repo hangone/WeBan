@@ -44,7 +44,7 @@ jobs:
           uv run pyinstaller --noconfirm --onefile \
             --name "$name" \
             --add-data "captcha_model.onnx${sep}." \
-            --add-data "answer/answer.json${sep}answer" \
+            --add-data "answer/answer.json${sep}answer/answer.json" \
             --add-data "config.example.toml${sep}." \
             --hidden-import nodriver \
             --hidden-import loguru \

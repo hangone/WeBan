@@ -18,7 +18,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv run pyinstaller --noconfirm --onefile \
     --name WeBan \
     --add-data "captcha_model.onnx:." \
-    --add-data "answer/answer.json:answer" \
+    --add-data "answer/answer.json:answer/answer.json" \
     --add-data "config.example.toml:." \
     --hidden-import nodriver \
     --hidden-import loguru \
