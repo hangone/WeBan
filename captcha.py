@@ -860,7 +860,6 @@ class CaptchaHandler:
             if isinstance(res, dict) and res.get("ret") == 0 and res.get("ticket"):
                 return {"randstr": res["randstr"], "ticket": res["ticket"]}
             raise RuntimeError(f"验证码未通过: ret={res.get('ret') if isinstance(res, dict) else res}")
-            await asyncio.sleep(0.3)
         raise RuntimeError("等待验证码回调超时")
 
     async def _run_captcha(self, tab, app_id: str) -> Dict[str, str]:
