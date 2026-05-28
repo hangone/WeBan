@@ -2543,6 +2543,10 @@
       {
         "content": "正在做一件有合理目的的行为",
         "isCorrect": 1
+      },
+      {
+        "content": "相对柔弱的个体",
+        "isCorrect": 1
       }
     ],
     "type": 2
@@ -2874,6 +2878,10 @@
       {
         "content": "得寸进尺",
         "isCorrect": 1
+      },
+      {
+        "content": "登台阶",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -7292,7 +7300,7 @@
         "isCorrect": 1
       }
     ],
-    "type": 2
+    "type": 1
   },
   "下面躲避雾霾的方式中错误的是：": {
     "optionList": [
@@ -7526,6 +7534,19 @@
       {
         "content": "其他三个选项皆是",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "不好的柚子囊内果肉少但皮厚，容易按下。": {
+    "optionList": [
+      {
+        "content": "对",
+        "isCorrect": 1
+      },
+      {
+        "content": "错",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -13926,6 +13947,10 @@
       {
         "content": "错，应该弃绝的是不当的锻炼方式",
         "isCorrect": 1
+      },
+      {
+        "content": "同意",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -17149,6 +17174,18 @@
       {
         "content": "剧烈运动后，胃肠和咽部如果突然受到大量冷饮的刺激，就会出现腹痛、腹泻或咽部疼痛、发音嘶哑、咳嗽以及其它病症。",
         "isCorrect": 1
+      },
+      {
+        "content": "人们在剧烈运动后会体温升高、咽部充血",
+        "isCorrect": 1
+      },
+      {
+        "content": "剧烈运动后，胃肠和咽部如果突然受到大量冷饮的刺激，就会出现腹痛、腹泻或咽部疼痛、发音嘶哑、咳嗽以及其它病症",
+        "isCorrect": 1
+      },
+      {
+        "content": "剧烈运动后立刻大量喝冷饮能快速降温、有益健康",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -28464,6 +28501,10 @@
       {
         "content": "24小时之后",
         "isCorrect": 1
+      },
+      {
+        "content": "12小时之后",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -29039,6 +29080,14 @@
       },
       {
         "content": "先断电，再灭火。",
+        "isCorrect": 1
+      },
+      {
+        "content": "立刻用灭火器灭火",
+        "isCorrect": 2
+      },
+      {
+        "content": "先断电，再灭火",
         "isCorrect": 1
       }
     ],
@@ -31509,6 +31558,22 @@
       },
       {
         "content": "风景好的休息场所。",
+        "isCorrect": 1
+      },
+      {
+        "content": "食堂",
+        "isCorrect": 1
+      },
+      {
+        "content": "教室",
+        "isCorrect": 1
+      },
+      {
+        "content": "运动场",
+        "isCorrect": 1
+      },
+      {
+        "content": "风景好的休息场所",
         "isCorrect": 1
       }
     ],
@@ -37261,6 +37326,23 @@
     ],
     "type": 2
   },
+  "户外迷路时，可通过哪些方式求救？": {
+    "optionList": [
+      {
+        "content": "电话报警",
+        "isCorrect": 1
+      },
+      {
+        "content": "发求救信号",
+        "isCorrect": 1
+      },
+      {
+        "content": "大声呼喊，漫无目的乱跑",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
   "户外野游存在较高的安全风险，关于野游过程中的体能管理，下列说法错误的是：": {
     "optionList": [
       {
@@ -37489,6 +37571,18 @@
       },
       {
         "content": "当然可以拼车，便宜呀。",
+        "isCorrect": 2
+      },
+      {
+        "content": "单身一人的时候绝不和人拼车",
+        "isCorrect": 1
+      },
+      {
+        "content": "当然可以拼车，便宜呀",
+        "isCorrect": 2
+      },
+      {
+        "content": "夜晚独行主动找人拼车分摊车费",
         "isCorrect": 2
       }
     ],
@@ -38378,6 +38472,10 @@
       {
         "content": "不贪、不慌、不轻信",
         "isCorrect": 1
+      },
+      {
+        "content": "按要求点击对方发来的陌生链接",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -42176,6 +42274,18 @@
       {
         "content": "要警惕校园里的小偷。",
         "isCorrect": 1
+      },
+      {
+        "content": "不用值钱的东西占座",
+        "isCorrect": 1
+      },
+      {
+        "content": "不要认为校园路不拾遗，要有防盗意识",
+        "isCorrect": 1
+      },
+      {
+        "content": "要警惕校园里的小偷",
+        "isCorrect": 1
       }
     ],
     "type": 2
@@ -42991,6 +43101,19 @@
     "type": 2
   },
   "根据我国《刑法》规定，侮辱妇女的将会被判处？": {
+    "optionList": [
+      {
+        "content": "处五年以下有期徒刑或者拘役",
+        "isCorrect": 1
+      },
+      {
+        "content": "罚款",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "根据我国《刑法》规定，强制侮辱妇女的将会被判处？": {
     "optionList": [
       {
         "content": "处五年以下有期徒刑或者拘役",
@@ -50738,6 +50861,14 @@
       {
         "content": "没有，60w的灯不是很常见吗？",
         "isCorrect": 2
+      },
+      {
+        "content": "有，灯泡可能引燃蚊帐",
+        "isCorrect": 1
+      },
+      {
+        "content": "没有，60w的灯很常见",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -52361,6 +52492,10 @@
       {
         "content": "髂胫束综合征",
         "isCorrect": 1
+      },
+      {
+        "content": "髌骨骨裂",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -54215,6 +54350,18 @@
       {
         "content": "远行戴头盔。",
         "isCorrect": 1
+      },
+      {
+        "content": "控速度",
+        "isCorrect": 1
+      },
+      {
+        "content": "不带重物",
+        "isCorrect": 1
+      },
+      {
+        "content": "远行戴头盔",
+        "isCorrect": 1
       }
     ],
     "type": 2
@@ -55416,6 +55563,14 @@
       {
         "content": "错。",
         "isCorrect": 2
+      },
+      {
+        "content": "对",
+        "isCorrect": 1
+      },
+      {
+        "content": "错",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -56609,6 +56764,18 @@
       {
         "content": "20-25公里每小时。",
         "isCorrect": 2
+      },
+      {
+        "content": "10-12公里每小时",
+        "isCorrect": 1
+      },
+      {
+        "content": "15-18公里每小时",
+        "isCorrect": 2
+      },
+      {
+        "content": "20-25公里每小时",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -56972,6 +57139,19 @@
       }
     ],
     "type": 2
+  },
+  "骚扰类的“色狼”更多在下面哪种地点出没？": {
+    "optionList": [
+      {
+        "content": "人多拥挤",
+        "isCorrect": 1
+      },
+      {
+        "content": "人烟稀少",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "髌股疼痛综合征最好的辅助治疗是什么？": {
     "optionList": [
