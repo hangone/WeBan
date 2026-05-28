@@ -48,12 +48,29 @@ python main.py # 或 uv run main.py
 
 ### Docker
 
+**完整镜像**（内置 Chromium，开箱即用）：
+
 ```bash
 docker run -it --rm \
   -v "$PWD/config.toml":/app/config.toml:ro \
   -v "$PWD/logs":/app/logs \
   hangyi/weban
 ```
+
+**精简镜像**（无内置浏览器，体积更小，需挂载宿主机浏览器）：
+
+```bash
+docker run -it --rm \
+  -v "$PWD/config.toml":/app/config.toml:ro \
+  -v "$PWD/logs":/app/logs \
+  -v "/usr/bin/google-chrome:/usr/bin/chromium:ro" \
+  -e CHROMIUM_BINARY=/usr/bin/chromium \
+  --cap-add=SYS_ADMIN \
+  hangyi/weban:slim
+```
+
+> 将 `/usr/bin/google-chrome` 替换为你系统中 Chrome/Chromium 的实际路径。macOS 示例：
+> `-v "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome:/usr/bin/chromium:ro"`
 
 首次使用先从 [config.example.toml](config.example.toml) 复制一份 `config.toml` 并填写账号信息。
 
