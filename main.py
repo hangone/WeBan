@@ -221,7 +221,7 @@ def run_account(account_config: dict, global_settings: dict, ai_config: dict, ac
 
         if study:
             mode_desc = {"true": "正常", "force": "强制重新学习"}.get(study_mode, study_mode)
-            log.info(f"开始学习 (模式: {mode_desc}, 每个任务时长: {study_time}s per course)")
+            log.info(f"开始学习 (模式: {mode_desc})")
             client.run_study(study_time, study_mode)
         else:
             log.info("学习模式已关闭，跳过所有学习任务")

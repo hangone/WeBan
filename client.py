@@ -410,7 +410,7 @@ class WeBanClient:
 
     # ---- study --------------------------------------------------------------
 
-    def run_study(self, study_time: str, study_mode: str = "true") -> None:
+    def run_study(self, study_time: str | int, study_mode: str = "true") -> None:
         """主学习流程入口：遍历所有项目 → 分类 → 课程，逐门学习
         :param study_time: 每门课学习时长 "基础时间,随机上限"（秒），如 "20,10"
         :param study_mode: 学习模式，"force" 时忽略完成状态全部重新学习
@@ -418,15 +418,15 @@ class WeBanClient:
         # 解析学习时长
         try:
             parts = str(study_time).split(",")
-            self.study_base_time = int(parts[0])
-            self.study_random_upper = int(parts[1]) if len(parts) > 1 else 0
+            self.study_base_time = max(0, int(parts[0]))
+            self.study_random_upper = max(0, int(parts[1])) if len(parts) > 1 else 0
         except (ValueError, IndexError):
             self.study_base_time = 20
             self.study_random_upper = 10
 
+        self.log.info(f"每门课学习时长: {self._format_duration(self.study_base_time)}~{self._format_duration(self.study_base_time + self.study_random_upper)}")
+
         force_restudy = study_mode == "force"
-        if force_restudy:
-            self.log.info(f"重新学习模式已开启，所有课程将重新学习，每门课程学习 {self._format_duration(self.study_base_time)}~{self._format_duration(self.study_base_time + self.study_random_upper)}")
 
         answers_json = self._load_answers_json(warn_on_fail=True)
 
