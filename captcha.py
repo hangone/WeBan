@@ -1055,9 +1055,14 @@ class CaptchaHandler:
         try:
             # 在终止进程前移除 child handler，避免 asyncio child watcher
             # 在事件循环关闭后尝试回调产生 "Loop is closed" 警告
-            if hasattr(browser, "_process") and browser._process:
+            process = getattr(browser, "_process", None)
+            pid = getattr(process, "pid", None)
+            if pid is not None:
                 try:
-                    asyncio.get_event_loop().remove_child_handler(browser._process.pid)
+                    get_child_watcher = getattr(asyncio, "get_child_watcher", None)
+                    if get_child_watcher is not None:
+                        watcher = get_child_watcher()
+                        watcher.remove_child_handler(pid)
                 except Exception:
                     pass
             browser.stop()
