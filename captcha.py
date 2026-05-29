@@ -681,9 +681,12 @@ def check_browser_health(
             "未找到浏览器，请安装 Chrome 或设置 browser_path / CHROMIUM_BINARY 环境变量"
         )
     try:
+        args = [resolved, "--headless=new", "--no-first-run", "--disable-gpu",
+                "--dump-dom", "data:text/html,<h1>ok</h1>"]
+        if os.environ.get("WEBAN_NO_SANDBOX", "").lower() in ("1", "true", "yes"):
+            args.append("--no-sandbox")
         proc = subprocess.run(
-            [resolved, "--headless=new", "--no-first-run", "--disable-gpu",
-             "--dump-dom", "data:text/html,<h1>ok</h1>"],
+            args,
             capture_output=True, timeout=10,
         )
         if proc.returncode != 0 or b"ok" not in proc.stdout:
