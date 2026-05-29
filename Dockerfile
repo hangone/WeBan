@@ -43,5 +43,6 @@ USER appuser
 WORKDIR /app
 
 ENV CHROMIUM_BINARY=/usr/bin/chromium
+ENV WEBAN_NO_SANDBOX=1
 
 ENTRYPOINT ["/app/WeBan"]
