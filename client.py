@@ -1309,6 +1309,11 @@ class WeBanClient:
 
     # ---- sync answers -------------------------------------------------------
 
+    @staticmethod
+    def _is_valid_answers(answers_json: Any) -> bool:
+        """校验题库是否为有效字典且非空"""
+        return isinstance(answers_json, dict) and bool(answers_json)
+
     def sync_answers(self) -> None:
         """同步答案
         :return: 无返回值
@@ -1320,9 +1325,9 @@ class WeBanClient:
             try:
                 with open(answer_path, encoding="utf-8") as f:
                     answers_json = json.load(f)
-                if not answers_json:
+                if not self._is_valid_answers(answers_json):
                     need_download = True
-            except Exception:
+            except (json.JSONDecodeError, OSError):
                 need_download = True
         
         if need_download:
@@ -1332,8 +1337,11 @@ class WeBanClient:
             try:
                 with open(answer_path, encoding="utf-8") as f:
                     answers_json = json.load(f)
-            except Exception as e:
+            except (json.JSONDecodeError, OSError) as e:
                 self.log.error(f"读取题库失败：{e}")
+                return
+            if not self._is_valid_answers(answers_json):
+                self.log.error("下载的题库格式无效，应为非空 JSON 对象")
                 return
 
         user_project_ids = [
