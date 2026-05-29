@@ -12,7 +12,7 @@ from loguru import logger
 from client import WeBanClient
 from captcha import check_browser_health
 
-VERSION = "v3.8.0"
+VERSION = "v3.8.1"
 
 if getattr(sys, "frozen", False):
     base_path = os.path.dirname(os.path.abspath(sys.executable))
