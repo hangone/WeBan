@@ -1314,16 +1314,27 @@ class WeBanClient:
         :return: 无返回值
         """
         os.makedirs(answer_dir, exist_ok=True)
-        if not os.path.exists(answer_path):
-            self.log.info("题库不存在，正在下载...")
+        need_download = not os.path.exists(answer_path)
+        
+        if not need_download:
+            try:
+                with open(answer_path, encoding="utf-8") as f:
+                    answers_json = json.load(f)
+                if not answers_json:
+                    need_download = True
+            except Exception:
+                need_download = True
+        
+        if need_download:
+            self.log.info("题库不存在或格式错误，正在下载...")
             with open(answer_path, "w", encoding="utf-8") as f:
                 f.write(self.api.download_answer())
-        try:
-            with open(answer_path, encoding="utf-8") as f:
-                answers_json = json.load(f)
-        except Exception as e:
-            self.log.error(f"读取题库失败，请重新下载题库：{e}")
-            return
+            try:
+                with open(answer_path, encoding="utf-8") as f:
+                    answers_json = json.load(f)
+            except Exception as e:
+                self.log.error(f"读取题库失败：{e}")
+                return
 
         user_project_ids = [
             p["userProjectId"] for p in self.api.list_my_project().get("data", [])

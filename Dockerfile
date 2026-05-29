@@ -33,13 +33,9 @@ FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
     chromium \
     && rm -rf /var/lib/apt/lists/* /var/cache/apt/* /tmp/* \
-    && useradd -m -s /bin/bash appuser \
-    && mkdir -p /app/logs \
-    && chown -R appuser:appuser /app
+    && mkdir -p /app/logs
 
-COPY --from=builder --chown=appuser:appuser /build/dist/WeBan /app/WeBan
-
-USER appuser
+COPY --from=builder /build/dist/WeBan /app/WeBan
 WORKDIR /app
 
 ENV CHROMIUM_BINARY=/usr/bin/chromium
