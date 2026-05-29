@@ -23,6 +23,7 @@ else:
     bundle_path = base_path
 answer_dir = os.path.join(base_path, "answer")
 answer_path = os.path.join(answer_dir, "answer.json")
+root_answer_path = os.path.join(base_path, "answer.json")
 bundle_answer_path = os.path.join(bundle_path, "answer", "answer.json")
 
 
@@ -249,7 +250,13 @@ class WeBanClient:
         :return: 清洗后的题目标题 → 正确答案内容列表的映射
         """
         answers: dict = {}
-        load_path = answer_path if os.path.exists(answer_path) else bundle_answer_path
+        # 优先级: 根目录 answer.json > answer/answer.json > 打包内置
+        if os.path.exists(root_answer_path):
+            load_path = root_answer_path
+        elif os.path.exists(answer_path):
+            load_path = answer_path
+        else:
+            load_path = bundle_answer_path
         try:
             with open(load_path, encoding="utf-8") as f:
                 for title, options in json.load(f).items():
