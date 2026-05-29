@@ -6,11 +6,12 @@ on:
       - "v*"
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 env:
   PYTHONIOENCODING: utf-8
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -37,7 +38,7 @@ jobs:
           os_name=$(echo "${{ runner.os }}" | tr '[:upper:]' '[:lower:]')
           arch=$(echo "${{ runner.arch }}" | tr '[:upper:]' '[:lower:]')
           ext=""
-          [[ "${{ runner.os }}" == "Windows" ]] && ext=".exe"
+          [[ "$os_name" == "windows" ]] && ext=".exe"
           name="WeBan-${os_name}-${arch}${ext}"
 
           sep=$(python -c "import os; print(os.pathsep)")
@@ -62,28 +63,18 @@ jobs:
           if-no-files-found: error
 
   docker:
-    name: Docker ${{ matrix.variant }}
-    runs-on: ubuntu-latest
+    name: Docker ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - variant: full
-            file: Dockerfile
-            tags: |
-              type=semver,pattern={{version}}
-              type=semver,pattern={{major}}.{{minor}}
-              type=raw,value=latest
-          - variant: slim
-            file: Dockerfile.slim
-            tags: |
-              type=semver,pattern={{version}}-slim
-              type=semver,pattern={{major}}.{{minor}}-slim
-              type=raw,value=slim
+          - platform: amd64
+            runner: ubuntu-latest
+          - platform: arm64
+            runner: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v6
-
-      - uses: docker/setup-qemu-action@v4
 
       - uses: docker/setup-buildx-action@v4
 
@@ -92,32 +83,70 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - uses: docker/build-push-action@v7
+        id: build
+        with:
+          context: .
+          platforms: linux/${{ matrix.platform }}
+          outputs: type=image,push-by-digest=true,name=${{ secrets.DOCKERHUB_USERNAME }}/weban,push=true
+          provenance: false
+          cache-from: type=gha,scope=${{ matrix.platform }}
+          cache-to: type=gha,scope=${{ matrix.platform }},mode=max
+
+      - name: Export digest
+        run: echo "${{ steps.build.outputs.digest }}" > digest-${{ matrix.platform }}.txt
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: digest-${{ matrix.platform }}
+          path: digest-${{ matrix.platform }}.txt
+
+  docker-merge:
+    name: Docker merge
+    needs: docker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: digest-*
+          path: digests
+          merge-multiple: true
+
       - uses: docker/metadata-action@v6
         id: meta
         with:
           images: ${{ secrets.DOCKERHUB_USERNAME }}/weban
-          tags: ${{ matrix.tags }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
 
-      - uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: ${{ matrix.file }}
-          platforms: linux/amd64,linux/arm64
-          push: true
-          provenance: false
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Merge multi-platform manifests
+        run: |
+          img="${{ secrets.DOCKERHUB_USERNAME }}/weban"
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            "$img@$(cat digests/digest-amd64.txt)" \
+            "$img@$(cat digests/digest-arm64.txt)"
 
   release:
     name: Release
-    needs: [build, docker]
+    permissions:
+      contents: write
+    needs: [build, docker-merge]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v8
         with:
+          pattern: WeBan-*
           path: artifacts
           merge-multiple: true
 
