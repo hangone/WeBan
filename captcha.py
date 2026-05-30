@@ -652,17 +652,37 @@ class LoginCaptchaSolver:
 # ── 浏览器自动检测 ──────────────────────────────────────
 
 
+def _find_playwright_browser() -> Optional[str]:
+    """检测 Playwright 安装的 Chrome/Chromium 路径。"""
+    pw_dir = Path.home() / ".cache" / "ms-playwright"
+    if not pw_dir.is_dir():
+        return None
+    system = platform.system()
+    patterns = {
+        "Linux": "chromium-*/chrome-linux/chrome",
+        "Darwin": "chromium-*/chrome-mac/Chromium.app/Contents/MacOS/Chromium",
+        "Windows": "chromium-*/chrome-win/chrome.exe",
+    }
+    pattern = patterns.get(system)
+    if pattern:
+        matches = sorted(pw_dir.glob(pattern), reverse=True)
+        if matches:
+            return str(matches[0])
+    return None
+
+
 def detect_browser() -> Optional[str]:
-    """自动检测系统中已安装的 Chrome/Chromium 浏览器路径。
+    """自动检测本地已安装的 Chrome/Chromium 浏览器路径。
 
-    检查顺序：环境变量 CHROMIUM_BINARY / CHROME_BINARY → 平台默认路径
+    检查顺序：Playwright → 系统默认路径
+    环境变量和 CDP 由 check_browser_health 处理。
     """
-    # 环境变量优先（Docker 等场景）
-    for env_var in ("CHROMIUM_BINARY", "CHROME_BINARY"):
-        path = os.environ.get(env_var, "")
-        if path and os.path.isfile(path):
-            return path
+    # 1. Playwright 安装的浏览器
+    pw = _find_playwright_browser()
+    if pw:
+        return pw
 
+    # 2. 系统默认路径
     system = platform.system()
     candidates: list[str] = []
     if system == "Darwin":
@@ -708,21 +728,35 @@ def check_browser_health(
     cdp_host: Optional[str] = None,
     cdp_port: Optional[int] = None,
 ) -> str:
-    """检测浏览器是否能正常启动。
+    """按优先级检测可用的浏览器：用户指定 → CDP → Playwright → 系统。
 
-    :param browser_path: 浏览器可执行文件路径，留空则自动查找
-    :param cdp_host: CDP 远程调试地址（CDP 模式跳过本地启动检测）
+    :param browser_path: 浏览器可执行文件路径（环境变量或配置文件指定）
+    :param cdp_host: CDP 远程调试地址
     :param cdp_port: CDP 远程调试端口
-    :return: 浏览器路径或地址
-    :raises RuntimeError: 浏览器无法启动时
+    :return: 浏览器路径或 CDP 地址
+    :raises RuntimeError: 无可用浏览器时
     """
+    # 1. 用户显式指定的浏览器路径
+    for env_var in ("CHROMIUM_BINARY", "CHROME_BINARY"):
+        env_path = os.environ.get(env_var, "")
+        if env_path and os.path.isfile(env_path):
+            return env_path
+    if browser_path and os.path.isfile(browser_path):
+        return browser_path
+
+    # 2. CDP 远程调试
     if cdp_host and cdp_port:
         return f"{cdp_host}:{cdp_port}"
 
-    resolved = browser_path or detect_browser()
+    # 3. Playwright / 系统浏览器（detect_browser 内部按 Playwright → 系统排序）
+    resolved = detect_browser()
     if not resolved:
         raise RuntimeError(
-            "未找到浏览器，请安装 Chrome 或设置 browser_path / CHROMIUM_BINARY 环境变量"
+            "未找到浏览器。请通过以下方式之一提供：\n"
+            "  1. 设置环境变量 CHROMIUM_BINARY 或配置 browser_path\n"
+            "  2. 配置 cdp_host 和 cdp_port 连接远程浏览器\n"
+            "  3. 安装 Playwright: pip install playwright && playwright install chromium\n"
+            "  4. 安装 Chrome 或 Chromium"
         )
     try:
         args = [
