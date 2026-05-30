@@ -625,6 +625,19 @@
     ],
     "type": 1
   },
+  "In China, how many types of fire are there?": {
+    "optionList": [
+      {
+        "content": "Six.",
+        "isCorrect": 1
+      },
+      {
+        "content": "Four.",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "In addition to the explosion, how often does it take to control the fire after a fire?": {
     "optionList": [
       {
@@ -3668,6 +3681,19 @@
       {
         "content": "好长时间不联系曾经也是朋友啊，直接借给这个朋友",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "一个心地善良的人会以为别人都是善良的；一个经常算计别人的人就会觉得别人也在算计他，这就是心理学上说的：": {
+    "optionList": [
+      {
+        "content": "投射效应",
+        "isCorrect": 1
+      },
+      {
+        "content": "羊群效应",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -32028,6 +32054,10 @@
       {
         "content": "积极心态。",
         "isCorrect": 1
+      },
+      {
+        "content": "消极心态。",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -33584,6 +33614,27 @@
       },
       {
         "content": "顺从他人",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "常被骗的人，可能存在的共同特征之一是？": {
+    "optionList": [
+      {
+        "content": "尊重他人",
+        "isCorrect": 2
+      },
+      {
+        "content": "容易被小便宜吸引",
+        "isCorrect": 1
+      },
+      {
+        "content": "不轻易转账",
+        "isCorrect": 2
+      },
+      {
+        "content": "警惕性强",
         "isCorrect": 2
       }
     ],
@@ -37465,6 +37516,10 @@
       {
         "content": "立即接听",
         "isCorrect": 1
+      },
+      {
+        "content": "骗子太多，赶快挂掉",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -37943,6 +37998,10 @@
       {
         "content": "对",
         "isCorrect": 1
+      },
+      {
+        "content": "错",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -39169,6 +39228,18 @@
       },
       {
         "content": "努力带着溺水者游向安全地带。",
+        "isCorrect": 2
+      },
+      {
+        "content": "放手自沉，使溺水者手松开，再进行救护",
+        "isCorrect": 1
+      },
+      {
+        "content": "努力带着溺水者游向安全地带",
+        "isCorrect": 2
+      },
+      {
+        "content": "强行掰开对方手臂拉扯",
         "isCorrect": 2
       }
     ],
@@ -48216,6 +48287,19 @@
       {
         "content": "美国",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "破窗理论是谁提出的？": {
+    "optionList": [
+      {
+        "content": "詹姆士·威尔逊和乔治·凯林",
+        "isCorrect": 1
+      },
+      {
+        "content": "詹姆士·威尔逊",
+        "isCorrect": 2
       }
     ],
     "type": 1
