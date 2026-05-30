@@ -75,19 +75,21 @@ def _suppress_asyncio_childwatcher():
         logger.setLevel(prev)
         # 程序退出时 patch transport 析构，抑制 "Event loop is closed" 异常
         _orig_del = BaseSubprocessTransport.__del__
+
         def _safe_del(self):
             try:
                 _orig_del(self)
             except RuntimeError:
                 pass
-        atexit.register(setattr, BaseSubprocessTransport, '__del__', _safe_del)
+
+        atexit.register(setattr, BaseSubprocessTransport, "__del__", _safe_del)
 
 
 # 腾讯验证码 SDK 地址
 TCAPTCHA_SDK_URL = "https://turing.captcha.qcloud.com/TJCaptcha.js"
 
 # 验证码 appId
-EXAM_CAPTCHA_APP_ID = "190330343"    # 无感验证码（考试）
+EXAM_CAPTCHA_APP_ID = "190330343"  # 无感验证码（考试）
 COURSE_CAPTCHA_APP_ID = "195119536"  # 图片点选验证码（课程完成）
 
 # 默认入口页面
@@ -138,8 +140,9 @@ _QUERY_JS = r"""
 # ── 图像工具 ──────────────────────────────────────────
 
 
-def normalize_mask(binary_mask: np.ndarray, canvas_size: int = 48,
-                   symbol_size: int = 34) -> Optional[np.ndarray]:
+def normalize_mask(
+    binary_mask: np.ndarray, canvas_size: int = 48, symbol_size: int = 34
+) -> Optional[np.ndarray]:
     """将二值 mask 缩放到固定画布大小，用于后续模板比较。
 
     :param binary_mask: 单通道二值图 (0/255)
@@ -170,7 +173,7 @@ def normalize_mask(binary_mask: np.ndarray, canvas_size: int = 48,
     canvas = np.zeros((canvas_size, canvas_size), dtype=np.uint8)
     oy = (canvas_size - new_h) // 2
     ox = (canvas_size - new_w) // 2
-    canvas[oy:oy + new_h, ox:ox + new_w] = resized
+    canvas[oy : oy + new_h, ox : ox + new_w] = resized
     return canvas
 
 
@@ -201,8 +204,9 @@ def crop_foreground(mask: np.ndarray) -> Optional[np.ndarray]:
     return mask[y1:y2, x1:x2]
 
 
-def match_cost(query: np.ndarray, candidate: np.ndarray,
-               allow_rotate: bool = True) -> float:
+def match_cost(
+    query: np.ndarray, candidate: np.ndarray, allow_rotate: bool = True
+) -> float:
     """计算两个归一化模板之间的匹配代价 (像素差值之和)。
 
     :param query: 48x48 归一化模板 (待查询)
@@ -229,8 +233,9 @@ def match_cost(query: np.ndarray, candidate: np.ndarray,
     return best
 
 
-def locate_with_template(query_mask: np.ndarray,
-                         main_mask: np.ndarray) -> Tuple[float, Optional[Tuple[int, int]]]:
+def locate_with_template(
+    query_mask: np.ndarray, main_mask: np.ndarray
+) -> Tuple[float, Optional[Tuple[int, int]]]:
     """在主图二值 mask 中定位查询符号的位置 (多尺度 + 旋转模板匹配)。
 
     :param query_mask: 提示图中单个符号的原始二值 mask
@@ -268,7 +273,10 @@ def locate_with_template(query_mask: np.ndarray,
             rotated = crop_foreground(rotated)
             if rotated is None:
                 continue
-            if rotated.shape[0] >= main_mask.shape[0] or rotated.shape[1] >= main_mask.shape[1]:
+            if (
+                rotated.shape[0] >= main_mask.shape[0]
+                or rotated.shape[1] >= main_mask.shape[1]
+            ):
                 continue
             if np.count_nonzero(rotated) < 40:
                 continue
@@ -287,7 +295,9 @@ def locate_with_template(query_mask: np.ndarray,
 # ── 提示图 / 主图解析 ─────────────────────────────────
 
 
-def _extract_query_templates(prompt_img: np.ndarray) -> Tuple[List[Optional[np.ndarray]], List[np.ndarray]]:
+def _extract_query_templates(
+    prompt_img: np.ndarray,
+) -> Tuple[List[Optional[np.ndarray]], List[np.ndarray]]:
     """从提示图 (顶部灰色 3 格题目条) 提取 3 个模板和原始 mask。
 
     :param prompt_img: BGR 格式的提示图 (包含顶部灰色条和下方箭头等)
@@ -299,7 +309,9 @@ def _extract_query_templates(prompt_img: np.ndarray) -> Tuple[List[Optional[np.n
     gray_mask = ((top_gray > 110) & (top_gray < 220)).astype(np.uint8) * 255
     gray_mask = cv2.morphologyEx(gray_mask, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
 
-    num_labels, _labels, stats, _centroids = cv2.connectedComponentsWithStats(gray_mask, connectivity=8)
+    num_labels, _labels, stats, _centroids = cv2.connectedComponentsWithStats(
+        gray_mask, connectivity=8
+    )
     strip_box = None
     best_area = -1
     for i in range(1, num_labels):
@@ -313,14 +325,16 @@ def _extract_query_templates(prompt_img: np.ndarray) -> Tuple[List[Optional[np.n
         strip_box = (0, 0, top_w, top_h)
 
     sx, sy, sw, sh = strip_box
-    strip_roi = prompt_img[sy:sy + sh, sx:sx + sw]
+    strip_roi = prompt_img[sy : sy + sh, sx : sx + sw]
     strip_roi_gray = cv2.cvtColor(strip_roi, cv2.COLOR_BGR2GRAY)
     query_cells = np.array_split(strip_roi_gray, 3, axis=1)
 
     query_templates: List[Optional[np.ndarray]] = []
     query_raw_masks: List[np.ndarray] = []
     for cell in query_cells:
-        _, cell_bw = cv2.threshold(cell, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+        _, cell_bw = cv2.threshold(
+            cell, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
+        )
         cell_bw[:2, :] = 0
         cell_bw[-2:, :] = 0
         cell_bw[:, :2] = 0
@@ -353,7 +367,9 @@ def _extract_main_candidates(main_img: np.ndarray) -> Tuple[List[dict], np.ndarr
     symbol_bw = cv2.morphologyEx(symbol_bw, cv2.MORPH_OPEN, np.ones((2, 2), np.uint8))
     template_main_bw = symbol_bw.copy()
 
-    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(symbol_bw, connectivity=8)
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
+        symbol_bw, connectivity=8
+    )
     candidates: List[dict] = []
     for i in range(1, num_labels):
         x, y, w, h, area = stats[i]
@@ -364,7 +380,9 @@ def _extract_main_candidates(main_img: np.ndarray) -> Tuple[List[dict], np.ndarr
         if w / max(h, 1) > 3.0 or h / max(w, 1) > 3.0:
             continue
 
-        component_mask = np.where(labels[y:y + h, x:x + w] == i, 255, 0).astype(np.uint8)
+        component_mask = np.where(labels[y : y + h, x : x + w] == i, 255, 0).astype(
+            np.uint8
+        )
         normalized = normalize_mask(component_mask)
         if normalized is None:
             continue
@@ -383,8 +401,9 @@ def _extract_main_candidates(main_img: np.ndarray) -> Tuple[List[dict], np.ndarr
 # ── 核心识别接口 ──────────────────────────────────────
 
 
-def detect_points(prompt_img: np.ndarray,
-                  main_img: np.ndarray) -> Tuple[List[Optional[Tuple[int, int]]], List[dict]]:
+def detect_points(
+    prompt_img: np.ndarray, main_img: np.ndarray
+) -> Tuple[List[Optional[Tuple[int, int]]], List[dict]]:
     """识别点选验证码的点击顺序。
 
     :param prompt_img: BGR 格式的提示图 (顶部显示 3 个待匹配符号)
@@ -456,7 +475,9 @@ def detect_points(prompt_img: np.ndarray,
         for j, point in enumerate(ordered_points):
             if j == i or point is None:
                 continue
-            distance = ((point[0] - new_point[0]) ** 2 + (point[1] - new_point[1]) ** 2) ** 0.5
+            distance = (
+                (point[0] - new_point[0]) ** 2 + (point[1] - new_point[1]) ** 2
+            ) ** 0.5
             if distance < 26:
                 too_close = True
                 break
@@ -470,9 +491,11 @@ def detect_points(prompt_img: np.ndarray,
     return ordered_points, candidates
 
 
-def render_debug(main_img: np.ndarray,
-                 ordered_points: List[Optional[Tuple[int, int]]],
-                 candidates: List[dict]) -> np.ndarray:
+def render_debug(
+    main_img: np.ndarray,
+    ordered_points: List[Optional[Tuple[int, int]]],
+    candidates: List[dict],
+) -> np.ndarray:
     """在主图上绘制候选框和识别结果，用于可视化调试。
 
     :param main_img: BGR 格式的主图
@@ -493,8 +516,15 @@ def render_debug(main_img: np.ndarray,
         if point is None:
             continue
         cv2.circle(vis, point, 16, (0, 255, 0), 2)
-        cv2.putText(vis, str(idx), (point[0] - 6, point[1] + 6),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+        cv2.putText(
+            vis,
+            str(idx),
+            (point[0] - 6, point[1] + 6),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.8,
+            (0, 255, 0),
+            2,
+        )
     return vis
 
 
@@ -507,7 +537,9 @@ def fetch_image(url: str) -> np.ndarray:
     :raises requests.HTTPError: HTTP 请求失败时
     """
     headers = {
-        "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"),
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
+        ),
         "Referer": "https://turing.captcha.qcloud.com/",
     }
     resp = requests.get(url, headers=headers, timeout=10)
@@ -534,7 +566,7 @@ class LoginCaptchaSolver:
             print(f"识别结果: {code}")
     """
 
-    _ocr: Any = None       # cv2.dnn.Net 或 False (不可用)
+    _ocr: Any = None  # cv2.dnn.Net 或 False (不可用)
     _initialized: bool = False
     _lock = threading.Lock()
     _charset = "0123456789abcdefghijklmnopqrstuvwxyz"
@@ -553,7 +585,7 @@ class LoginCaptchaSolver:
                 if not cls._initialized:
                     try:
                         if getattr(sys, "frozen", False):
-                            model_path = Path(sys._MEIPASS) / "captcha_model.onnx"
+                            model_path = Path(sys._MEIPASS) / "captcha_model.onnx"  # type: ignore[attr-defined]
                         else:
                             model_path = Path(__file__).parent / "captcha_model.onnx"
 
@@ -586,16 +618,22 @@ class LoginCaptchaSolver:
             return None
         try:
             arr = cv2.imdecode(np.frombuffer(image, np.uint8), cv2.IMREAD_GRAYSCALE)
+            if arr is None:
+                return None
             h, w = arr.shape
             seg_w = w // 4
 
             result = []
             for i in range(4):
-                char_img = arr[:, i * seg_w:(i + 1) * seg_w if i < 3 else w]
-                resized = cv2.resize(char_img, (cls._char_size, cls._char_size),
-                                     interpolation=cv2.INTER_LINEAR)
+                char_img = arr[:, i * seg_w : (i + 1) * seg_w if i < 3 else w]
+                resized = cv2.resize(
+                    char_img,
+                    (cls._char_size, cls._char_size),
+                    interpolation=cv2.INTER_LINEAR,
+                )
                 inp = (resized.astype(np.float32) / 255.0).reshape(
-                    1, 1, cls._char_size, cls._char_size)
+                    1, 1, cls._char_size, cls._char_size
+                )
                 with cls._lock:
                     ocr.setInput(inp)
                     out = ocr.forward()
@@ -648,10 +686,16 @@ def detect_browser() -> Optional[str]:
         pf = os.environ.get("PROGRAMFILES", "")
         pf86 = os.environ.get("PROGRAMFILES(X86)", "")
         candidates = [
-            *[str(Path(p) / "Google/Chrome/Application/chrome.exe")
-              for p in (local, pf, pf86) if p],
-            *[str(Path(p) / "Chromium/Application/chrome.exe")
-              for p in (local, pf, pf86) if p],
+            *[
+                str(Path(p) / "Google/Chrome/Application/chrome.exe")
+                for p in (local, pf, pf86)
+                if p
+            ],
+            *[
+                str(Path(p) / "Chromium/Application/chrome.exe")
+                for p in (local, pf, pf86)
+                if p
+            ],
         ]
     for p in candidates:
         if os.path.isfile(p):
@@ -681,16 +725,25 @@ def check_browser_health(
             "未找到浏览器，请安装 Chrome 或设置 browser_path / CHROMIUM_BINARY 环境变量"
         )
     try:
-        args = [resolved, "--headless=new", "--no-first-run", "--disable-gpu",
-                "--dump-dom", "data:text/html,<h1>ok</h1>"]
+        args = [
+            resolved,
+            "--headless=new",
+            "--no-first-run",
+            "--disable-gpu",
+            "--dump-dom",
+            "data:text/html,<h1>ok</h1>",
+        ]
         if os.environ.get("WEBAN_NO_SANDBOX", "").lower() in ("1", "true", "yes"):
             args.append("--no-sandbox")
         proc = subprocess.run(
             args,
-            capture_output=True, timeout=10,
+            capture_output=True,
+            timeout=10,
         )
         if proc.returncode != 0 or b"ok" not in proc.stdout:
-            raise RuntimeError(f"浏览器启动失败 (exit={proc.returncode}): {proc.stderr.decode()[:200]}")
+            raise RuntimeError(
+                f"浏览器启动失败 (exit={proc.returncode}): {proc.stderr.decode()[:200]}"
+            )
     except FileNotFoundError:
         raise RuntimeError(f"浏览器可执行文件不存在: {resolved}")
     except subprocess.TimeoutExpired:
@@ -700,14 +753,21 @@ def check_browser_health(
 
 # ── CaptchaHandler ────────────────────────────────────
 
+
 class CaptchaHandler:
     """通过浏览器处理腾讯验证码"""
 
-    def __init__(self, tenant_code: str, user_id: str, token: str, log,
-                 browser_path: Optional[str] = None,
-                 cdp_host: Optional[str] = None,
-                 cdp_port: Optional[int] = None,
-                 debug_dir: Optional[Path] = None) -> None:
+    def __init__(
+        self,
+        tenant_code: str,
+        user_id: str,
+        token: str,
+        log,
+        browser_path: Optional[str] = None,
+        cdp_host: Optional[str] = None,
+        cdp_port: Optional[int] = None,
+        debug_dir: Optional[Path] = None,
+    ) -> None:
         """初始化验证码处理器。
 
         :param tenant_code: 租户编码
@@ -735,10 +795,14 @@ class CaptchaHandler:
     @staticmethod
     async def _eval_json(tab, expression: str) -> Optional[dict]:
         """执行 JS 并将结果转为 Python dict（处理 nodriver 的 RemoteObject 反序列化）。"""
-        res = await tab.evaluate(expression, return_by_value=True)
+        res: Any = await tab.evaluate(expression, return_by_value=True)
         if isinstance(res, cdp.runtime.RemoteObject):
-            if res.deep_serialized_value and res.deep_serialized_value.type_ == "object":
-                return _dsv_to_py(res.deep_serialized_value)
+            if (
+                res.deep_serialized_value
+                and res.deep_serialized_value.type_ == "object"
+            ):
+                result = _dsv_to_py(res.deep_serialized_value)
+                return result if isinstance(result, dict) else None
             return None
         if isinstance(res, dict):
             return res
@@ -753,7 +817,11 @@ class CaptchaHandler:
         窗口尺寸 428x818 模拟移动端以匹配腾讯验证码的移动版 UI。
         """
         browser_path = self.browser_path or detect_browser()
-        no_sandbox = os.environ.get("WEBAN_NO_SANDBOX", "").lower() in ("1", "true", "yes")
+        no_sandbox = os.environ.get("WEBAN_NO_SANDBOX", "").lower() in (
+            "1",
+            "true",
+            "yes",
+        )
         browser_args = [
             "--window-size=428,818",
             "--mute-audio",
@@ -799,7 +867,9 @@ class CaptchaHandler:
             }}
         """)
         for _ in range(20):
-            loaded = await tab.evaluate("(() => typeof TencentCaptcha !== 'undefined')()", return_by_value=True)
+            loaded = await tab.evaluate(
+                "(() => typeof TencentCaptcha !== 'undefined')()", return_by_value=True
+            )
             if loaded is True:
                 return
             await asyncio.sleep(0.5)
@@ -862,7 +932,9 @@ class CaptchaHandler:
                 continue
             if isinstance(res, dict) and res.get("ret") == 0 and res.get("ticket"):
                 return {"randstr": res["randstr"], "ticket": res["ticket"]}
-            raise RuntimeError(f"验证码未通过: ret={res.get('ret') if isinstance(res, dict) else res}")
+            raise RuntimeError(
+                f"验证码未通过: ret={res.get('ret') if isinstance(res, dict) else res}"
+            )
         raise RuntimeError("等待验证码回调超时")
 
     async def _run_captcha(self, tab, app_id: str) -> Dict[str, str]:
@@ -905,7 +977,10 @@ class CaptchaHandler:
         s = await CaptchaHandler._eval_json(tab, _QUERY_JS)
         if not s:
             return None
-        if not (s.get("bgUrl", "").startswith("http") and s.get("ansUrl", "").startswith("http")):
+        if not (
+            s.get("bgUrl", "").startswith("http")
+            and s.get("ansUrl", "").startswith("http")
+        ):
             return None
         if not s.get("bgRect"):
             return None
@@ -942,7 +1017,9 @@ class CaptchaHandler:
         await tab.mouse_click(rx, ry)
         await asyncio.sleep(1.5)
 
-    async def _auto_solve_once(self, tab, attempt: int, save_debug: bool) -> Optional[Dict]:
+    async def _auto_solve_once(
+        self, tab, attempt: int, save_debug: bool
+    ) -> Optional[Dict]:
         """单次自动识别尝试：抓图 → 识别 → 点击 → 提交。
 
         :param tab: 浏览器标签页对象
@@ -973,9 +1050,13 @@ class CaptchaHandler:
             self._debug_dir.mkdir(parents=True, exist_ok=True)
             stamp = int(time.time() * 1000)
             cv2.imwrite(str(self._debug_dir / f"{stamp}_a{attempt}_main.png"), main_img)
-            cv2.imwrite(str(self._debug_dir / f"{stamp}_a{attempt}_prompt.png"), prompt_img)
-            cv2.imwrite(str(self._debug_dir / f"{stamp}_a{attempt}_debug.png"),
-                        render_debug(main_img, ordered, candidates))
+            cv2.imwrite(
+                str(self._debug_dir / f"{stamp}_a{attempt}_prompt.png"), prompt_img
+            )
+            cv2.imwrite(
+                str(self._debug_dir / f"{stamp}_a{attempt}_debug.png"),
+                render_debug(main_img, ordered, candidates),
+            )
 
         if any(p is None for p in ordered):
             self.log.warning(f"自动识别: 识别有缺失 {ordered}")
@@ -1022,8 +1103,9 @@ class CaptchaHandler:
             self.log.warning(f"自动识别: {exc}")
             return None
 
-    async def _auto_solve_captcha(self, tab, app_id: str, max_retry: int = 10,
-                            save_debug: bool = False) -> Optional[Dict[str, str]]:
+    async def _auto_solve_captcha(
+        self, tab, app_id: str, max_retry: int = 10, save_debug: bool = False
+    ) -> Optional[Dict[str, str]]:
         """尝试自动识别点选验证码，失败时自动刷新重试。
 
         :param tab: 浏览器标签页对象 (已加载 SDK)
@@ -1122,7 +1204,9 @@ class CaptchaHandler:
             "handle_course_captcha() 无法在已运行的事件循环中调用，请改用 handle_course_captcha_async()"
         )
 
-    async def handle_course_captcha_async(self, course_url: Optional[str] = None) -> Dict[str, str]:
+    async def handle_course_captcha_async(
+        self, course_url: Optional[str] = None
+    ) -> Dict[str, str]:
         """处理课程完成时的图片点选验证码（异步版本）。"""
         entry_url = course_url or COURSE_ENTRY_URL
 
