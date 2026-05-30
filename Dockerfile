@@ -1,9 +1,14 @@
-# ── Builder: PyInstaller 打包 ──────────────────────────────
-FROM python:3.12-slim-bookworm AS builder
+# WeBan Docker 镜像
+# 目标:
+#   with-browser   — 内置浏览器，开箱即用
+#   without-browser — 通过 CDP 连接宿主机浏览器
 
+# ── Builder: PyInstaller 打包 ──────────────────────────────
+FROM python:3.12-slim AS builder
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 RUN apt-get update && apt-get install -y --no-install-recommends binutils \
     && rm -rf /var/lib/apt/lists/*
-RUN pip install --no-cache-dir uv
 
 WORKDIR /build
 
@@ -25,20 +30,26 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --hidden-import numpy \
     --hidden-import cv2 \
     --collect-submodules nodriver \
-    main.py
+    main.py \
+    && strip /build/dist/WeBan
 
-# ── Runtime ────────────────────────────────────────────────
-FROM debian:bookworm-slim
-
-RUN apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
-    chromium \
-    && rm -rf /var/lib/apt/lists/* /var/cache/apt/* /tmp/* \
-    && mkdir -p /app/logs
+# ── with-browser: 内置 Chrome headless shell ───────────────
+FROM chromedp/headless-shell:stable AS with-browser
 
 COPY --from=builder /build/dist/WeBan /app/WeBan
 WORKDIR /app
 
-ENV CHROMIUM_BINARY=/usr/bin/chromium
+ENV CHROMIUM_BINARY=/headless-shell/headless-shell
+ENV WEBAN_NO_SANDBOX=1
+
+ENTRYPOINT ["/app/WeBan"]
+
+# ── without-browser: 纯二进制，CDP 连接宿主机浏览器 ────────
+FROM debian:stable-slim AS without-browser
+
+COPY --from=builder /build/dist/WeBan /app/WeBan
+WORKDIR /app
+
 ENV WEBAN_NO_SANDBOX=1
 
 ENTRYPOINT ["/app/WeBan"]

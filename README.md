@@ -49,18 +49,68 @@ python main.py # 或 uv run main.py
 
 ### Docker
 
-**完整镜像**（内置 Chromium，开箱即用）：
+提供两种镜像变体：
+
+| 镜像 | Tag | 说明 |
+|------|-----|------|
+| 内置浏览器 | `latest` / `with-browser` / `<版本号>` | 开箱即用 |
+| 轻量镜像 | `without-browser` / `<版本号>-without-browser` | 通过 CDP 连接宿主机浏览器 |
+
+#### 完整镜像（内置浏览器）
 
 ```bash
 docker run -it --rm \
   -v "$PWD/config.toml":/app/config.toml:ro \
   -v "$PWD/logs":/app/logs \
-  hangyi/weban
+  hangyi/weban:latest
 ```
+
+#### 轻量镜像（CDP 连接宿主机浏览器）
+
+容器会自动检测 Docker 环境并尝试连接宿主机的 Chrome，无需手动配置 CDP。
+
+**第一步：在宿主机启动 Chrome 远程调试**
+
+打开 Chrome，地址栏输入 `chrome://inspect/#remote-debugging`，勾选 **Allow remote debugging for this browser instance**。
+
+或者直接命令行启动带远程调试的 Chrome：
+
+```bash
+# macOS
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --remote-debugging-port=9222
+
+# Linux
+google-chrome --remote-debugging-port=9222
+
+# Windows
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222
+```
+
+> 参考：[Chrome DevTools: Debug your browser session](https://developer.chrome.com/blog/chrome-devtools-mcp-debug-your-browser-session)
+
+**第二步：运行容器**
+
+```bash
+docker run -it --rm \
+  -v "$PWD/config.toml":/app/config.toml:ro \
+  -v "$PWD/logs":/app/logs \
+  hangyi/weban:without-browser
+```
+
+如需自定义 CDP 地址，可在 `config.toml` 中配置 `cdp_host` 和 `cdp_port`。
 
 ## 配置说明
 
 首次使用先从 [config.example.toml](config.example.toml) 复制一份 `config.toml` 并填写账号信息。账号级配置可覆盖全局设置。
+
+### 浏览器检测
+
+程序按以下优先级自动检测可用的浏览器，无需手动配置：
+
+1. **用户指定**：环境变量 `CHROMIUM_BINARY` / 配置文件 `browser_path`
+2. **CDP 远程调试**：配置文件 `cdp_host` + `cdp_port`，或 Docker 环境下自动尝试 `host.docker.internal:9222`
+3. **Playwright 浏览器**：`pip install playwright && playwright install chromium`
+4. **系统浏览器**：自动查找已安装的 Chrome / Chromium
 
 ## 功能特性
 
