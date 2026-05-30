@@ -17,7 +17,7 @@ from captcha import CaptchaHandler, LoginCaptchaSolver
 
 if getattr(sys, "frozen", False):
     base_path = os.path.dirname(os.path.abspath(sys.executable))
-    bundle_path = sys._MEIPASS
+    bundle_path = sys._MEIPASS  # type: ignore[attr-defined]
 else:
     base_path = os.path.dirname(os.path.abspath(__file__))
     bundle_path = base_path
@@ -42,6 +42,7 @@ def clean_text(text):
 # module-level helpers
 # ---------------------------------------------------------------------------
 
+
 def get_source_str(query: dict) -> str:
     """从 URL 参数推断 sourceStr，与 JS 逻辑一致
     :param query: parse_qs 解析后的 URL 查询参数
@@ -63,8 +64,8 @@ def _extract_map(content: str) -> dict:
     :return: {step_index: nonstr_value} 映射，未找到返回空字典
     """
     for pattern in [
-        r'(?:const|var|let)\s+nonstrMap\s*=\s*new\s+Map\(\[([\s\S]*?)\]\)',
-        r'(?:const|var|let)\s+pageIdMap\s*=\s*new\s+Map\(\[([\s\S]*?)\]\)',
+        r"(?:const|var|let)\s+nonstrMap\s*=\s*new\s+Map\(\[([\s\S]*?)\]\)",
+        r"(?:const|var|let)\s+pageIdMap\s*=\s*new\s+Map\(\[([\s\S]*?)\]\)",
     ]:
         match = re.search(pattern, content)
         if match:
@@ -72,7 +73,7 @@ def _extract_map(content: str) -> dict:
             if entries:
                 return {int(step): val for step, val in entries}
     # 退而求其次：匹配任意 Map（变量名未知）
-    for m in re.finditer(r'new\s+Map\(\[([\s\S]*?)\]\)', content):
+    for m in re.finditer(r"new\s+Map\(\[([\s\S]*?)\]\)", content):
         entries = re.findall(r'\[(\d+),\s*[\'"]([^\'"]+)[\'"]\]', m.group(1))
         if entries:
             return {int(step): val for step, val in entries}
@@ -110,7 +111,7 @@ def _count_nav_pages(html: str) -> tuple[int, int]:
         if "page-start" in classes:
             has_start_page = True
             continue  # 单独计数
-        page_match = re.search(r'page-(\d+)', m.group(1))
+        page_match = re.search(r"page-(\d+)", m.group(1))
         if page_match:
             content_pages += 1
 
@@ -118,10 +119,11 @@ def _count_nav_pages(html: str) -> tuple[int, int]:
     question_pages = 0
     for m in re.finditer(
         r'<section\b[^>]*class="([^"]*\bpage-item\b[^"]*)"[^>]*>'
-        r'(?:(?!</section>).)*?(?:data-all-answer|page-commit)',
-        html, re.DOTALL,
+        r"(?:(?!</section>).)*?(?:data-all-answer|page-commit)",
+        html,
+        re.DOTALL,
     ):
-        page_match = re.search(r'page-(\d+)', m.group(1))
+        page_match = re.search(r"page-(\d+)", m.group(1))
         if page_match:
             question_pages += 1
 
@@ -193,7 +195,9 @@ class WeBanClient:
         if user and all([user.get("userId"), user.get("token")]):
             self.api = WeBanAPI(user=user, debug=debug, log=log)
         elif all([self.tenant_name, account, password]):
-            self.api = WeBanAPI(account=account, password=password, debug=debug, log=log)
+            self.api = WeBanAPI(
+                account=account, password=password, debug=debug, log=log
+            )
         else:
             self.api = WeBanAPI(debug=debug, log=log)
         self.tenant_code = self.get_tenant_code()
@@ -294,7 +298,9 @@ class WeBanClient:
         :param task: 任务数据（含 userProjectId）
         :return: 完整的课程播放 URL
         """
-        url = self.api.get_course_url(course["resourceId"], task["userProjectId"])["data"]
+        url = self.api.get_course_url(course["resourceId"], task["userProjectId"])[
+            "data"
+        ]
         url += f"&userProjectId={task['userProjectId']}"
         url += f"&userId={self.api.user['userId']}"
         url += f"&courseId={course['resourceId']}"
@@ -357,7 +363,13 @@ class WeBanClient:
         required = data["requiredNum"] - data["requiredFinishedNum"]
         optional = data["optionalNum"] - data["optionalFinishedNum"]
         push = data["pushNum"] - data["pushFinishedNum"]
-        eta = max(0, int((self.study_base_time + self.study_random_upper / 2) * (required + optional + push)))
+        eta = max(
+            0,
+            int(
+                (self.study_base_time + self.study_random_upper / 2)
+                * (required + optional + push)
+            ),
+        )
         if output:
             eta_str = self._format_duration(eta)
             self.log.info(
@@ -391,7 +403,9 @@ class WeBanClient:
                 if not verify_code:
                     continue
             else:
-                account_id = self.api.account or self.api.user.get("userId") or "unknown"
+                account_id = (
+                    self.api.account or self.api.user.get("userId") or "unknown"
+                )
                 captcha_dir = os.path.join(base_path, "logs", account_id)
                 os.makedirs(captcha_dir, exist_ok=True)
                 captcha_path = os.path.join(captcha_dir, "verify_code.png")
@@ -411,7 +425,9 @@ class WeBanClient:
                 continue
             if self.api.user.get("userId"):
                 return self.api.user
-            self.log.error(f"登录出错，请检查 config.toml 内账号密码，或删除文件后重试: {res}")
+            self.log.error(
+                f"登录出错，请检查 config.toml 内账号密码，或删除文件后重试: {res}"
+            )
             break
         return None
 
@@ -431,7 +447,9 @@ class WeBanClient:
             self.study_base_time = 20
             self.study_random_upper = 10
 
-        self.log.info(f"每门课学习时长: {self._format_duration(self.study_base_time)}~{self._format_duration(self.study_base_time + self.study_random_upper)}")
+        self.log.info(
+            f"每门课学习时长: {self._format_duration(self.study_base_time)}~{self._format_duration(self.study_base_time + self.study_random_upper)}"
+        )
 
         force_restudy = study_mode == "force"
 
@@ -447,7 +465,9 @@ class WeBanClient:
         if completion.get("code", -1) != "0":
             self.log.error(f"获取模块完成情况失败：{completion}")
 
-        showable_modules = [d["module"] for d in completion.get("data", []) if d["showable"] == 1]
+        showable_modules = [
+            d["module"] for d in completion.get("data", []) if d["showable"] == 1
+        ]
         if "labProject" in showable_modules:
             self.log.info("加载实验室课程")
             lab_project = self.api.lab_index()
@@ -466,14 +486,21 @@ class WeBanClient:
                 (2, "自选课", "optionalNum", "optionalFinishedNum"),
             ]
             for choose_type in choose_types:
-                categories = self.api.list_category(task["userProjectId"], choose_type[0])
+                categories = self.api.list_category(
+                    task["userProjectId"], choose_type[0]
+                )
                 if categories.get("code") != "0":
                     self.log.error(f"获取 {choose_type[1]} 分类失败：{categories}")
                     continue
 
                 for category in categories.get("data", []):
-                    category_prefix = f"{choose_type[1]} {project_prefix}/{category['categoryName']}"
-                    if not force_restudy and category["finishedNum"] >= category["totalNum"]:
+                    category_prefix = (
+                        f"{choose_type[1]} {project_prefix}/{category['categoryName']}"
+                    )
+                    if (
+                        not force_restudy
+                        and category["finishedNum"] >= category["totalNum"]
+                    ):
                         continue
 
                     courses = self.api.list_course(
@@ -483,27 +510,50 @@ class WeBanClient:
                         if not force_restudy and int(course.get("finished", 0)) == 1:
                             continue
                         course_prefix = f"{category_prefix}/{course['resourceName']}"
-                        progress_before = self.get_progress(task["userProjectId"], project_prefix, output=False)
+                        progress_before = self.get_progress(
+                            task["userProjectId"], project_prefix, output=False
+                        )
                         finished_before = 0
                         if progress_before.get("code", -1) == "0":
                             d = progress_before["data"]
-                            finished_before = d["requiredFinishedNum"] + d["pushFinishedNum"] + d["optionalFinishedNum"]
+                            finished_before = (
+                                d["requiredFinishedNum"]
+                                + d["pushFinishedNum"]
+                                + d["optionalFinishedNum"]
+                            )
                         self._study_one_course(
-                            course, task, category_prefix, project_prefix,
-                            answers_json, force_restudy,
+                            course,
+                            task,
+                            category_prefix,
+                            project_prefix,
+                            answers_json,
+                            force_restudy,
                         )
-                        progress_after = self.get_progress(task["userProjectId"], project_prefix)
+                        progress_after = self.get_progress(
+                            task["userProjectId"], project_prefix
+                        )
                         if progress_after.get("code", -1) == "0":
                             d = progress_after["data"]
-                            finished_after = d["requiredFinishedNum"] + d["pushFinishedNum"] + d["optionalFinishedNum"]
+                            finished_after = (
+                                d["requiredFinishedNum"]
+                                + d["pushFinishedNum"]
+                                + d["optionalFinishedNum"]
+                            )
                             if finished_after <= finished_before:
-                                self.log.warning(f"{course_prefix}：完课成功但进度未更新，请手动检查")
+                                self.log.warning(
+                                    f"{course_prefix}：完课成功但进度未更新，请手动检查"
+                                )
 
             self.log.success(f"{project_prefix} 课程学习完成")
 
     def _study_one_course(
-        self, course: dict, task: dict, category_prefix: str,
-        project_prefix: str, answers_json: dict, force_restudy: bool,
+        self,
+        course: dict,
+        task: dict,
+        category_prefix: str,
+        project_prefix: str,
+        answers_json: dict,
+        force_restudy: bool,
     ) -> None:
         """处理单门课程：有 apinext 的走翻页流程，没 apinext 的直接答题+完课"""
         course_prefix = f"{category_prefix}/{course['resourceName']}"
@@ -526,7 +576,7 @@ class WeBanClient:
 
         course_code = ""
         url_path = urlparse(course_url).path
-        code_match = re.search(r'/course/([^/]+)/', url_path)
+        code_match = re.search(r"/course/([^/]+)/", url_path)
         if code_match:
             course_code = code_match.group(1)
         item_info = (
@@ -545,11 +595,17 @@ class WeBanClient:
 
         # 1. apinext finish=2 翻页（先翻页解锁题目）
         if uses_apinext and total_step:
-            self.log.info(f"total_step={total_step} ({item_info.get('total_step_source', '')})")
+            self.log.info(
+                f"total_step={total_step} ({item_info.get('total_step_source', '')})"
+            )
             self.handle_apinext(
-                course["userCourseId"], course["resourceId"],
-                task["userProjectId"], nonstr_map, total_step,
-                unique_no=unique_no, finish=2,
+                course["userCourseId"],
+                course["resourceId"],
+                task["userProjectId"],
+                nonstr_map,
+                total_step,
+                unique_no=unique_no,
+                finish=2,
             )
 
         # 2. 获取并回答题目（翻页后题目才可用）
@@ -557,20 +613,36 @@ class WeBanClient:
         if question_data and question_data.get("code") == "0":
             data = question_data.get("data", {})
             for qlist, label, save_func in [
-                (data.get("viewpointQuestionList", []), "观点题", self.api.save_question),
-                (data.get("examQuestionList", []), "课后习题", self.api.save_exam_question),
+                (
+                    data.get("viewpointQuestionList", []),
+                    "观点题",
+                    self.api.save_question,
+                ),
+                (
+                    data.get("examQuestionList", []),
+                    "课后习题",
+                    self.api.save_exam_question,
+                ),
             ]:
                 if qlist:
                     self.log.info(f"  {label} {len(qlist)} 道")
                     for i, q in enumerate(qlist):
                         hit = self._answer_question(
-                            q, answers_json, course["resourceId"], save_func, source_str,
+                            q,
+                            answers_json,
+                            course["resourceId"],
+                            save_func,
+                            source_str,
                         )
-                        self.log.info(f"    {i + 1}/{len(qlist)} {'✓' if hit else '未命中'}")
+                        self.log.info(
+                            f"    {i + 1}/{len(qlist)} {'✓' if hit else '未命中'}"
+                        )
                         time.sleep(0.5)
         elif question_data:
             self.log.info(f"  list_question: code={question_data.get('code')}")
-        if item_info.get("has_exam") and not question_data.get("data", {}).get("examQuestionList"):
+        if item_info.get("has_exam") and not question_data.get("data", {}).get(
+            "examQuestionList"
+        ):
             self.log.info("  检测到题目标记但 list_question 无课后习题，可能为内联题目")
 
         # 3. 确保满足最低学习时长（服务端要求 study 后至少学习 study_time 秒才接受完课）
@@ -578,15 +650,21 @@ class WeBanClient:
         study_time = self.study_base_time + randint(0, self.study_random_upper)
         remaining = study_time - elapsed
         if remaining > 0:
-            self.log.info(f"等待学习时长 {self._format_duration(remaining)} (已用 {self._format_duration(elapsed)}/{self._format_duration(study_time)})")
+            self.log.info(
+                f"等待学习时长 {self._format_duration(remaining)} (已用 {self._format_duration(elapsed)}/{self._format_duration(study_time)})"
+            )
             time.sleep(remaining)
 
         # 4. apinext finish=1（仅加载 apicenext.js 的课程）
         if uses_apinext and total_step:
             self.handle_apinext(
-                course["userCourseId"], course["resourceId"],
-                task["userProjectId"], nonstr_map, total_step,
-                unique_no=unique_no, finish=1,
+                course["userCourseId"],
+                course["resourceId"],
+                task["userProjectId"],
+                nonstr_map,
+                total_step,
+                unique_no=unique_no,
+                finish=1,
             )
             time.sleep(2)
 
@@ -599,7 +677,12 @@ class WeBanClient:
         self.log.success(f"{course_prefix} 完成")
 
     def _finish_course(
-        self, course: dict, task: dict, query: dict, course_url: str, unique_no: str,
+        self,
+        course: dict,
+        task: dict,
+        query: dict,
+        course_url: str,
+        unique_no: str,
     ) -> dict:
         """调用正确的完课接口并返回响应
 
@@ -625,10 +708,15 @@ class WeBanClient:
         finish_kwargs = {"unique_no": unique_no}
         if query.get("csCapt", [None])[0] == "true":
             try:
-                captcha_result = self.captcha_handler.handle_course_captcha(course_url=course_url)
+                captcha_result = self.captcha_handler.handle_course_captcha(
+                    course_url=course_url
+                )
                 check_res = self.api.course_check(
-                    course["userCourseId"], task["userProjectId"], course["resourceId"],
-                    captcha_result["randstr"], captcha_result["ticket"],
+                    course["userCourseId"],
+                    task["userProjectId"],
+                    course["resourceId"],
+                    captcha_result["randstr"],
+                    captcha_result["ticket"],
                 )
                 if check_res.get("code", -1) != "0":
                     self.log.error(f"课程验证码校验失败：{check_res}")
@@ -684,7 +772,9 @@ class WeBanClient:
         if completion.get("code", -1) != "0":
             self.log.error(f"获取模块完成情况失败：{completion}")
 
-        showable_modules = [d["module"] for d in completion.get("data", []) if d["showable"] == 1]
+        showable_modules = [
+            d["module"] for d in completion.get("data", []) if d["showable"] == 1
+        ]
         if "labProject" in showable_modules:
             self.log.info("加载实验室课程")
             lab_project = self.api.lab_index()
@@ -714,7 +804,11 @@ class WeBanClient:
                     self.log.info(f"{plan_name} 无剩余考试机会，跳过")
                     continue
 
-                if exam_mode == "true" and exam_finish_num > 0 and exam_score >= pass_score:
+                if (
+                    exam_mode == "true"
+                    and exam_finish_num > 0
+                    and exam_score >= pass_score
+                ):
                     self.log.info(
                         f"{plan_name} 已及格 ({exam_score}分 >= {pass_score}分)，跳过"
                     )
@@ -762,9 +856,13 @@ class WeBanClient:
 
                 # 无感验证码
                 try:
-                    captcha_result = self.captcha_handler.handle_exam_captcha(user_exam_plan_id)
+                    captcha_result = self.captcha_handler.handle_exam_captcha(
+                        user_exam_plan_id
+                    )
                     check_res = self.api.exam_check(
-                        user_exam_plan_id, captcha_result["randstr"], captcha_result["ticket"],
+                        user_exam_plan_id,
+                        captcha_result["randstr"],
+                        captcha_result["ticket"],
                     )
                     if check_res.get("code", -1) != "0":
                         self.log.error(f"无感验证码校验失败：{check_res}")
@@ -788,12 +886,15 @@ class WeBanClient:
                 question_list = exam_paper.get("questionList", [])
                 have_answer, no_answer = [], []
                 for question in question_list:
-                    target = have_answer if clean_text(question["title"]) in answers_json else no_answer
+                    target = (
+                        have_answer
+                        if clean_text(question["title"]) in answers_json
+                        else no_answer
+                    )
                     target.append(question)
 
                 match_rate = (
-                    len(have_answer) / len(question_list) * 100
-                    if question_list else 0
+                    len(have_answer) / len(question_list) * 100 if question_list else 0
                 )
                 self.log.info(
                     f"题目总数：{question_num}，有答案的题目数：{len(have_answer)}，"
@@ -827,7 +928,9 @@ class WeBanClient:
 
                     if ai_answers_ids:
                         answers_ids = ai_answers_ids
-                        use_time = question_base_time + randint(0, question_random_upper)
+                        use_time = question_base_time + randint(
+                            0, question_random_upper
+                        )
                         self.log.info(
                             f"[{i + 1}/{len(no_answer)}] AI 搜题作答成功 "
                             f"({type_label})，等待 {self._format_duration(use_time)}: "
@@ -837,7 +940,9 @@ class WeBanClient:
                     elif random_answer:
                         # 自动随机作答：单选随机选一个，多选全选
                         answers_ids = self._auto_select_answer(question)
-                        use_time = question_base_time + randint(0, question_random_upper)
+                        use_time = question_base_time + randint(
+                            0, question_random_upper
+                        )
                         self.log.info(
                             f"[{i + 1}/{len(no_answer)}] 随机作答 "
                             f"({type_label})，等待 {self._format_duration(use_time)}: "
@@ -858,12 +963,21 @@ class WeBanClient:
                         answers_ids = []
 
                         while not answers_ids:
-                            answer = self._prompt(
-                                f"[{self.api.user.get('realName', '未知')}] "
-                                "请输入答案序号（多个选项用英文逗号分隔，如 1,2,3,4）："
-                            ).replace(" ", "").replace("，", ",")
-                            candidates = [ans.strip() for ans in answer.split(",") if ans.strip()]
-                            if all(ans.isdigit() and 1 <= int(ans) <= opt_count for ans in candidates):
+                            answer = (
+                                self._prompt(
+                                    f"[{self.api.user.get('realName', '未知')}] "
+                                    "请输入答案序号（多个选项用英文逗号分隔，如 1,2,3,4）："
+                                )
+                                .replace(" ", "")
+                                .replace("，", ",")
+                            )
+                            candidates = [
+                                ans.strip() for ans in answer.split(",") if ans.strip()
+                            ]
+                            if all(
+                                ans.isdigit() and 1 <= int(ans) <= opt_count
+                                for ans in candidates
+                            ):
                                 answers_ids = [
                                     question["optionList"][int(ans) - 1]["id"]
                                     for ans in candidates
@@ -882,16 +996,17 @@ class WeBanClient:
 
                     self.log.info("正在提交当前答案")
                     if not self.record_answer(
-                        user_exam_plan_id, question["id"],
-                        use_time, answers_ids, exam_plan_id,
+                        user_exam_plan_id,
+                        question["id"],
+                        use_time,
+                        answers_ids,
+                        exam_plan_id,
                     ):
                         raise RuntimeError(f"答题失败，请重新考试：{question}")
 
                 # ── 题库作答 ──
                 if have_answer:
-                    self.log.info(
-                        f"开始答题库中的题目，共 {len(have_answer)} 道题目"
-                    )
+                    self.log.info(f"开始答题库中的题目，共 {len(have_answer)} 道题目")
                 for i, question in enumerate(have_answer):
                     self.log.info(
                         f"[{i + 1}/{len(have_answer)}] 题目在题库中，开始答题"
@@ -907,11 +1022,16 @@ class WeBanClient:
                         if clean_text(opt["content"]) in answers
                     ]
                     use_time = question_base_time + randint(0, question_random_upper)
-                    self.log.info(f"等待 {self._format_duration(use_time)}，模拟答题中...")
+                    self.log.info(
+                        f"等待 {self._format_duration(use_time)}，模拟答题中..."
+                    )
                     time.sleep(use_time)
                     if not self.record_answer(
-                        user_exam_plan_id, question["id"], use_time,
-                        answers_ids, exam_plan_id,
+                        user_exam_plan_id,
+                        question["id"],
+                        use_time,
+                        answers_ids,
+                        exam_plan_id,
                     ):
                         raise RuntimeError(f"答题失败，请重新考试：{question}")
 
@@ -925,7 +1045,9 @@ class WeBanClient:
 
     # ---- item.js parsing ----------------------------------------------------
 
-    def parse_item_js(self, course_code: str, course_url: str | None = None) -> Dict[str, Any]:
+    def parse_item_js(
+        self, course_code: str, course_url: str | None = None
+    ) -> Dict[str, Any]:
         """解析课程 JS，检测是否使用 apinext 并提取 nonstrMap/total_step。
 
         关键判断：HTML 是否加载 apicenext.js。
@@ -937,19 +1059,26 @@ class WeBanClient:
             缺失时 mcwk 资源服务器可能 403。
         """
         result = {
-            "uses_apinext": False, "nonstr_map": {}, "has_exam": False,
-            "total_step": 0, "total_step_source": "",
+            "uses_apinext": False,
+            "nonstr_map": {},
+            "has_exam": False,
+            "total_step": 0,
+            "total_step_source": "",
         }
 
         try:
-            html_url = f"https://mcwk.mycourse.cn/course/{course_code}/{course_code}.html"
+            html_url = (
+                f"https://mcwk.mycourse.cn/course/{course_code}/{course_code}.html"
+            )
             html = _fetch_text(self.api.session, html_url, referer=course_url)
             if not html:
                 return result
 
             # 不加载 apicenext.js 的课程不需要 apinext
             if "apicenext.js" not in html:
-                result["has_exam"] = "saveExamQuestion" in html or "listQuestions" in html
+                result["has_exam"] = (
+                    "saveExamQuestion" in html or "listQuestions" in html
+                )
                 return result
 
             result["uses_apinext"] = True
@@ -958,10 +1087,12 @@ class WeBanClient:
                 for src in re.findall(r'<script\b[^>]*\bsrc=["\']([^"\']+)["\']', html)
                 if "item.js" in src or f"{course_code}.js" in src
             ]
-            script_urls.extend([
-                f"https://mcwk.mycourse.cn/course/{course_code}/js/item.js",
-                f"https://mcwk.mycourse.cn/course/{course_code}/build/js/{course_code}.js",
-            ])
+            script_urls.extend(
+                [
+                    f"https://mcwk.mycourse.cn/course/{course_code}/js/item.js",
+                    f"https://mcwk.mycourse.cn/course/{course_code}/build/js/{course_code}.js",
+                ]
+            )
 
             seen_urls: set[str] = set()
             for item_url in script_urls:
@@ -1041,12 +1172,19 @@ class WeBanClient:
                 nonstr = nonstr_map.get(step, "")
                 try:
                     resp = self.api.apinext(
-                        user_course_id, course_id, user_project_id,
-                        step=step, finish=2, nonstr=nonstr, unique_no=unique_no,
+                        user_course_id,
+                        course_id,
+                        user_project_id,
+                        step=step,
+                        finish=2,
+                        nonstr=nonstr,
+                        unique_no=unique_no,
                     )
                     self.log.info(f"apinext [{step}/{total_step}] finish=2 已发送")
                     if not resp.get("success"):
-                        self.log.warning(f"apinext [{step}/{total_step}] 返回异常：{resp}")
+                        self.log.warning(
+                            f"apinext [{step}/{total_step}] 返回异常：{resp}"
+                        )
                 except Exception as e:
                     self.log.warning(f"apinext [{step}/{total_step}] 失败：{e}")
         else:
@@ -1055,8 +1193,13 @@ class WeBanClient:
             try:
                 # finish=1 的 step 需要偏移 total_step + 1（nonstr_map 不含此步）
                 resp = self.api.apinext(
-                    user_course_id, course_id, user_project_id,
-                    step=total_step + 1, finish=1, nonstr="", unique_no=unique_no,
+                    user_course_id,
+                    course_id,
+                    user_project_id,
+                    step=total_step + 1,
+                    finish=1,
+                    nonstr="",
+                    unique_no=unique_no,
                 )
                 if not resp.get("success"):
                     self.log.warning(f"apinext 完成请求返回异常：{resp}")
@@ -1083,7 +1226,12 @@ class WeBanClient:
         return [option_list[randint(0, len(option_list) - 1)]["id"]]
 
     def _answer_question(
-        self, question: dict, answers_json: Dict, course_id: str, save_func, source: str,
+        self,
+        question: dict,
+        answers_json: Dict,
+        course_id: str,
+        save_func,
+        source: str,
     ) -> bool:
         """答题通用逻辑，返回是否通过题库命中
 
@@ -1115,7 +1263,10 @@ class WeBanClient:
 
         # 题库未命中：先提交第一个选项，从响应中提取正确 answerLabel
         res = save_func(
-            course_id, question["id"], json.dumps([option_list[0]["id"]]), source,
+            course_id,
+            question["id"],
+            json.dumps([option_list[0]["id"]]),
+            source,
         )
         data = res.get("data", {})
         # 观点题返回投票统计列表，无 answerLabel
@@ -1131,7 +1282,9 @@ class WeBanClient:
             return False
 
         letter_to_opt = {chr(65 + idx): opt for idx, opt in enumerate(option_list)}
-        answer_ids = [letter_to_opt[ch]["id"] for ch in correct_letters if ch in letter_to_opt]
+        answer_ids = [
+            letter_to_opt[ch]["id"] for ch in correct_letters if ch in letter_to_opt
+        ]
         if answer_ids:
             save_func(course_id, question["id"], json.dumps(answer_ids), source)
         return False
@@ -1153,7 +1306,11 @@ class WeBanClient:
         :return: 成功返回 True，失败返回 False
         """
         res = self.api.exam_record_question(
-            user_exam_plan_id, question_id, per_time, answers_ids, exam_plan_id,
+            user_exam_plan_id,
+            question_id,
+            per_time,
+            answers_ids,
+            exam_plan_id,
         )
         if res.get("code", -1) != "0":
             self.log.error(f"答题失败，请重新开启考试：{res}")
@@ -1185,7 +1342,9 @@ class WeBanClient:
         options = question.get("optionList", [])
         opt_count = len(options)
 
-        options_str = "\n".join([f"{i + 1}. {opt['content']}" for i, opt in enumerate(options)])
+        options_str = "\n".join(
+            [f"{i + 1}. {opt['content']}" for i, opt in enumerate(options)]
+        )
 
         prompt = f"""你是一个在线教育考试答题助手。请根据题目和选项，给出正确答案。
 
@@ -1223,7 +1382,9 @@ class WeBanClient:
 
         for attempt in range(1, max_retries + 1):
             try:
-                resp = self.api.session.post(url, headers=headers, json=payload, timeout=timeout)
+                resp = self.api.session.post(
+                    url, headers=headers, json=payload, timeout=timeout
+                )
                 resp.raise_for_status()
                 res_data = resp.json()
 
@@ -1241,7 +1402,9 @@ class WeBanClient:
             except Exception as e:
                 if attempt < max_retries:
                     wait = attempt * 2
-                    self.log.warning(f"AI 搜题第 {attempt} 次请求失败，{wait}s 后重试：{e}")
+                    self.log.warning(
+                        f"AI 搜题第 {attempt} 次请求失败，{wait}s 后重试：{e}"
+                    )
                     time.sleep(wait)
                 else:
                     self.log.error(f"AI 搜题请求失败（已重试 {max_retries} 次）：{e}")
@@ -1267,7 +1430,9 @@ class WeBanClient:
                 valid_ids.append(options[val - 1]["id"])
                 self.log.info(f"AI 推荐：{val}. {options[val - 1]['content']}")
             else:
-                self.log.warning(f"AI 返回的选项序号 {val} 超出范围 1~{opt_count}，忽略")
+                self.log.warning(
+                    f"AI 返回的选项序号 {val} 超出范围 1~{opt_count}，忽略"
+                )
 
         if not valid_ids:
             self.log.warning("AI 返回的答案未能匹配任何有效选项")
@@ -1319,17 +1484,25 @@ class WeBanClient:
         :return: 无返回值
         """
         os.makedirs(answer_dir, exist_ok=True)
-        need_download = not os.path.exists(answer_path)
-        
+        # 按优先级查找已有题库: 根目录 > answer/ > 打包内置
+        existing_path: str | None = None
+        for p in [root_answer_path, answer_path, bundle_answer_path]:
+            if os.path.exists(p):
+                existing_path = p
+                break
+        need_download = existing_path is None
+
+        answers_json: dict | None = None
         if not need_download:
+            assert existing_path is not None
             try:
-                with open(answer_path, encoding="utf-8") as f:
+                with open(existing_path, encoding="utf-8") as f:
                     answers_json = json.load(f)
                 if not self._is_valid_answers(answers_json):
                     need_download = True
             except (json.JSONDecodeError, OSError):
                 need_download = True
-        
+
         if need_download:
             self.log.info("题库不存在或格式错误，正在下载...")
             with open(answer_path, "w", encoding="utf-8") as f:
@@ -1344,17 +1517,24 @@ class WeBanClient:
                 self.log.error("下载的题库格式无效，应为非空 JSON 对象")
                 return
 
+        if answers_json is None:
+            self.log.error("题库加载失败")
+            return
+
         user_project_ids = [
             p["userProjectId"] for p in self.api.list_my_project().get("data", [])
         ]
         user_project_ids.extend(
-            p["userProjectId"] for p in self.api.list_my_project(ended=1).get("data", [])
+            p["userProjectId"]
+            for p in self.api.list_my_project(ended=1).get("data", [])
         )
         completion = self.api.list_completion()
         if completion.get("code", -1) != "0":
             self.log.error(f"获取模块完成情况失败：{completion}")
 
-        showable_modules = [d["module"] for d in completion.get("data", []) if d["showable"] == 1]
+        showable_modules = [
+            d["module"] for d in completion.get("data", []) if d["showable"] == 1
+        ]
         if "labProject" in showable_modules:
             self.log.info("加载实验室课程")
             lab_project = self.api.lab_index()
@@ -1368,9 +1548,9 @@ class WeBanClient:
                 for history in self.api.exam_list_history(
                     plan["examPlanId"], plan["examType"]
                 ).get("data", []):
-                    questions = self.api.exam_review_paper(history["id"], history["isRetake"])[
-                        "data"
-                    ].get("questions", [])
+                    questions = self.api.exam_review_paper(
+                        history["id"], history["isRetake"]
+                    )["data"].get("questions", [])
                     for answer in questions:
                         title = answer["title"]
                         old_opts = {
@@ -1392,5 +1572,7 @@ class WeBanClient:
                         }
 
         with open(answer_path, "w", encoding="utf-8") as f:
-            f.write(json.dumps(answers_json, indent=2, ensure_ascii=False, sort_keys=True))
+            f.write(
+                json.dumps(answers_json, indent=2, ensure_ascii=False, sort_keys=True)
+            )
             f.write("\n")

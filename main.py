@@ -16,7 +16,7 @@ VERSION = "v3.8.1"
 
 if getattr(sys, "frozen", False):
     base_path = os.path.dirname(os.path.abspath(sys.executable))
-    bundle_path = sys._MEIPASS
+    bundle_path = sys._MEIPASS  # type: ignore[attr-defined]
 else:
     base_path = os.path.dirname(os.path.abspath(__file__))
     bundle_path = base_path
@@ -45,7 +45,8 @@ logger.add(sink=sys.stdout, colorize=True, format=log_format)
 os.makedirs(logs_dir, exist_ok=True)
 logger.add(
     os.path.join(logs_dir, "weban.log"),
-    encoding="utf-8", format=log_format,
+    encoding="utf-8",
+    format=log_format,
     retention="7 days",
 )
 
@@ -54,6 +55,7 @@ sync_lock = threading.Lock()
 
 
 # ── 工具函数 ──────────────────────────────────────────────
+
 
 def open_editor(path: str):
     """打开系统编辑器编辑指定文件"""
@@ -85,6 +87,7 @@ def is_account_valid(account: dict) -> bool:
 
 # ── 配置加载 ──────────────────────────────────────────────
 
+
 def load_config() -> dict:
     """加载 config.toml，不存在则下载远程模板并打开编辑器"""
     if not os.path.exists(config_path):
@@ -102,6 +105,7 @@ def load_config() -> dict:
 
         if not downloaded and os.path.exists(config_example_path):
             import shutil
+
             shutil.copy(config_example_path, config_path)
             logger.success(f"已从本地模板创建 {config_path}")
 
@@ -121,16 +125,22 @@ def load_config() -> dict:
 
 # ── 账号级日志过滤器 ─────────────────────────────────────────
 
+
 def _make_account_filter(account_name: str):
     """返回一个 loguru filter，只放行 extra[account] == account_name 的日志记录"""
-    def filter_fn(record: dict) -> bool:
+
+    def filter_fn(record) -> bool:
         return record["extra"].get("account") == account_name
+
     return filter_fn
 
 
 # ── 单个账号执行 ────────────────────────────────────────────
 
-def run_account(account_config: dict, global_settings: dict, ai_config: dict, account_index: int) -> bool:
+
+def run_account(
+    account_config: dict, global_settings: dict, ai_config: dict, account_index: int
+) -> bool:
     """运行单个账号的任务
 
     :param account_config: [[account]] 的字典
@@ -177,8 +187,11 @@ def run_account(account_config: dict, global_settings: dict, ai_config: dict, ac
     # 添加只属于该账号的日志 sink
     account_filter = _make_account_filter(account_name)
     handler_id = logger.add(
-        account_log_path, encoding="utf-8", format=log_format,
-        retention="7 days", filter=account_filter,
+        account_log_path,
+        encoding="utf-8",
+        format=log_format,
+        retention="7 days",
+        filter=account_filter,
     )
 
     log = logger.bind(account=account_name)
@@ -190,16 +203,27 @@ def run_account(account_config: dict, global_settings: dict, ai_config: dict, ac
             user = {"userId": user_id, "token": token_val}
             log.info("使用 Token 登录")
             client = WeBanClient(
-                tenant_name, user=user, log=log, browser_path=browser_path,
-                cdp_host=cdp_host, cdp_port=cdp_port, debug=debug,
+                tenant_name,
+                user=user,
+                log=log,
+                browser_path=browser_path,
+                cdp_host=cdp_host,
+                cdp_port=cdp_port,
+                debug=debug,
                 ai_config=ai_config,
             )
         elif tenant_name and username:
             # 密码登录 — password 默认为 username
             log.info("使用密码登录")
             client = WeBanClient(
-                tenant_name, username, password, log=log, browser_path=browser_path,
-                cdp_host=cdp_host, cdp_port=cdp_port, debug=debug,
+                tenant_name,
+                username,
+                password,
+                log=log,
+                browser_path=browser_path,
+                cdp_host=cdp_host,
+                cdp_port=cdp_port,
+                debug=debug,
                 ai_config=ai_config,
             )
         else:
@@ -221,7 +245,9 @@ def run_account(account_config: dict, global_settings: dict, ai_config: dict, ac
         study = study_mode != "false"
 
         if study:
-            mode_desc = {"true": "正常", "force": "强制重新学习"}.get(study_mode, study_mode)
+            mode_desc = {"true": "正常", "force": "强制重新学习"}.get(
+                study_mode, study_mode
+            )
             log.info(f"开始学习 (模式: {mode_desc})")
             client.run_study(study_time, study_mode)
         else:
@@ -303,8 +329,16 @@ if __name__ == "__main__":
         # 单账号时提示是否更换
         if len(valid_accounts) == 1:
             acct = valid_accounts[0]
-            acct_name = acct.get("username") or acct.get("user_id") or acct.get("tenant_name", "")
-            choice = input(f"当前账号：{acct_name}，是否更换账号？(y/N，默认N): ").strip().lower()
+            acct_name = (
+                acct.get("username")
+                or acct.get("user_id")
+                or acct.get("tenant_name", "")
+            )
+            choice = (
+                input(f"当前账号：{acct_name}，是否更换账号？(y/N，默认N): ")
+                .strip()
+                .lower()
+            )
             if choice == "y":
                 open_editor(config_path)
                 global_settings, ai_config, accounts = load_all_config()
@@ -331,9 +365,11 @@ if __name__ == "__main__":
         max_workers = min(len(accounts), int(global_settings.get("max_workers", 5)))
 
         if len(accounts) > 1:
-            choice = input(
-                f"检测到 {len(accounts)} 个账号，是否同时运行？(Y/n，默认Y): "
-            ).strip().lower()
+            choice = (
+                input(f"检测到 {len(accounts)} 个账号，是否同时运行？(Y/n，默认Y): ")
+                .strip()
+                .lower()
+            )
             use_multithread = choice != "n"
         else:
             use_multithread = False
@@ -345,7 +381,10 @@ if __name__ == "__main__":
 
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 future_to_account = {
-                    executor.submit(run_account, cfg, global_settings, ai_config, i): (cfg, i)
+                    executor.submit(run_account, cfg, global_settings, ai_config, i): (
+                        cfg,
+                        i,
+                    )
                     for i, cfg in enumerate(accounts)
                 }
 
@@ -360,7 +399,9 @@ if __name__ == "__main__":
                         logger.error(f"[账号 {idx + 1}] 线程执行异常: {e}")
                         failed_count += 1
 
-            logger.info(f"所有账号执行完成！成功: {success_count}，失败: {failed_count}")
+            logger.info(
+                f"所有账号执行完成！成功: {success_count}，失败: {failed_count}"
+            )
         else:
             logger.info("使用单线程模式，逐个执行")
             success_count = 0
@@ -372,7 +413,9 @@ if __name__ == "__main__":
                 else:
                     failed_count += 1
 
-            logger.info(f"所有账号执行完成！成功: {success_count}，失败: {failed_count}")
+            logger.info(
+                f"所有账号执行完成！成功: {success_count}，失败: {failed_count}"
+            )
 
     except KeyboardInterrupt:
         print("用户终止")
