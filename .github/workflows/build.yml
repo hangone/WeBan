@@ -29,6 +29,9 @@ jobs:
         with:
           python-version: "3.12"
           cache-python: true
+          enable-cache: true
+        env:
+          UV_PYTHON_PREFERENCE: only-managed
 
       - run: uv sync
 
