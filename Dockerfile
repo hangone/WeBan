@@ -33,6 +33,16 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     main.py \
     && strip /build/dist/WeBan
 
+# ── without-browser: 纯二进制，CDP 连接宿主机浏览器 ────────
+FROM debian:stable-slim AS without-browser
+
+COPY --from=builder /build/dist/WeBan /app/WeBan
+WORKDIR /app
+
+ENV WEBAN_NO_SANDBOX=1
+
+ENTRYPOINT ["/app/WeBan"]
+
 # ── with-browser: 内置 Chrome headless shell ───────────────
 FROM chromedp/headless-shell:stable AS with-browser
 
@@ -40,16 +50,6 @@ COPY --from=builder /build/dist/WeBan /app/WeBan
 WORKDIR /app
 
 ENV CHROMIUM_BINARY=/headless-shell/headless-shell
-ENV WEBAN_NO_SANDBOX=1
-
-ENTRYPOINT ["/app/WeBan"]
-
-# ── without-browser: 纯二进制，CDP 连接宿主机浏览器 ────────
-FROM debian:stable-slim AS without-browser
-
-COPY --from=builder /build/dist/WeBan /app/WeBan
-WORKDIR /app
-
 ENV WEBAN_NO_SANDBOX=1
 
 ENTRYPOINT ["/app/WeBan"]
