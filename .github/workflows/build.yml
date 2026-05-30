@@ -63,15 +63,23 @@ jobs:
           if-no-files-found: error
 
   docker:
-    name: Docker ${{ matrix.platform }}
+    name: Docker ${{ matrix.variant }} ${{ matrix.platform }}
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - platform: amd64
+          - variant: with-browser
+            platform: amd64
             runner: ubuntu-latest
-          - platform: arm64
+          - variant: with-browser
+            platform: arm64
+            runner: ubuntu-24.04-arm
+          - variant: without-browser
+            platform: amd64
+            runner: ubuntu-latest
+          - variant: without-browser
+            platform: arm64
             runner: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v6
@@ -87,19 +95,21 @@ jobs:
         id: build
         with:
           context: .
+          file: Dockerfile
+          target: ${{ matrix.variant }}
           platforms: linux/${{ matrix.platform }}
           outputs: type=image,push-by-digest=true,name=${{ secrets.DOCKERHUB_USERNAME }}/weban,push=true
           provenance: false
-          cache-from: type=gha,scope=${{ matrix.platform }}
-          cache-to: type=gha,scope=${{ matrix.platform }},mode=max
+          cache-from: type=gha,scope=docker-${{ matrix.platform }}
+          cache-to: type=gha,scope=docker-${{ matrix.platform }},mode=max
 
       - name: Export digest
-        run: echo "${{ steps.build.outputs.digest }}" > digest-${{ matrix.platform }}.txt
+        run: echo "${{ steps.build.outputs.digest }}" > digest-${{ matrix.variant }}-${{ matrix.platform }}.txt
 
       - uses: actions/upload-artifact@v7
         with:
-          name: digest-${{ matrix.platform }}
-          path: digest-${{ matrix.platform }}.txt
+          name: digest-${{ matrix.variant }}-${{ matrix.platform }}
+          path: digest-${{ matrix.variant }}-${{ matrix.platform }}.txt
 
   docker-merge:
     name: Docker merge
@@ -120,27 +130,44 @@ jobs:
           merge-multiple: true
 
       - uses: docker/metadata-action@v6
-        id: meta
+        id: meta-with-browser
         with:
           images: ${{ secrets.DOCKERHUB_USERNAME }}/weban
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest
+            type=raw,value=with-browser
 
-      - name: Merge multi-platform manifests
+      - uses: docker/metadata-action@v6
+        id: meta-without-browser
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/weban
+          tags: |
+            type=semver,pattern={{version}}-without-browser
+            type=raw,value=without-browser
+
+      - name: Merge with-browser manifests
         run: |
           img="${{ secrets.DOCKERHUB_USERNAME }}/weban"
           docker buildx imagetools create \
-            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            "$img@$(cat digests/digest-amd64.txt)" \
-            "$img@$(cat digests/digest-arm64.txt)"
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "${{ steps.meta-with-browser.outputs.json }}") \
+            "$img@$(cat digests/digest-with-browser-amd64.txt)" \
+            "$img@$(cat digests/digest-with-browser-arm64.txt)"
+
+      - name: Merge without-browser manifests
+        run: |
+          img="${{ secrets.DOCKERHUB_USERNAME }}/weban"
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "${{ steps.meta-without-browser.outputs.json }}") \
+            "$img@$(cat digests/digest-without-browser-amd64.txt)" \
+            "$img@$(cat digests/digest-without-browser-arm64.txt)"
 
   release:
     name: Release
     permissions:
       contents: write
-    needs: [build, docker-merge]
+    needs: [build, docker, docker-merge]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:

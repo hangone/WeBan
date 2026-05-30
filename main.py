@@ -350,15 +350,29 @@ if __name__ == "__main__":
         accounts = valid_accounts
         logger.info(f"共加载到 {len(accounts)} 个账号")
 
-        # 检测浏览器是否可用
+        # 检测浏览器是否可用（优先级：用户指定 → CDP → Playwright → 系统）
         browser_path = global_settings.get("browser_path", "") or None
         cdp_host = global_settings.get("cdp_host", "") or None
         cdp_port = int(global_settings.get("cdp_port", 0)) or None
+
+        # Docker 环境下未配置浏览器和 CDP 时，自动尝试默认 CDP 地址
+        in_docker = os.path.exists("/.dockerenv") or os.path.isfile("/run/.containerenv")
+        if not browser_path and not cdp_host and not cdp_port and in_docker:
+            cdp_host, cdp_port = "host.docker.internal", 9222
+            logger.info("检测到 Docker 环境，自动尝试 CDP 连接 host.docker.internal:9222")
+
         try:
             resolved = check_browser_health(browser_path, cdp_host, cdp_port)
             logger.info(f"浏览器检测通过: {resolved}")
         except RuntimeError as e:
             logger.error(f"浏览器检测失败: {e}")
+            if in_docker:
+                logger.warning(
+                    "请在宿主机 Chrome 中开启远程调试，然后重启容器：\n"
+                    "  1. 地址栏输入 chrome://inspect/#remote-debugging\n"
+                    "  2. 勾选 Allow remote debugging for this browser instance\n"
+                    "  3. 或在 config.toml 中配置 cdp_host 和 cdp_port"
+                )
             sys.exit(1)
 
         # 是否多线程
