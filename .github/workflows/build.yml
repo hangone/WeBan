@@ -148,18 +148,22 @@ jobs:
             type=raw,value=without-browser
 
       - name: Merge with-browser manifests
+        env:
+          JSON: ${{ steps.meta-with-browser.outputs.json }}
         run: |
           img="${{ secrets.DOCKERHUB_USERNAME }}/weban"
-          docker buildx imagetools create \
-            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "${{ steps.meta-with-browser.outputs.json }}") \
+          tags=$(echo "$JSON" | jq -r '.tags | map("-t " + .) | join(" ")')
+          docker buildx imagetools create $tags \
             "$img@$(cat digests/digest-with-browser-amd64.txt)" \
             "$img@$(cat digests/digest-with-browser-arm64.txt)"
 
       - name: Merge without-browser manifests
+        env:
+          JSON: ${{ steps.meta-without-browser.outputs.json }}
         run: |
           img="${{ secrets.DOCKERHUB_USERNAME }}/weban"
-          docker buildx imagetools create \
-            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "${{ steps.meta-without-browser.outputs.json }}") \
+          tags=$(echo "$JSON" | jq -r '.tags | map("-t " + .) | join(" ")')
+          docker buildx imagetools create $tags \
             "$img@$(cat digests/digest-without-browser-amd64.txt)" \
             "$img@$(cat digests/digest-without-browser-arm64.txt)"
 
