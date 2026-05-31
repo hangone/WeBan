@@ -6381,6 +6381,18 @@
       {
         "content": "日照少的地方。",
         "isCorrect": 2
+      },
+      {
+        "content": "日照多的地方",
+        "isCorrect": 1
+      },
+      {
+        "content": "日照少的地方",
+        "isCorrect": 2
+      },
+      {
+        "content": "低洼积水处扎营",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -6401,6 +6413,22 @@
       },
       {
         "content": "雷雨多发地带的空旷谷地。",
+        "isCorrect": 2
+      },
+      {
+        "content": "悬崖下边，可以躲雨",
+        "isCorrect": 2
+      },
+      {
+        "content": "日照充足的小湖附近",
+        "isCorrect": 1
+      },
+      {
+        "content": "宽阔的河流旁",
+        "isCorrect": 2
+      },
+      {
+        "content": "雷雨多发地带的空旷谷地",
         "isCorrect": 2
       }
     ],
@@ -7326,7 +7354,7 @@
         "isCorrect": 1
       }
     ],
-    "type": 2
+    "type": 1
   },
   "下面躲避雾霾的方式中错误的是：": {
     "optionList": [
@@ -10202,6 +10230,22 @@
       {
         "content": "2月2日。",
         "isCorrect": 2
+      },
+      {
+        "content": "2月12日",
+        "isCorrect": 2
+      },
+      {
+        "content": "12月12日",
+        "isCorrect": 2
+      },
+      {
+        "content": "12月2日",
+        "isCorrect": 1
+      },
+      {
+        "content": "2月2日",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -11441,6 +11485,10 @@
       },
       {
         "content": "不脱离官方平台转账",
+        "isCorrect": 1
+      },
+      {
+        "content": "听到“解冻金”“保证金”就知道是骗子",
         "isCorrect": 1
       }
     ],
@@ -20474,6 +20522,18 @@
       {
         "content": "立刻拨打120、110电话。",
         "isCorrect": 1
+      },
+      {
+        "content": "立刻跳下水去救人",
+        "isCorrect": 2
+      },
+      {
+        "content": "立刻拨打120、110电话",
+        "isCorrect": 1
+      },
+      {
+        "content": "慌乱逃离现场",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -21315,6 +21375,14 @@
       },
       {
         "content": "错。",
+        "isCorrect": 2
+      },
+      {
+        "content": "对",
+        "isCorrect": 1
+      },
+      {
+        "content": "错",
         "isCorrect": 2
       }
     ],
@@ -24712,6 +24780,26 @@
       },
       {
         "content": "走路时不玩手机、不戴耳机。",
+        "isCorrect": 1
+      },
+      {
+        "content": "走在人行道上",
+        "isCorrect": 1
+      },
+      {
+        "content": "人行道、马路都可以随便走",
+        "isCorrect": 2
+      },
+      {
+        "content": "边玩手机边走路或者过马路",
+        "isCorrect": 2
+      },
+      {
+        "content": "戴着耳机走路",
+        "isCorrect": 2
+      },
+      {
+        "content": "走路时不玩手机、不戴耳机",
         "isCorrect": 1
       }
     ],
@@ -30763,6 +30851,14 @@
       {
         "content": "随机的数字和字母组合，对自己有意义、但是别人不知道的数字和字母组合。",
         "isCorrect": 1
+      },
+      {
+        "content": "随机的数字和字母组合，对自己有意义、但是别人不知道的数字和字母组合",
+        "isCorrect": 1
+      },
+      {
+        "content": "键盘上按顺序的字母或者自己生日",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -36591,6 +36687,18 @@
       {
         "content": "12",
         "isCorrect": 1
+      },
+      {
+        "content": "8",
+        "isCorrect": 2
+      },
+      {
+        "content": "10",
+        "isCorrect": 2
+      },
+      {
+        "content": "15",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -38962,6 +39070,23 @@
     ],
     "type": 1
   },
+  "收到短信：“您的征信报告存在逾期记录，添加‘征信专员’微信可修复，手续费3000元”，正确的做法是：": {
+    "optionList": [
+      {
+        "content": "微信转账缴费，尽快修复征信",
+        "isCorrect": 2
+      },
+      {
+        "content": "登录央行征信中心官网查询真实记录",
+        "isCorrect": 1
+      },
+      {
+        "content": "添加“征信专员”微信，进行咨询",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "收到银行卡扣费、买卖游戏装备等短信提醒，内附一条链接，你会怎么做？": {
     "optionList": [
       {
@@ -40286,6 +40411,18 @@
       {
         "content": "把打车信息发给父母朋友，随时联络。",
         "isCorrect": 1
+      },
+      {
+        "content": "坐在车里玩手机或者和司机聊天",
+        "isCorrect": 2
+      },
+      {
+        "content": "把打车信息发给父母朋友，随时联络",
+        "isCorrect": 1
+      },
+      {
+        "content": "全程埋头玩手机，不留意周边路况",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -45129,6 +45266,18 @@
       {
         "content": "救人一命胜造七级浮屠。",
         "isCorrect": 2
+      },
+      {
+        "content": "能不下水就不下水",
+        "isCorrect": 1
+      },
+      {
+        "content": "救人一命胜造七级浮屠",
+        "isCorrect": 2
+      },
+      {
+        "content": "立刻下水徒手施救",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -45999,6 +46148,18 @@
       {
         "content": "处10年有期徒刑。",
         "isCorrect": 1
+      },
+      {
+        "content": "处20年有期徒刑。",
+        "isCorrect": 2
+      },
+      {
+        "content": "处7年有期徒刑。",
+        "isCorrect": 2
+      },
+      {
+        "content": "处5年有期徒刑。",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -48797,6 +48958,18 @@
       {
         "content": "双脚并拢蹲下。",
         "isCorrect": 1
+      },
+      {
+        "content": "大步逃跑",
+        "isCorrect": 2
+      },
+      {
+        "content": "双脚并拢蹲下",
+        "isCorrect": 1
+      },
+      {
+        "content": "立刻趴在地面躲避",
+        "isCorrect": 2
       }
     ],
     "type": 1
