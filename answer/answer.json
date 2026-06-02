@@ -1997,6 +1997,19 @@
     ],
     "type": 1
   },
+  "“延迟满足”不是单纯地让孩子学会等待，也不是一味地压制他们的欲望。": {
+    "optionList": [
+      {
+        "content": "正确",
+        "isCorrect": 1
+      },
+      {
+        "content": "错误",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "“彭泽，在吗？是我，小梁，我来看你了。”宿舍外传来了一阵敲门声，紧接着有人进入宿舍，问：“请问彭泽在吗？我是他的好朋友。”这时你会怎么做呢？": {
     "optionList": [
       {
@@ -7467,6 +7480,18 @@
       {
         "content": "发芽的姜。",
         "isCorrect": 2
+      },
+      {
+        "content": "部分烂掉的水果",
+        "isCorrect": 1
+      },
+      {
+        "content": "发芽的姜",
+        "isCorrect": 2
+      },
+      {
+        "content": "发芽的大蒜",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -11489,6 +11514,14 @@
       },
       {
         "content": "听到“解冻金”“保证金”就知道是骗子",
+        "isCorrect": 1
+      },
+      {
+        "content": "不点不明链接，听到“解冻金”“保证金”就知道是骗子",
+        "isCorrect": 1
+      },
+      {
+        "content": "不信高价回收、低价卖出的广告",
         "isCorrect": 1
       }
     ],
@@ -15768,6 +15801,10 @@
       {
         "content": "正确",
         "isCorrect": 1
+      },
+      {
+        "content": "错误",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -18204,6 +18241,14 @@
       },
       {
         "content": "窗口期进行常规抗体检测时，人体内的艾滋病抗体还不够多，所以检测不出来。",
+        "isCorrect": 1
+      },
+      {
+        "content": "窗口期进行常规抗体检测时，人体内艾滋病病毒太少，所以检测不出来",
+        "isCorrect": 2
+      },
+      {
+        "content": "窗口期进行常规抗体检测时，人体内的艾滋病抗体还不够多，所以检测不出来",
         "isCorrect": 1
       }
     ],
@@ -20893,6 +20938,14 @@
       {
         "content": "错。",
         "isCorrect": 2
+      },
+      {
+        "content": "对",
+        "isCorrect": 1
+      },
+      {
+        "content": "错",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -21998,6 +22051,14 @@
       },
       {
         "content": "错。",
+        "isCorrect": 1
+      },
+      {
+        "content": "对",
+        "isCorrect": 2
+      },
+      {
+        "content": "错",
         "isCorrect": 1
       }
     ],
@@ -34710,6 +34771,10 @@
       {
         "content": "及时与学校管理人员取得联系",
         "isCorrect": 1
+      },
+      {
+        "content": "跟对方协商，私下解决",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -51304,6 +51369,18 @@
       {
         "content": "行政权",
         "isCorrect": 1
+      },
+      {
+        "content": "行政机关",
+        "isCorrect": 2
+      },
+      {
+        "content": "行政相对方",
+        "isCorrect": 2
+      },
+      {
+        "content": "行政行为",
+        "isCorrect": 2
       }
     ],
     "type": 1
