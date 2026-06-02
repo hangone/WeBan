@@ -31,7 +31,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --hidden-import cv2 \
     --collect-submodules nodriver \
     main.py \
-    && strip /build/dist/WeBan
+    && strip dist/WeBan
 
 # ── without-browser: 纯二进制，CDP 连接宿主机浏览器 ────────
 FROM debian:stable-slim AS without-browser
@@ -39,17 +39,15 @@ FROM debian:stable-slim AS without-browser
 COPY --from=builder /build/dist/WeBan /app/WeBan
 WORKDIR /app
 
-ENV WEBAN_NO_SANDBOX=1
-
 ENTRYPOINT ["/app/WeBan"]
 
-# ── with-browser: 内置 Chrome headless shell ───────────────
+# ── with-browser: 内置 Chrome headless shell（CDP 模式）────
 FROM chromedp/headless-shell:stable AS with-browser
 
 COPY --from=builder /build/dist/WeBan /app/WeBan
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 WORKDIR /app
 
-ENV CHROMIUM_BINARY=/headless-shell/headless-shell
-ENV WEBAN_NO_SANDBOX=1
-
-ENTRYPOINT ["/app/WeBan"]
+ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["/app/WeBan"]

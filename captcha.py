@@ -16,6 +16,7 @@ import json
 import logging
 import os
 import platform
+import shutil
 import subprocess
 import sys
 import random
@@ -652,11 +653,11 @@ class LoginCaptchaSolver:
 # ── 浏览器自动检测 ──────────────────────────────────────
 
 
-def _find_playwright_browser() -> Optional[str]:
-    """检测 Playwright 安装的 Chrome/Chromium 路径。"""
+def _playwright_candidates() -> list[str]:
+    """返回 Playwright 安装的 Chrome/Chromium 路径（最新版本优先）。"""
     pw_dir = Path.home() / ".cache" / "ms-playwright"
     if not pw_dir.is_dir():
-        return None
+        return []
     system = platform.system()
     patterns = {
         "Linux": "chromium-*/chrome-linux/chrome",
@@ -664,62 +665,106 @@ def _find_playwright_browser() -> Optional[str]:
         "Windows": "chromium-*/chrome-win/chrome.exe",
     }
     pattern = patterns.get(system)
-    if pattern:
-        matches = sorted(pw_dir.glob(pattern), reverse=True)
-        if matches:
-            return str(matches[0])
-    return None
+    if not pattern:
+        return []
+    return [str(p) for p in sorted(pw_dir.glob(pattern), reverse=True)]
+
+
+def _registry_candidates() -> list[str]:
+    """从 Windows 注册表中查找已安装的 Chrome/Edge 路径。"""
+    if platform.system() != "Windows":
+        return []
+    try:
+        import winreg
+    except ImportError:
+        return []
+    results: list[str] = []
+    # Chrome/Edge 通过 App Paths 注册
+    for hive, subkey in [
+        (winreg.HKEY_CURRENT_USER, r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe"),
+        (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe"),
+        (winreg.HKEY_CURRENT_USER, r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe"),
+        (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe"),
+    ]:
+        try:
+            with winreg.OpenKey(hive, subkey) as key:
+                path, _ = winreg.QueryValueEx(key, None)
+                if path and os.path.isfile(path):
+                    results.append(path)
+        except (FileNotFoundError, PermissionError):
+            continue
+    return results
 
 
 def detect_browser() -> Optional[str]:
-    """自动检测本地已安装的 Chrome/Chromium 浏览器路径。
+    """自动检测本地已安装的 Chrome/Chromium/Edge 浏览器路径。
 
-    检查顺序：Playwright → 系统默认路径
-    环境变量和 CDP 由 check_browser_health 处理。
+    按优先级依次检查：
+    1. Playwright 缓存
+    2. Windows 注册表
+    3. 平台常见安装路径
+    4. PATH 查找
+
+    仅覆盖 Chrome / Chromium / Edge 三款浏览器的各通道版本（stable/beta/dev/canary）。
+    CDP 连接和用户指定路径由 check_browser_health 处理。
     """
-    # 1. Playwright 安装的浏览器
-    pw = _find_playwright_browser()
-    if pw:
-        return pw
-
-    # 2. 系统默认路径
     system = platform.system()
-    candidates: list[str] = []
+    candidates: list[str] = _playwright_candidates() + _registry_candidates()
+
     if system == "Darwin":
-        candidates = [
-            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-            "/Applications/Google Chrome Dev.app/Contents/MacOS/Google Chrome Dev",
-            "/Applications/Chromium.app/Contents/MacOS/Chromium",
-            "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
-            "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
-        ]
+        _apps = "/Applications"
+        _chrome = ["Google Chrome", "Google Chrome Beta", "Google Chrome Dev", "Google Chrome Canary"]
+        _chromium = ["Chromium"]
+        _edge = ["Microsoft Edge", "Microsoft Edge Beta", "Microsoft Edge Dev", "Microsoft Edge Canary"]
+        for name in _chrome + _chromium + _edge:
+            candidates.append(f"{_apps}/{name}.app/Contents/MacOS/{name}")
+
     elif system == "Linux":
-        candidates = [
-            "/usr/bin/google-chrome",
-            "/usr/bin/google-chrome-stable",
-            "/usr/bin/chromium",
-            "/usr/bin/chromium-browser",
-            "/snap/bin/chromium",
+        _chrome = ["google-chrome", "google-chrome-stable", "google-chrome-beta", "google-chrome-unstable"]
+        _chromium = ["chromium", "chromium-browser"]
+        _edge = ["microsoft-edge-stable", "microsoft-edge-beta", "microsoft-edge-dev", "microsoft-edge"]
+        for name in _chrome + _chromium + _edge:
+            candidates.append(f"/usr/bin/{name}")
+            candidates.append(f"/snap/bin/{name}")
+        # /opt/ 路径（部分发行版安装位置）
+        candidates += [
+            "/opt/google/chrome/google-chrome",
+            "/opt/google/chrome-beta/google-chrome",
+            "/opt/google/chrome-unstable/google-chrome",
+            "/opt/microsoft/msedge/msedge",
+            "/opt/microsoft/msedge-beta/msedge",
+            "/opt/microsoft/msedge-dev/msedge",
         ]
+
     elif system == "Windows":
         local = os.environ.get("LOCALAPPDATA", "")
         pf = os.environ.get("PROGRAMFILES", "")
         pf86 = os.environ.get("PROGRAMFILES(X86)", "")
-        candidates = [
-            *[
-                str(Path(p) / "Google/Chrome/Application/chrome.exe")
-                for p in (local, pf, pf86)
-                if p
-            ],
-            *[
-                str(Path(p) / "Chromium/Application/chrome.exe")
-                for p in (local, pf, pf86)
-                if p
-            ],
-        ]
+        _chrome = ["Chrome", "Chrome Beta", "Chrome Dev", "Chrome SxS"]  # SxS = Canary
+        _chromium = ["Chromium"]
+        _edge = ["Microsoft/Edge", "Microsoft/Edge Beta", "Microsoft/Edge Dev", "Microsoft/Edge SxS"]
+        for base in (local, pf, pf86):
+            if not base:
+                continue
+            for name in _chrome + _chromium:
+                candidates.append(str(Path(base) / name / "Application" / "chrome.exe"))
+            for name in _edge:
+                candidates.append(str(Path(base) / name / "Application" / "msedge.exe"))
+
     for p in candidates:
         if os.path.isfile(p):
             return p
+
+    # PATH 查找
+    for name in (
+        "google-chrome", "google-chrome-stable", "google-chrome-beta", "google-chrome-unstable",
+        "chromium", "chromium-browser",
+        "microsoft-edge-stable", "microsoft-edge-beta", "microsoft-edge-dev", "microsoft-edge",
+    ):
+        found = shutil.which(name)
+        if found:
+            return found
+
     return None
 
 
@@ -728,35 +773,31 @@ def check_browser_health(
     cdp_host: Optional[str] = None,
     cdp_port: Optional[int] = None,
 ) -> str:
-    """按优先级检测可用的浏览器：用户指定 → CDP → Playwright → 系统。
+    """按优先级检测可用的浏览器：CDP → 用户路径 → 自动检测。
 
-    :param browser_path: 浏览器可执行文件路径（环境变量或配置文件指定）
+    :param browser_path: 浏览器可执行文件路径（配置文件指定）
     :param cdp_host: CDP 远程调试地址
     :param cdp_port: CDP 远程调试端口
     :return: 浏览器路径或 CDP 地址
     :raises RuntimeError: 无可用浏览器时
     """
-    # 1. 用户显式指定的浏览器路径
-    for env_var in ("CHROMIUM_BINARY", "CHROME_BINARY"):
-        env_path = os.environ.get(env_var, "")
-        if env_path and os.path.isfile(env_path):
-            return env_path
-    if browser_path and os.path.isfile(browser_path):
-        return browser_path
-
-    # 2. CDP 远程调试
+    # 1. CDP 远程调试
     if cdp_host and cdp_port:
         return f"{cdp_host}:{cdp_port}"
 
-    # 3. Playwright / 系统浏览器（detect_browser 内部按 Playwright → 系统排序）
+    # 2. 配置文件指定的浏览器路径
+    if browser_path and os.path.isfile(browser_path):
+        return browser_path
+
+    # 3. 自动检测
     resolved = detect_browser()
     if not resolved:
         raise RuntimeError(
-            "未找到浏览器。请通过以下方式之一提供：\n"
-            "  1. 设置环境变量 CHROMIUM_BINARY 或配置 browser_path\n"
-            "  2. 配置 cdp_host 和 cdp_port 连接远程浏览器\n"
+            "未找到 Chrome / Chromium / Edge 浏览器。请通过以下方式之一提供：\n"
+            "  1. 在 config.toml 中配置 cdp_host 和 cdp_port 连接远程浏览器\n"
+            "  2. 在 config.toml 中配置 browser_path 指定浏览器路径\n"
             "  3. 安装 Playwright: pip install playwright && playwright install chromium\n"
-            "  4. 安装 Chrome 或 Chromium"
+            "  4. 安装 Chrome、Chromium 或 Edge"
         )
     try:
         args = [
@@ -764,17 +805,16 @@ def check_browser_health(
             "--headless=new",
             "--no-first-run",
             "--disable-gpu",
+            "--no-sandbox",
             "--dump-dom",
             "data:text/html,<h1>ok</h1>",
         ]
-        if os.environ.get("WEBAN_NO_SANDBOX", "").lower() in ("1", "true", "yes"):
-            args.append("--no-sandbox")
         proc = subprocess.run(
             args,
             capture_output=True,
             timeout=10,
         )
-        if proc.returncode != 0 or b"ok" not in proc.stdout:
+        if proc.returncode != 0 or b"<h1>ok</h1>" not in proc.stdout:
             raise RuntimeError(
                 f"浏览器启动失败 (exit={proc.returncode}): {proc.stderr.decode()[:200]}"
             )
@@ -850,12 +890,11 @@ class CaptchaHandler:
 
         窗口尺寸 428x818 模拟移动端以匹配腾讯验证码的移动版 UI。
         """
-        browser_path = self.browser_path or detect_browser()
-        no_sandbox = os.environ.get("WEBAN_NO_SANDBOX", "").lower() in (
-            "1",
-            "true",
-            "yes",
-        )
+        # CDP 模式优先，不需要本地浏览器
+        if self.cdp_host and self.cdp_port:
+            browser_path = self.browser_path or "cdp"
+        else:
+            browser_path = self.browser_path or detect_browser()
         browser_args = [
             "--window-size=428,818",
             "--mute-audio",
@@ -866,16 +905,31 @@ class CaptchaHandler:
         ]
         if headless:
             browser_args.append("--headless=new")
-        if self.cdp_host and self.cdp_port:
-            browser_path = browser_path or "cdp"
-        return await nodriver.start(
-            headless=headless,
-            browser_executable_path=browser_path or None,
-            browser_args=browser_args,
-            sandbox=not no_sandbox,
-            host=self.cdp_host,
-            port=self.cdp_port,
-        )
+        try:
+            return await nodriver.start(
+                headless=headless,
+                browser_executable_path=browser_path or None,
+                browser_args=browser_args,
+                host=self.cdp_host,
+                port=self.cdp_port,
+            )
+        except Exception as e:
+            if "Failed to connect to browser" in str(e):
+                if self.cdp_host and self.cdp_port:
+                    raise RuntimeError(
+                        f"无法连接 CDP 浏览器 ({self.cdp_host}:{self.cdp_port})。"
+                        "请检查：\n"
+                        "  1. 远程浏览器是否已启动并开放调试端口\n"
+                        "  2. config.toml 中 cdp_host 和 cdp_port 是否正确"
+                    ) from e
+                raise RuntimeError(
+                    f"无法启动浏览器 ({browser_path or '自动检测'})。"
+                    "请尝试以下解决方案：\n"
+                    "  1. 在 config.toml 中配置 browser_path 指定浏览器路径\n"
+                    "  2. 在 config.toml 中配置 cdp_host 和 cdp_port 连接远程浏览器\n"
+                    "  3. 安装最新版 Chrome 或 Chromium"
+                ) from e
+            raise
 
     async def _inject_auth(self, tab) -> None:
         """向页面注入 localStorage 认证信息。
@@ -924,7 +978,13 @@ class CaptchaHandler:
         browser = await asyncio.wait_for(self._create_browser(headless), timeout=30)
         try:
             origin = entry_url.split("#")[0].rstrip("/")
-            tab = await asyncio.wait_for(browser.get(f"{origin}/"), timeout=30)
+            try:
+                tab = await asyncio.wait_for(browser.get(f"{origin}/"), timeout=30)
+            except RuntimeError:
+                if not (self.cdp_host and self.cdp_port):
+                    raise
+                # CDP 模式下浏览器初始无页面，创建新标签页
+                tab = await asyncio.wait_for(browser.get(f"{origin}/", new_tab=True), timeout=30)
             await self._inject_auth(tab)
             self.log.info("正在加载入口页面")
             await asyncio.wait_for(tab.get(entry_url), timeout=30)

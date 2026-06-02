@@ -350,30 +350,41 @@ if __name__ == "__main__":
         accounts = valid_accounts
         logger.info(f"共加载到 {len(accounts)} 个账号")
 
-        # 检测浏览器是否可用（优先级：用户指定 → CDP → Playwright → 系统）
+        # 检测浏览器是否可用（优先级：CDP → 用户路径 → 自动检测）
         browser_path = global_settings.get("browser_path", "") or None
         cdp_host = global_settings.get("cdp_host", "") or None
         cdp_port = int(global_settings.get("cdp_port", 0)) or None
 
-        # Docker 环境下未配置浏览器和 CDP 时，自动尝试默认 CDP 地址
-        in_docker = os.path.exists("/.dockerenv") or os.path.isfile("/run/.containerenv")
-        if not browser_path and not cdp_host and not cdp_port and in_docker:
-            cdp_host, cdp_port = "host.docker.internal", 9222
-            logger.info("检测到 Docker 环境，自动尝试 CDP 连接 host.docker.internal:9222")
+        # 用户未配置时，自动探测可用的 CDP 端口
+        if not browser_path and not cdp_host and not cdp_port:
+            import socket
+            for host, port in [
+                ("127.0.0.1", 9222), ("127.0.0.1", 9223),
+                ("host.docker.internal", 9222), ("host.docker.internal", 9223),
+            ]:
+                try:
+                    with socket.create_connection((host, port), timeout=1):
+                        # 端口可达，进一步验证是否为 CDP 服务
+                        resp = requests.get(f"http://{host}:{port}/json/version", timeout=3)
+                        if resp.ok and "Browser" in resp.json():
+                            cdp_host, cdp_port = host, port
+                            logger.info(f"自动探测到 CDP 浏览器 {host}:{port}")
+                            break
+                except (OSError, requests.RequestException, ValueError):
+                    continue
 
         try:
             resolved = check_browser_health(browser_path, cdp_host, cdp_port)
             logger.info(f"浏览器检测通过: {resolved}")
         except RuntimeError as e:
             logger.error(f"浏览器检测失败: {e}")
-            if in_docker:
-                logger.warning(
-                    "请在宿主机 Chrome 中开启远程调试，然后重启容器：\n"
-                    "  1. 地址栏输入 chrome://inspect/#remote-debugging\n"
-                    "  2. 勾选 Allow remote debugging for this browser instance\n"
-                    "  3. 或在 config.toml 中配置 cdp_host 和 cdp_port"
-                )
             sys.exit(1)
+
+        # 将探测结果写回 global_settings，供 run_account 读取
+        if cdp_host:
+            global_settings["cdp_host"] = cdp_host
+        if cdp_port:
+            global_settings["cdp_port"] = cdp_port
 
         # 是否多线程
         max_workers = min(len(accounts), int(global_settings.get("max_workers", 5)))

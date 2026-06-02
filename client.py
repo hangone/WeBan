@@ -799,6 +799,18 @@ class WeBanClient:
                 exam_score = plan.get("examScore", 0)
                 pass_score = plan.get("passScore", 0)
 
+                # ── 已考过的考试，显示历史成绩 ──
+                if exam_finish_num > 0:
+                    try:
+                        pp = self.api.exam_prepare_paper(plan["id"])
+                        full_score = pp.get("data", {}).get("paperScore", 100)
+                    except Exception:
+                        full_score = 100
+                    self.log.info(
+                        f"{plan_name} 已考过 {exam_finish_num} 次，"
+                        f"最高 {exam_score}/{full_score}（及格线 {pass_score}）"
+                    )
+
                 # ── 根据 exam_mode 判断是否跳过 ──
                 if exam_odd_num <= 0:
                     self.log.info(f"{plan_name} 无剩余考试机会，跳过")
@@ -809,14 +821,14 @@ class WeBanClient:
                     and exam_finish_num > 0
                     and exam_score >= pass_score
                 ):
-                    self.log.info(
-                        f"{plan_name} 已及格 ({exam_score}分 >= {pass_score}分)，跳过"
-                    )
+                    self.log.info(f"{plan_name} 已及格 ({exam_score}分 >= {pass_score}分)，跳过")
                     continue
 
-                if exam_mode == "perfect" and exam_score >= 100:
-                    self.log.info(f"{plan_name} 已满分 ({exam_score}分)，跳过")
-                    continue
+                # perfect 模式：已满分则跳过
+                if exam_mode == "perfect" and exam_finish_num > 0:
+                    if exam_score >= full_score:
+                        self.log.info(f"{plan_name} 已满分 ({exam_score}分)，跳过")
+                        continue
 
                 # perfect 模式：只剩 1 次机会时，检查题库是否能全覆盖
                 if exam_mode == "perfect" and exam_odd_num <= 1:
@@ -828,10 +840,7 @@ class WeBanClient:
                     self.log.warning(warning_msg)
 
                 if exam_mode == "true" and exam_finish_num > 0:
-                    self.log.info(
-                        f"{plan_name} 已完成 {exam_finish_num} 次，"
-                        f"最高 {exam_score} 分，继续考试以争取更好成绩"
-                    )
+                    self.log.info(f"{plan_name} 已完成 {exam_finish_num} 次，{plan_name} 继续考试以争取更好成绩")
 
                 user_exam_plan_id = plan["id"]
                 exam_plan_id = plan["examPlanId"]
