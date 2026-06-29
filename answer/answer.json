@@ -14395,6 +14395,18 @@
       {
         "content": "避孕套能以极高几率防性病。",
         "isCorrect": 2
+      },
+      {
+        "content": "吃了紧急避孕药后，72小时内都可以发生无保护性行为了",
+        "isCorrect": 1
+      },
+      {
+        "content": "避孕套能以极高几率防性病",
+        "isCorrect": 2
+      },
+      {
+        "content": "频繁服用紧急避孕药会扰乱内分泌",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -55735,6 +55747,10 @@
       {
         "content": "错。",
         "isCorrect": 2
+      },
+      {
+        "content": "对",
+        "isCorrect": 1
       }
     ],
     "type": 1
