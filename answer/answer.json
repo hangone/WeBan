@@ -1537,6 +1537,27 @@
     ],
     "type": 1
   },
+  "“合作安全理念”取代传统武力手段的理念依据是：": {
+    "optionList": [
+      {
+        "content": "国际法禁止战争",
+        "isCorrect": 2
+      },
+      {
+        "content": "合作更符合现代国际秩序",
+        "isCorrect": 1
+      },
+      {
+        "content": "武力手段完全失效",
+        "isCorrect": 2
+      },
+      {
+        "content": "合作无需成本",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "“同学们，我们是学生会的人，为了给大家建立档案，现在要登记大家的个人信息，请大家配合。”你会怎么做？": {
     "optionList": [
       {
@@ -2674,6 +2695,27 @@
     ],
     "type": 1
   },
+  "“统筹发展和安全”与“发展和安全并重”的区别是？": {
+    "optionList": [
+      {
+        "content": "统筹强调动态调整",
+        "isCorrect": 1
+      },
+      {
+        "content": "并重强调动态调整",
+        "isCorrect": 2
+      },
+      {
+        "content": "统筹忽视安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "并重忽视发展",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "“网络成瘾” 的类型有哪些？": {
     "optionList": [
       {
@@ -3352,6 +3394,27 @@
       }
     ],
     "type": 2
+  },
+  "《孙子兵法》强调军事安全的重要性在于？": {
+    "optionList": [
+      {
+        "content": "战争不可避免",
+        "isCorrect": 2
+      },
+      {
+        "content": "关系国家生死存亡",
+        "isCorrect": 1
+      },
+      {
+        "content": "仅关注防御",
+        "isCorrect": 2
+      },
+      {
+        "content": "忽视外交",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "《安全生产法》规定（）负责生产安全事故的应急救援。": {
     "optionList": [
@@ -6631,6 +6694,18 @@
       {
         "content": "“我这牛肉可是纯进口的，我卖贵点很正常吧？”其实这牛肉的产地很一般，价格低廉，口感还不如国内的普通牛肉",
         "isCorrect": 2
+      },
+      {
+        "content": "因个人拖延，迟迟未完成答应帮同事做的工作",
+        "isCorrect": 1
+      },
+      {
+        "content": "将普通牛肉标注为“进口牛肉”，高价售卖",
+        "isCorrect": 2
+      },
+      {
+        "content": "旅游团宣传“0元游”，实际全程强制购物",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -6934,6 +7009,10 @@
       {
         "content": "失业了，有的人自怨自怜，有的人若无其事",
         "isCorrect": 1
+      },
+      {
+        "content": "天气放晴，所有人都瞬间变得开心愉悦",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -7509,7 +7588,7 @@
         "isCorrect": 1
       }
     ],
-    "type": 2
+    "type": 1
   },
   "下面躲避雾霾的方式中错误的是：": {
     "optionList": [
@@ -8271,6 +8350,27 @@
     ],
     "type": 1
   },
+  "个人安全与国家安全的关系是？": {
+    "optionList": [
+      {
+        "content": "无关",
+        "isCorrect": 2
+      },
+      {
+        "content": "个人安全是国家安全的组成",
+        "isCorrect": 1
+      },
+      {
+        "content": "国家安全优先于个人",
+        "isCorrect": 2
+      },
+      {
+        "content": "个人优先于国家安全",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "个人提出劳动仲裁失败的主要原因是：": {
     "optionList": [
       {
@@ -8449,6 +8549,27 @@
     ],
     "type": 1
   },
+  "中国倡导的国际新秩序强调？": {
+    "optionList": [
+      {
+        "content": "主权平等",
+        "isCorrect": 1
+      },
+      {
+        "content": "大国特权",
+        "isCorrect": 2
+      },
+      {
+        "content": "军事扩张",
+        "isCorrect": 2
+      },
+      {
+        "content": "文化同化",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "中国共产党人的初心和使命，就是为中国人民______，为中华民族______。这个初心和使命是激励中国共产党人不断前进的根本动力。（ ）": {
     "optionList": [
       {
@@ -8616,6 +8737,27 @@
       }
     ],
     "type": 2
+  },
+  "中国应对军事威胁的策略是？": {
+    "optionList": [
+      {
+        "content": "放弃国防",
+        "isCorrect": 2
+      },
+      {
+        "content": "依赖国际干预",
+        "isCorrect": 2
+      },
+      {
+        "content": "加强国防与外交",
+        "isCorrect": 1
+      },
+      {
+        "content": "妥协退让",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "中国式现代化为人类实现现代化提供了新的选择，中国共产党和中国人民为解决人类面临的共同问题提供中国智慧、中国方案、______。（）": {
     "optionList": [
@@ -10586,6 +10728,18 @@
       {
         "content": "不孕、习惯性流产。",
         "isCorrect": 1
+      },
+      {
+        "content": "习惯性流产",
+        "isCorrect": 2
+      },
+      {
+        "content": "不孕",
+        "isCorrect": 2
+      },
+      {
+        "content": "前面两个选项都是",
+        "isCorrect": 1
       }
     ],
     "type": 1
@@ -11803,6 +11957,48 @@
       },
       {
         "content": "仪器损坏",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "以下哪些属于总体国家安全观提出的时代背景？": {
+    "optionList": [
+      {
+        "content": "国内外风险因素明显增多",
+        "isCorrect": 1
+      },
+      {
+        "content": "国际战略格局变化（如美国战略东移）",
+        "isCorrect": 1
+      },
+      {
+        "content": "国内社会矛盾激化（如群体事件）",
+        "isCorrect": 1
+      },
+      {
+        "content": "传统安全威胁消失",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
+  "以下哪些属于总体国家安全观的实践要求？": {
+    "optionList": [
+      {
+        "content": "将人民安全置于其他安全之前",
+        "isCorrect": 1
+      },
+      {
+        "content": "通过服务人民夯实安全基础、群众基础",
+        "isCorrect": 1
+      },
+      {
+        "content": "以军事手段优先保障安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "赋予公民安全话语权",
         "isCorrect": 1
       }
     ],
@@ -13397,6 +13593,27 @@
     ],
     "type": 1
   },
+  "以下哪项不属于传统安全要素？": {
+    "optionList": [
+      {
+        "content": "军事安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "网络安全",
+        "isCorrect": 1
+      },
+      {
+        "content": "领土安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "主权安全",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "以下哪项不属于初起火灾的特点？": {
     "optionList": [
       {
@@ -14254,6 +14471,23 @@
     ],
     "type": 1
   },
+  "仰卧起坐如果锻炼不当，可能会带来哪些问题？": {
+    "optionList": [
+      {
+        "content": "腰肌劳损",
+        "isCorrect": 1
+      },
+      {
+        "content": "腰椎间盘突出",
+        "isCorrect": 1
+      },
+      {
+        "content": "颈椎受伤",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "仰卧起坐容易带来腰椎问题，应该弃绝这项运动？": {
     "optionList": [
       {
@@ -14419,6 +14653,27 @@
       {
         "content": "保密与反间谍",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "传统安全观的主要问题是？": {
+    "optionList": [
+      {
+        "content": "过度重视国民安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "简化国家安全为政治、军事、国土安全",
+        "isCorrect": 1
+      },
+      {
+        "content": "强调人与物的安全平衡",
+        "isCorrect": 2
+      },
+      {
+        "content": "统筹国土与国民安全",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -17303,6 +17558,27 @@
     ],
     "type": 2
   },
+  "关于“统筹开放和安全”，下面说法正确的是：": {
+    "optionList": [
+      {
+        "content": "因开放可能带来风险而拒绝开放",
+        "isCorrect": 2
+      },
+      {
+        "content": "以开放促发展、在发展中保安全",
+        "isCorrect": 1
+      },
+      {
+        "content": "完全接受开放中的负面影响",
+        "isCorrect": 2
+      },
+      {
+        "content": "保持国家安全底线思维",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "关于“黄金72小时”，下面说法正确的是：": {
     "optionList": [
       {
@@ -17998,6 +18274,27 @@
     ],
     "type": 2
   },
+  "关于文化安全的相对性，以下哪一项正确？": {
+    "optionList": [
+      {
+        "content": "文化应完全保留传统，禁止任何变化",
+        "isCorrect": 2
+      },
+      {
+        "content": "文化安全意味着所有文化都应被保护",
+        "isCorrect": 2
+      },
+      {
+        "content": "文化安全是动态的，需平衡传统与现代化",
+        "isCorrect": 1
+      },
+      {
+        "content": "文化安全仅针对外来文化的冲击",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "关于新型冠状病毒，下列说法正确的有（ ）": {
     "optionList": [
       {
@@ -18515,6 +18812,14 @@
       {
         "content": "足球是全天候运动，可以在恶劣天气下进行。",
         "isCorrect": 1
+      },
+      {
+        "content": "黄昏、黎明，能见度低，神经反应迟钝，容易造成运动损伤。",
+        "isCorrect": 2
+      },
+      {
+        "content": "场地不平、碎石杂物多（跑道、沙坑），容易造成踝关节扭伤、骨膜损伤、跟腱拉伤等。",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -22782,6 +23087,27 @@
     ],
     "type": 2
   },
+  "国家安全宣传教育的核心价值观是？": {
+    "optionList": [
+      {
+        "content": "军事优先",
+        "isCorrect": 2
+      },
+      {
+        "content": "人民安全",
+        "isCorrect": 1
+      },
+      {
+        "content": "经济发展",
+        "isCorrect": 2
+      },
+      {
+        "content": "文化传承",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "国家安全工作应当坚持总体国家安全观，以（    ）为依托，维护各领域国家安全，构建国家安全体系，走中国特色国家安全道路。": {
     "optionList": [
       {
@@ -23006,6 +23332,48 @@
       },
       {
         "content": "扣押",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "国家安全治理的 “四面一体” 体系不包括？": {
+    "optionList": [
+      {
+        "content": "国家安全构成要素",
+        "isCorrect": 2
+      },
+      {
+        "content": "危害国家安全因素",
+        "isCorrect": 2
+      },
+      {
+        "content": "国际安全同盟",
+        "isCorrect": 1
+      },
+      {
+        "content": "国家安全保障机制",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "国家安全治理的首选策略是？": {
+    "optionList": [
+      {
+        "content": "以军事威慑为主",
+        "isCorrect": 2
+      },
+      {
+        "content": "优先使用软实力塑造",
+        "isCorrect": 1
+      },
+      {
+        "content": "依赖情报渗透",
+        "isCorrect": 2
+      },
+      {
+        "content": "被动应对安全威胁",
         "isCorrect": 2
       }
     ],
@@ -23278,6 +23646,48 @@
       },
       {
         "content": "错误",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "国民素质对国家安全的影响体现在？": {
+    "optionList": [
+      {
+        "content": "仅影响经济",
+        "isCorrect": 2
+      },
+      {
+        "content": "仅影响军事",
+        "isCorrect": 2
+      },
+      {
+        "content": "多领域综合作用",
+        "isCorrect": 1
+      },
+      {
+        "content": "无关紧要",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "国际安全的基础是？": {
+    "optionList": [
+      {
+        "content": "军事优势",
+        "isCorrect": 2
+      },
+      {
+        "content": "经济制裁",
+        "isCorrect": 2
+      },
+      {
+        "content": "相互尊重与合作",
+        "isCorrect": 1
+      },
+      {
+        "content": "文化同化",
         "isCorrect": 2
       }
     ],
@@ -27471,6 +27881,27 @@
       }
     ],
     "type": 2
+  },
+  "天灾对国家安全的威胁直接表现为？": {
+    "optionList": [
+      {
+        "content": "经济衰退",
+        "isCorrect": 2
+      },
+      {
+        "content": "社会动荡",
+        "isCorrect": 2
+      },
+      {
+        "content": "国民生命损失",
+        "isCorrect": 1
+      },
+      {
+        "content": "国际冲突",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "天然气热水器的报废年限为几年？": {
     "optionList": [
@@ -33596,6 +34027,27 @@
     ],
     "type": 2
   },
+  "封建王朝的兴衰周期律主要源于？": {
+    "optionList": [
+      {
+        "content": "自然环境变化",
+        "isCorrect": 2
+      },
+      {
+        "content": "制度缺陷",
+        "isCorrect": 1
+      },
+      {
+        "content": "国际压力",
+        "isCorrect": 2
+      },
+      {
+        "content": "国民素质低下",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "将“中华人民共和国实行依法治国，建设社会主义法治国家”写入宪法的是（ ）。": {
     "optionList": [
       {
@@ -33843,6 +34295,10 @@
       },
       {
         "content": "小张穿了露趾凉鞋，脚趾直接暴露易被砸伤",
+        "isCorrect": 1
+      },
+      {
+        "content": "施工楼层外侧没有设立防护网",
         "isCorrect": 1
       }
     ],
@@ -34395,6 +34851,27 @@
     ],
     "type": 1
   },
+  "工业时代的核心资源是？": {
+    "optionList": [
+      {
+        "content": "土地",
+        "isCorrect": 2
+      },
+      {
+        "content": "石油",
+        "isCorrect": 1
+      },
+      {
+        "content": "稀土",
+        "isCorrect": 2
+      },
+      {
+        "content": "水资源",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "希望自己能得到他人的尊重，首要的是？": {
     "optionList": [
       {
@@ -34925,6 +35402,27 @@
     ],
     "type": 1
   },
+  "应对气候变化的国际协议是？": {
+    "optionList": [
+      {
+        "content": "《京都议定书》",
+        "isCorrect": 1
+      },
+      {
+        "content": "《凡尔赛和约》",
+        "isCorrect": 2
+      },
+      {
+        "content": "《开罗宣言》",
+        "isCorrect": 2
+      },
+      {
+        "content": "《波茨坦公告》",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "应急广播系统会受到停电的影响、不能工作吗？": {
     "optionList": [
       {
@@ -35436,6 +35934,27 @@
     ],
     "type": 1
   },
+  "当前工业安全的核心挑战是？": {
+    "optionList": [
+      {
+        "content": "能源过剩",
+        "isCorrect": 2
+      },
+      {
+        "content": "芯片技术依赖",
+        "isCorrect": 1
+      },
+      {
+        "content": "劳动力不足",
+        "isCorrect": 2
+      },
+      {
+        "content": "市场饱和",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "当前我国科技安全面临的挑战有哪些?": {
     "optionList": [
       {
@@ -35479,6 +35998,27 @@
     "type": 2
   },
   "当前统筹开放与安全的战略意义在于？": {
+    "optionList": [
+      {
+        "content": "避免国际竞争，确保绝对安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "在开放中提升竞争力，以发展保障安全",
+        "isCorrect": 1
+      },
+      {
+        "content": "放弃部分主权换取经济发展",
+        "isCorrect": 2
+      },
+      {
+        "content": "完全依靠国际合作解决安全问题",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "当前统筹开放和安全的战略意义在于？": {
     "optionList": [
       {
         "content": "避免国际竞争，确保绝对安全",
@@ -36125,6 +36665,27 @@
     ],
     "type": 1
   },
+  "影响国家安全的自然因素包括：": {
+    "optionList": [
+      {
+        "content": "国土面积",
+        "isCorrect": 1
+      },
+      {
+        "content": "人口分布",
+        "isCorrect": 2
+      },
+      {
+        "content": "自然资源",
+        "isCorrect": 1
+      },
+      {
+        "content": "气候条件",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "影响艾滋病流行的因素主要有：": {
     "optionList": [
       {
@@ -36730,6 +37291,69 @@
     ],
     "type": 1
   },
+  "总体国家安全观对国家安全范围的界定是？": {
+    "optionList": [
+      {
+        "content": "仅涉及传统安全领域",
+        "isCorrect": 2
+      },
+      {
+        "content": "涵盖所有国民、领域、方面、层级安全的总和",
+        "isCorrect": 1
+      },
+      {
+        "content": "聚焦政治和军事安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "由地方政府自行定义",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "总体国家安全观属于哪种类型的安全观？": {
+    "optionList": [
+      {
+        "content": "传统安全观",
+        "isCorrect": 2
+      },
+      {
+        "content": "低级非传统安全观",
+        "isCorrect": 2
+      },
+      {
+        "content": "高级非传统安全观",
+        "isCorrect": 1
+      },
+      {
+        "content": "单一领域安全观",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "总体国家安全观提出的 “五个统筹” 不包括以下哪项？": {
+    "optionList": [
+      {
+        "content": "传统安全和非传统安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "自身安全和共同安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "经济安全和文化安全",
+        "isCorrect": 1
+      },
+      {
+        "content": "发展和安全",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "总体国家安全观提出的直接时代背景是？": {
     "optionList": [
       {
@@ -36767,6 +37391,27 @@
       }
     ],
     "type": 2
+  },
+  "总体国家安全观的 “开放性” 体现在？": {
+    "optionList": [
+      {
+        "content": "固定不变的安全领域",
+        "isCorrect": 2
+      },
+      {
+        "content": "不断纳入新安全问题（如文化、科技）",
+        "isCorrect": 1
+      },
+      {
+        "content": "仅关注传统安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "排斥国际经验",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "总体国家安全观的 “非传统安全” 领域不包括？": {
     "optionList": [
@@ -36809,6 +37454,27 @@
       }
     ],
     "type": 1
+  },
+  "总体国家安全观的兼容性特征主要体现在哪些方面？": {
+    "optionList": [
+      {
+        "content": "吸收中国传统文化中的民本主义",
+        "isCorrect": 1
+      },
+      {
+        "content": "融合西方近代的人本主义思想",
+        "isCorrect": 1
+      },
+      {
+        "content": "借鉴冷战后的非传统安全理论",
+        "isCorrect": 1
+      },
+      {
+        "content": "仅关注军事安全领域",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
   },
   "总体国家安全观的思想基础有哪些？": {
     "optionList": [
@@ -37623,6 +38289,27 @@
     ],
     "type": 1
   },
+  "我国军事工业安全的挑战包括？": {
+    "optionList": [
+      {
+        "content": "自主创新能力不足",
+        "isCorrect": 2
+      },
+      {
+        "content": "过度依赖进口",
+        "isCorrect": 2
+      },
+      {
+        "content": "技术封锁",
+        "isCorrect": 2
+      },
+      {
+        "content": "以上都是",
+        "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
   "我国出现第一例计算机病毒的时间是：": {
     "optionList": [
       {
@@ -38196,6 +38883,27 @@
       }
     ],
     "type": 2
+  },
+  "我国首个国家安全战略文本是？": {
+    "optionList": [
+      {
+        "content": "《国家安全法》",
+        "isCorrect": 2
+      },
+      {
+        "content": "《反间谍法》",
+        "isCorrect": 2
+      },
+      {
+        "content": "《国家安全战略纲要》",
+        "isCorrect": 1
+      },
+      {
+        "content": "《网络安全法》",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "我校处于珠海机场净空保护区范围之内，禁止：": {
     "optionList": [
@@ -40702,6 +41410,27 @@
     ],
     "type": 2
   },
+  "新时代安全观的核心转变是：": {
+    "optionList": [
+      {
+        "content": "强化武力手段",
+        "isCorrect": 2
+      },
+      {
+        "content": "从“维护”转向“塑造”",
+        "isCorrect": 1
+      },
+      {
+        "content": "减少国际合作",
+        "isCorrect": 2
+      },
+      {
+        "content": "弱化文化安全",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "新生入学时，应征参加中国人民解放军（含中国人民武装警察部队）的，可申请保留入学资格至退役后（  ）年。": {
     "optionList": [
       {
@@ -40988,6 +41717,48 @@
       }
     ],
     "type": 1
+  },
+  "日本“皇民化运动”属于：": {
+    "optionList": [
+      {
+        "content": "文化侵略",
+        "isCorrect": 1
+      },
+      {
+        "content": "文化交流",
+        "isCorrect": 2
+      },
+      {
+        "content": "文化保护",
+        "isCorrect": 2
+      },
+      {
+        "content": "文化创新",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "日本明治维新 \"殖产兴业\" 政策的具体措施包括：": {
+    "optionList": [
+      {
+        "content": "建立示范工厂",
+        "isCorrect": 1
+      },
+      {
+        "content": "引进外国专家",
+        "isCorrect": 1
+      },
+      {
+        "content": "发展纺织业",
+        "isCorrect": 1
+      },
+      {
+        "content": "军事优先发展",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
   },
   "早上上课，小川来到教室，发现这么冷的天居然还开着窗户，就关上了，并跟班里的人说，怕大家感冒窗户就不要开了。这样的想法对吗？为什么？": {
     "optionList": [
@@ -46389,6 +47160,27 @@
     ],
     "type": 2
   },
+  "清朝闭关锁国政策的后果是？": {
+    "optionList": [
+      {
+        "content": "经济繁荣",
+        "isCorrect": 2
+      },
+      {
+        "content": "科技文化落后",
+        "isCorrect": 1
+      },
+      {
+        "content": "军事强大",
+        "isCorrect": 2
+      },
+      {
+        "content": "国际地位提升",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "清洗苹果时，我们可以：": {
     "optionList": [
       {
@@ -47423,6 +48215,27 @@
     ],
     "type": 1
   },
+  "物权人开发利用不动产时，需保护周边生态环境，体现的是？": {
+    "optionList": [
+      {
+        "content": "绿色原则",
+        "isCorrect": 1
+      },
+      {
+        "content": "公平原则",
+        "isCorrect": 2
+      },
+      {
+        "content": "诚信原则",
+        "isCorrect": 2
+      },
+      {
+        "content": "守法原则",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "物权具有（）。": {
     "optionList": [
       {
@@ -47547,6 +48360,27 @@
     "type": 2
   },
   "犯高空抛物罪，视情节严重程度，当事人会面临不同程度的处罚，包括：": {
+    "optionList": [
+      {
+        "content": "拘役",
+        "isCorrect": 1
+      },
+      {
+        "content": "死刑",
+        "isCorrect": 1
+      },
+      {
+        "content": "有期徒刑",
+        "isCorrect": 1
+      },
+      {
+        "content": "罚金",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "犯高空抛物致人重伤、死亡，情节特别恶劣构成重罪的，行为人可能面临的处罚有？": {
     "optionList": [
       {
         "content": "拘役",
@@ -50601,6 +51435,27 @@
     ],
     "type": 2
   },
+  "组建退役军人事务部的主要目的是？": {
+    "optionList": [
+      {
+        "content": "提升军队战斗力",
+        "isCorrect": 2
+      },
+      {
+        "content": "保障退役军人权益，稳定军心",
+        "isCorrect": 1
+      },
+      {
+        "content": "减少军费开支",
+        "isCorrect": 2
+      },
+      {
+        "content": "加强国际军事合作",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "组织、利用邪教组织破坏国家法律、行政法规实施，但行为人能够真诚悔罪，明确表示退出邪教组织、不再从事邪教活动的，可以不起诉或者免予刑事处罚。这种说法正确吗？": {
     "optionList": [
       {
@@ -50833,7 +51688,49 @@
     ],
     "type": 1
   },
+  "统筹传统安全和非传统安全的核心要求是？": {
+    "optionList": [
+      {
+        "content": "优先解决传统安全问题",
+        "isCorrect": 2
+      },
+      {
+        "content": "将两者严格区分管理",
+        "isCorrect": 2
+      },
+      {
+        "content": "将所有安全问题整合到国家安全体系中",
+        "isCorrect": 1
+      },
+      {
+        "content": "仅关注新出现的非传统安全",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "统筹国土安全与国民安全的核心在于？": {
+    "optionList": [
+      {
+        "content": "完全放弃物的安全，专注人的安全",
+        "isCorrect": 2
+      },
+      {
+        "content": "在物的安全与人的安全之间建立平衡，突出人的安全",
+        "isCorrect": 1
+      },
+      {
+        "content": "延续传统安全观，以国土安全优先",
+        "isCorrect": 2
+      },
+      {
+        "content": "仅关注非传统安全领域",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "统筹国土安全和国民安全的核心在于？": {
     "optionList": [
       {
         "content": "完全放弃物的安全，专注人的安全",
@@ -56219,6 +57116,27 @@
     ],
     "type": 2
   },
+  "郭伯雄、徐才厚事件反映了？": {
+    "optionList": [
+      {
+        "content": "军纪严明",
+        "isCorrect": 2
+      },
+      {
+        "content": "军事腐败的危害",
+        "isCorrect": 1
+      },
+      {
+        "content": "军队战斗力提升",
+        "isCorrect": 2
+      },
+      {
+        "content": "国际合作加强",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "酒驾的后果可能有?": {
     "optionList": [
       {
@@ -56544,6 +57462,10 @@
       },
       {
         "content": "长治久安是国家的事情，和个人无关",
+        "isCorrect": 2
+      },
+      {
+        "content": "混乱的社会环境不会影响个人的基本权利",
         "isCorrect": 2
       }
     ],
