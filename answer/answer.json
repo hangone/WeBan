@@ -11253,6 +11253,10 @@
       {
         "content": "戴好口罩、打车去医院",
         "isCorrect": 1
+      },
+      {
+        "content": "自行服用退烧药治疗",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -14540,6 +14544,23 @@
       {
         "content": "正确",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "任何单位和个人发现传染病病人或者疑似传染病病人时，应当怎么做？": {
+    "optionList": [
+      {
+        "content": "及时向附近的疾病控制机构或者医疗机构报告",
+        "isCorrect": 1
+      },
+      {
+        "content": "立刻自行吃药治疗",
+        "isCorrect": 2
+      },
+      {
+        "content": "找人帮忙一起送其去医院",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -17853,6 +17874,18 @@
       {
         "content": "台风过后，空气清新，正适合出门，安心散步。",
         "isCorrect": 2
+      },
+      {
+        "content": "台风就是普通的大风，不需要特意防范",
+        "isCorrect": 2
+      },
+      {
+        "content": "台风和地震、泥石流一样不可预测",
+        "isCorrect": 2
+      },
+      {
+        "content": "台风来临时，要留在室内，不要出门",
+        "isCorrect": 1
       }
     ],
     "type": 1
@@ -37964,6 +37997,23 @@
     ],
     "type": 2
   },
+  "我们可以通过（）方法去克服“应激反应”。": {
+    "optionList": [
+      {
+        "content": "求助专业的心理干预",
+        "isCorrect": 1
+      },
+      {
+        "content": "自我调节",
+        "isCorrect": 1
+      },
+      {
+        "content": "顺其自然",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
   "我们在网络上可以随意购买未开刃的长刀。": {
     "optionList": [
       {
@@ -45772,6 +45822,31 @@
     ],
     "type": 1
   },
+  "歹徒往往具有下面哪些特征？": {
+    "optionList": [
+      {
+        "content": "频繁进出大型活动场所。",
+        "isCorrect": 1
+      },
+      {
+        "content": "夸张地打哈欠、不时碰触脸或耳朵。",
+        "isCorrect": 1
+      },
+      {
+        "content": "东张西望、不时看表，似乎在等待什么人。",
+        "isCorrect": 1
+      },
+      {
+        "content": "神情紧张、坐立不安，不停踱步、颤抖。",
+        "isCorrect": 1
+      },
+      {
+        "content": "专注地注视一般人没有兴趣的东西，如垃圾桶。",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "歹徒来抢劫，如果旁边都是邻居，大白天开着窗，可以考虑。": {
     "optionList": [
       {
@@ -51982,6 +52057,10 @@
       {
         "content": "具备维护经济安全能力",
         "isCorrect": 1
+      },
+      {
+        "content": "忽视实体经济，大力炒作虚拟经济",
+        "isCorrect": 2
       }
     ],
     "type": 2
@@ -58858,6 +58937,27 @@
     ],
     "type": 2
   },
+  "面对歹徒时，对于适合捅刺的刀，要护住胸腹内脏；而用来劈、砍的刀具，相对来说不容易伤及内脏，高危部位是颈部和头部。下面适于劈、砍的刀具是：": {
+    "optionList": [
+      {
+        "content": "菜刀。",
+        "isCorrect": 1
+      },
+      {
+        "content": "砍刀。",
+        "isCorrect": 1
+      },
+      {
+        "content": "匕首。",
+        "isCorrect": 2
+      },
+      {
+        "content": "弹簧刀。",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
   "面对毒品，以下哪些心理是错误的？": {
     "optionList": [
       {
@@ -59169,6 +59269,23 @@
       }
     ],
     "type": 2
+  },
+  "食物中毒的主要原因是：": {
+    "optionList": [
+      {
+        "content": "毒素",
+        "isCorrect": 1
+      },
+      {
+        "content": "病毒",
+        "isCorrect": 2
+      },
+      {
+        "content": "普通微生物",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "食物中毒的原因有：": {
     "optionList": [
