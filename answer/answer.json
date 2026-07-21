@@ -37952,6 +37952,14 @@
       {
         "content": "错。",
         "isCorrect": 2
+      },
+      {
+        "content": "对",
+        "isCorrect": 1
+      },
+      {
+        "content": "错",
+        "isCorrect": 2
       }
     ],
     "type": 1
