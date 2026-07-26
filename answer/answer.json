@@ -17857,6 +17857,27 @@
     ],
     "type": 2
   },
+  "关于台灯的使用，以下哪个做法是正确的，不容易导致引燃附近物品或引发火灾？": {
+    "optionList": [
+      {
+        "content": "使用12W的LED灯泡，并将台灯放置在木质书桌的角落，周围堆放少量书籍",
+        "isCorrect": 1
+      },
+      {
+        "content": "将额定功率为25W的台灯，换装上一颗60W的白炽灯泡，并将台灯紧挨着窗帘放置",
+        "isCorrect": 2
+      },
+      {
+        "content": "台灯电源线不够长，自行用普通胶布将两段电线缠绕连接后使用",
+        "isCorrect": 2
+      },
+      {
+        "content": "用一块深色棉布盖住80W台灯，以遮挡光线助眠",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "关于台风，下面说法正确的是：": {
     "optionList": [
       {
@@ -24876,6 +24897,10 @@
       },
       {
         "content": "做到人走灯灭，人走断电",
+        "isCorrect": 1
+      },
+      {
+        "content": "禁止使用违规电器",
         "isCorrect": 1
       }
     ],
@@ -42024,6 +42049,10 @@
       {
         "content": "错。",
         "isCorrect": 2
+      },
+      {
+        "content": "对",
+        "isCorrect": 1
       }
     ],
     "type": 1
@@ -50634,6 +50663,10 @@
       {
         "content": "立刻去检查溺水者是否有呼吸，进行心肺复苏。",
         "isCorrect": 2
+      },
+      {
+        "content": "立刻去检查溺水者是否有呼吸，进行心肺复苏",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -55771,6 +55804,10 @@
       {
         "content": "了解想转的专业",
         "isCorrect": 2
+      },
+      {
+        "content": "其他两个选项皆是",
+        "isCorrect": 1
       }
     ],
     "type": 1
@@ -57141,6 +57178,22 @@
       },
       {
         "content": "其他三个选项皆是。",
+        "isCorrect": 1
+      },
+      {
+        "content": "拍下肇事车辆照片",
+        "isCorrect": 2
+      },
+      {
+        "content": "邀请目击者作证",
+        "isCorrect": 2
+      },
+      {
+        "content": "保留车祸证据（如车体碎片）",
+        "isCorrect": 2
+      },
+      {
+        "content": "其他三个选项皆是",
         "isCorrect": 1
       }
     ],
