@@ -754,11 +754,12 @@ class WeBanAPI:
         :param user_course_id: 用户课程 ID
         :param token: 验证码获取的 token，weiban 模式会替代 URL 中的 id
         :param course_type: 决定接口——"weiban"（JSONP GET，需绕过跨域）、"open"（POST）、"moon"（POST）
-        :param unique_no: 微课专用唯一标识
-        :param referer: 课程来源
+        :param unique_no: 仅 apicenext 课程传入；与翻页共用同一 uuid。普通课不传
+          （sdk.js: `if (typeof uuid !== 'undefined') opts.uniqueNo = uuid`）
+        :param referer: JSONP 完课 Referer，默认 mcwk 根路径（与浏览器 script 请求一致）
         :return: 完成结果 dict
         JSONP 模式是因为 weiban 服务端返回 callback 包裹而非 JSON，前端通过 <script> 标签跨域拉取。
-        detailCode=10018 表示服务端进度尚未落库，采用指数退避重试（3/6/10/15/20 秒，最多 6 次）。
+        detailCode=10018 表示「系统检测到您的行为存在异常」，不是进度未落库，禁止重试。
         """
         data = {"userCourseId": user_course_id, "tenantCode": self.tenant_code}
         if unique_no:
@@ -772,33 +773,43 @@ class WeBanAPI:
             url = f"{self.baseurl}/pharos/usercourse/v2/{token or user_course_id}.do"
 
         is_jsonp = course_type not in ("open", "moon")
-        for attempt in range(6):
-            if is_jsonp:
-                ts = int(self.get_timestamp(13, 0))
-                cb = f"jQuery3410{randint(10**15, 10**16 - 1)}_{ts}"
-                response = self.session.get(
-                    url,
-                    params={**data, "callback": cb, "_": ts + 1},
-                    timeout=self.timeout,
-                )
-            else:
-                response = self.session.post(url, data=data, timeout=self.timeout)
+        if is_jsonp:
+            ts = int(self.get_timestamp(13, 0))
+            cb = f"jQuery3410{randint(10**15, 10**16 - 1)}_{ts}"
+            headers = {
+                "Accept": "*/*",
+                "Referer": referer or "https://mcwk.mycourse.cn/",
+                "X-Token": None,
+            }
+            response = self.session.get(
+                url,
+                params={**data, "callback": cb, "_": ts + 1},
+                headers=headers,
+                timeout=self.timeout,
+            )
+        else:
+            response = self.session.post(url, data=data, timeout=self.timeout)
+
+        if response.status_code == 701 or "Account locked" in response.text:
+            return {
+                "code": "-1",
+                "detailCode": "701",
+                "msg": "Account locked",
+                "raw": response.text,
+            }
+
+        try:
+            result = response.json()
+        except json.JSONDecodeError:
+            text = response.text
+            s, e = text.find("("), text.rfind(")")
+            if s != -1 and e != -1:
+                text = text[s + 1 : e]
             try:
-                result = response.json()
+                result = json.loads(text)
             except json.JSONDecodeError:
-                text = response.text
-                s, e = text.find("("), text.rfind(")")
-                if s != -1 and e != -1:
-                    text = text[s + 1 : e]
-                try:
-                    result = json.loads(text)
-                except json.JSONDecodeError:
-                    return {"raw": response.text}
-            if result.get("detailCode") == "10018" and attempt < 5:
-                time.sleep((3, 6, 10, 15, 20)[attempt])
-                continue
-            return result
-        return {}  # unreachable, satisfies type checker
+                return {"raw": response.text}
+        return result
 
     def finish_lyra(self, user_activity_id: str) -> Dict[str, Any]:
         """完成安全实训（Lyra 独立微服务，不走 _post 统一入口）
@@ -911,6 +922,9 @@ class WeBanAPI:
         ticket: str,
     ) -> Dict[str, Any]:
         """验证码校验（课程完成时），appId: 195119536
+
+        浏览器从 mcwk 页面 jQuery.post 发出：无 timestamp query、无 X-Token，
+        Origin/Referer 为 mcwk。不走 _post，避免多带 timestamp 和默认头。
         :param user_course_id: 用户课程 ID
         :param user_project_id: 用户项目 ID
         :param course_id: 课程 ID
@@ -918,18 +932,28 @@ class WeBanAPI:
         :param ticket: 验证码票据
         :return: 校验结果 dict
         {"code":"0","data":"${token}","detailCode":"0"}
-
         """
-        return self._post(
-            "/pharos/usercourse/check.do",
-            {
-                "userCourseId": user_course_id,
-                "userProjectId": user_project_id,
-                "courseId": course_id,
-                "randstr": randstr,
-                "ticket": ticket,
-            },
+        url = f"{self.baseurl}/pharos/usercourse/check.do"
+        data = {
+            "userId": self.user["userId"],
+            "userCourseId": user_course_id,
+            "userProjectId": user_project_id,
+            "courseId": course_id,
+            "tenantCode": self.tenant_code,
+            "randstr": randstr,
+            "ticket": ticket,
+        }
+        headers = {
+            "Accept": "*/*",
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "Origin": "https://mcwk.mycourse.cn",
+            "Referer": "https://mcwk.mycourse.cn/",
+            "X-Token": None,
+        }
+        response = self.session.post(
+            url, data=data, headers=headers, timeout=self.timeout
         )
+        return handle_response(response)
 
     def exam_check_verify_code(
         self, user_exam_plan_id: str, verfy_code: str, verify_time: int | None
