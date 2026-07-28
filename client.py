@@ -521,7 +521,7 @@ class WeBanClient:
                                 + d["pushFinishedNum"]
                                 + d["optionalFinishedNum"]
                             )
-                        self._study_one_course(
+                        ok = self._study_one_course(
                             course,
                             task,
                             category_prefix,
@@ -529,6 +529,11 @@ class WeBanClient:
                             answers_json,
                             force_restudy,
                         )
+                        if not ok:
+                            self.log.error(
+                                "检测到行为异常或账号锁定，已停止本账号后续学习"
+                            )
+                            return
                         progress_after = self.get_progress(
                             task["userProjectId"], project_prefix
                         )
@@ -546,6 +551,20 @@ class WeBanClient:
 
             self.log.success(f"{project_prefix} 课程学习完成")
 
+    @staticmethod
+    def _is_account_blocked(res: dict) -> bool:
+        """完课/接口返回是否表示行为异常或账号锁定，应立即停跑。"""
+        if not res:
+            return False
+        detail = str(res.get("detailCode", ""))
+        msg = str(res.get("msg", ""))
+        raw = str(res.get("raw", ""))
+        if detail in {"10018", "701"}:
+            return True
+        if "行为存在异常" in msg or "Account locked" in raw or "Account locked" in msg:
+            return True
+        return False
+
     def _study_one_course(
         self,
         course: dict,
@@ -554,12 +573,15 @@ class WeBanClient:
         project_prefix: str,
         answers_json: dict,
         force_restudy: bool,
-    ) -> None:
-        """处理单门课程：有 apinext 的走翻页流程，没 apinext 的直接答题+完课"""
+    ) -> bool:
+        """处理单门课程：有 apinext 的走翻页流程，没 apinext 的直接答题+完课。
+
+        :return: True 可继续下一门；False 表示账号异常/锁定，应停止本账号
+        """
         course_prefix = f"{category_prefix}/{course['resourceName']}"
 
         if not force_restudy and int(course.get("finished", 0)) == 1:
-            return
+            return True
 
         self.log.info(f"学习： {course_prefix}")
         self.api.study(course["resourceId"], task["userProjectId"])
@@ -567,7 +589,7 @@ class WeBanClient:
 
         if "userCourseId" not in course:
             self.log.success(f"{course_prefix} 完成")
-            return
+            return True
 
         course_url = self._build_course_url(course, task)
         self.log.info(f"{course_prefix}：{course_url.split('?')[0]}")
@@ -582,13 +604,20 @@ class WeBanClient:
         item_info = (
             self.parse_item_js(course_code, course_url=course_url)
             if course_code
-            else {"nonstr_map": {}, "has_exam": False, "total_step": 0}
+            else {
+                "uses_apinext": False,
+                "nonstr_map": {},
+                "has_exam": False,
+                "total_step": 0,
+            }
         )
 
-        unique_no = str(uuid4())
         nonstr_map = item_info.get("nonstr_map", {})
         total_step = item_info.get("total_step", 0)
         uses_apinext = item_info.get("uses_apinext", False)
+        # sdk.js 仅在 apicenext.js 定义了全局 uuid 时才带 uniqueNo；
+        # 无 apinext 的课传 uniqueNo 会被判行为异常 (10018)
+        unique_no = str(uuid4()) if uses_apinext else None
 
         if uses_apinext:
             self.api.init_index(task["userProjectId"])
@@ -604,7 +633,7 @@ class WeBanClient:
                 task["userProjectId"],
                 nonstr_map,
                 total_step,
-                unique_no=unique_no,
+                unique_no=unique_no or "",
                 finish=2,
             )
 
@@ -663,7 +692,7 @@ class WeBanClient:
                 task["userProjectId"],
                 nonstr_map,
                 total_step,
-                unique_no=unique_no,
+                unique_no=unique_no or "",
                 finish=1,
             )
             time.sleep(2)
@@ -672,9 +701,12 @@ class WeBanClient:
         res = self._finish_course(course, task, query, course_url, unique_no)
         if res.get("code", "-1") != "0":
             self.log.error(f"{course_prefix} 完成失败：{res}")
-            return
+            if self._is_account_blocked(res):
+                return False
+            return True
 
         self.log.success(f"{course_prefix} 完成")
+        return True
 
     def _finish_course(
         self,
@@ -682,7 +714,7 @@ class WeBanClient:
         task: dict,
         query: dict,
         course_url: str,
-        unique_no: str,
+        unique_no: str | None,
     ) -> dict:
         """调用正确的完课接口并返回响应
 
@@ -695,7 +727,7 @@ class WeBanClient:
         :param task: 任务数据
         :param query: URL 查询参数（parse_qs 格式）
         :param course_url: 完整课程 URL（用于 captcha）
-        :param unique_no: apinext 使用的唯一标识
+        :param unique_no: 仅 apinext 课程传入；None 表示不传 uniqueNo
         :return: 完课 API 响应
         """
         if query.get("lyra", [None])[0] == "lyra":
@@ -705,7 +737,11 @@ class WeBanClient:
         if query.get("source", [None])[0] == "moon":
             return self.api.finish_by_token(course["userCourseId"], course_type="moon")
 
-        finish_kwargs = {"unique_no": unique_no}
+        finish_kwargs: dict = {
+            "referer": "https://mcwk.mycourse.cn/",
+        }
+        if unique_no:
+            finish_kwargs["unique_no"] = unique_no
         if query.get("csCapt", [None])[0] == "true":
             try:
                 captcha_result = self.captcha_handler.handle_course_captcha(
