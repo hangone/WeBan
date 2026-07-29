@@ -25,6 +25,23 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Inject version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          ver="${GITHUB_REF#refs/tags/v}"
+          python - "$ver" <<'PY'
+          import re, sys
+          ver = sys.argv[1]
+          p = "pyproject.toml"
+          s = open(p, encoding="utf-8").read()
+          s2, n = re.subn(r'^version = ".*?"', f'version = "{ver}"', s, count=1, flags=re.M)
+          if n != 1:
+              raise SystemExit(f"未在 {p} 中找到 version 字段")
+          open(p, "w", encoding="utf-8").write(s2)
+          print(f"已注入版本 {ver}")
+          PY
+
       - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
         with:
           python-version: "3.12"
@@ -50,6 +67,7 @@ jobs:
             --add-data "captcha_model.onnx${sep}." \
             --add-data "answer/answer.json${sep}answer/answer.json" \
             --add-data "config.example.toml${sep}." \
+            --add-data "pyproject.toml${sep}." \
             --hidden-import nodriver \
             --hidden-import loguru \
             --hidden-import numpy \
@@ -83,6 +101,16 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Resolve app version
+        id: ver
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: docker/setup-buildx-action@v4
 
       - uses: docker/login-action@v4
@@ -97,6 +125,8 @@ jobs:
           file: Dockerfile
           target: ${{ matrix.variant }}
           platforms: ${{ matrix.platform }}
+          build-args: |
+            APP_VERSION=${{ steps.ver.outputs.version }}
           outputs: type=image,name=${{ secrets.DOCKERHUB_USERNAME }}/weban,push-by-digest=true,name-canonical=true,push=true
           provenance: false
           cache-from: type=gha,scope=docker-${{ matrix.variant }}-${{ matrix.arch }}
