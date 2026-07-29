@@ -12,7 +12,34 @@ from loguru import logger
 from client import WeBanClient
 from captcha import check_browser_health
 
-VERSION = "v3.8.3"
+
+def _resolve_version() -> str:
+    """版本号单一来源：pyproject.toml（打包后从冻结资源读取），importlib.metadata 作回退"""
+    candidates = []
+    if getattr(sys, "frozen", False):
+        bundle = getattr(sys, "_MEIPASS", None)
+        if bundle:
+            candidates.append(os.path.join(bundle, "pyproject.toml"))
+    candidates.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "pyproject.toml"))
+
+    for path in candidates:
+        try:
+            with open(path, "rb") as f:
+                version = tomllib.load(f).get("project", {}).get("version")
+            if version:
+                return version
+        except (OSError, tomllib.TOMLDecodeError):
+            continue
+
+    try:
+        from importlib.metadata import version as _dist_version
+
+        return _dist_version("weban")
+    except Exception:
+        return "unknown"
+
+
+VERSION = f"v{_resolve_version()}"
 
 if getattr(sys, "frozen", False):
     base_path = os.path.dirname(os.path.abspath(sys.executable))
