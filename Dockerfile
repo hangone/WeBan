@@ -12,7 +12,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends binutils \
 
 WORKDIR /build
 
+ARG APP_VERSION
 COPY pyproject.toml uv.lock ./
+RUN if [ -n "$APP_VERSION" ]; then \
+      python -c "import re,sys; \
+p='pyproject.toml'; s=open(p,encoding='utf-8').read(); \
+s2,n=re.subn(r'^version = \".*?\"', f'version = \"{sys.argv[1]}\"', s, count=1, flags=re.M); \
+assert n==1, 'version field not found'; open(p,'w',encoding='utf-8').write(s2)" "$APP_VERSION"; \
+    fi
+
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-install-project
 
@@ -25,6 +33,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --add-data "captcha_model.onnx:." \
     --add-data "answer/answer.json:answer/answer.json" \
     --add-data "config.example.toml:." \
+    --add-data "pyproject.toml:." \
     --hidden-import nodriver \
     --hidden-import loguru \
     --hidden-import numpy \
