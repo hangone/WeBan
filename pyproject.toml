@@ -1,6 +1,6 @@
 [project]
 name = "weban"
-version = "3.8.6"
+version = "3.8.7"
 description = "auto finish weiban"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
@@ -19,3 +19,8 @@ dev = [
     "pyright>=1.1.409",
     "ruff>=0.15.15",
 ]
+
+[tool.pyright]
+pythonVersion = "3.12"
+venvPath = "."
+venv = ".venv"
