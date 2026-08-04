@@ -1,16 +1,16 @@
 import json
 import os
+import re
 import sys
+import threading
 import time
 import webbrowser
 from random import randint
-from typing import Any, Dict
-from urllib.parse import parse_qs, urlparse, urljoin
+from typing import Any
+from urllib.parse import parse_qs, urljoin, urlparse
 from uuid import uuid4
 
 from loguru import logger
-import re
-import threading
 
 from api import WeBanAPI
 from captcha import CaptchaHandler, LoginCaptchaSolver
@@ -147,7 +147,7 @@ def _fetch_text(session, url: str, referer: str | None = None) -> str:
         headers = {"Referer": referer} if referer else None
         resp = session.get(url, timeout=10, headers=headers)
         return resp.text if resp.status_code == 200 else ""
-    except Exception:
+    except OSError:
         return ""
 
 
@@ -164,13 +164,13 @@ class WeBanClient:
         tenant_name: str,
         account: str | None = None,
         password: str | None = None,
-        user: Dict[str, str] | None = None,
+        user: dict[str, str] | None = None,
         log=logger,
         browser_path: str | None = None,
         cdp_host: str | None = None,
         cdp_port: int | None = None,
         debug: bool = False,
-        ai_config: Dict[str, Any] | None = None,
+        ai_config: dict[str, Any] | None = None,
     ) -> None:
         """
         :param tenant_name: 学校全称
@@ -188,6 +188,12 @@ class WeBanClient:
         self.tenant_name = tenant_name.strip()
         self.study_base_time = 20
         self.study_random_upper = 10
+        self.study_force = False
+        self.exam_mode = "true"
+        # 时间预估状态（自适应 EMA）
+        self._eta_course_avg: float | None = None  # 每门课实测平均耗时（秒）
+        self._eta_course_last: dict = {}  # project_id -> (时间戳, 已完成课程数)
+        self._eta_exam_avg: float | None = None  # 每场考试实测平均耗时（秒）
         self.browser_path = browser_path
         self.cdp_host = cdp_host
         self.cdp_port = cdp_port
@@ -227,7 +233,7 @@ class WeBanClient:
         return self._captcha_handler
 
     @staticmethod
-    def _format_duration(seconds: int | float) -> str:
+    def _format_duration(seconds: float) -> str:
         """秒数格式化为 XhXXmXXs / XmXXs / Xs"""
         s = int(seconds)
         h, rem = divmod(s, 3600)
@@ -347,7 +353,7 @@ class WeBanClient:
 
     def get_progress(
         self, user_project_id: str, project_prefix: str | None, output: bool = True
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """获取学习进度
         :param user_project_id: 项目 ID
         :param project_prefix: 日志前缀（如项目名）
@@ -360,16 +366,50 @@ class WeBanClient:
                 self.log.warning(f"{project_prefix} 获取进度失败：{progress}")
             return progress
         data = progress.get("data", {})
-        required = data["requiredNum"] - data["requiredFinishedNum"]
-        optional = data["optionalNum"] - data["optionalFinishedNum"]
-        push = data["pushNum"] - data["pushFinishedNum"]
-        eta = max(
-            0,
-            int(
-                (self.study_base_time + self.study_random_upper / 2)
-                * (required + optional + push)
-            ),
+        if self.study_force:
+            # force 模式会重新学习所有课程，剩余量按总数计算
+            required = data["requiredNum"]
+            optional = data["optionalNum"]
+            push = data["pushNum"]
+        else:
+            required = data["requiredNum"] - data["requiredFinishedNum"]
+            optional = data["optionalNum"] - data["optionalFinishedNum"]
+            push = data["pushNum"] - data["pushFinishedNum"]
+        exam_left = data["examNum"] - data["examFinishedNum"]
+
+        # 自适应每课耗时：相邻两次进度查询之间每完成 n 门课，实测一次并更新 EMA
+        finished = (
+            data["requiredFinishedNum"]
+            + data["pushFinishedNum"]
+            + data["optionalFinishedNum"]
         )
+        now = time.time()
+        last = self._eta_course_last.get(user_project_id)
+        if last is not None and finished >= last[1]:
+            dt = now - last[0]
+            n = finished - last[1]
+            # 间隔超过 15 分钟视为中断/卡死；单课超过 5 分钟视为异常（卡验证码等），均不采纳
+            if n > 0 and 0 < dt <= 900:
+                per_course = dt / n
+                if per_course <= 300:
+                    if self._eta_course_avg is None:
+                        self._eta_course_avg = per_course
+                    else:
+                        self._eta_course_avg = (
+                            0.7 * self._eta_course_avg + 0.3 * per_course
+                        )
+        self._eta_course_last[user_project_id] = (now, finished)
+
+        # 每门课：等待时长理论均值 + 固定开销（翻页 step 发送/课后习题/完课 API 等）
+        course_est = self._eta_course_avg or (
+            self.study_base_time + self.study_random_upper / 2 + 3
+        )
+        eta = course_est * (required + optional + push)
+        # 每场考试：默认 50 题 × 每题 4.5s + 固定开销 ≈ 4 分钟（有实测后自动替换）
+        if exam_left > 0 and self.exam_mode != "false":
+            exam_est = self._eta_exam_avg or (50 * 4.5 + 15)
+            eta += exam_est * exam_left
+        eta = max(0, int(eta))
         if output:
             eta_str = self._format_duration(eta)
             self.log.info(
@@ -382,7 +422,7 @@ class WeBanClient:
 
     # ---- login --------------------------------------------------------------
 
-    def login(self) -> Dict | None:
+    def login(self) -> dict | None:
         """登录并获取 token
 
         重试策略：前 10 次尝试用 CNN 模型自动识别验证码，
@@ -417,7 +457,7 @@ class WeBanClient:
                 )
                 try:
                     os.remove(captcha_path)
-                except Exception:
+                except OSError:
                     pass
             res = self.api.login(verify_code, int(verify_time))
             if res.get("detailCode") == "67":
@@ -452,6 +492,7 @@ class WeBanClient:
         )
 
         force_restudy = study_mode == "force"
+        self.study_force = force_restudy
 
         answers_json = self._load_answers_json(warn_on_fail=True)
 
@@ -561,9 +602,7 @@ class WeBanClient:
         raw = str(res.get("raw", ""))
         if detail in {"10018", "701"}:
             return True
-        if "行为存在异常" in msg or "Account locked" in raw or "Account locked" in msg:
-            return True
-        return False
+        return ("行为存在异常" in msg or "Account locked" in raw or "Account locked" in msg)
 
     def _study_one_course(
         self,
@@ -701,9 +740,7 @@ class WeBanClient:
         res = self._finish_course(course, task, query, course_url, unique_no)
         if res.get("code", "-1") != "0":
             self.log.error(f"{course_prefix} 完成失败：{res}")
-            if self._is_account_blocked(res):
-                return False
-            return True
+            return not self._is_account_blocked(res)
 
         self.log.success(f"{course_prefix} 完成")
         return True
@@ -759,7 +796,7 @@ class WeBanClient:
                     return check_res
                 self.log.success("课程验证码校验通过")
                 finish_kwargs["token"] = check_res.get("data", "")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- 浏览器自动化可能抛任意异常，降级为完成失败
                 self.log.error(f"课程验证码处理异常: {e}")
                 return {"code": "-1"}
         return self.api.finish_by_token(course["userCourseId"], **finish_kwargs)
@@ -795,6 +832,7 @@ class WeBanClient:
         except (ValueError, IndexError):
             question_base_time = 3
             question_random_upper = 3
+        self.exam_mode = exam_mode
 
         answers_json = self._load_answers_json()
 
@@ -836,12 +874,13 @@ class WeBanClient:
                 pass_score = plan.get("passScore", 0)
 
                 # ── 已考过的考试，显示历史成绩 ──
+                full_score = 100
                 if exam_finish_num > 0:
                     try:
                         pp = self.api.exam_prepare_paper(plan["id"])
                         full_score = pp.get("data", {}).get("paperScore", 100)
-                    except Exception:
-                        full_score = 100
+                    except OSError:
+                        pass
                     self.log.info(
                         f"{plan_name} 已考过 {exam_finish_num} 次，"
                         f"最高 {exam_score}/{full_score}（及格线 {pass_score}）"
@@ -860,11 +899,13 @@ class WeBanClient:
                     self.log.info(f"{plan_name} 已及格 ({exam_score}分 >= {pass_score}分)，跳过")
                     continue
 
-                # perfect 模式：已满分则跳过
-                if exam_mode == "perfect" and exam_finish_num > 0:
-                    if exam_score >= full_score:
-                        self.log.info(f"{plan_name} 已满分 ({exam_score}分)，跳过")
-                        continue
+                if (
+                    exam_mode == "perfect"
+                    and exam_finish_num > 0
+                    and exam_score >= full_score
+                ):
+                    self.log.info(f"{plan_name} 已满分 ({exam_score}分)，跳过")
+                    continue
 
                 # perfect 模式：只剩 1 次机会时，检查题库是否能全覆盖
                 if exam_mode == "perfect" and exam_odd_num <= 1:
@@ -900,6 +941,7 @@ class WeBanClient:
                 )
 
                 # 无感验证码
+                plan_start_ts = time.time()
                 try:
                     captcha_result = self.captcha_handler.handle_exam_captcha(
                         user_exam_plan_id
@@ -913,7 +955,7 @@ class WeBanClient:
                         self.log.error(f"无感验证码校验失败：{check_res}")
                         continue
                     self.log.success("无感验证码校验通过")
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 -- 浏览器自动化可能抛任意异常
                     self.log.error(f"无感验证码处理异常: {e}")
                     continue
 
@@ -947,12 +989,11 @@ class WeBanClient:
                 )
 
                 # perfect 模式：匹配率不足且 random_answer=False 时警告
-                if exam_mode == "perfect" and match_rate < 100:
-                    if not random_answer:
-                        self.log.warning(
-                            f"题库匹配率 {match_rate:.1f}% 不足 100%，"
-                            f"perfect 模式下手动作答可能存在风险"
-                        )
+                if exam_mode == "perfect" and match_rate < 100 and not random_answer:
+                    self.log.warning(
+                        f"题库匹配率 {match_rate:.1f}% 不足 100%，"
+                        f"perfect 模式下手动作答可能存在风险"
+                    )
 
                 # 检查提交匹配率
                 if match_rate < exam_submit_match_rate and not random_answer:
@@ -1087,12 +1128,22 @@ class WeBanClient:
                 self.log.success(
                     f"试卷提交成功，考试完成，成绩：{submit_res['data']['score']} 分"
                 )
+                self._update_exam_eta(time.time() - plan_start_ts)
+
+    def _update_exam_eta(self, elapsed: float) -> None:
+        """用实测考试耗时更新每场考试的自适应估计（EMA）"""
+        if elapsed <= 0:
+            return
+        if self._eta_exam_avg is None:
+            self._eta_exam_avg = elapsed
+        else:
+            self._eta_exam_avg = 0.7 * self._eta_exam_avg + 0.3 * elapsed
 
     # ---- item.js parsing ----------------------------------------------------
 
     def parse_item_js(
         self, course_code: str, course_url: str | None = None
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """解析课程 JS，检测是否使用 apinext 并提取 nonstrMap/total_step。
 
         关键判断：HTML 是否加载 apicenext.js。
@@ -1170,7 +1221,7 @@ class WeBanClient:
                     parts.append(f"+{extra_steps}题")
                 result["total_step_source"] = " ".join(parts)
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 解析边界，尽力而为，失败返回默认结构
             self.log.warning(f"解析课程 JS 失败：{e}")
         return result
 
@@ -1181,7 +1232,7 @@ class WeBanClient:
         user_course_id: str,
         course_id: str,
         user_project_id: str,
-        nonstr_map: Dict[int, str],
+        nonstr_map: dict[int, str],
         total_step: int,
         unique_no: str = "",
         finish: int = 2,
@@ -1230,7 +1281,7 @@ class WeBanClient:
                         self.log.warning(
                             f"apinext [{step}/{total_step}] 返回异常：{resp}"
                         )
-                except Exception as e:
+                except OSError as e:
                     self.log.warning(f"apinext [{step}/{total_step}] 失败：{e}")
         else:
             if step_delay:
@@ -1249,7 +1300,7 @@ class WeBanClient:
                 if not resp.get("success"):
                     self.log.warning(f"apinext 完成请求返回异常：{resp}")
                 self.log.info(f"apinext 完成标记 step={total_step + 1} finish=1 已发送")
-            except Exception as e:
+            except OSError as e:
                 self.log.warning(f"apinext 完成请求失败：{e}")
         return unique_no
 
@@ -1273,7 +1324,7 @@ class WeBanClient:
     def _answer_question(
         self,
         question: dict,
-        answers_json: Dict,
+        answers_json: dict,
         course_id: str,
         save_func,
         source: str,
@@ -1444,7 +1495,7 @@ class WeBanClient:
                 content = res_data["choices"][0]["message"]["content"].strip()
                 break
 
-            except Exception as e:
+            except (OSError, ValueError, KeyError, IndexError, TypeError) as e:
                 if attempt < max_retries:
                     wait = attempt * 2
                     self.log.warning(
