@@ -1885,7 +1885,7 @@
         "isCorrect": 1
       },
       {
-        "content": "完全没区别",
+        "content": "完全没区别。",
         "isCorrect": 2
       },
       {
@@ -1895,10 +1895,6 @@
       {
         "content": "“套路贷”是以“借款”为名行非法占有被害人财物之实。“套路贷”作为一种新型的诈骗，其恶性远超传统意义的“高利贷”。",
         "isCorrect": 1
-      },
-      {
-        "content": "完全没区别。",
-        "isCorrect": 2
       }
     ],
     "type": 1
@@ -5073,37 +5069,12 @@
         "isCorrect": 1
       },
       {
-        "content": "所处环境完全干涸后",
-        "isCorrect": 1
-      },
-      {
         "content": "56℃以上条件下30分钟后",
         "isCorrect": 1
       },
       {
         "content": "在空气中暴露30分钟",
         "isCorrect": 2
-      }
-    ],
-    "type": 2
-  },
-  "下列哪些是与生物安全相关的法律法规？": {
-    "optionList": [
-      {
-        "content": "《传染病防治法》",
-        "isCorrect": 1
-      },
-      {
-        "content": "《进出境动植物检疫法》",
-        "isCorrect": 1
-      },
-      {
-        "content": "《中华人民共和国生物保护法》",
-        "isCorrect": 2
-      },
-      {
-        "content": "《野生动物保护法》",
-        "isCorrect": 1
       }
     ],
     "type": 2
@@ -5117,6 +5088,10 @@
       {
         "content": "《进出境动植物检疫法》",
         "isCorrect": 1
+      },
+      {
+        "content": "《中华人民共和国生物保护法》",
+        "isCorrect": 2
       },
       {
         "content": "《野生动物保护法》",
@@ -5146,7 +5121,7 @@
     ],
     "type": 2
   },
-  "下列哪些是现行宪法新增加的内容？": {
+  "下列哪些是现行宪法新增加的内容？（）": {
     "optionList": [
       {
         "content": "平等权",
@@ -5163,15 +5138,6 @@
       {
         "content": "迁徙自由",
         "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
-  "下列哪些是现行宪法新增加的内容？（）": {
-    "optionList": [
-      {
-        "content": "人格尊严不受侵犯",
-        "isCorrect": 1
       }
     ],
     "type": 1
@@ -5226,14 +5192,6 @@
       },
       {
         "content": "碟仙。",
-        "isCorrect": 1
-      },
-      {
-        "content": "笔仙",
-        "isCorrect": 1
-      },
-      {
-        "content": "碟仙",
         "isCorrect": 1
       },
       {
@@ -5815,7 +5773,7 @@
     ],
     "type": 1
   },
-  "下列有安全隐患的行为是：": {
+  "下列有安全隐患的行为是：（）": {
     "optionList": [
       {
         "content": "边看手机边过马路。",
@@ -5831,23 +5789,6 @@
       },
       {
         "content": "边看手机边过马路、开车间隙看看手机。",
-        "isCorrect": 1
-      }
-    ],
-    "type": 1
-  },
-  "下列有安全隐患的行为是：（）": {
-    "optionList": [
-      {
-        "content": "边看手机边过马路。",
-        "isCorrect": 2
-      },
-      {
-        "content": "开车间隙看看手机。",
-        "isCorrect": 2
-      },
-      {
-        "content": "前面两个选项都有安全隐患",
         "isCorrect": 1
       }
     ],
@@ -5910,10 +5851,6 @@
         "isCorrect": 1
       },
       {
-        "content": "细菌性痢疾",
-        "isCorrect": 1
-      },
-      {
         "content": "胃肠炎",
         "isCorrect": 2
       },
@@ -5966,10 +5903,6 @@
       },
       {
         "content": "脑脊液。",
-        "isCorrect": 1
-      },
-      {
-        "content": "母乳",
         "isCorrect": 1
       },
       {
@@ -6169,7 +6102,7 @@
     ],
     "type": 2
   },
-  "下列选项中属于直接接触传播的是": {
+  "下列选项中属于直接接触传播的是：": {
     "optionList": [
       {
         "content": "接吻、性交、飞沫。",
@@ -6178,19 +6111,10 @@
       {
         "content": "接触被患者污染的毛巾。",
         "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
-  "下列选项中属于直接接触传播的是：": {
-    "optionList": [
+      },
       {
         "content": "接吻、性交",
         "isCorrect": 1
-      },
-      {
-        "content": "接触被患者污染的毛巾",
-        "isCorrect": 2
       }
     ],
     "type": 1
@@ -6407,18 +6331,6 @@
         "isCorrect": 1
       },
       {
-        "content": "认真学习国家安全理论和知识",
-        "isCorrect": 1
-      },
-      {
-        "content": "积极参加国家安全宣传教育活动",
-        "isCorrect": 1
-      },
-      {
-        "content": "熟悉有关国家安全法律法规",
-        "isCorrect": 1
-      },
-      {
         "content": "一旦发现危害国家安全的行为，立即向学校保卫部门或国家安全机关报告",
         "isCorrect": 1
       }
@@ -6449,10 +6361,6 @@
       },
       {
         "content": "不能穿着防护装备离开实验室",
-        "isCorrect": 1
-      },
-      {
-        "content": "不同实验室、不同工作性质和特点，对应不同的装备组合，不能通用",
         "isCorrect": 1
       },
       {
@@ -6698,14 +6606,6 @@
         "isCorrect": 2
       },
       {
-        "content": "日照多的地方",
-        "isCorrect": 1
-      },
-      {
-        "content": "日照少的地方",
-        "isCorrect": 2
-      },
-      {
         "content": "低洼积水处扎营",
         "isCorrect": 2
       }
@@ -6728,22 +6628,6 @@
       },
       {
         "content": "雷雨多发地带的空旷谷地。",
-        "isCorrect": 2
-      },
-      {
-        "content": "悬崖下边，可以躲雨",
-        "isCorrect": 2
-      },
-      {
-        "content": "日照充足的小湖附近",
-        "isCorrect": 1
-      },
-      {
-        "content": "宽阔的河流旁",
-        "isCorrect": 2
-      },
-      {
-        "content": "雷雨多发地带的空旷谷地",
         "isCorrect": 2
       }
     ],
@@ -7696,14 +7580,6 @@
       {
         "content": "集会、游行、示威的负责人必须负责维持集会、游行、示威的秩序，对要加入的他人审核管理。",
         "isCorrect": 2
-      },
-      {
-        "content": "可以随意使用别人的手机登录自己的手机银行或支付软件",
-        "isCorrect": 2
-      },
-      {
-        "content": "不轻易在别人的设备上登录自己的支付账号；经常查看支付软件的安全设置，删除曾经登录过的旧设备",
-        "isCorrect": 1
       }
     ],
     "type": 2
@@ -7821,14 +7697,6 @@
         "isCorrect": 2
       },
       {
-        "content": "部分烂掉的水果",
-        "isCorrect": 1
-      },
-      {
-        "content": "发芽的姜",
-        "isCorrect": 2
-      },
-      {
         "content": "发芽的大蒜",
         "isCorrect": 2
       }
@@ -7843,14 +7711,6 @@
       },
       {
         "content": "拼命狗刨让自己浮起来。",
-        "isCorrect": 2
-      },
-      {
-        "content": "憋气、放松，让身体浮起来",
-        "isCorrect": 1
-      },
-      {
-        "content": "拼命狗刨让自己浮起来",
         "isCorrect": 2
       },
       {
@@ -7939,18 +7799,6 @@
       },
       {
         "content": "其他三个选项皆是。",
-        "isCorrect": 1
-      },
-      {
-        "content": "转专业",
-        "isCorrect": 2
-      },
-      {
-        "content": "努力学习，并且争取申请双专业",
-        "isCorrect": 2
-      },
-      {
-        "content": "其他三个选项皆是",
         "isCorrect": 1
       }
     ],
@@ -8156,14 +8004,6 @@
         "isCorrect": 1
       },
       {
-        "content": "谦和有礼貌",
-        "isCorrect": 1
-      },
-      {
-        "content": "尊重当地居民的风俗习惯",
-        "isCorrect": 1
-      },
-      {
         "content": "随意打探他人隐私",
         "isCorrect": 2
       }
@@ -8250,18 +8090,6 @@
       },
       {
         "content": "不知道。",
-        "isCorrect": 2
-      },
-      {
-        "content": "是",
-        "isCorrect": 1
-      },
-      {
-        "content": "否",
-        "isCorrect": 2
-      },
-      {
-        "content": "不知道",
         "isCorrect": 2
       }
     ],
@@ -9290,7 +9118,7 @@
     ],
     "type": 1
   },
-  "为了防范毒品，以下做法错误的是：": {
+  "为了防范毒品，以下做法错误的是：（ ）": {
     "optionList": [
       {
         "content": "不结交有吸毒、贩毒行为的恶友。",
@@ -9311,12 +9139,7 @@
       {
         "content": "有朋友承认他被骗吸毒已经上瘾，向你寻求帮助并要求你保密，于是你没有告诉别人，悄悄鼓励他。",
         "isCorrect": 1
-      }
-    ],
-    "type": 1
-  },
-  "为了防范毒品，以下做法错误的是：（ ）": {
-    "optionList": [
+      },
       {
         "content": "遇到难以排解的心事，可以适当通过抽烟、喝酒、泡吧等方式排解忧愁。",
         "isCorrect": 1
@@ -9372,22 +9195,6 @@
       },
       {
         "content": "远离滥用药物的可能。",
-        "isCorrect": 1
-      },
-      {
-        "content": "树立正确的人生观，不盲目追求享受、寻求刺激",
-        "isCorrect": 1
-      },
-      {
-        "content": "交友本着多多益善的原则，什么人都来往",
-        "isCorrect": 2
-      },
-      {
-        "content": "不进不正当的娱乐场所",
-        "isCorrect": 1
-      },
-      {
-        "content": "对娱乐场所的陌生人、香烟、饮料食品等提高警惕，决不吸食摇头丸、K粉等兴奋剂",
         "isCorrect": 1
       }
     ],
@@ -9832,7 +9639,7 @@
     ],
     "type": 2
   },
-  "为什么高校容易成为间谍的关注对象？": {
+  "为什么高校容易成为间谍的关注对象？（）": {
     "optionList": [
       {
         "content": "涉外交往频繁",
@@ -9849,23 +9656,6 @@
       {
         "content": "间谍喜欢和年轻人接触",
         "isCorrect": 2
-      }
-    ],
-    "type": 2
-  },
-  "为什么高校容易成为间谍的关注对象？（）": {
-    "optionList": [
-      {
-        "content": "涉外交往频繁",
-        "isCorrect": 1
-      },
-      {
-        "content": "参与国家级课题",
-        "isCorrect": 1
-      },
-      {
-        "content": "信息资源丰富",
-        "isCorrect": 1
       }
     ],
     "type": 2
@@ -10682,7 +10472,7 @@
     ],
     "type": 1
   },
-  "交通安全日是哪一天？": {
+  "交通安全日是哪一天？（）": {
     "optionList": [
       {
         "content": "2月12日。",
@@ -10699,31 +10489,6 @@
       {
         "content": "2月2日。",
         "isCorrect": 2
-      },
-      {
-        "content": "2月12日",
-        "isCorrect": 2
-      },
-      {
-        "content": "12月12日",
-        "isCorrect": 2
-      },
-      {
-        "content": "12月2日",
-        "isCorrect": 1
-      },
-      {
-        "content": "2月2日",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
-  "交通安全日是哪一天？（）": {
-    "optionList": [
-      {
-        "content": "12月2日。",
-        "isCorrect": 1
       }
     ],
     "type": 1
@@ -10846,18 +10611,6 @@
       {
         "content": "不孕、习惯性流产。",
         "isCorrect": 1
-      },
-      {
-        "content": "习惯性流产",
-        "isCorrect": 2
-      },
-      {
-        "content": "不孕",
-        "isCorrect": 2
-      },
-      {
-        "content": "前面两个选项都是",
-        "isCorrect": 1
       }
     ],
     "type": 1
@@ -10883,7 +10636,7 @@
     ],
     "type": 1
   },
-  "人民民主专政的主要特色是？": {
+  "人民民主专政的主要特色是？（）": {
     "optionList": [
       {
         "content": "对人民实行民主对敌人实行专政",
@@ -10893,19 +10646,6 @@
         "content": "人民代表大会制",
         "isCorrect": 2
       },
-      {
-        "content": "爱国统一战线",
-        "isCorrect": 1
-      },
-      {
-        "content": "共产党领导下的多党合作制",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
-  "人民民主专政的主要特色是？（）": {
-    "optionList": [
       {
         "content": "爱国统一战线",
         "isCorrect": 1
@@ -11141,22 +10881,6 @@
       },
       {
         "content": "经社区戒毒、强制隔离戒毒后再次吸食、注射毒品的。",
-        "isCorrect": 1
-      },
-      {
-        "content": "拒绝接受社区戒毒的",
-        "isCorrect": 1
-      },
-      {
-        "content": "在社区戒毒期间吸食、注射毒品的",
-        "isCorrect": 1
-      },
-      {
-        "content": "严重违反社区戒毒协议的",
-        "isCorrect": 1
-      },
-      {
-        "content": "经社区戒毒、强制隔离戒毒后再次吸食、注射毒品的",
         "isCorrect": 1
       }
     ],
@@ -11594,23 +11318,6 @@
     ],
     "type": 1
   },
-  "以下关于楼梯间的设计的说法，正确的是": {
-    "optionList": [
-      {
-        "content": "楼梯间的设计要尽量减少布置凸出墙体的物体",
-        "isCorrect": 1
-      },
-      {
-        "content": "楼梯扶手不应使用木制扶手",
-        "isCorrect": 1
-      },
-      {
-        "content": "楼梯间的宽度设计还需考虑采取措施，以保证人行宽度不宜过宽，防止人群疏散时失稳跌倒而导致踩踏等意外",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
   "以下关于楼梯间的设计的说法，正确的是：": {
     "optionList": [
       {
@@ -12000,27 +11707,6 @@
     ],
     "type": 2
   },
-  "以下哪些因素附近不适合存放化学品": {
-    "optionList": [
-      {
-        "content": "热源",
-        "isCorrect": 1
-      },
-      {
-        "content": "火源",
-        "isCorrect": 1
-      },
-      {
-        "content": "电源",
-        "isCorrect": 1
-      },
-      {
-        "content": "水源",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
   "以下哪些因素附近不适合存放化学品。": {
     "optionList": [
       {
@@ -12037,27 +11723,6 @@
       },
       {
         "content": "水源",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
-  "以下哪些属于不当存放和使用氢气瓶的后果": {
-    "optionList": [
-      {
-        "content": "爆炸",
-        "isCorrect": 1
-      },
-      {
-        "content": "起火",
-        "isCorrect": 1
-      },
-      {
-        "content": "人身伤害",
-        "isCorrect": 1
-      },
-      {
-        "content": "仪器损坏",
         "isCorrect": 1
       }
     ],
@@ -12277,31 +11942,6 @@
     ],
     "type": 2
   },
-  "以下哪些属于高速运转类设备可能对实验人员带来机械危险？": {
-    "optionList": [
-      {
-        "content": "卷绕",
-        "isCorrect": 1
-      },
-      {
-        "content": "挤压",
-        "isCorrect": 1
-      },
-      {
-        "content": "飞出物打击",
-        "isCorrect": 1
-      },
-      {
-        "content": "坠落打击",
-        "isCorrect": 1
-      },
-      {
-        "content": "切割",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
   "以下哪些情况可能会引发与酒有关的事故？": {
     "optionList": [
       {
@@ -12344,7 +11984,7 @@
     ],
     "type": 2
   },
-  "以下哪些情况需要你提高警惕、小心毒品？": {
+  "以下哪些情况需要你提高警惕小心毒品？（ ）": {
     "optionList": [
       {
         "content": "朋友承认他曾尝试吸毒，根本不会上瘾，问你要不要尝试。",
@@ -12361,12 +12001,7 @@
       {
         "content": "你跟朋友去新开的夜总会玩，酒保说在搞活动，你们来就提供你们娱乐必备小药丸。",
         "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
-  "以下哪些情况需要你提高警惕小心毒品？": {
-    "optionList": [
+      },
       {
         "content": "考学压力太大，同学给你可以提神的小粉末。",
         "isCorrect": 1
@@ -12397,43 +12032,6 @@
       },
       {
         "content": "失恋了兄弟安慰你，给你喝可以忘却烦恼的“加料水”。",
-        "isCorrect": 1
-      },
-      {
-        "content": "考学压力太大，同学给你可以提神的小粉末",
-        "isCorrect": 1
-      },
-      {
-        "content": "找了酒吧服务员兼职，老板和同事请你尝试“好玩的”，还说用了就是一家人",
-        "isCorrect": 1
-      },
-      {
-        "content": "受偏头痛困扰多年，同学告诉你他有“特效药”，保证一吃见效",
-        "isCorrect": 1
-      },
-      {
-        "content": "聚会时你看到有人“吸药面”，你想离开却被朋友们说太怂",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
-  "以下哪些情况需要你提高警惕小心毒品？（ ）": {
-    "optionList": [
-      {
-        "content": "朋友承认他曾尝试吸毒，根本不会上瘾，问你要不要尝试。",
-        "isCorrect": 1
-      },
-      {
-        "content": "在酒吧有美女给你推荐新型嗨药、聚会必备，可以免费给你尝试。",
-        "isCorrect": 1
-      },
-      {
-        "content": "男朋友说他搞到吃了可以更爽的“粉面”，如果你不跟他试试就要分手。",
-        "isCorrect": 1
-      },
-      {
-        "content": "你跟朋友去新开的夜总会玩，酒保说在搞活动，你们来就提供你们娱乐必备小药丸。",
         "isCorrect": 1
       }
     ],
@@ -12724,22 +12322,6 @@
       },
       {
         "content": "不解决实际问题，让求助者自己做决定。",
-        "isCorrect": 1
-      },
-      {
-        "content": "求助者和心理咨询师之间是陌生的",
-        "isCorrect": 1
-      },
-      {
-        "content": "职业保密原则",
-        "isCorrect": 1
-      },
-      {
-        "content": "价值中立原则",
-        "isCorrect": 1
-      },
-      {
-        "content": "不解决实际问题，让求助者自己做决定",
         "isCorrect": 1
       }
     ],
@@ -13282,43 +12864,6 @@
     ],
     "type": 2
   },
-  "以下哪些行为是错误的": {
-    "optionList": [
-      {
-        "content": "超负荷用电",
-        "isCorrect": 1
-      },
-      {
-        "content": "擅自改装和私拉乱接线路",
-        "isCorrect": 1
-      },
-      {
-        "content": "不接插头就将裸头导线直接插入插座中使用",
-        "isCorrect": 1
-      },
-      {
-        "content": "使用获批准使用的电器",
-        "isCorrect": 2
-      },
-      {
-        "content": "非实验人员直接进入实验室",
-        "isCorrect": 1
-      },
-      {
-        "content": "在实验室住宿",
-        "isCorrect": 1
-      },
-      {
-        "content": "参观实验室前先登记信息",
-        "isCorrect": 2
-      },
-      {
-        "content": "实验室物品借出时办理手续",
-        "isCorrect": 2
-      }
-    ],
-    "type": 2
-  },
   "以下哪些行为是错误的：": {
     "optionList": [
       {
@@ -13336,12 +12881,7 @@
       {
         "content": "使用获批准使用的电器",
         "isCorrect": 2
-      }
-    ],
-    "type": 2
-  },
-  "以下哪些行为是错误的？": {
-    "optionList": [
+      },
       {
         "content": "非实验人员直接进入实验室",
         "isCorrect": 1
@@ -13589,27 +13129,6 @@
     ],
     "type": 2
   },
-  "以下哪种行为不属于社交与情感场景诈骗的常见诱饵？": {
-    "optionList": [
-      {
-        "content": "暧昧私信和露骨视频",
-        "isCorrect": 2
-      },
-      {
-        "content": "情侣间的生日祝福信息",
-        "isCorrect": 1
-      },
-      {
-        "content": "同城约见的色情广告",
-        "isCorrect": 2
-      },
-      {
-        "content": "免费约炮、上门服务的宣传",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
   "以下哪种行为不属于社交与情感场景诈骗的常见诱饵？（）": {
     "optionList": [
       {
@@ -13753,10 +13272,6 @@
       {
         "content": "火势发展比较缓慢。",
         "isCorrect": 2
-      },
-      {
-        "content": "火势急，有浓烟",
-        "isCorrect": 1
       }
     ],
     "type": 1
@@ -14390,27 +13905,6 @@
     ],
     "type": 2
   },
-  "以下行为属于间谍行为的有：": {
-    "optionList": [
-      {
-        "content": "间谍组织及其代理人实施或者指使、资助他人实施，或者境内外机构、组织、个人与其相勾结实施的危害中华人民共和国国家安全的活动",
-        "isCorrect": 1
-      },
-      {
-        "content": "参加间谍组织或者接受间谍组织及其代理人的任务的",
-        "isCorrect": 1
-      },
-      {
-        "content": "为敌人指示攻击目标的",
-        "isCorrect": 1
-      },
-      {
-        "content": "国防建设和武装力量活动中的秘密事项",
-        "isCorrect": 2
-      }
-    ],
-    "type": 2
-  },
   "以下行为符合文明宿舍创建要求的是（ ）。": {
     "optionList": [
       {
@@ -14453,17 +13947,12 @@
     ],
     "type": 1
   },
-  "以下说法不正确的是：": {
+  "以下说法不正确的是？（）": {
     "optionList": [
       {
         "content": "在安装和使用手机App时，不用阅读隐私政策或用户协议，直接掠过即可",
         "isCorrect": 1
-      }
-    ],
-    "type": 1
-  },
-  "以下说法不正确的是？（）": {
-    "optionList": [
+      },
       {
         "content": "校园内不得传播宗教",
         "isCorrect": 2
@@ -14516,14 +14005,6 @@
       },
       {
         "content": "避孕套能以极高几率防性病。",
-        "isCorrect": 2
-      },
-      {
-        "content": "吃了紧急避孕药后，72小时内都可以发生无保护性行为了",
-        "isCorrect": 1
-      },
-      {
-        "content": "避孕套能以极高几率防性病",
         "isCorrect": 2
       },
       {
@@ -14708,19 +14189,6 @@
       },
       {
         "content": "误导",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
-  "任何形式的刷单都是违法行为，这种说法正确吗？": {
-    "optionList": [
-      {
-        "content": "正确",
-        "isCorrect": 1
-      },
-      {
-        "content": "错误",
         "isCorrect": 2
       }
     ],
@@ -15153,7 +14621,7 @@
     ],
     "type": 1
   },
-  "作为高校学生，应如何避免出现政治性问题？": {
+  "作为高校学生，应如何避免出现政治性问题？（）": {
     "optionList": [
       {
         "content": "坚定理想信念",
@@ -15170,23 +14638,6 @@
       {
         "content": "多看网络热搜、娱乐新闻",
         "isCorrect": 2
-      }
-    ],
-    "type": 2
-  },
-  "作为高校学生，应如何避免出现政治性问题？（）": {
-    "optionList": [
-      {
-        "content": "坚定理想信念",
-        "isCorrect": 1
-      },
-      {
-        "content": "树立正确的荣辱观",
-        "isCorrect": 1
-      },
-      {
-        "content": "严格遵守政治纪律",
-        "isCorrect": 1
       }
     ],
     "type": 2
@@ -15491,21 +14942,12 @@
     ],
     "type": 1
   },
-  "你收到短信：“我是你女朋友的对象，我爱上你女朋友了，我要和她结婚！这里有我和她的照片，不信，你还是自己看吧。网址：xxxxxxx”你应该怎么做？": {
+  "你收到短信：“我是你女朋友的对象，我爱上你女朋友了，我要和她结婚！这里有我和她的照片，不信，你还是自己看吧。网址：xxxxxxx”你应该怎么做？（）": {
     "optionList": [
       {
         "content": "非常气愤，点击链接查看。",
         "isCorrect": 2
       },
-      {
-        "content": "骗人信息，我可不想中木马，删除。",
-        "isCorrect": 1
-      }
-    ],
-    "type": 1
-  },
-  "你收到短信：“我是你女朋友的对象，我爱上你女朋友了，我要和她结婚！这里有我和她的照片，不信，你还是自己看吧。网址：xxxxxxx”你应该怎么做？（）": {
-    "optionList": [
       {
         "content": "骗人信息，我可不想中木马，删除。",
         "isCorrect": 1
@@ -16041,7 +15483,7 @@
     ],
     "type": 1
   },
-  "使用灭火器的时候应该注意什么？": {
+  "使用灭火器的时候应该注意什么？(    )": {
     "optionList": [
       {
         "content": "站在上风向灭火。",
@@ -16058,32 +15500,6 @@
       {
         "content": "对准燃烧点上部喷射。",
         "isCorrect": 2
-      }
-    ],
-    "type": 2
-  },
-  "使用灭火器的时候应该注意什么？(    )": {
-    "optionList": [
-      {
-        "content": "站在上风向灭火",
-        "isCorrect": 1
-      },
-      {
-        "content": "对准燃烧点根部喷射",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
-  "使用灭火器的时候应该注意什么？（）": {
-    "optionList": [
-      {
-        "content": "站在上风向灭火。",
-        "isCorrect": 1
-      },
-      {
-        "content": "对准燃烧点根部喷射。",
-        "isCorrect": 1
       }
     ],
     "type": 2
@@ -17451,23 +16867,6 @@
     ],
     "type": 2
   },
-  "公职人员应如何增强反间谍意识？": {
-    "optionList": [
-      {
-        "content": "树立“国家安全高于一切”的观念",
-        "isCorrect": 1
-      },
-      {
-        "content": "善于识别各种伪装的思想",
-        "isCorrect": 1
-      },
-      {
-        "content": "掌握国家安全知识、提高安全防范意识",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
   "公职人员应如何增强反间谍意识？（）": {
     "optionList": [
       {
@@ -17919,14 +17318,6 @@
         "isCorrect": 1
       },
       {
-        "content": "人们在剧烈运动后会体温升高、咽部充血",
-        "isCorrect": 1
-      },
-      {
-        "content": "剧烈运动后，胃肠和咽部如果突然受到大量冷饮的刺激，就会出现腹痛、腹泻或咽部疼痛、发音嘶哑、咳嗽以及其它病症",
-        "isCorrect": 1
-      },
-      {
         "content": "剧烈运动后立刻大量喝冷饮能快速降温、有益健康",
         "isCorrect": 2
       }
@@ -17941,14 +17332,6 @@
       },
       {
         "content": "发展心理咨询是心理健康的人对未来发展有困惑时做的咨询。",
-        "isCorrect": 1
-      },
-      {
-        "content": "发展心理咨询是心理不健康的人想要发展成健康所做的咨询",
-        "isCorrect": 2
-      },
-      {
-        "content": "发展心理咨询是心理健康的人对未来发展有困惑时做的咨询",
         "isCorrect": 1
       }
     ],
@@ -18013,18 +17396,6 @@
       {
         "content": "台风过后，空气清新，正适合出门，安心散步。",
         "isCorrect": 2
-      },
-      {
-        "content": "台风就是普通的大风，不需要特意防范",
-        "isCorrect": 2
-      },
-      {
-        "content": "台风和地震、泥石流一样不可预测",
-        "isCorrect": 2
-      },
-      {
-        "content": "台风来临时，要留在室内，不要出门",
-        "isCorrect": 1
       }
     ],
     "type": 1
@@ -18565,20 +17936,8 @@
         "isCorrect": 2
       },
       {
-        "content": "量刑较重",
-        "isCorrect": 1
-      },
-      {
-        "content": "将受到秘密处决",
-        "isCorrect": 2
-      },
-      {
         "content": "有自首或者立功表现的，可以从轻、减轻或者免除处罚",
         "isCorrect": 1
-      },
-      {
-        "content": "只有批评教育，不涉及刑罚",
-        "isCorrect": 2
       }
     ],
     "type": 2
@@ -18914,10 +18273,6 @@
         "isCorrect": 1
       },
       {
-        "content": "窗口期的时候，人体内的艾滋病抗体还不够多，所以检测不出来",
-        "isCorrect": 1
-      },
-      {
         "content": "窗口期肯定会发生发热、皮疹、腹泻等。",
         "isCorrect": 2
       },
@@ -18927,14 +18282,6 @@
       },
       {
         "content": "窗口期进行常规抗体检测时，人体内的艾滋病抗体还不够多，所以检测不出来。",
-        "isCorrect": 1
-      },
-      {
-        "content": "窗口期进行常规抗体检测时，人体内艾滋病病毒太少，所以检测不出来",
-        "isCorrect": 2
-      },
-      {
-        "content": "窗口期进行常规抗体检测时，人体内的艾滋病抗体还不够多，所以检测不出来",
         "isCorrect": 1
       }
     ],
@@ -19919,7 +19266,7 @@
     ],
     "type": 2
   },
-  "出血热的三痛指的是哪三痛": {
+  "出血热的三痛指的是哪三痛？": {
     "optionList": [
       {
         "content": "头痛。",
@@ -19936,27 +19283,6 @@
       {
         "content": "浑身疼。",
         "isCorrect": 2
-      }
-    ],
-    "type": 2
-  },
-  "出血热的三痛指的是哪三痛？": {
-    "optionList": [
-      {
-        "content": "头痛",
-        "isCorrect": 1
-      },
-      {
-        "content": "腰疼",
-        "isCorrect": 1
-      },
-      {
-        "content": "浑身疼",
-        "isCorrect": 2
-      },
-      {
-        "content": "眼眶疼",
-        "isCorrect": 1
       }
     ],
     "type": 2
@@ -20017,23 +19343,6 @@
       {
         "content": "结伴去热闹的夜市。",
         "isCorrect": 1
-      }
-    ],
-    "type": 1
-  },
-  "分析化学实验室用水分为（）个级别": {
-    "optionList": [
-      {
-        "content": "2",
-        "isCorrect": 2
-      },
-      {
-        "content": "3",
-        "isCorrect": 1
-      },
-      {
-        "content": "4",
-        "isCorrect": 2
       }
     ],
     "type": 1
@@ -20124,10 +19433,6 @@
       {
         "content": "对。",
         "isCorrect": 2
-      },
-      {
-        "content": "对",
-        "isCorrect": 2
       }
     ],
     "type": 1
@@ -20141,10 +19446,6 @@
       {
         "content": "对",
         "isCorrect": 2
-      },
-      {
-        "content": "错",
-        "isCorrect": 1
       }
     ],
     "type": 1
@@ -20286,27 +19587,6 @@
       {
         "content": "注意安全检验合格标志。",
         "isCorrect": 1
-      }
-    ],
-    "type": 1
-  },
-  "到目前为止，我国对现行宪法进行了（）次全面修改": {
-    "optionList": [
-      {
-        "content": "3",
-        "isCorrect": 2
-      },
-      {
-        "content": "4",
-        "isCorrect": 2
-      },
-      {
-        "content": "5",
-        "isCorrect": 1
-      },
-      {
-        "content": "6",
-        "isCorrect": 2
       }
     ],
     "type": 1
@@ -21065,18 +20345,6 @@
       {
         "content": "其他两个选项皆是。",
         "isCorrect": 1
-      },
-      {
-        "content": "寻求心理辅导老师的帮助",
-        "isCorrect": 2
-      },
-      {
-        "content": "自己想办法找方法克服",
-        "isCorrect": 2
-      },
-      {
-        "content": "其他两个选项皆是",
-        "isCorrect": 1
       }
     ],
     "type": 1
@@ -21097,18 +20365,6 @@
       },
       {
         "content": "怎么学都学不好，自暴自弃。",
-        "isCorrect": 2
-      },
-      {
-        "content": "从小被逼迫学习但不知道为谁而学",
-        "isCorrect": 2
-      },
-      {
-        "content": "因为讨厌某些人，逆反而讨厌学习",
-        "isCorrect": 2
-      },
-      {
-        "content": "怎么学都学不好，自暴自弃",
         "isCorrect": 2
       }
     ],
@@ -21363,14 +20619,6 @@
         "isCorrect": 1
       },
       {
-        "content": "立刻跳下水去救人",
-        "isCorrect": 2
-      },
-      {
-        "content": "立刻拨打120、110电话",
-        "isCorrect": 1
-      },
-      {
         "content": "慌乱逃离现场",
         "isCorrect": 2
       }
@@ -21527,23 +20775,6 @@
     ],
     "type": 1
   },
-  "发生火灾时,不得组织(  )扑救火灾。": {
-    "optionList": [
-      {
-        "content": "女青年",
-        "isCorrect": 2
-      },
-      {
-        "content": "未成年人",
-        "isCorrect": 1
-      },
-      {
-        "content": "军人",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
   "发生火灾时你应注意哪些事项？": {
     "optionList": [
       {
@@ -21568,8 +20799,16 @@
   "发生火灾时，不得组织(    )扑救火灾。": {
     "optionList": [
       {
+        "content": "女青年",
+        "isCorrect": 2
+      },
+      {
         "content": "未成年人",
         "isCorrect": 1
+      },
+      {
+        "content": "军人",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -21646,10 +20885,6 @@
   "发生高危性行为后，下面说法正确的是：": {
     "optionList": [
       {
-        "content": "等3个月后去检查，结果还是阴性的话，就肯定没感染",
-        "isCorrect": 1
-      },
-      {
         "content": "等3个月后去检查，结果还是阴性的话，就肯定没感染。",
         "isCorrect": 1
       },
@@ -21672,18 +20907,6 @@
       },
       {
         "content": "不知道。",
-        "isCorrect": 2
-      },
-      {
-        "content": "是",
-        "isCorrect": 1
-      },
-      {
-        "content": "否",
-        "isCorrect": 2
-      },
-      {
-        "content": "不知道",
         "isCorrect": 2
       }
     ],
@@ -21731,14 +20954,6 @@
       },
       {
         "content": "错。",
-        "isCorrect": 2
-      },
-      {
-        "content": "对",
-        "isCorrect": 1
-      },
-      {
-        "content": "错",
         "isCorrect": 2
       }
     ],
@@ -22223,14 +21438,6 @@
       {
         "content": "错。",
         "isCorrect": 2
-      },
-      {
-        "content": "对",
-        "isCorrect": 1
-      },
-      {
-        "content": "错",
-        "isCorrect": 2
       }
     ],
     "type": 1
@@ -22335,14 +21542,6 @@
       {
         "content": "马上给中暑同学喝冰水",
         "isCorrect": 2
-      },
-      {
-        "content": "赶紧帮同学补大量水",
-        "isCorrect": 2
-      },
-      {
-        "content": "给同学少量多次补充水分",
-        "isCorrect": 1
       }
     ],
     "type": 1
@@ -22853,14 +22052,6 @@
       },
       {
         "content": "错。",
-        "isCorrect": 1
-      },
-      {
-        "content": "对",
-        "isCorrect": 2
-      },
-      {
-        "content": "错",
         "isCorrect": 1
       }
     ],
@@ -24404,7 +23595,7 @@
     ],
     "type": 1
   },
-  "在党的十九大报告中，“安全”一词被提及的次数有多少次？": {
+  "在党的十九大报告中，“安全”一词被提及的次数有多少次？（）": {
     "optionList": [
       {
         "content": "22",
@@ -24421,16 +23612,7 @@
     ],
     "type": 1
   },
-  "在党的十九大报告中，“安全”一词被提及的次数有多少次？（）": {
-    "optionList": [
-      {
-        "content": "55",
-        "isCorrect": 1
-      }
-    ],
-    "type": 1
-  },
-  "在党的十九大报告中，多少次提到“国家安全”？": {
+  "在党的十九大报告中，多少次提到“国家安全”？（）": {
     "optionList": [
       {
         "content": "18",
@@ -24443,15 +23625,6 @@
       {
         "content": "36",
         "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
-  "在党的十九大报告中，多少次提到“国家安全”？（）": {
-    "optionList": [
-      {
-        "content": "18",
-        "isCorrect": 1
       }
     ],
     "type": 1
@@ -24658,14 +23831,6 @@
         "isCorrect": 1
       },
       {
-        "content": "你和小伙伴有了不一样的意见，决定分头行动",
-        "isCorrect": 2
-      },
-      {
-        "content": "你和小伙伴有了不一样的意见，最后决定选择更安全的路线一起走",
-        "isCorrect": 1
-      },
-      {
         "content": "擅自攀爬偏僻陡峭区域游玩",
         "isCorrect": 2
       }
@@ -24748,7 +23913,7 @@
     ],
     "type": 1
   },
-  "在咖啡厅里，发现了免费wifi，但是手机显示安全性未知域的提醒，你会怎么做呢？": {
+  "在咖啡厅里，发现了免费wifi，但是手机显示安全性未知域的提醒，你会怎么做呢？（）": {
     "optionList": [
       {
         "content": "有免费的wifi当然要上了，没有关系的",
@@ -24758,15 +23923,6 @@
         "content": "应该没事吧，既然有wifi，不至于有什么问题的",
         "isCorrect": 2
       },
-      {
-        "content": "既然手机提示了，那还是不连接了，万一出问题就不好了",
-        "isCorrect": 1
-      }
-    ],
-    "type": 1
-  },
-  "在咖啡厅里，发现了免费wifi，但是手机显示安全性未知域的提醒，你会怎么做呢？（）": {
-    "optionList": [
       {
         "content": "既然手机提示了，那还是不连接了，万一出问题就不好了",
         "isCorrect": 1
@@ -24923,19 +24079,6 @@
     ],
     "type": 1
   },
-  "在审查经营主体是否合法时，不仅要查企业是否合法，也需要查查所谓的“投资项目”是否在企业注册的经营范围内。": {
-    "optionList": [
-      {
-        "content": "正确",
-        "isCorrect": 1
-      },
-      {
-        "content": "错误",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
   "在室内发现煤气味，要立即打开排气扇。": {
     "optionList": [
       {
@@ -25041,22 +24184,6 @@
       },
       {
         "content": "做到人走灯灭，人走断电。",
-        "isCorrect": 1
-      },
-      {
-        "content": "禁止吸烟，禁止使用明火",
-        "isCorrect": 1
-      },
-      {
-        "content": "禁止使用大功率电器",
-        "isCorrect": 1
-      },
-      {
-        "content": "避免电器长时间使用或超时充电",
-        "isCorrect": 1
-      },
-      {
-        "content": "做到人走灯灭，人走断电",
         "isCorrect": 1
       },
       {
@@ -25263,7 +24390,7 @@
     ],
     "type": 1
   },
-  "在我国发布的气象灾害预警信号中，哪些气象灾害会发布蓝、黄、橙、红四级预警信号。": {
+  "在我国发布的气象灾害预警信号中，哪些气象灾害会发布蓝、黄、橙、红四级预警信号。（）": {
     "optionList": [
       {
         "content": "台风、寒潮、暴雨、暴雪、大风。",
@@ -25280,31 +24407,6 @@
       {
         "content": "台风、霜、暴雨、暴雪、大风。",
         "isCorrect": 2
-      },
-      {
-        "content": "台风、寒潮、暴雨、暴雪、大风",
-        "isCorrect": 1
-      },
-      {
-        "content": "台风、寒潮、大雨、暴雪、大风",
-        "isCorrect": 2
-      },
-      {
-        "content": "台风、寒潮、暴雨、大雪、大风",
-        "isCorrect": 2
-      },
-      {
-        "content": "台风、霜、暴雨、暴雪、大风",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
-  "在我国发布的气象灾害预警信号中，哪些气象灾害会发布蓝、黄、橙、红四级预警信号。（）": {
-    "optionList": [
-      {
-        "content": "台风、寒潮、暴雨、暴雪、大风。",
-        "isCorrect": 1
       }
     ],
     "type": 1
@@ -25436,10 +24538,6 @@
       {
         "content": "用手背轻触门板和把手，根据温度判断火势大小",
         "isCorrect": 1
-      },
-      {
-        "content": "捂住口鼻，抓紧时间，直接打开门逃跑",
-        "isCorrect": 2
       }
     ],
     "type": 1
@@ -25763,22 +24861,6 @@
       {
         "content": "骑车前应检查车闸是否完好。",
         "isCorrect": 1
-      },
-      {
-        "content": "可以骑很快",
-        "isCorrect": 2
-      },
-      {
-        "content": "不要频繁使用车铃",
-        "isCorrect": 1
-      },
-      {
-        "content": "可以骑车带人",
-        "isCorrect": 2
-      },
-      {
-        "content": "骑车前应检查车闸是否完好",
-        "isCorrect": 1
       }
     ],
     "type": 2
@@ -25803,26 +24885,6 @@
       },
       {
         "content": "走路时不玩手机、不戴耳机。",
-        "isCorrect": 1
-      },
-      {
-        "content": "走在人行道上",
-        "isCorrect": 1
-      },
-      {
-        "content": "人行道、马路都可以随便走",
-        "isCorrect": 2
-      },
-      {
-        "content": "边玩手机边走路或者过马路",
-        "isCorrect": 2
-      },
-      {
-        "content": "戴着耳机走路",
-        "isCorrect": 2
-      },
-      {
-        "content": "走路时不玩手机、不戴耳机",
         "isCorrect": 1
       }
     ],
@@ -25850,27 +24912,6 @@
     "type": 1
   },
   "在校大学生庄某利用微信多次为境外间谍情报机关提供国家秘密，需要承担 （   ）。": {
-    "optionList": [
-      {
-        "content": "刑事责任",
-        "isCorrect": 1
-      },
-      {
-        "content": "民事责任",
-        "isCorrect": 2
-      },
-      {
-        "content": "行政责任",
-        "isCorrect": 2
-      },
-      {
-        "content": "违宪责任",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
-  "在校大学生庄某利用微信多次为境外间谍情报机关提供国家秘密，需要承担（   ）。": {
     "optionList": [
       {
         "content": "刑事责任",
@@ -26534,27 +25575,6 @@
     ],
     "type": 2
   },
-  "在遇到机械故障时，哪些情况是不能修理的": {
-    "optionList": [
-      {
-        "content": "带电",
-        "isCorrect": 1
-      },
-      {
-        "content": "带压",
-        "isCorrect": 1
-      },
-      {
-        "content": "高温过冷",
-        "isCorrect": 1
-      },
-      {
-        "content": "无专用工具",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
   "在遇到机械故障时，哪些情况是不能修理的？": {
     "optionList": [
       {
@@ -26585,7 +25605,7 @@
     ],
     "type": 1
   },
-  "在遭遇劫持时，下列哪些应对措施是可选的？": {
+  "在遭遇劫持时，下列哪些应对措施是可选的？（）": {
     "optionList": [
       {
         "content": "保持冷静和清醒",
@@ -26606,24 +25626,7 @@
     ],
     "type": 2
   },
-  "在遭遇劫持时，下列哪些应对措施是可选的？（）": {
-    "optionList": [
-      {
-        "content": "保持冷静和清醒",
-        "isCorrect": 1
-      },
-      {
-        "content": "避免大幅度动作",
-        "isCorrect": 1
-      },
-      {
-        "content": "配合周旋，稳定劫持者",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
-  "在遭遇劫持时，如何正确的求救？": {
+  "在遭遇劫持时，如何正确的求救？（）": {
     "optionList": [
       {
         "content": "尽可能保留和隐藏自己的通讯工具，适时用短信等方式向警方求救；",
@@ -26636,19 +25639,6 @@
       {
         "content": "大吼大叫",
         "isCorrect": 2
-      }
-    ],
-    "type": 2
-  },
-  "在遭遇劫持时，如何正确的求救？（）": {
-    "optionList": [
-      {
-        "content": "尽可能保留和隐藏自己的通讯工具，适时用短信等方式向警方求救；",
-        "isCorrect": 1
-      },
-      {
-        "content": "巧妙寻求机会按下报警按钮。",
-        "isCorrect": 1
       }
     ],
     "type": 2
@@ -26973,15 +25963,6 @@
     ],
     "type": 1
   },
-  "坚持党的领导、人民当家作主、依法治国有机统一。（）是社会主义民主政治的本质特征。": {
-    "optionList": [
-      {
-        "content": "人民当家作主",
-        "isCorrect": 1
-      }
-    ],
-    "type": 1
-  },
   "坚持总体国家安全观。统筹发展和安全，增强（   ） ，做到居安思危，是我们党治国理政的一个重大原则。": {
     "optionList": [
       {
@@ -27067,18 +26048,6 @@
       },
       {
         "content": "不知道。",
-        "isCorrect": 2
-      },
-      {
-        "content": "可以",
-        "isCorrect": 1
-      },
-      {
-        "content": "不可以",
-        "isCorrect": 2
-      },
-      {
-        "content": "不知道",
         "isCorrect": 2
       }
     ],
@@ -27230,27 +26199,6 @@
       }
     ],
     "type": 2
-  },
-  "处理严重的冻伤，要把冻伤部位放在（）摄氏度的水中": {
-    "optionList": [
-      {
-        "content": "0~22",
-        "isCorrect": 2
-      },
-      {
-        "content": "20~25",
-        "isCorrect": 2
-      },
-      {
-        "content": "30~42",
-        "isCorrect": 2
-      },
-      {
-        "content": "40~42",
-        "isCorrect": 1
-      }
-    ],
-    "type": 1
   },
   "处理严重的冻伤，要把冻伤部位放在（）摄氏度的水中。": {
     "optionList": [
@@ -27424,23 +26372,6 @@
     "type": 1
   },
   "多数实验室事故系（  ）原因造成。": {
-    "optionList": [
-      {
-        "content": "人为",
-        "isCorrect": 1
-      },
-      {
-        "content": "仪器",
-        "isCorrect": 2
-      },
-      {
-        "content": "环境",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
-  "多数实验室事故系（）原因造成": {
     "optionList": [
       {
         "content": "人为",
@@ -27728,10 +26659,6 @@
       {
         "content": "对。",
         "isCorrect": 2
-      },
-      {
-        "content": "对",
-        "isCorrect": 2
       }
     ],
     "type": 1
@@ -27831,27 +26758,6 @@
       {
         "content": "按照警察教学的方法保护财产，人民警察不可能是坏人",
         "isCorrect": 1
-      }
-    ],
-    "type": 1
-  },
-  "大学生小王因手头紧张遇到“低息贷款”宣传，下载对方指定APP后显示账户冻结，对方要求缴纳解冻金，小王安全且正确的应对方式是？": {
-    "optionList": [
-      {
-        "content": "立即用花呗转账缴纳解冻金",
-        "isCorrect": 2
-      },
-      {
-        "content": "打电话报警，这是诈骗",
-        "isCorrect": 1
-      },
-      {
-        "content": "重新下载APP再次尝试申请",
-        "isCorrect": 2
-      },
-      {
-        "content": "向同学借款缴纳解冻金",
-        "isCorrect": 2
       }
     ],
     "type": 1
@@ -28025,27 +26931,6 @@
       }
     ],
     "type": 1
-  },
-  "大学生的日常生活费基本上都是来自于父母，每个月的金额也相对固定，一些学生想通过做兼职增加收入，以下哪种方式比较可靠？": {
-    "optionList": [
-      {
-        "content": "优先了解学校内的勤工俭学岗位",
-        "isCorrect": 1
-      },
-      {
-        "content": "从正规招聘平台寻找兼职工作",
-        "isCorrect": 1
-      },
-      {
-        "content": "刷单、代写论文这类兼职坚决不做",
-        "isCorrect": 1
-      },
-      {
-        "content": "要求缴纳体检费、报名费、培训费的兼职坚决不做",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
   },
   "大学生的日常生活费基本上都是来自于父母，每个月的金额也相对固定，一些学生想通过做兼职增加收入，以下哪种方式比较可靠？（）": {
     "optionList": [
@@ -28569,7 +27454,7 @@
     ],
     "type": 2
   },
-  "如何养成良好的守法习惯？": {
+  "如何养成良好的守法习惯？（）": {
     "optionList": [
       {
         "content": "不信、不听、不传政治谣言",
@@ -28585,23 +27470,6 @@
       },
       {
         "content": "多学习法律法规知识",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
-  "如何养成良好的守法习惯？（）": {
-    "optionList": [
-      {
-        "content": "不信、不听、不传政治谣言",
-        "isCorrect": 1
-      },
-      {
-        "content": "不观看、不传播反动宣传品",
-        "isCorrect": 1
-      },
-      {
-        "content": "不围观、不参与非法聚集活动",
         "isCorrect": 1
       }
     ],
@@ -28623,18 +27491,6 @@
       },
       {
         "content": "弄清楚自己是否夸大了感觉。",
-        "isCorrect": 1
-      },
-      {
-        "content": "弄清楚自己是不喜欢老师，还是不喜欢专业本身",
-        "isCorrect": 1
-      },
-      {
-        "content": "弄清楚是否学习方法不对导致厌学",
-        "isCorrect": 1
-      },
-      {
-        "content": "弄清楚自己到底“喜欢”什么，而不是“不喜欢”什么",
         "isCorrect": 1
       }
     ],
@@ -28767,7 +27623,7 @@
     ],
     "type": 2
   },
-  "如何挂失自己的手机号？": {
+  "如何挂失自己的手机号？（）": {
     "optionList": [
       {
         "content": "拨打运营商电话",
@@ -28780,19 +27636,6 @@
       {
         "content": "等待一段时间，让号码自动失效",
         "isCorrect": 2
-      }
-    ],
-    "type": 2
-  },
-  "如何挂失自己的手机号？（）": {
-    "optionList": [
-      {
-        "content": "拨打运营商电话",
-        "isCorrect": 1
-      },
-      {
-        "content": "去营业厅办理",
-        "isCorrect": 1
       }
     ],
     "type": 2
@@ -28951,19 +27794,6 @@
       {
         "content": "多交朋友，向朋友借钱",
         "isCorrect": 2
-      }
-    ],
-    "type": 2
-  },
-  "如何远离套现行为？": {
-    "optionList": [
-      {
-        "content": "树立正确的消费观",
-        "isCorrect": 1
-      },
-      {
-        "content": "珍惜个人信用",
-        "isCorrect": 1
       },
       {
         "content": "树立守法意识",
@@ -28993,7 +27823,7 @@
     ],
     "type": 2
   },
-  "如何避免被传销“洗脑”？": {
+  "如何避免被传销“洗脑”？（）": {
     "optionList": [
       {
         "content": "坚守常识",
@@ -29010,23 +27840,6 @@
       {
         "content": "贪便宜想暴富",
         "isCorrect": 2
-      }
-    ],
-    "type": 2
-  },
-  "如何避免被传销“洗脑”？（）": {
-    "optionList": [
-      {
-        "content": "坚守常识",
-        "isCorrect": 1
-      },
-      {
-        "content": "学法守法",
-        "isCorrect": 1
-      },
-      {
-        "content": "端正三观",
-        "isCorrect": 1
       }
     ],
     "type": 2
@@ -29191,7 +28004,7 @@
     ],
     "type": 2
   },
-  "如何预防政治性案件的发生？": {
+  "如何预防政治性案件的发生？（）": {
     "optionList": [
       {
         "content": "自觉执行保密规定",
@@ -29204,19 +28017,6 @@
       {
         "content": "不和外国人说话",
         "isCorrect": 2
-      }
-    ],
-    "type": 2
-  },
-  "如何预防政治性案件的发生？（）": {
-    "optionList": [
-      {
-        "content": "自觉执行保密规定",
-        "isCorrect": 1
-      },
-      {
-        "content": "始终保持警惕性",
-        "isCorrect": 1
       }
     ],
     "type": 2
@@ -30381,14 +29181,6 @@
       {
         "content": "先断电，再灭火。",
         "isCorrect": 1
-      },
-      {
-        "content": "立刻用灭火器灭火",
-        "isCorrect": 2
-      },
-      {
-        "content": "先断电，再灭火",
-        "isCorrect": 1
       }
     ],
     "type": 1
@@ -30761,10 +29553,6 @@
       {
         "content": "对",
         "isCorrect": 2
-      },
-      {
-        "content": "错",
-        "isCorrect": 1
       }
     ],
     "type": 1
@@ -32343,14 +31131,6 @@
       {
         "content": "随机的数字和字母组合，对自己有意义、但是别人不知道的数字和字母组合。",
         "isCorrect": 1
-      },
-      {
-        "content": "随机的数字和字母组合，对自己有意义、但是别人不知道的数字和字母组合",
-        "isCorrect": 1
-      },
-      {
-        "content": "键盘上按顺序的字母或者自己生日",
-        "isCorrect": 2
       }
     ],
     "type": 1
@@ -32588,27 +31368,6 @@
     ],
     "type": 1
   },
-  "实验前需检查通风系统，确保其正常运行，柜口面风速（）米每秒为宜": {
-    "optionList": [
-      {
-        "content": "0.15~0.5",
-        "isCorrect": 2
-      },
-      {
-        "content": "0.35~0.75",
-        "isCorrect": 1
-      },
-      {
-        "content": "0.5~0.85",
-        "isCorrect": 2
-      },
-      {
-        "content": "0.45~0.65",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
   "实验前需检查通风系统，确保其正常运行，柜口面风速（）米每秒为宜。": {
     "optionList": [
       {
@@ -32724,23 +31483,6 @@
     "type": 2
   },
   "实验室存储柜危险化学品存储量宜按（ ）储存。": {
-    "optionList": [
-      {
-        "content": "最小使用量",
-        "isCorrect": 1
-      },
-      {
-        "content": "最大使用量",
-        "isCorrect": 2
-      },
-      {
-        "content": "一般使用量",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
-  "实验室存储柜危险化学品存储量宜按（）储存": {
     "optionList": [
       {
         "content": "最小使用量",
@@ -32906,7 +31648,7 @@
     ],
     "type": 1
   },
-  "室友相处，应该遵循下面哪些原则呢？": {
+  "室友相处，应该遵循下面哪些原则呢？()": {
     "optionList": [
       {
         "content": "不以自己的标准去要求别人。",
@@ -32930,39 +31672,6 @@
       },
       {
         "content": "多尊重他人感受，调整自己行为。",
-        "isCorrect": 1
-      },
-      {
-        "content": "不以自己的标准去要求别人",
-        "isCorrect": 1
-      },
-      {
-        "content": "别人的行为习惯没有伤害或影响任何人时，不评价指点别人",
-        "isCorrect": 1
-      },
-      {
-        "content": "多尊重他人感受，调整自己行为",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
-  "室友相处，应该遵循下面哪些原则呢？()": {
-    "optionList": [
-      {
-        "content": "不以自己的标准去要求别人。",
-        "isCorrect": 1
-      },
-      {
-        "content": "别人没有影响到自己时，不“替别人操心”。",
-        "isCorrect": 1
-      },
-      {
-        "content": "多尊重他人感受。",
-        "isCorrect": 1
-      },
-      {
-        "content": "遇到问题及时和辅导员、心理老师沟通。",
         "isCorrect": 1
       }
     ],
@@ -33193,22 +31902,6 @@
       },
       {
         "content": "风景好的休息场所。",
-        "isCorrect": 1
-      },
-      {
-        "content": "食堂",
-        "isCorrect": 1
-      },
-      {
-        "content": "教室",
-        "isCorrect": 1
-      },
-      {
-        "content": "运动场",
-        "isCorrect": 1
-      },
-      {
-        "content": "风景好的休息场所",
         "isCorrect": 1
       }
     ],
@@ -33526,14 +32219,6 @@
       },
       {
         "content": "立刻喂退烧药",
-        "isCorrect": 2
-      },
-      {
-        "content": "解开衣服，帮他们用凉水擦身",
-        "isCorrect": 1
-      },
-      {
-        "content": "把他们泡到凉水里快速降温",
         "isCorrect": 2
       }
     ],
@@ -34297,22 +32982,6 @@
       {
         "content": "要求缴纳“会费”、“提货款”。",
         "isCorrect": 1
-      },
-      {
-        "content": "要求以销售人员的名义上岗",
-        "isCorrect": 1
-      },
-      {
-        "content": "许诺高回报、挣大钱",
-        "isCorrect": 1
-      },
-      {
-        "content": "工作时要求着正装",
-        "isCorrect": 2
-      },
-      {
-        "content": "要求缴纳“会费”“提货款”",
-        "isCorrect": 1
       }
     ],
     "type": 2
@@ -34826,7 +33495,7 @@
     ],
     "type": 1
   },
-  "小明在游戏中看到有人在卖自己需要的装备，于是联系对方购买，然而对方需要小明提供自己的详细个人信息，小明应该怎么做呢？": {
+  "小明在游戏中看到有人在卖自己需要的装备，于是联系对方购买，然而对方需要小明提供自己的详细个人信息，小明应该怎么做呢？（）": {
     "optionList": [
       {
         "content": "好不容易找到了装备，果断提交信息，买之",
@@ -34839,15 +33508,6 @@
       {
         "content": "大家都是玩游戏的，不会有问题的",
         "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
-  "小明在游戏中看到有人在卖自己需要的装备，于是联系对方购买，然而对方需要小明提供自己的详细个人信息，小明应该怎么做呢？（）": {
-    "optionList": [
-      {
-        "content": "不能盲目给对方，要高度警惕，万一是骗子就不好了",
-        "isCorrect": 1
       }
     ],
     "type": 1
@@ -34895,20 +33555,7 @@
     ],
     "type": 1
   },
-  "小明的同学在外地做实验，着急使用某种危化品，小明是否可以使用快递的方式寄送物品？": {
-    "optionList": [
-      {
-        "content": "可以",
-        "isCorrect": 2
-      },
-      {
-        "content": "不可以",
-        "isCorrect": 1
-      }
-    ],
-    "type": 1
-  },
-  "小明认识了一位在山区支教的女生，一段时间后，该女生开始向小明借钱，小明应该怎么做呢？": {
+  "小明认识了一位在山区支教的女生，一段时间后，该女生开始向小明借钱，小明应该怎么做呢？（）": {
     "optionList": [
       {
         "content": "既然她能在山区支教，说明她很有爱心，我应该帮助她",
@@ -34921,15 +33568,6 @@
       {
         "content": "对方既然开口，说明把自己当朋友，朋友需要自然应该帮助",
         "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
-  "小明认识了一位在山区支教的女生，一段时间后，该女生开始向小明借钱，小明应该怎么做呢？（）": {
-    "optionList": [
-      {
-        "content": "应该要提高警惕，不能盲目打款",
-        "isCorrect": 1
       }
     ],
     "type": 1
@@ -35081,27 +33719,6 @@
     "type": 1
   },
   "小玲有辆最高时速40公里每小时的电动自行车，按照这个时速上路，如果遇到事故，极有可能被认定为（     ）追责。": {
-    "optionList": [
-      {
-        "content": "机动车",
-        "isCorrect": 1
-      },
-      {
-        "content": "非机动车",
-        "isCorrect": 2
-      },
-      {
-        "content": "行人",
-        "isCorrect": 2
-      },
-      {
-        "content": "残疾人用车",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
-  "小玲有辆最高时速40公里每小时的电动自行车，按照这个时速上路，如果遇到事故，极有可能被认定为（ ）追责。": {
     "optionList": [
       {
         "content": "机动车",
@@ -36283,14 +34900,6 @@
       {
         "content": "不强求他人的喜爱，自尊自爱，去和喜欢自己的人交往。",
         "isCorrect": 1
-      },
-      {
-        "content": "非常沮丧，心情受影响，觉得自己很失败",
-        "isCorrect": 2
-      },
-      {
-        "content": "不强求他人的喜爱，自尊自爱，去和喜欢自己的人交往",
-        "isCorrect": 1
       }
     ],
     "type": 1
@@ -36531,7 +35140,7 @@
     ],
     "type": 1
   },
-  "当在网络上遇到需要进行现金交易，并要求不断增加数额时，你应该": {
+  "当在网络上遇到需要进行现金交易，并要求不断增加数额时，你应该：": {
     "optionList": [
       {
         "content": "按照指示进行转账交易",
@@ -36540,15 +35149,6 @@
       {
         "content": "想到止损线，停顿犹豫",
         "isCorrect": 1
-      }
-    ],
-    "type": 1
-  },
-  "当在网络上遇到需要进行现金交易，并要求不断增加数额时，你应该：": {
-    "optionList": [
-      {
-        "content": "按照指示进行转账交易",
-        "isCorrect": 2
       },
       {
         "content": "想到课中讲的“止损线”，停下来，立刻寻求辅导员或警察的帮助",
@@ -36831,27 +35431,6 @@
     ],
     "type": 2
   },
-  "当收到以下哪些信息时，需要提高警惕并核实？": {
-    "optionList": [
-      {
-        "content": "你的学分异常，点击链接完善信息否则影响毕业",
-        "isCorrect": 1
-      },
-      {
-        "content": "恭喜你获得奖学金，提供银行卡账号和密码即可领取",
-        "isCorrect": 1
-      },
-      {
-        "content": "接到一个教育局通知：考试需重新报名，点击链接缴费",
-        "isCorrect": 1
-      },
-      {
-        "content": "接到一条好友私信：手机号注销，麻烦扫二维码代付网购尾款",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
   "当收到以下哪些信息时，需要提高警惕并核实？（）": {
     "optionList": [
       {
@@ -37014,23 +35593,6 @@
     "optionList": [
       {
         "content": "未受火势威胁的安全出口方向",
-        "isCorrect": 1
-      }
-    ],
-    "type": 1
-  },
-  "当陌生账号发送“您的游戏账号存在风险，需缴纳解冻费解锁”的信息时，正确做法是？": {
-    "optionList": [
-      {
-        "content": "详细询问陌生账号的操作流程并照做",
-        "isCorrect": 2
-      },
-      {
-        "content": "按对方要求立即转账缴纳解冻费",
-        "isCorrect": 2
-      },
-      {
-        "content": "直接联系游戏官方客服核实情况",
         "isCorrect": 1
       }
     ],
@@ -37375,14 +35937,6 @@
       {
         "content": "其他两个选项皆是。",
         "isCorrect": 1
-      },
-      {
-        "content": "轻信了可以免费得到昂贵的东西",
-        "isCorrect": 2
-      },
-      {
-        "content": "没有考察清楚就把自己的信息发给了陌生人",
-        "isCorrect": 2
       }
     ],
     "type": 1
@@ -38326,14 +36880,6 @@
       {
         "content": "错。",
         "isCorrect": 2
-      },
-      {
-        "content": "对",
-        "isCorrect": 1
-      },
-      {
-        "content": "错",
-        "isCorrect": 2
       }
     ],
     "type": 1
@@ -38394,10 +36940,6 @@
       {
         "content": "《后汉书》",
         "isCorrect": 2
-      },
-      {
-        "content": "《汉书·霍光传》",
-        "isCorrect": 1
       }
     ],
     "type": 1
@@ -38553,19 +37095,7 @@
         "isCorrect": 1
       },
       {
-        "content": "知道邪教的特点，懂得辨识邪教",
-        "isCorrect": 1
-      },
-      {
-        "content": "学习科学知识，能识破邪教自相矛盾的地方",
-        "isCorrect": 1
-      },
-      {
         "content": "学法懂法，增强识别邪教违法行为的能力",
-        "isCorrect": 1
-      },
-      {
-        "content": "积极乐观，不被邪教洗脑",
         "isCorrect": 1
       }
     ],
@@ -38758,27 +37288,6 @@
     "type": 1
   },
   "我国估计存活艾滋病感染者超过（      ）人。": {
-    "optionList": [
-      {
-        "content": "100万",
-        "isCorrect": 2
-      },
-      {
-        "content": "120万",
-        "isCorrect": 1
-      },
-      {
-        "content": "50万",
-        "isCorrect": 2
-      },
-      {
-        "content": "150万",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
-  "我国估计存活艾滋病感染者超过（      ）人。": {
     "optionList": [
       {
         "content": "100万",
@@ -39123,7 +37632,7 @@
     ],
     "type": 2
   },
-  "我国的“全民国家安全教育日”是哪一天？": {
+  "我国的“全民国家安全教育日”是哪一天？（）": {
     "optionList": [
       {
         "content": "2.15",
@@ -39136,15 +37645,6 @@
       {
         "content": "6.15",
         "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
-  "我国的“全民国家安全教育日”是哪一天？（）": {
-    "optionList": [
-      {
-        "content": "4.15",
-        "isCorrect": 1
       }
     ],
     "type": 1
@@ -39214,48 +37714,6 @@
     "type": 1
   },
   "我国的艾滋病患者中有（        ）以上是经性途径感染的。": {
-    "optionList": [
-      {
-        "content": "60%",
-        "isCorrect": 2
-      },
-      {
-        "content": "70%",
-        "isCorrect": 2
-      },
-      {
-        "content": "80%",
-        "isCorrect": 2
-      },
-      {
-        "content": "90%",
-        "isCorrect": 1
-      }
-    ],
-    "type": 1
-  },
-  "我国的艾滋病患者中有（ ）以上是经性途径感染的。": {
-    "optionList": [
-      {
-        "content": "60%",
-        "isCorrect": 2
-      },
-      {
-        "content": "70%",
-        "isCorrect": 2
-      },
-      {
-        "content": "80%",
-        "isCorrect": 2
-      },
-      {
-        "content": "90%",
-        "isCorrect": 1
-      }
-    ],
-    "type": 1
-  },
-  "我国的艾滋病患者中有（        ）以上是经性途径感染的。": {
     "optionList": [
       {
         "content": "60%",
@@ -39560,19 +38018,6 @@
       {
         "content": "发求救信号",
         "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
-  "户外迷路时，可通过哪些方式求救？": {
-    "optionList": [
-      {
-        "content": "电话报警",
-        "isCorrect": 1
-      },
-      {
-        "content": "发求救信号",
-        "isCorrect": 1
       },
       {
         "content": "大声呼喊，漫无目的乱跑",
@@ -39650,7 +38095,7 @@
     ],
     "type": 1
   },
-  "手机上突然无故收到一条短信，提示一个网站地址，这时，你该怎么做？": {
+  "手机上突然无故收到一条短信，提示一个网站地址，这时，你该怎么做？（）": {
     "optionList": [
       {
         "content": "心存疑惑，但还是点开了链接",
@@ -39667,16 +38112,7 @@
     ],
     "type": 1
   },
-  "手机上突然无故收到一条短信，提示一个网站地址，这时，你该怎么做？（）": {
-    "optionList": [
-      {
-        "content": "一看就是骗子短信，果断删除",
-        "isCorrect": 1
-      }
-    ],
-    "type": 1
-  },
-  "手机号码挂失后，该号码还可以用吗？": {
+  "手机号码挂失后，该号码还可以用吗？（）": {
     "optionList": [
       {
         "content": "可以，只不过需要补办一张新卡",
@@ -39685,15 +38121,6 @@
       {
         "content": "不可以",
         "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
-  "手机号码挂失后，该号码还可以用吗？（）": {
-    "optionList": [
-      {
-        "content": "可以，只不过需要补办一张新卡",
-        "isCorrect": 1
       }
     ],
     "type": 1
@@ -39813,14 +38240,6 @@
       },
       {
         "content": "当然可以拼车，便宜呀。",
-        "isCorrect": 2
-      },
-      {
-        "content": "单身一人的时候绝不和人拼车",
-        "isCorrect": 1
-      },
-      {
-        "content": "当然可以拼车，便宜呀",
         "isCorrect": 2
       },
       {
@@ -40589,27 +39008,6 @@
     ],
     "type": 1
   },
-  "接到“家人遭遇车祸，需立刻转账支付医疗费”的紧急来电，对方催着马上打钱且不让多问，你的正确处理方式是？": {
-    "optionList": [
-      {
-        "content": "心急如焚，立刻按要求转账确保家人治疗",
-        "isCorrect": 2
-      },
-      {
-        "content": "与对方讨价还价，降低转账金额后再操作",
-        "isCorrect": 2
-      },
-      {
-        "content": "询问对方医院名称后，直接向该医院账户转账",
-        "isCorrect": 2
-      },
-      {
-        "content": "先挂断电话，联系家人本人或共同亲友核实情况",
-        "isCorrect": 1
-      }
-    ],
-    "type": 1
-  },
   "接到“家人遭遇车祸，需立刻转账支付医疗费”的紧急来电，对方催着马上打钱且不让多问，你的正确处理方式是？（）": {
     "optionList": [
       {
@@ -40640,23 +39038,6 @@
       {
         "content": "投点试试",
         "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
-  "接到“某银行信贷员”电话：“您符合我行低息贷款资格，需先缴纳2000元手续费即可放款”，正确的做法是：": {
-    "optionList": [
-      {
-        "content": "按要求转账，等待放款",
-        "isCorrect": 2
-      },
-      {
-        "content": "要求对方减免手续费后再办理",
-        "isCorrect": 2
-      },
-      {
-        "content": "到银行柜台或官方 APP 申请贷款",
-        "isCorrect": 1
       }
     ],
     "type": 1
@@ -40761,23 +39142,6 @@
     "type": 2
   },
   "接触液氮、干冰等制冷剂或冷冻药品时，需要佩戴（）": {
-    "optionList": [
-      {
-        "content": "普通手套",
-        "isCorrect": 2
-      },
-      {
-        "content": "防切割手套",
-        "isCorrect": 2
-      },
-      {
-        "content": "低温防护手套",
-        "isCorrect": 1
-      }
-    ],
-    "type": 1
-  },
-  "接触液氮、干冰等制冷剂或冷冻药品时，需要佩戴：": {
     "optionList": [
       {
         "content": "普通手套",
@@ -41187,23 +39551,6 @@
     ],
     "type": 1
   },
-  "收到短信：“您的征信报告存在逾期记录，添加‘征信专员’微信可修复，手续费3000元”，正确的做法是：": {
-    "optionList": [
-      {
-        "content": "微信转账缴费，尽快修复征信",
-        "isCorrect": 2
-      },
-      {
-        "content": "登录央行征信中心官网查询真实记录",
-        "isCorrect": 1
-      },
-      {
-        "content": "添加“征信专员”微信，进行咨询",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
   "收到银行卡扣费、买卖游戏装备等短信提醒，内附一条链接，你会怎么做？": {
     "optionList": [
       {
@@ -41470,14 +39817,6 @@
       },
       {
         "content": "努力带着溺水者游向安全地带。",
-        "isCorrect": 2
-      },
-      {
-        "content": "放手自沉，使溺水者手松开，再进行救护",
-        "isCorrect": 1
-      },
-      {
-        "content": "努力带着溺水者游向安全地带",
         "isCorrect": 2
       },
       {
@@ -42090,23 +40429,6 @@
     ],
     "type": 2
   },
-  "无人机如何避免”黑飞“？": {
-    "optionList": [
-      {
-        "content": "实名登记",
-        "isCorrect": 1
-      },
-      {
-        "content": "取得相应的驾驶执照",
-        "isCorrect": 1
-      },
-      {
-        "content": "在合法空域飞行",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
   "无人机带来的隐私危机是指（）。": {
     "optionList": [
       {
@@ -42411,10 +40733,6 @@
       {
         "content": "错。",
         "isCorrect": 2
-      },
-      {
-        "content": "对",
-        "isCorrect": 1
       }
     ],
     "type": 1
@@ -42560,19 +40878,6 @@
     ],
     "type": 2
   },
-  "晚上准备离开实验室了，但是实验还没有做完的情况下，仪器设备（）开机过夜": {
-    "optionList": [
-      {
-        "content": "应该",
-        "isCorrect": 2
-      },
-      {
-        "content": "不应该",
-        "isCorrect": 1
-      }
-    ],
-    "type": 1
-  },
   "晚上准备离开实验室了，但是实验还没有做完的情况下，仪器设备（）开机过夜。": {
     "optionList": [
       {
@@ -42594,14 +40899,6 @@
       },
       {
         "content": "把打车信息发给父母朋友，随时联络。",
-        "isCorrect": 1
-      },
-      {
-        "content": "坐在车里玩手机或者和司机聊天",
-        "isCorrect": 2
-      },
-      {
-        "content": "把打车信息发给父母朋友，随时联络",
         "isCorrect": 1
       },
       {
@@ -43144,10 +41441,6 @@
       {
         "content": "迷信的心理会被人利用，骗钱骗色。迷信心理的根源是想要走捷径，但是捷径也有相应更大的代价。",
         "isCorrect": 1
-      },
-      {
-        "content": "这不是强奸，是心甘情愿的，小玲的“霉运”一定被去除了",
-        "isCorrect": 2
       },
       {
         "content": "迷信心理易被不法分子利用，导致骗财骗色",
@@ -43725,27 +42018,6 @@
     ],
     "type": 1
   },
-  "机场净空区包括以下哪些禁止项？": {
-    "optionList": [
-      {
-        "content": "禁止燃放烟花爆竹",
-        "isCorrect": 1
-      },
-      {
-        "content": "禁止放养鸽子及其他鸟类",
-        "isCorrect": 1
-      },
-      {
-        "content": "禁止放飞气球、风筝",
-        "isCorrect": 1
-      },
-      {
-        "content": "禁止孔明灯、航模、无人机",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
   "机场净空区包括以下哪些禁止项？（）": {
     "optionList": [
       {
@@ -44074,27 +42346,6 @@
       {
         "content": "立即重设密码",
         "isCorrect": 1
-      }
-    ],
-    "type": 1
-  },
-  "某同学收到一条署名“学校财务处”的短信，内容为“因学费系统升级，需重新核对并补缴学费，现提供新缴费账号，务必在24小时内完成转账，否则将影响学籍注册，如有疑问请添加我的微信了解详情”。面对这种情况，该同学正确的做法是？": {
-    "optionList": [
-      {
-        "content": "担心影响学籍，立即通过短信提供的微信转账缴费",
-        "isCorrect": 2
-      },
-      {
-        "content": "第一时间添加对方微信，详细咨询补缴学费的具体流程",
-        "isCorrect": 2
-      },
-      {
-        "content": "拨打学校官网公布的财务处官方电话，核实该缴费通知的真实性",
-        "isCorrect": 1
-      },
-      {
-        "content": "向同学紧急借钱，按照短信要求按时转账避免影响注册",
-        "isCorrect": 2
       }
     ],
     "type": 1
@@ -44622,27 +42873,6 @@
     ],
     "type": 2
   },
-  "校园贷存在哪些风险？": {
-    "optionList": [
-      {
-        "content": "低利率、高费用",
-        "isCorrect": 1
-      },
-      {
-        "content": "风险控制不完善",
-        "isCorrect": 1
-      },
-      {
-        "content": "用户信息可能被盗取、泄露和篡改",
-        "isCorrect": 1
-      },
-      {
-        "content": "过于宽松的信贷政策，会纵容一部分自制力差的大学生过度消费，助长攀比风气",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
   "校园贷存在哪些风险？（）": {
     "optionList": [
       {
@@ -44771,18 +43001,6 @@
       {
         "content": "要警惕校园里的小偷。",
         "isCorrect": 1
-      },
-      {
-        "content": "不用值钱的东西占座",
-        "isCorrect": 1
-      },
-      {
-        "content": "不要认为校园路不拾遗，要有防盗意识",
-        "isCorrect": 1
-      },
-      {
-        "content": "要警惕校园里的小偷",
-        "isCorrect": 1
       }
     ],
     "type": 2
@@ -44857,23 +43075,6 @@
     "type": 1
   },
   "根据《中华人民共和国刑法修正案(九)》规定，明知他人利用信息网络实施犯罪，为其犯罪提供互联网接入、服务器托管、网络存储、通讯传输等技术支持，或者提供广告推广、支付结算等帮助，情节严重的行为，处（     ）有期徒刑或者拘役，并处或者单处罚金。": {
-    "optionList": [
-      {
-        "content": "一年以下",
-        "isCorrect": 2
-      },
-      {
-        "content": "三年以下",
-        "isCorrect": 1
-      },
-      {
-        "content": "三年以上五年以内",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
-  "根据《中华人民共和国刑法修正案(九)》规定，明知他人利用信息网络实施犯罪，为其犯罪提供互联网接入、服务器托管、网络存储、通讯传输等技术支持，或者提供广告推广、支付结算等帮助，情节严重的行为，处（ ）有期徒刑或者拘役，并处或者单处罚金。": {
     "optionList": [
       {
         "content": "一年以下",
@@ -46229,10 +44430,6 @@
   "正确使用安全套是性生活中最有效的预防性病和艾滋病的措施之一。这个说法正确吗？": {
     "optionList": [
       {
-        "content": "正确",
-        "isCorrect": 1
-      },
-      {
         "content": "正确。",
         "isCorrect": 1
       },
@@ -46446,22 +44643,6 @@
       },
       {
         "content": "11月10日。",
-        "isCorrect": 2
-      },
-      {
-        "content": "11月9日",
-        "isCorrect": 1
-      },
-      {
-        "content": "11月6日",
-        "isCorrect": 2
-      },
-      {
-        "content": "11月8日",
-        "isCorrect": 2
-      },
-      {
-        "content": "11月10日",
         "isCorrect": 2
       }
     ],
@@ -46736,7 +44917,7 @@
     ],
     "type": 2
   },
-  "毒贩可能将毒品包装成哪些食物？": {
+  "毒贩可能将毒品包装成哪些食物？（ ）": {
     "optionList": [
       {
         "content": "小糖片",
@@ -46781,32 +44962,7 @@
     ],
     "type": 2
   },
-  "毒贩可能将毒品包装成哪些食物？（ ）": {
-    "optionList": [
-      {
-        "content": "小糖片",
-        "isCorrect": 1
-      },
-      {
-        "content": "瓶装口服液",
-        "isCorrect": 1
-      },
-      {
-        "content": "咖啡",
-        "isCorrect": 1
-      },
-      {
-        "content": "巧克力",
-        "isCorrect": 1
-      },
-      {
-        "content": "茶叶",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
-  "毒贩引诱他人吸毒的手段有哪些？": {
+  "毒贩引诱他人吸毒的手段有哪些？（ ）": {
     "optionList": [
       {
         "content": "免费赠送",
@@ -46823,12 +44979,7 @@
       {
         "content": "声称“吸毒瘦身减肥”",
         "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
-  "毒贩引诱他人吸毒的手段有哪些？（ ）": {
-    "optionList": [
+      },
       {
         "content": "声称“吸毒治病/止痛”",
         "isCorrect": 1
@@ -47308,26 +45459,6 @@
       {
         "content": "现金、证件和保险单。",
         "isCorrect": 2
-      },
-      {
-        "content": "新鲜水果和蔬菜",
-        "isCorrect": 2
-      },
-      {
-        "content": "救生圈等漂浮工具",
-        "isCorrect": 1
-      },
-      {
-        "content": "治疗腹泻的药",
-        "isCorrect": 1
-      },
-      {
-        "content": "密封起来的干燥衣物",
-        "isCorrect": 1
-      },
-      {
-        "content": "现金、证件和保险单",
-        "isCorrect": 2
       }
     ],
     "type": 2
@@ -47639,27 +45770,6 @@
     ],
     "type": 1
   },
-  "涉及高致病性病原微生物的活动必须在（）实验室进行": {
-    "optionList": [
-      {
-        "content": "BSL-1",
-        "isCorrect": 2
-      },
-      {
-        "content": "BSL-2",
-        "isCorrect": 2
-      },
-      {
-        "content": "BSL-3",
-        "isCorrect": 1
-      },
-      {
-        "content": "BSL-4",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
   "涉及高致病性病原微生物的活动必须在（）实验室进行。": {
     "optionList": [
       {
@@ -47725,27 +45835,6 @@
     "type": 1
   },
   "深海安全是指和平探索和利用国际深海区域，增强（     ）的能力，维护我国国际深海区域的活动、资产的安全，以及深海发展利益相对处于没有危险和不受内外威胁的状态。": {
-    "optionList": [
-      {
-        "content": "安全进出",
-        "isCorrect": 1
-      },
-      {
-        "content": "科学考察",
-        "isCorrect": 1
-      },
-      {
-        "content": "开发利用",
-        "isCorrect": 1
-      },
-      {
-        "content": "掠夺深海资源和利用深海空间打击别国",
-        "isCorrect": 2
-      }
-    ],
-    "type": 2
-  },
-  "深海安全是指和平探索和利用国际深海区域，增强（ ）的能力，维护我国国际深海区域的活动、资产的安全，以及深海发展利益相对处于没有危险和不受内外威胁的状态。": {
     "optionList": [
       {
         "content": "安全进出",
@@ -47985,14 +46074,6 @@
         "isCorrect": 2
       },
       {
-        "content": "能不下水就不下水",
-        "isCorrect": 1
-      },
-      {
-        "content": "救人一命胜造七级浮屠",
-        "isCorrect": 2
-      },
-      {
         "content": "立刻下水徒手施救",
         "isCorrect": 2
       }
@@ -48037,14 +46118,6 @@
       },
       {
         "content": "有呼吸就不用人工呼吸，大声呼唤、拍打来唤醒溺水者。",
-        "isCorrect": 2
-      },
-      {
-        "content": "立刻进行人工呼吸",
-        "isCorrect": 1
-      },
-      {
-        "content": "有呼吸就不用人工呼吸，大声呼唤、拍打来唤醒溺水者",
         "isCorrect": 2
       }
     ],
@@ -49141,7 +47214,7 @@
     ],
     "type": 1
   },
-  "环形包扎法可用于回返式包扎法的开始和结束。": {
+  "环形包扎法可用于回返式包扎法的开始和结束。（）": {
     "optionList": [
       {
         "content": "正确",
@@ -49150,15 +47223,6 @@
       {
         "content": "错误",
         "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
-  "环形包扎法可用于回返式包扎法的开始和结束。（）": {
-    "optionList": [
-      {
-        "content": "正确",
-        "isCorrect": 1
       }
     ],
     "type": 1
@@ -49573,24 +47637,15 @@
     ],
     "type": 2
   },
-  "用户收到了一封可疑的电子邮件，要求用户提供银行账户及密码，这是属于何种攻击手段？": {
-    "optionList": [
-      {
-        "content": "钓鱼攻击",
-        "isCorrect": 1
-      }
-    ],
-    "type": 1
-  },
   "用户收到了一封可疑的电子邮件，要求用户提供银行账户及密码，这是属于何种攻击手段？（）": {
     "optionList": [
       {
-        "content": "缓存溢出攻击",
-        "isCorrect": 2
-      },
-      {
         "content": "钓鱼攻击",
         "isCorrect": 1
+      },
+      {
+        "content": "缓存溢出攻击",
+        "isCorrect": 2
       },
       {
         "content": "暗门攻击",
@@ -50059,23 +48114,6 @@
     ],
     "type": 2
   },
-  "电伤是电流以热效应、机械效应、化学效应等形式对人体外表造成的局部伤害。一般可分为：": {
-    "optionList": [
-      {
-        "content": "电烧伤",
-        "isCorrect": 1
-      },
-      {
-        "content": "电烙印",
-        "isCorrect": 1
-      },
-      {
-        "content": "皮肤金属化",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
   "电信业务经营者应当依法全面落实电话用户（ ）身份信息登记制度。": {
     "optionList": [
       {
@@ -50279,23 +48317,6 @@
     ],
     "type": 1
   },
-  "电动车充电原则上不应超过多久？": {
-    "optionList": [
-      {
-        "content": "6小时",
-        "isCorrect": 2
-      },
-      {
-        "content": "10小时",
-        "isCorrect": 1
-      },
-      {
-        "content": "8小时",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
   "电动车充电原则上不应超过多久？（）": {
     "optionList": [
       {
@@ -50394,10 +48415,6 @@
         "isCorrect": 1
       },
       {
-        "content": "将你的整个身体蜷缩起来，双手抱头，减少冲击",
-        "isCorrect": 2
-      },
-      {
         "content": "将你的整个背部跟头部紧贴电梯内墙，使上身呈直线状态，同时屈膝踮脚、双手抱头护颈，减少上下肢及头部冲击",
         "isCorrect": 1
       }
@@ -50475,14 +48492,6 @@
       },
       {
         "content": "下开上关。",
-        "isCorrect": 2
-      },
-      {
-        "content": "上开下关",
-        "isCorrect": 1
-      },
-      {
-        "content": "下开上关",
         "isCorrect": 2
       }
     ],
@@ -50575,27 +48584,6 @@
     "type": 1
   },
   "疏散楼梯间是人员竖向疏散的安全通道，需要满足（）": {
-    "optionList": [
-      {
-        "content": "疏散楼梯间应保证人员在楼梯间内疏散时能有较好的光线",
-        "isCorrect": 1
-      },
-      {
-        "content": "疏散楼梯间要尽量采用自然通风",
-        "isCorrect": 1
-      },
-      {
-        "content": "不能利用天然采光和自然通风的疏散楼梯间，需按规范要求设置机械防烟措施",
-        "isCorrect": 1
-      },
-      {
-        "content": "楼梯间的设计要尽量增加布置凸出墙体的物体",
-        "isCorrect": 2
-      }
-    ],
-    "type": 2
-  },
-  "疏散楼梯间是人员竖向疏散的安全通道，需要满足：": {
     "optionList": [
       {
         "content": "疏散楼梯间应保证人员在楼梯间内疏散时能有较好的光线",
@@ -50830,18 +48818,6 @@
       {
         "content": "不知道。",
         "isCorrect": 2
-      },
-      {
-        "content": "是",
-        "isCorrect": 1
-      },
-      {
-        "content": "否",
-        "isCorrect": 2
-      },
-      {
-        "content": "不知道",
-        "isCorrect": 2
       }
     ],
     "type": 1
@@ -51045,10 +49021,6 @@
       },
       {
         "content": "立刻去检查溺水者是否有呼吸，进行心肺复苏。",
-        "isCorrect": 2
-      },
-      {
-        "content": "立刻去检查溺水者是否有呼吸，进行心肺复苏",
         "isCorrect": 2
       }
     ],
@@ -51348,10 +49320,6 @@
         "isCorrect": 2
       },
       {
-        "content": "48小时",
-        "isCorrect": 1
-      },
-      {
         "content": "24小时",
         "isCorrect": 2
       },
@@ -51565,19 +49533,6 @@
     "type": 1
   },
   "空气传播主要是病原体(如细菌、病毒等)通过什么进行传播的呢?( )": {
-    "optionList": [
-      {
-        "content": "飞沫、飞沫核和尘埃。",
-        "isCorrect": 1
-      },
-      {
-        "content": "飞沫、尘埃。",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
-  "空气传播主要是病原体（如细菌、病毒等）通过什么进行传播的呢？": {
     "optionList": [
       {
         "content": "飞沫、飞沫核和尘埃。",
@@ -51829,14 +49784,6 @@
       },
       {
         "content": "双脚并拢蹲下。",
-        "isCorrect": 1
-      },
-      {
-        "content": "大步逃跑",
-        "isCorrect": 2
-      },
-      {
-        "content": "双脚并拢蹲下",
         "isCorrect": 1
       },
       {
@@ -52267,7 +50214,7 @@
     ],
     "type": 1
   },
-  "给共享单车上私锁，并据为己有，涉嫌什么？": {
+  "给共享单车上私锁，并据为己有，涉嫌什么？（ ）": {
     "optionList": [
       {
         "content": "盗窃罪",
@@ -52276,15 +50223,6 @@
       {
         "content": "抢夺罪",
         "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
-  "给共享单车上私锁，并据为己有，涉嫌什么？（ ）": {
-    "optionList": [
-      {
-        "content": "盗窃罪",
-        "isCorrect": 1
       }
     ],
     "type": 1
@@ -52774,27 +50712,6 @@
       }
     ],
     "type": 2
-  },
-  "网络交友诈骗有很多类型，其中一种被称为“杀猪盘”，请问以下描述中，哪个是杀猪盘诈骗最典型的特征？": {
-    "optionList": [
-      {
-        "content": "短期内以高额返利为诱饵诱导充值",
-        "isCorrect": 2
-      },
-      {
-        "content": "长期营造完美人设，通过嘘寒问暖获取信任后借钱",
-        "isCorrect": 1
-      },
-      {
-        "content": "以“信誉分不足”“保证金”为由索要钱财",
-        "isCorrect": 2
-      },
-      {
-        "content": "冒充客服要求缴纳解冻费",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
   },
   "网络交友诈骗有很多类型，其中一种被称为“杀猪盘”，请问以下描述中，哪个是杀猪盘诈骗最典型的特征？（）": {
     "optionList": [
@@ -53565,10 +51482,6 @@
   "艾滋病感染者可以通过按时吃药来控制病情，但仍然有耐药和机会性感染的问题。——这句话正确吗？": {
     "optionList": [
       {
-        "content": "正确",
-        "isCorrect": 1
-      },
-      {
         "content": "正确。",
         "isCorrect": 1
       },
@@ -53647,27 +51560,10 @@
       {
         "content": "脑细胞",
         "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
-  "艾滋病病毒主要攻击人体的哪种细胞？": {
-    "optionList": [
+      },
       {
         "content": "CD4+T淋巴细胞",
         "isCorrect": 1
-      },
-      {
-        "content": "肝细胞",
-        "isCorrect": 2
-      },
-      {
-        "content": "肾细胞",
-        "isCorrect": 2
-      },
-      {
-        "content": "脑细胞",
-        "isCorrect": 2
       }
     ],
     "type": 1
@@ -53834,21 +51730,12 @@
     ],
     "type": 1
   },
-  "若发现有人触电，必须让触电者迅速脱离电源。应立即关闭电源开关或拔掉电源插头。若无法及时找到或断开电源，可用铁棒、竹竿等物挑开电线。": {
+  "若发现有人触电，必须让触电者迅速脱离电源。应立即关闭电源开关或拔掉电源插头。若无法及时找到或断开电源，可用铁棒、竹竿等物挑开电线。（）": {
     "optionList": [
       {
         "content": "正确",
         "isCorrect": 2
       },
-      {
-        "content": "错误",
-        "isCorrect": 1
-      }
-    ],
-    "type": 1
-  },
-  "若发现有人触电，必须让触电者迅速脱离电源。应立即关闭电源开关或拔掉电源插头。若无法及时找到或断开电源，可用铁棒、竹竿等物挑开电线。（）": {
-    "optionList": [
       {
         "content": "错误",
         "isCorrect": 1
@@ -54142,10 +52029,6 @@
       {
         "content": "没有，60w的灯不是很常见吗？",
         "isCorrect": 2
-      },
-      {
-        "content": "有，灯泡可能引燃蚊帐",
-        "isCorrect": 1
       },
       {
         "content": "没有，60w的灯很常见",
@@ -55279,7 +53162,7 @@
     ],
     "type": 1
   },
-  "诈骗的套路和话术并不是一成不变的，骗子也会改变诈骗手法。面对持续升级的诈骗套路，正确的应对方式是？": {
+  "诈骗的套路和话术并不是一成不变的，骗子也会改变诈骗手法。面对持续升级的诈骗套路，正确的应对方式是？（）": {
     "optionList": [
       {
         "content": "不断学习更新反诈知识，适配新套路",
@@ -55299,27 +53182,6 @@
       },
       {
         "content": "不断学习更新反诈知识，识别新套路",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
-  "诈骗的套路和话术并不是一成不变的，骗子也会改变诈骗手法。面对持续升级的诈骗套路，正确的应对方式是？（）": {
-    "optionList": [
-      {
-        "content": "不断学习更新反诈知识，适配新套路",
-        "isCorrect": 1
-      },
-      {
-        "content": "遇到可疑情况立即停止交易，及时止损",
-        "isCorrect": 1
-      },
-      {
-        "content": "对方说是官方客服、游戏管理员，说的话就可以相信",
-        "isCorrect": 2
-      },
-      {
-        "content": "吸取他人被骗教训，时刻保持警惕",
         "isCorrect": 1
       }
     ],
@@ -56182,14 +54044,6 @@
       {
         "content": "寻找安全通道，快速撤离。",
         "isCorrect": 1
-      },
-      {
-        "content": "迅速坐电梯逃生",
-        "isCorrect": 2
-      },
-      {
-        "content": "寻找安全通道，快速撤离",
-        "isCorrect": 1
       }
     ],
     "type": 1
@@ -56279,18 +54133,6 @@
       },
       {
         "content": "其他两个选项皆是。",
-        "isCorrect": 1
-      },
-      {
-        "content": "了解自己的能力和长处",
-        "isCorrect": 2
-      },
-      {
-        "content": "了解想转的专业",
-        "isCorrect": 2
-      },
-      {
-        "content": "其他两个选项皆是",
         "isCorrect": 1
       }
     ],
@@ -56488,10 +54330,6 @@
       {
         "content": "错。",
         "isCorrect": 2
-      },
-      {
-        "content": "对",
-        "isCorrect": 1
       }
     ],
     "type": 1
@@ -56509,14 +54347,6 @@
       {
         "content": "让身体更健康、让心理更健康。",
         "isCorrect": 1
-      },
-      {
-        "content": "让身体更健康",
-        "isCorrect": 2
-      },
-      {
-        "content": "让心理更健康",
-        "isCorrect": 2
       }
     ],
     "type": 1
@@ -56992,23 +54822,6 @@
     ],
     "type": 2
   },
-  "逃生路线图需标明：": {
-    "optionList": [
-      {
-        "content": "两条及以上逃生路线",
-        "isCorrect": 1
-      },
-      {
-        "content": "消防集结点",
-        "isCorrect": 1
-      },
-      {
-        "content": "事故意外交接点",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
   "逃避亲密关系是哪种依恋类型的特征？": {
     "optionList": [
       {
@@ -57067,15 +54880,6 @@
       }
     ],
     "type": 2
-  },
-  "选用合格的三孔插座和活动插座板，一定要选用经过国家质量认证的合格产品。最好选用带（）认证的正厂产品": {
-    "optionList": [
-      {
-        "content": "3C",
-        "isCorrect": 1
-      }
-    ],
-    "type": 1
   },
   "选用合格的三孔插座和活动插座板，一定要选用经过国家质量认证的合格产品。最好选用带（）认证的正厂产品。": {
     "optionList": [
@@ -57190,16 +54994,12 @@
   "通过外表可以判断一个人是否感染了艾滋病吗？": {
     "optionList": [
       {
-        "content": "不可以",
+        "content": "不可以。",
         "isCorrect": 1
       },
       {
         "content": "可以。",
         "isCorrect": 2
-      },
-      {
-        "content": "不可以。",
-        "isCorrect": 1
       }
     ],
     "type": 1
@@ -57692,22 +55492,6 @@
       {
         "content": "其他三个选项皆是。",
         "isCorrect": 1
-      },
-      {
-        "content": "拍下肇事车辆照片",
-        "isCorrect": 2
-      },
-      {
-        "content": "邀请目击者作证",
-        "isCorrect": 2
-      },
-      {
-        "content": "保留车祸证据（如车体碎片）",
-        "isCorrect": 2
-      },
-      {
-        "content": "其他三个选项皆是",
-        "isCorrect": 1
       }
     ],
     "type": 1
@@ -57776,44 +55560,11 @@
       {
         "content": "远行戴头盔。",
         "isCorrect": 1
-      },
-      {
-        "content": "控速度",
-        "isCorrect": 1
-      },
-      {
-        "content": "不带重物",
-        "isCorrect": 1
-      },
-      {
-        "content": "远行戴头盔",
-        "isCorrect": 1
       }
     ],
     "type": 2
   },
   "邪教 “全能神” 属于以下哪一类邪教？": {
-    "optionList": [
-      {
-        "content": "冒用基督教名义的邪教",
-        "isCorrect": 1
-      },
-      {
-        "content": "以歪曲佛教道教教义为主的邪教",
-        "isCorrect": 2
-      },
-      {
-        "content": "以杂合气功手法歪曲宗教教义的邪教",
-        "isCorrect": 2
-      },
-      {
-        "content": "冒用伊斯兰教名义的邪教",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
-  "邪教“全能神”属于以下哪一类邪教？": {
     "optionList": [
       {
         "content": "冒用基督教名义的邪教",
@@ -58286,27 +56037,6 @@
     ],
     "type": 1
   },
-  "间谍一般都会做什么？": {
-    "optionList": [
-      {
-        "content": "刺探",
-        "isCorrect": 1
-      },
-      {
-        "content": "分析",
-        "isCorrect": 1
-      },
-      {
-        "content": "窃取",
-        "isCorrect": 1
-      },
-      {
-        "content": "策反",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
   "间谍一般都会做什么？（）": {
     "optionList": [
       {
@@ -58743,23 +56473,6 @@
     ],
     "type": 1
   },
-  "陌生“客服”来电称“您的银行卡异常，需下载‘会议APP’开启屏幕共享协助处理”，你要怎么做：": {
-    "optionList": [
-      {
-        "content": "按指引下载APP，配合操作",
-        "isCorrect": 2
-      },
-      {
-        "content": "拒绝屏幕共享，通过银行官网查询账户",
-        "isCorrect": 1
-      },
-      {
-        "content": "开启共享前先修改银行卡密码",
-        "isCorrect": 2
-      }
-    ],
-    "type": 1
-  },
   "陌生号码来电，当你怀疑时，对方严肃地说：“我的声音你都听不出来啊”。你感觉他的声音像老师，对方随即承认。第二天，该号码再次来电，说要给领导送红包，让你帮忙转账6000元，这时，错误做法是：": {
     "optionList": [
       {
@@ -59016,10 +56729,6 @@
         "isCorrect": 1
       },
       {
-        "content": "山洞里",
-        "isCorrect": 2
-      },
-      {
         "content": "楼房里",
         "isCorrect": 2
       }
@@ -59034,14 +56743,6 @@
       },
       {
         "content": "错。",
-        "isCorrect": 2
-      },
-      {
-        "content": "对",
-        "isCorrect": 1
-      },
-      {
-        "content": "错",
         "isCorrect": 2
       }
     ],
@@ -59169,23 +56870,6 @@
       }
     ],
     "type": 1
-  },
-  "静电电位可高达数万伏至数十万伏，可能发生放电，产生电气火花，引起爆炸、火灾，也能造成对人体的电击伤害，以下哪些物品容易引发静电": {
-    "optionList": [
-      {
-        "content": "化学纤维质地的坐垫",
-        "isCorrect": 1
-      },
-      {
-        "content": "家用电器",
-        "isCorrect": 1
-      },
-      {
-        "content": "纯棉衣服",
-        "isCorrect": 2
-      }
-    ],
-    "type": 2
   },
   "静电电位可高达数万伏至数十万伏，可能发生放电，产生电气火花，引起爆炸、火灾，也能造成对人体的电击伤害，以下哪些物品容易引发静电？": {
     "optionList": [
@@ -59554,23 +57238,6 @@
     ],
     "type": 2
   },
-  "面对室友相处中的矛盾冲突，应该怎么办？": {
-    "optionList": [
-      {
-        "content": "理解室友间的人际冲突",
-        "isCorrect": 1
-      },
-      {
-        "content": "发展处理冲突的技能",
-        "isCorrect": 1
-      },
-      {
-        "content": "提升自信，发展沟通技巧",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
   "面对对手时，有什么心态更有助于我们成功？": {
     "optionList": [
       {
@@ -59686,7 +57353,7 @@
     ],
     "type": 2
   },
-  "面对毒品，以下哪些心理要不得？": {
+  "面对毒品，以下哪些心理要不得？（ ）": {
     "optionList": [
       {
         "content": "好奇心理",
@@ -59718,27 +57385,6 @@
       },
       {
         "content": "性臣服心理",
-        "isCorrect": 1
-      }
-    ],
-    "type": 2
-  },
-  "面对毒品，以下哪些心理要不得？（ ）": {
-    "optionList": [
-      {
-        "content": "好奇心理",
-        "isCorrect": 1
-      },
-      {
-        "content": "空虚求刺激心理",
-        "isCorrect": 1
-      },
-      {
-        "content": "及时行乐心理",
-        "isCorrect": 1
-      },
-      {
-        "content": "冒险心理",
         "isCorrect": 1
       }
     ],
@@ -59905,7 +57551,7 @@
         "isCorrect": 1
       },
       {
-        "content": "不在宿舍使用酒精炉",
+        "content": "不在宿舍使用酒精炉。",
         "isCorrect": 1
       },
       {
@@ -59913,7 +57559,7 @@
         "isCorrect": 1
       },
       {
-        "content": "离开宿舍时拔下电源插头",
+        "content": "离开宿舍时拔下电源插头。",
         "isCorrect": 1
       },
       {
@@ -59921,15 +57567,7 @@
         "isCorrect": 1
       },
       {
-        "content": "不在宿舍使用酒精炉。",
-        "isCorrect": 1
-      },
-      {
         "content": "不躺卧吸烟和乱扔烟头，最好不在宿舍抽烟。",
-        "isCorrect": 1
-      },
-      {
-        "content": "离开宿舍时拔下电源插头。",
         "isCorrect": 1
       }
     ],
@@ -60058,14 +57696,6 @@
       {
         "content": "把电源关了再换水。",
         "isCorrect": 1
-      },
-      {
-        "content": "主动去换水",
-        "isCorrect": 2
-      },
-      {
-        "content": "把电源关了再换水",
-        "isCorrect": 1
       }
     ],
     "type": 1
@@ -60143,27 +57773,6 @@
       {
         "content": "你的需要及其与现存世界的联系",
         "isCorrect": 1
-      }
-    ],
-    "type": 1
-  },
-  "马弗炉和控制器应在（）摄氏度的环境温度下运行": {
-    "optionList": [
-      {
-        "content": "0~40",
-        "isCorrect": 1
-      },
-      {
-        "content": "40~60",
-        "isCorrect": 2
-      },
-      {
-        "content": "30~50",
-        "isCorrect": 2
-      },
-      {
-        "content": "0~20",
-        "isCorrect": 2
       }
     ],
     "type": 1
@@ -60314,18 +57923,6 @@
       },
       {
         "content": "20-25公里每小时。",
-        "isCorrect": 2
-      },
-      {
-        "content": "10-12公里每小时",
-        "isCorrect": 1
-      },
-      {
-        "content": "15-18公里每小时",
-        "isCorrect": 2
-      },
-      {
-        "content": "20-25公里每小时",
         "isCorrect": 2
       }
     ],
@@ -60531,27 +58128,6 @@
     ],
     "type": 2
   },
-  "骗子会利用校园场景中某些具体事项实施诈骗，为了防止自己被诈骗分子利用，要认真学习关于校园场景下的防骗知识。关于校园防骗技巧，以下说法正确的有？": {
-    "optionList": [
-      {
-        "content": "正规官方通知绝不会只针对个人单独发送",
-        "isCorrect": 1
-      },
-      {
-        "content": "学校老师、国家工作人员绝不会通过私人微信索要费用或个人信息",
-        "isCorrect": 1
-      },
-      {
-        "content": "涉及转账、汇款时，必须多渠道核实对方身份",
-        "isCorrect": 1
-      },
-      {
-        "content": "贵重物品可以委托看起来“可靠”的陌生人看管，比如对方自称“老师”“校友”",
-        "isCorrect": 2
-      }
-    ],
-    "type": 2
-  },
   "骗子会利用校园场景中某些具体事项实施诈骗，为了防止自己被诈骗分子利用，要认真学习关于校园场景下的防骗知识。关于校园防骗技巧，以下说法正确的有？（）": {
     "optionList": [
       {
@@ -60624,27 +58200,6 @@
       {
         "content": "在学校进行备案",
         "isCorrect": 2
-      }
-    ],
-    "type": 2
-  },
-  "骗子常通过冒充各类身份、制造紧急情境，再用特定话术引发受害者的恐慌，从而实施诈骗。以下选项中，属于骗子在紧急场景诈骗中常用的话术是？": {
-    "optionList": [
-      {
-        "content": "你的银行卡号涉嫌走私、洗钱、现在要求你配合国家级调查，请把你的银行卡资金转移到安全账户",
-        "isCorrect": 1
-      },
-      {
-        "content": "你家人出车祸了，现在需要立马手术，把钱打到xxxx账户，否则有生命危险",
-        "isCorrect": 1
-      },
-      {
-        "content": "亲，你中奖了，请点击短信中的链接，领取奖品",
-        "isCorrect": 2
-      },
-      {
-        "content": "你的包裹中查出毒品，马上加我微信，我这边有你的通缉令，如果不配合将要判重刑",
-        "isCorrect": 1
       }
     ],
     "type": 2

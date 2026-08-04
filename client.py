@@ -253,11 +253,11 @@ class WeBanClient:
             return input(message).strip()
 
     def _load_answers_json(self, warn_on_fail: bool = False) -> dict:
-        """加载题库，返回 {clean_text(题目): [正确选项的 clean_text(content), ...]}
+        """加载题库，返回 {clean_text(题目): {clean_text(正确选项), ...}}
 
         :param warn_on_fail: True 时加载失败只警告不抛异常（学习模式容错），
             False 时抛出异常（考试模式必须要有题库）
-        :return: 清洗后的题目标题 → 正确答案内容列表的映射
+        :return: 清洗后的题目标题 → 正确答案内容集合的映射
         """
         answers: dict = {}
         # 优先级: 根目录 answer.json > answer/answer.json > 打包内置
@@ -271,7 +271,7 @@ class WeBanClient:
             with open(load_path, encoding="utf-8") as f:
                 for title, options in json.load(f).items():
                     title = clean_text(title)
-                    answers.setdefault(title, []).extend(
+                    answers.setdefault(title, set()).update(
                         clean_text(a["content"])
                         for a in options.get("optionList", [])
                         if a["isCorrect"] == 1
@@ -1575,6 +1575,47 @@ class WeBanClient:
         """校验题库是否为有效字典且非空"""
         return isinstance(answers_json, dict) and bool(answers_json)
 
+    @staticmethod
+    def _normalize_answers(answers_json: dict) -> dict:
+        """合并 clean_text 后相同的题目与选项条目，保留原始标点。
+
+        标题与选项文本取各组内最长（标点最完整）的原文，选项标记取并集
+        （任一变体标 1 则保留 1），合并前后经 clean_text 匹配的运行时
+        行为不变。
+        """
+        merged: dict = {}
+        for title, question in answers_json.items():
+            clean_title = clean_text(title)
+            entry = merged.get(clean_title)
+            if entry is None:
+                entry = merged[clean_title] = {
+                    "title": title,
+                    "type": question.get("type"),
+                    "options": {},
+                }
+            elif len(title) > len(entry["title"]):
+                entry["title"] = title
+            for option in question.get("optionList", []):
+                content = clean_text(option["content"])
+                old = entry["options"].get(content)
+                if old is None:
+                    entry["options"][content] = {
+                        "content": option["content"],
+                        "isCorrect": option["isCorrect"],
+                    }
+                else:
+                    if len(option["content"]) > len(old["content"]):
+                        old["content"] = option["content"]
+                    if option["isCorrect"] == 1:
+                        old["isCorrect"] = 1
+        return {
+            entry["title"]: {
+                "type": entry["type"],
+                "optionList": list(entry["options"].values()),
+            }
+            for entry in merged.values()
+        }
+
     def sync_answers(self) -> None:
         """同步答案
         :return: 无返回值
@@ -1617,6 +1658,11 @@ class WeBanClient:
             self.log.error("题库加载失败")
             return
 
+        # 合并变体：clean_text 相同的题目/选项仅保留一条，保留原始标点
+        answers_json = self._normalize_answers(answers_json)
+        # clean 标题 → 原始标题索引，服务器标题按 clean 语义匹配
+        key_by_clean = {clean_text(k): k for k in answers_json}
+
         user_project_ids = [
             p["userProjectId"] for p in self.api.list_my_project().get("data", [])
         ]
@@ -1648,26 +1694,56 @@ class WeBanClient:
                         history["id"], history["isRetake"]
                     )["data"].get("questions", [])
                     for answer in questions:
-                        title = answer["title"]
-                        old_opts = {
-                            o["content"]: o["isCorrect"]
-                            for o in answers_json.get(title, {}).get("optionList", [])
+                        server_title = answer["title"]
+                        clean_title = clean_text(server_title)
+                        old_key = key_by_clean.get(clean_title)
+                        if old_key is None:
+                            # 新题：直接以服务器原文入库
+                            answers_json[server_title] = {
+                                "type": answer["type"],
+                                "optionList": list(answer.get("optionList", [])),
+                            }
+                            key_by_clean[clean_title] = server_title
+                            continue
+                        entry = answers_json[old_key]
+                        # 标题有变化则以服务器原文更新
+                        if old_key != server_title:
+                            del answers_json[old_key]
+                            answers_json[server_title] = entry
+                            key_by_clean[clean_title] = server_title
+                        # 选项按 clean 内容匹配合并，文本与标记以服务器为准
+                        options = {
+                            clean_text(o["content"]): o for o in entry["optionList"]
                         }
-                        new_opts = old_opts | {
-                            o["content"]: o["isCorrect"]
-                            for o in answer.get("optionList", [])
-                        }
-                        for content in new_opts.keys() - old_opts.keys():
-                            self.log.info(f"发现题目：{title} 新选项：{content}")
-                        answers_json[title] = {
-                            "type": answer["type"],
-                            "optionList": [
-                                {"content": content, "isCorrect": is_correct}
-                                for content, is_correct in new_opts.items()
-                            ],
-                        }
+                        for option in answer.get("optionList", []):
+                            content = clean_text(option["content"])
+                            old = options.get(content)
+                            if old is None:
+                                options[content] = {
+                                    "content": option["content"],
+                                    "isCorrect": option["isCorrect"],
+                                }
+                                self.log.info(
+                                    f"发现题目：{server_title} 新选项：{option['content']}"
+                                )
+                            elif (
+                                old["content"] != option["content"]
+                                or old["isCorrect"] != option["isCorrect"]
+                            ):
+                                old["content"] = option["content"]
+                                old["isCorrect"] = option["isCorrect"]
+                        entry["optionList"] = list(options.values())
+                        entry["type"] = answer["type"]
 
-        with open(answer_path, "w", encoding="utf-8") as f:
+        # 写回读取来源（打包内置路径只读，退回可写的 answer/ 目录），
+        # 与 _load_answers_json 的加载优先级保持一致，避免同步结果不被加载
+        write_path = (
+            existing_path
+            if existing_path is not None and existing_path != bundle_answer_path
+            else answer_path
+        )
+        os.makedirs(os.path.dirname(write_path), exist_ok=True)
+        with open(write_path, "w", encoding="utf-8") as f:
             f.write(
                 json.dumps(answers_json, indent=2, ensure_ascii=False, sort_keys=True)
             )
