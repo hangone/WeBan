@@ -3,11 +3,11 @@ import json
 import time
 from base64 import b64encode, urlsafe_b64decode, urlsafe_b64encode
 from random import randint
-from typing import Any, Dict
+from typing import Any, ClassVar
 from uuid import uuid4
 
-import requests
 import pyaes
+import requests
 from loguru import logger
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -18,7 +18,7 @@ def pkcs7_pad(data: bytes, block_size: int = 16) -> bytes:
     return data + bytes([pad_len] * pad_len)
 
 
-def handle_response(response: requests.Response) -> Dict[str, Any]:
+def handle_response(response: requests.Response) -> dict[str, Any]:
     """处理接口响应"""
     if response.status_code != 200:
         if response.status_code == 403:
@@ -41,7 +41,7 @@ class LoggingSession:
     backoff_factor=1），外层捕获 RequestException 记日志后抛回。
     """
 
-    DEFAULT_HEADERS = {
+    DEFAULT_HEADERS: ClassVar[dict[str, str]] = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
             "(KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
@@ -104,7 +104,7 @@ class WeBanAPI:
         tenant_code: str | None = None,
         account: str | None = None,
         password: str | None = None,
-        user: Dict[str, str] | None = None,
+        user: dict[str, str] | None = None,
         timeout: int | tuple = (9.05, 15),
         debug: bool = False,
         log=logger,
@@ -159,7 +159,7 @@ class WeBanAPI:
         endpoint: str,
         data: dict | None = None,
         timestamp_args: tuple | None = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         通用 POST 请求，封装所有端点共用的模板代码。
         自动拼接 baseurl、timestamp 置入 query、注入 tenantCode 到 body。
@@ -185,7 +185,7 @@ class WeBanAPI:
         )
         return handle_response(response)
 
-    def _mercury_request(self, params: dict) -> Dict[str, Any]:
+    def _mercury_request(self, params: dict) -> dict[str, Any]:
         """
         mercuryprovider 通用请求。会将 appKey/format/v/timestamp/clientId 标准参数与传入 params 合并，
         按 key 字母序拼接成 sign_str，用固定密钥 75uet0kwvnc90xo 做包装式 SHA1 签名。
@@ -225,7 +225,7 @@ class WeBanAPI:
         """
         self.tenant_code = tenant_code
 
-    def get_tenant_list_with_letter(self) -> Dict[str, Any]:
+    def get_tenant_list_with_letter(self) -> dict[str, Any]:
         """
         获取学校代码和名称列表
 
@@ -249,7 +249,7 @@ class WeBanAPI:
         )
         return handle_response(response)
 
-    def get_tenant_config(self, tenant_code: str | None = None) -> Dict[str, Any]:
+    def get_tenant_config(self, tenant_code: str | None = None) -> dict[str, Any]:
         """
         获取学校配置
 
@@ -280,7 +280,7 @@ class WeBanAPI:
         )
         return handle_response(response)
 
-    def get_simple_config(self, tenant_code: str | None = None) -> Dict[str, Any]:
+    def get_simple_config(self, tenant_code: str | None = None) -> dict[str, Any]:
         """
         获取简单配置
         :param tenant_code: 学校代码
@@ -291,7 +291,7 @@ class WeBanAPI:
             {"tenantCode": tenant_code or self.tenant_code},
         )
 
-    def get_help(self, tenant_code: str | None = None) -> Dict[str, Any]:
+    def get_help(self, tenant_code: str | None = None) -> dict[str, Any]:
         """
         获取帮助文件
         :return:
@@ -317,7 +317,7 @@ class WeBanAPI:
         response = self.session.get(url, params=params, timeout=self.timeout)
         return response.content
 
-    def login(self, verify_code: str, verify_time: int | None) -> Dict[str, Any]:
+    def login(self, verify_code: str, verify_time: int | None) -> dict[str, Any]:
         """
         登录，请求体经 AES-ECB 加密后发送。成功后自动将 token、userId 存入 self.user 并更新 X-Token 头。
         :param verify_code: 用户输入的验证码
@@ -386,7 +386,7 @@ class WeBanAPI:
     # 首页 / 项目
     # ========================================================================
 
-    def list_completion(self) -> Dict[str, Any]:
+    def list_completion(self) -> dict[str, Any]:
         """
         获取模块
         :return:
@@ -430,7 +430,7 @@ class WeBanAPI:
         """
         return self._post("/pharos/index/listCompletion.do")
 
-    def lab_index(self) -> Dict[str, Any]:
+    def lab_index(self) -> dict[str, Any]:
         """
         获取实验室模块信息
         :return:
@@ -467,7 +467,7 @@ class WeBanAPI:
         # 该端点要求 timestamp 带 1 位小数（如 1234567890.1）
         return self._post("/pharos/lab/index.do", timestamp_args=(10, 1))
 
-    def list_study_task(self) -> Dict[str, Any]:
+    def list_study_task(self) -> dict[str, Any]:
         """获取学习任务列表
         :return: 学习任务列表 dict
         {
@@ -506,7 +506,7 @@ class WeBanAPI:
         """
         return self._post("/pharos/index/listStudyTask.do")
 
-    def list_my_project(self, ended: int = 2) -> Dict[str, Any]:
+    def list_my_project(self, ended: int = 2) -> dict[str, Any]:
         """
         获取我的项目列表。
         :param ended: 1=已结束, 2=未结束/进行中（默认 2）
@@ -537,7 +537,7 @@ class WeBanAPI:
         """
         return self._post("/pharos/index/listMyProject.do", {"ended": ended})
 
-    def show_progress(self, user_project_id: str) -> Dict[str, Any]:
+    def show_progress(self, user_project_id: str) -> dict[str, Any]:
         """获取学习任务进度
         :param user_project_id: 用户项目 ID
         :return: 进度 dict
@@ -573,13 +573,13 @@ class WeBanAPI:
             "/pharos/project/showProgress.do", {"userProjectId": user_project_id}
         )
 
-    def list_valve(self) -> Dict[str, Any]:
+    def list_valve(self) -> dict[str, Any]:
         """获取项目页功能开关
         :return: 功能开关 dict
         """
         return self._post("/pharos/index/listValve.do")
 
-    def get_next_task(self, user_project_id: str) -> Dict[str, Any]:
+    def get_next_task(self, user_project_id: str) -> dict[str, Any]:
         """获取项目下一步状态
         :param user_project_id: 用户项目 ID
         :return: 下一步状态 dict
@@ -588,7 +588,7 @@ class WeBanAPI:
             "/pharos/project/getNextTask.do", {"userProjectId": user_project_id}
         )
 
-    def get_project_simple(self, user_project_id: str) -> Dict[str, Any]:
+    def get_project_simple(self, user_project_id: str) -> dict[str, Any]:
         """获取项目基础模式信息
         :param user_project_id: 用户项目 ID
         :return: 项目基础信息 dict
@@ -603,7 +603,7 @@ class WeBanAPI:
 
     def list_category(
         self, user_project_id: str, choose_type: int = 3
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """获取课程分类列表
         :param user_project_id: 用户项目 ID
         :param choose_type: 课程类型（1=推送课, 2=自选课, 3=必修课）
@@ -629,7 +629,7 @@ class WeBanAPI:
 
     def list_course(
         self, user_project_id: str, category_code: str, choose_type: int = 3
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """获取课程列表
         :param user_project_id: 用户项目 ID
         :param category_code: 分类代码
@@ -664,7 +664,7 @@ class WeBanAPI:
             },
         )
 
-    def init_index(self, user_project_id: str) -> Dict[str, Any]:
+    def init_index(self, user_project_id: str) -> dict[str, Any]:
         """初始化课程索引（开始学习前调用，模拟浏览器行为）
         :param user_project_id: 用户项目 ID
         :return: 初始化结果 dict
@@ -674,7 +674,7 @@ class WeBanAPI:
             "/pharos/usercourse/initIndex.do", {"userProjectId": user_project_id}
         )
 
-    def study(self, course_id: str, user_project_id: str) -> Dict[str, Any]:
+    def study(self, course_id: str, user_project_id: str) -> dict[str, Any]:
         """开始学习课程
         :param course_id: 课程 ID
         :param user_project_id: 用户项目 ID
@@ -689,7 +689,7 @@ class WeBanAPI:
             {"courseId": course_id, "userProjectId": user_project_id},
         )
 
-    def get_course_url(self, course_id: str, user_project_id: str) -> Dict[str, Any]:
+    def get_course_url(self, course_id: str, user_project_id: str) -> dict[str, Any]:
         """获取课程链接
         :param course_id: 课程 ID
         :param user_project_id: 用户项目 ID
@@ -707,7 +707,7 @@ class WeBanAPI:
 
     def invoke_captcha(
         self, user_course_id: str, user_project_id: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         通过验证码获取完成 token。
         不走 OCR —— 验证码是"找出正确汉字"，但后端仅校验坐标，
@@ -748,7 +748,7 @@ class WeBanAPI:
         course_type: str | None = "weiban",
         unique_no: str | None = None,
         referer: str | None = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         通过 userCourseId 或验证码 token 完成课程。
         :param user_course_id: 用户课程 ID
@@ -811,7 +811,7 @@ class WeBanAPI:
                 return {"raw": response.text}
         return result
 
-    def finish_lyra(self, user_activity_id: str) -> Dict[str, Any]:
+    def finish_lyra(self, user_activity_id: str) -> dict[str, Any]:
         """完成安全实训（Lyra 独立微服务，不走 _post 统一入口）
         :param user_activity_id: 用户活动 ID
         :return: 完成结果 dict
@@ -828,7 +828,7 @@ class WeBanAPI:
     # 考试
     # ========================================================================
 
-    def exam_list_plan(self, user_project_id: str) -> Dict[str, Any]:
+    def exam_list_plan(self, user_project_id: str) -> dict[str, Any]:
         """获取考试计划列表
         :param user_project_id: 用户项目 ID
         :return: 考试计划列表 dict
@@ -862,7 +862,7 @@ class WeBanAPI:
             "/pharos/exam/listPlan.do", {"userProjectId": user_project_id}
         )
 
-    def exam_before_paper(self, user_exam_plan_id: str) -> Dict[str, Any]:
+    def exam_before_paper(self, user_exam_plan_id: str) -> dict[str, Any]:
         """获取是否有未提交的答案
         :param user_exam_plan_id: 用户考试计划 ID
         :return: 未提交答案信息 dict
@@ -878,7 +878,7 @@ class WeBanAPI:
             "/pharos/exam/beforePaper.do", {"userExamPlanId": user_exam_plan_id}
         )
 
-    def exam_prepare_paper(self, user_exam_plan_id: str) -> Dict[str, Any]:
+    def exam_prepare_paper(self, user_exam_plan_id: str) -> dict[str, Any]:
         """准备考试
         :param user_exam_plan_id: 用户考试计划 ID
         :return: 考试准备结果 dict
@@ -900,7 +900,7 @@ class WeBanAPI:
 
     def exam_check(
         self, user_exam_plan_id: str, randstr: str, ticket: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """无感验证码校验（考试前），appId: 190330343
         :param user_exam_plan_id: 用户考试计划 ID
         :param randstr: 验证码随机串
@@ -920,7 +920,7 @@ class WeBanAPI:
         course_id: str,
         randstr: str,
         ticket: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """验证码校验（课程完成时），appId: 195119536
 
         浏览器从 mcwk 页面 jQuery.post 发出：无 timestamp query、无 X-Token，
@@ -957,7 +957,7 @@ class WeBanAPI:
 
     def exam_check_verify_code(
         self, user_exam_plan_id: str, verfy_code: str, verify_time: int | None
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """检查考试验证码
         :param user_exam_plan_id: 用户考试计划 ID
         :param verfy_code: 验证码
@@ -977,7 +977,7 @@ class WeBanAPI:
             },
         )
 
-    def exam_start_paper(self, user_exam_plan_id: str) -> Dict[str, Any]:
+    def exam_start_paper(self, user_exam_plan_id: str) -> dict[str, Any]:
         """开始考试，返回试卷题目列表（data 字段含 questionList 数组，每题有 questionId/answerIds 等字段）
         :param user_exam_plan_id: 用户考试计划 ID
         :return: 试卷题目列表 dict
@@ -1046,7 +1046,7 @@ class WeBanAPI:
         use_time: int,
         answer_ids: list | None,
         exam_plan_id: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """记录考试答案
         :param user_exam_plan_id: 用户考试计划 ID
         :param question_id: 题目 ID
@@ -1069,7 +1069,7 @@ class WeBanAPI:
             data["answerIds"] = ",".join(answer_ids)
         return self._post("/pharos/exam/recordQuestion.do", data)
 
-    def exam_submit_paper(self, user_exam_plan_id: str) -> Dict[str, Any]:
+    def exam_submit_paper(self, user_exam_plan_id: str) -> dict[str, Any]:
         """提交考试
         :param user_exam_plan_id: 用户考试计划 ID
         :return: 提交结果 dict
@@ -1092,7 +1092,7 @@ class WeBanAPI:
             "/pharos/exam/submitPaper.do", {"userExamPlanId": user_exam_plan_id}
         )
 
-    def exam_fresh_paper(self, user_exam_plan_id: str) -> Dict[str, Any]:
+    def exam_fresh_paper(self, user_exam_plan_id: str) -> dict[str, Any]:
         """重置考试题目
         :param user_exam_plan_id: 用户考试计划 ID
         :return: 刷新结果 dict
@@ -1140,7 +1140,7 @@ class WeBanAPI:
 
     def exam_review_paper(
         self, user_exam_id: str, is_retake: int = 2
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """查看考试结果
         :param user_exam_id: 用户考试 ID
         :param is_retake: 1=补考, 2=正常考试
@@ -1188,7 +1188,7 @@ class WeBanAPI:
             {"userExamId": user_exam_id, "isRetake": is_retake},
         )
 
-    def exam_list_history(self, exam_plan_id: str, exam_type: int) -> Dict[str, Any]:
+    def exam_list_history(self, exam_plan_id: str, exam_type: int) -> dict[str, Any]:
         """获取考试历史记录
         :param exam_plan_id: 考试计划 ID
         :param exam_type: 考试类型
@@ -1245,7 +1245,7 @@ class WeBanAPI:
         finish: int = 2,
         nonstr: str = "",
         unique_no: str | None = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         学习进度追踪接口，部分课程需要此接口记录翻页和完成状态。
         :param user_course_id: 用户课程 ID
@@ -1293,7 +1293,7 @@ class WeBanAPI:
         )
         return handle_response(response)
 
-    def list_question(self, course_id: str) -> Dict[str, Any]:
+    def list_question(self, course_id: str) -> dict[str, Any]:
         """获取课后习题列表（course_id 为 resourceId UUID）
         :param course_id: 课程 ID（resourceId UUID）
         :return: 习题列表 dict
@@ -1338,7 +1338,7 @@ class WeBanAPI:
 
     def save_question(
         self, course_id: str, question_id: str, answers: str, source: str = "WEIBAN"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """提交课中观点题答案
         :param course_id: 课程 ID
         :param question_id: 题目 ID
@@ -1365,7 +1365,7 @@ class WeBanAPI:
 
     def save_exam_question(
         self, course_id: str, question_id: str, answers: str, source: str = "WEIBAN"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """提交课后习题答案
         :param course_id: 课程 ID
         :param question_id: 题目 ID

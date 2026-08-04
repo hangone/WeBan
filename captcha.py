@@ -16,20 +16,20 @@ import json
 import logging
 import os
 import platform
+import random
 import shutil
 import subprocess
 import sys
-import random
 import threading
 import time
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, ClassVar
 
 import cv2
+import nodriver
 import numpy as np
 import requests
-import nodriver
 from nodriver import cdp
 from nodriver.cdp.runtime import DeepSerializedValue
 
@@ -143,7 +143,7 @@ _QUERY_JS = r"""
 
 def normalize_mask(
     binary_mask: np.ndarray, canvas_size: int = 48, symbol_size: int = 34
-) -> Optional[np.ndarray]:
+) -> np.ndarray | None:
     """将二值 mask 缩放到固定画布大小，用于后续模板比较。
 
     :param binary_mask: 单通道二值图 (0/255)
@@ -167,8 +167,8 @@ def normalize_mask(
 
     h, w = crop.shape
     scale = symbol_size / max(h, w)
-    new_w = max(1, int(round(w * scale)))
-    new_h = max(1, int(round(h * scale)))
+    new_w = max(1, round(w * scale))
+    new_h = max(1, round(h * scale))
     resized = cv2.resize(crop, (new_w, new_h), interpolation=cv2.INTER_NEAREST)
 
     canvas = np.zeros((canvas_size, canvas_size), dtype=np.uint8)
@@ -191,7 +191,7 @@ def rotate_mask(mask: np.ndarray, angle: float) -> np.ndarray:
     return cv2.warpAffine(mask, matrix, (w, h), flags=cv2.INTER_NEAREST, borderValue=0)
 
 
-def crop_foreground(mask: np.ndarray) -> Optional[np.ndarray]:
+def crop_foreground(mask: np.ndarray) -> np.ndarray | None:
     """裁剪 mask 到最小外接矩形 (去除全黑边距)。
 
     :param mask: 单通道二值图
@@ -229,14 +229,13 @@ def match_cost(
     for angle in (-60, -45, -30, -20, -10, 10, 20, 30, 45, 60, 90, -90):
         rotated = rotate_mask(query, angle)
         score = float(np.sum(cv2.absdiff(rotated, candidate)) / 255.0)
-        if score < best:
-            best = score
+        best = min(best, score)
     return best
 
 
 def locate_with_template(
     query_mask: np.ndarray, main_mask: np.ndarray
-) -> Tuple[float, Optional[Tuple[int, int]]]:
+) -> tuple[float, tuple[int, int] | None]:
     """在主图二值 mask 中定位查询符号的位置 (多尺度 + 旋转模板匹配)。
 
     :param query_mask: 提示图中单个符号的原始二值 mask
@@ -265,8 +264,8 @@ def locate_with_template(
     angles = range(-90, 91, 10)
 
     for scale in scales:
-        new_w = max(8, int(round(qw * scale)))
-        new_h = max(8, int(round(qh * scale)))
+        new_w = max(8, round(qw * scale))
+        new_h = max(8, round(qh * scale))
         base = cv2.resize(query_crop, (new_w, new_h), interpolation=cv2.INTER_NEAREST)
 
         for angle in angles:
@@ -298,7 +297,7 @@ def locate_with_template(
 
 def _extract_query_templates(
     prompt_img: np.ndarray,
-) -> Tuple[List[Optional[np.ndarray]], List[np.ndarray]]:
+) -> tuple[list[np.ndarray | None], list[np.ndarray]]:
     """从提示图 (顶部灰色 3 格题目条) 提取 3 个模板和原始 mask。
 
     :param prompt_img: BGR 格式的提示图 (包含顶部灰色条和下方箭头等)
@@ -330,8 +329,8 @@ def _extract_query_templates(
     strip_roi_gray = cv2.cvtColor(strip_roi, cv2.COLOR_BGR2GRAY)
     query_cells = np.array_split(strip_roi_gray, 3, axis=1)
 
-    query_templates: List[Optional[np.ndarray]] = []
-    query_raw_masks: List[np.ndarray] = []
+    query_templates: list[np.ndarray | None] = []
+    query_raw_masks: list[np.ndarray] = []
     for cell in query_cells:
         _, cell_bw = cv2.threshold(
             cell, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
@@ -347,7 +346,7 @@ def _extract_query_templates(
     return query_templates, query_raw_masks
 
 
-def _extract_main_candidates(main_img: np.ndarray) -> Tuple[List[dict], np.ndarray]:
+def _extract_main_candidates(main_img: np.ndarray) -> tuple[list[dict], np.ndarray]:
     """从主图提取所有候选符号及其归一化特征。
 
     :param main_img: BGR 格式的主图 (包含多个可点击符号)
@@ -371,7 +370,7 @@ def _extract_main_candidates(main_img: np.ndarray) -> Tuple[List[dict], np.ndarr
     num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
         symbol_bw, connectivity=8
     )
-    candidates: List[dict] = []
+    candidates: list[dict] = []
     for i in range(1, num_labels):
         x, y, w, h, area = stats[i]
         if area < 150 or area > 6000:
@@ -404,7 +403,7 @@ def _extract_main_candidates(main_img: np.ndarray) -> Tuple[List[dict], np.ndarr
 
 def detect_points(
     prompt_img: np.ndarray, main_img: np.ndarray
-) -> Tuple[List[Optional[Tuple[int, int]]], List[dict]]:
+) -> tuple[list[tuple[int, int] | None], list[dict]]:
     """识别点选验证码的点击顺序。
 
     :param prompt_img: BGR 格式的提示图 (顶部显示 3 个待匹配符号)
@@ -428,8 +427,8 @@ def detect_points(
         return [None, None, None], candidates
 
     used: set[int] = set()
-    ordered_points: List[Optional[Tuple[int, int]]] = []
-    base_scores: List[float] = []
+    ordered_points: list[tuple[int, int] | None] = []
+    base_scores: list[float] = []
 
     # 第一轮: 粗匹配 — 归一化模板 + 旋转搜索
     for template in query_templates:
@@ -494,8 +493,8 @@ def detect_points(
 
 def render_debug(
     main_img: np.ndarray,
-    ordered_points: List[Optional[Tuple[int, int]]],
-    candidates: List[dict],
+    ordered_points: list[tuple[int, int] | None],
+    candidates: list[dict],
 ) -> np.ndarray:
     """在主图上绘制候选框和识别结果，用于可视化调试。
 
@@ -571,7 +570,7 @@ class LoginCaptchaSolver:
     _initialized: bool = False
     _lock = threading.Lock()
     _charset = "0123456789abcdefghijklmnopqrstuvwxyz"
-    _idx_to_char = {i: c for c, i in {c: i for i, c in enumerate(_charset)}.items()}
+    _idx_to_char: ClassVar[dict[int, str]] = {i: c for c, i in {c: i for i, c in enumerate(_charset)}.items()}
     _char_size = 28
 
     @classmethod
@@ -594,15 +593,16 @@ class LoginCaptchaSolver:
                             log.warning(f"验证码模型文件不存在: {model_path}")
                             cls._ocr = False
                         else:
+                            # OpenCV 失败只会抛 cv2.error（模型文件已提前检查存在）
                             cls._ocr = cv2.dnn.readNetFromONNX(str(model_path))
-                    except Exception:
+                    except cv2.error:
                         log.warning("OpenCV DNN 初始化失败，自动验证码识别功能将不可用")
                         cls._ocr = False
                     cls._initialized = True
         return cls._ocr if cls._ocr is not False else None
 
     @classmethod
-    def recognize(cls, image: bytes, log) -> Optional[str]:
+    def recognize(cls, image: bytes, log) -> str | None:
         """用 CNN ONNX 模型识别验证码图片。
 
         :param image: 验证码图片字节 (bytes)
@@ -621,7 +621,7 @@ class LoginCaptchaSolver:
             arr = cv2.imdecode(np.frombuffer(image, np.uint8), cv2.IMREAD_GRAYSCALE)
             if arr is None:
                 return None
-            h, w = arr.shape
+            _, w = arr.shape
             seg_w = w // 4
 
             result = []
@@ -645,7 +645,7 @@ class LoginCaptchaSolver:
             if len(code) == 4:
                 return code
             log.warning("验证码识别结果长度不正确，正在重试")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- cv2/numpy 识别管线，失败返回 None 由调用方重试
             log.error(f"验证码识别异常: {e}")
         return None
 
@@ -680,15 +680,16 @@ def _registry_candidates() -> list[str]:
         return []
     results: list[str] = []
     # Chrome/Edge 通过 App Paths 注册
+    # winreg 仅 Windows 存在，typeshed 按平台裁剪导致 Darwin 下属性不可见
     for hive, subkey in [
-        (winreg.HKEY_CURRENT_USER, r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe"),
-        (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe"),
-        (winreg.HKEY_CURRENT_USER, r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe"),
-        (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe"),
+        (winreg.HKEY_CURRENT_USER, r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe"),  # type: ignore[attr-defined]
+        (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe"),  # type: ignore[attr-defined]
+        (winreg.HKEY_CURRENT_USER, r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe"),  # type: ignore[attr-defined]
+        (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe"),  # type: ignore[attr-defined]
     ]:
         try:
-            with winreg.OpenKey(hive, subkey) as key:
-                path, _ = winreg.QueryValueEx(key, None)
+            with winreg.OpenKey(hive, subkey) as key:  # type: ignore[attr-defined]
+                path, _ = winreg.QueryValueEx(key, None)  # type: ignore[attr-defined]
                 if path and os.path.isfile(path):
                     results.append(path)
         except (FileNotFoundError, PermissionError):
@@ -696,7 +697,7 @@ def _registry_candidates() -> list[str]:
     return results
 
 
-def detect_browser() -> Optional[str]:
+def detect_browser() -> str | None:
     """自动检测本地已安装的 Chrome/Chromium/Edge 浏览器路径。
 
     按优先级依次检查：
@@ -769,9 +770,9 @@ def detect_browser() -> Optional[str]:
 
 
 def check_browser_health(
-    browser_path: Optional[str] = None,
-    cdp_host: Optional[str] = None,
-    cdp_port: Optional[int] = None,
+    browser_path: str | None = None,
+    cdp_host: str | None = None,
+    cdp_port: int | None = None,
 ) -> str:
     """按优先级检测可用的浏览器：CDP → 用户路径 → 自动检测。
 
@@ -813,6 +814,7 @@ def check_browser_health(
             args,
             capture_output=True,
             timeout=10,
+            check=False,  # 下面手动检查 returncode
         )
         if proc.returncode != 0 or b"<h1>ok</h1>" not in proc.stdout:
             raise RuntimeError(
@@ -837,10 +839,10 @@ class CaptchaHandler:
         user_id: str,
         token: str,
         log,
-        browser_path: Optional[str] = None,
-        cdp_host: Optional[str] = None,
-        cdp_port: Optional[int] = None,
-        debug_dir: Optional[Path] = None,
+        browser_path: str | None = None,
+        cdp_host: str | None = None,
+        cdp_port: int | None = None,
+        debug_dir: Path | None = None,
     ) -> None:
         """初始化验证码处理器。
 
@@ -867,7 +869,7 @@ class CaptchaHandler:
     # ── 浏览器 / 页面构建 ──────────────────────────────
 
     @staticmethod
-    async def _eval_json(tab, expression: str) -> Optional[dict]:
+    async def _eval_json(tab, expression: str) -> dict | None:
         """执行 JS 并将结果转为 Python dict（处理 nodriver 的 RemoteObject 反序列化）。"""
         res: Any = await tab.evaluate(expression, return_by_value=True)
         if isinstance(res, cdp.runtime.RemoteObject):
@@ -991,7 +993,7 @@ class CaptchaHandler:
             await self._ensure_captcha_sdk(tab)
             self.log.info("页面准备完成")
             return browser, tab
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self._quit_browser(browser, "页面构建超时")
             raise RuntimeError("页面加载超时，请检查网络连接")
         except Exception:
@@ -1008,7 +1010,7 @@ class CaptchaHandler:
         """
         await tab.evaluate(_SHOW_JS.replace("__APP_ID__", json.dumps(app_id)))
 
-    async def _wait_captcha_result(self, tab, timeout: float = 120.0) -> Dict[str, str]:
+    async def _wait_captcha_result(self, tab, timeout: float = 120.0) -> dict[str, str]:
         """轮询等待验证码回调结果。
 
         :param tab: 浏览器标签页对象
@@ -1031,7 +1033,7 @@ class CaptchaHandler:
             )
         raise RuntimeError("等待验证码回调超时")
 
-    async def _run_captcha(self, tab, app_id: str) -> Dict[str, str]:
+    async def _run_captcha(self, tab, app_id: str) -> dict[str, str]:
         """触发验证码并阻塞等待用户手动完成。
 
         :param tab: 浏览器标签页对象
@@ -1113,7 +1115,7 @@ class CaptchaHandler:
 
     async def _auto_solve_once(
         self, tab, attempt: int, save_debug: bool
-    ) -> Optional[Dict]:
+    ) -> dict | None:
         """单次自动识别尝试：抓图 → 识别 → 点击 → 提交。
 
         :param tab: 浏览器标签页对象
@@ -1131,7 +1133,7 @@ class CaptchaHandler:
         try:
             main_img = fetch_image(state["bgUrl"])
             prompt_img = fetch_image(state["ansUrl"])
-        except Exception as exc:
+        except (OSError, RuntimeError) as exc:
             self.log.warning(f"自动识别: 抓图失败 - {exc}")
             return None
 
@@ -1199,7 +1201,7 @@ class CaptchaHandler:
 
     async def _auto_solve_captcha(
         self, tab, app_id: str, max_retry: int = 10, save_debug: bool = False
-    ) -> Optional[Dict[str, str]]:
+    ) -> dict[str, str] | None:
         """尝试自动识别点选验证码，失败时自动刷新重试。
 
         :param tab: 浏览器标签页对象 (已加载 SDK)
@@ -1242,16 +1244,16 @@ class CaptchaHandler:
                     if get_child_watcher is not None:
                         watcher = get_child_watcher()
                         watcher.remove_child_handler(pid)
-                except Exception:
+                except (OSError, RuntimeError, KeyError, ValueError):
                     pass
             browser.stop()
             if label:
                 self.log.info(f"已关闭浏览器 ({label})")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- nodriver 停止浏览器可能抛任意异常
             if label:
                 self.log.warning(f"关闭浏览器异常 ({label}): {exc}")
 
-    def handle_exam_captcha(self, user_exam_plan_id: str) -> Dict[str, str]:
+    def handle_exam_captcha(self, user_exam_plan_id: str) -> dict[str, str]:
         """处理考试前的无感验证码（同步版本）。
 
         无感模式：验证码在后台自动完成，无需用户交互，因此使用 headless=True。
@@ -1269,7 +1271,7 @@ class CaptchaHandler:
             "handle_exam_captcha() 无法在已运行的事件循环中调用，请改用 handle_exam_captcha_async()"
         )
 
-    async def handle_exam_captcha_async(self, user_exam_plan_id: str) -> Dict[str, str]:
+    async def handle_exam_captcha_async(self, user_exam_plan_id: str) -> dict[str, str]:
         """处理考试前的无感验证码（异步版本）。"""
         self.log.info("正在处理无感验证码")
         browser, tab = await self._build_page(EXAM_ENTRY_URL, headless=True)
@@ -1280,7 +1282,7 @@ class CaptchaHandler:
         finally:
             self._quit_browser(browser, "无感验证码")
 
-    def handle_course_captcha(self, course_url: Optional[str] = None) -> Dict[str, str]:
+    def handle_course_captcha(self, course_url: str | None = None) -> dict[str, str]:
         """处理课程完成时的图片点选验证码（同步版本）。
 
         流程：先以无头模式自动识别 (10 次重试)，全部失败后再打开可见浏览器让用户手动完成。
@@ -1299,8 +1301,8 @@ class CaptchaHandler:
         )
 
     async def handle_course_captcha_async(
-        self, course_url: Optional[str] = None
-    ) -> Dict[str, str]:
+        self, course_url: str | None = None
+    ) -> dict[str, str]:
         """处理课程完成时的图片点选验证码（异步版本）。"""
         entry_url = course_url or COURSE_ENTRY_URL
 
@@ -1312,7 +1314,7 @@ class CaptchaHandler:
             if result:
                 self.log.success("验证码自动识别成功")
                 return result
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- 浏览器自动化异常，回退到手动处理
             self.log.warning(f"自动识别异常，将回退到手动: {exc}")
         finally:
             self._quit_browser(browser, "自动识别")

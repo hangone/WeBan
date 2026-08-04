@@ -4,13 +4,13 @@ import sys
 import threading
 import tomllib
 import traceback
-from concurrent.futures import as_completed, ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
 from loguru import logger
 
-from client import WeBanClient
 from captcha import check_browser_health
+from client import WeBanClient
 
 
 def _resolve_version() -> str:
@@ -35,7 +35,7 @@ def _resolve_version() -> str:
         from importlib.metadata import version as _dist_version
 
         return _dist_version("weban")
-    except Exception:
+    except ImportError:  # PackageNotFoundError 是其子类，统一回退 unknown
         return "unknown"
 
 
@@ -99,7 +99,7 @@ def open_editor(path: str):
     try:
         print("编辑完成后按回车键继续...", flush=True)
         input()
-    except Exception:
+    except EOFError:  # stdin 关闭（如管道执行）时直接结束
         pass
 
 
@@ -127,7 +127,7 @@ def load_config() -> dict:
                 f.write(resp.text)
             logger.success(f"远程模板已下载到 {config_path}")
             downloaded = True
-        except Exception as e:
+        except OSError as e:
             logger.error(f"下载远程模板失败: {e}")
 
         if not downloaded and os.path.exists(config_example_path):
@@ -276,6 +276,7 @@ def run_account(
                 study_mode, study_mode
             )
             log.info(f"开始学习 (模式: {mode_desc})")
+            client.exam_mode = exam_mode  # 进度预估需要知道考试是否计入
             client.run_study(study_time, study_mode)
         else:
             log.info("学习模式已关闭，跳过所有学习任务")
@@ -315,7 +316,7 @@ def run_account(
     except ValueError as e:
         log.error(f"参数错误: {e}")
         return False
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 入口兜底，任何未预期异常都记录并返回失败
         log.error(f"运行失败: {e}")
         traceback.print_exc(file=sys.stderr)
         return False
@@ -447,7 +448,7 @@ if __name__ == "__main__":
                             success_count += 1
                         else:
                             failed_count += 1
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001 -- 线程结果可能抛任意异常
                         logger.error(f"[账号 {idx + 1}] 线程执行异常: {e}")
                         failed_count += 1
 
@@ -471,11 +472,11 @@ if __name__ == "__main__":
 
     except KeyboardInterrupt:
         print("用户终止")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 入口兜底
         logger.error(f"运行失败: {e}")
         traceback.print_exc(file=sys.stderr)
 
     try:
         input("按回车键退出")
-    except Exception:
+    except EOFError:
         pass
