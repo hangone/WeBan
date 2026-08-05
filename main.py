@@ -211,13 +211,13 @@ def run_account(
     os.makedirs(account_log_dir, exist_ok=True)
     account_log_path = os.path.join(account_log_dir, "weban.log")
 
-    # 添加只属于该账号的日志 sink
+    # 添加只属于该账号的日志 sink（debug 请求/响应详情走 DEBUG 级别，需放行）
     account_filter = _make_account_filter(account_name)
     handler_id = logger.add(
         account_log_path,
         encoding="utf-8",
+        level="DEBUG",
         format=log_format,
-        retention="7 days",
         filter=account_filter,
     )
 

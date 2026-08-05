@@ -69,23 +69,35 @@ class LoggingSession:
         return self._session.headers
 
     def request(self, method: str, url: str, **kwargs) -> requests.Response:
-        if self.debug:
+        # debug 日志只记录 mycourse.cn 域名的请求/响应，其余域名（题库、
+        # 腾讯 CDN、AI 等）不记录，避免无关噪音和二进制乱码
+        if self.debug and "mycourse.cn" in url:
             parts = [f"{method} {url}"]
             for key in ("params", "data", "json"):
                 val = kwargs.get(key)
                 if val is not None:
-                    parts.append(f"{key}={str(val)[:200]}")
+                    parts.append(f"{key}={val}")
             self.log.debug(" | ".join(parts))
         try:
             response = self._session.request(method, url, **kwargs)
         except requests.RequestException as e:
             self.log.error(f"{method} {url} 请求异常: {e}")
             raise
-        if self.debug:
-            self.log.debug(
-                f"{method} {url} | status={response.status_code} | "
-                f"response={str(response.text)[:500]}"
-            )
+        if self.debug and "mycourse.cn" in url:
+            content_type = response.headers.get("Content-Type", "")
+            if not content_type or not content_type.lower().startswith(
+                ("text/", "application/json", "application/javascript")
+            ):
+                self.log.debug(
+                    f"{method} {url} | status={response.status_code} | "
+                    f"content-type={content_type or 'unknown'} | "
+                    f"body={len(response.content)} bytes (binary, skipped)"
+                )
+            else:
+                self.log.debug(
+                    f"{method} {url} | status={response.status_code} | "
+                    f"response={response.text}"
+                )
         return response
 
     def get(self, url: str, **kwargs) -> requests.Response:

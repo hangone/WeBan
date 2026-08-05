@@ -613,7 +613,8 @@ class WeBanClient:
         answers_json: dict,
         force_restudy: bool,
     ) -> bool:
-        """处理单门课程：有 apinext 的走翻页流程，没 apinext 的直接答题+完课。
+        """处理单门课程：有 apinext 的走翻页流程；无 apinext 的也补 jupiter
+翻页轨迹上报，再答题+完课。
 
         :return: True 可继续下一门；False 表示账号异常/锁定，应停止本账号
         """
@@ -654,6 +655,8 @@ class WeBanClient:
         nonstr_map = item_info.get("nonstr_map", {})
         total_step = item_info.get("total_step", 0)
         uses_apinext = item_info.get("uses_apinext", False)
+        # jupiter 学习轨迹上报始终带本次会话 uuid（浏览器每次学习都上报）
+        apinext_no = str(uuid4())
         # sdk.js 仅在 apicenext.js 定义了全局 uuid 时才带 uniqueNo；
         # 无 apinext 的课传 uniqueNo 会被判行为异常 (10018)
         unique_no = str(uuid4()) if uses_apinext else None
@@ -661,18 +664,20 @@ class WeBanClient:
         if uses_apinext:
             self.api.init_index(task["userProjectId"])
 
-        # 1. apinext finish=2 翻页（先翻页解锁题目）
-        if uses_apinext and total_step:
+        # 1. jupiter finish=2 翻页轨迹（先翻页解锁题目；无 apicenext 的课也补轨迹上报）
+        if total_step:
             self.log.info(
                 f"total_step={total_step} ({item_info.get('total_step_source', '')})"
             )
+            if not uses_apinext:
+                self.log.info("  课程未加载 apicenext.js，补充翻页轨迹上报")
             self.handle_apinext(
                 course["userCourseId"],
                 course["resourceId"],
                 task["userProjectId"],
                 nonstr_map,
                 total_step,
-                unique_no=unique_no or "",
+                unique_no=apinext_no,
                 finish=2,
             )
 
@@ -723,15 +728,15 @@ class WeBanClient:
             )
             time.sleep(remaining)
 
-        # 4. apinext finish=1（仅加载 apicenext.js 的课程）
-        if uses_apinext and total_step:
+        # 4. jupiter finish=1 完成标记（提交前上报学习完成）
+        if total_step:
             self.handle_apinext(
                 course["userCourseId"],
                 course["resourceId"],
                 task["userProjectId"],
                 nonstr_map,
                 total_step,
-                unique_no=unique_no or "",
+                unique_no=apinext_no,
                 finish=1,
             )
             time.sleep(2)
@@ -1170,11 +1175,15 @@ class WeBanClient:
             if not html:
                 return result
 
-            # 不加载 apicenext.js 的课程不需要 apinext
+            # 不加载 apicenext.js 的课程：JS 无 nonstrMap，但页面仍有翻页轨迹，浏览器 jupiter 上报 step2 nonstr 为空照样 success）。
             if "apicenext.js" not in html:
                 result["has_exam"] = (
                     "saveExamQuestion" in html or "listQuestions" in html
                 )
+                nav_pages, _ = _count_nav_pages(html)
+                if nav_pages:
+                    result["total_step"] = nav_pages
+                    result["total_step_source"] = f"html nav={nav_pages}"
                 return result
 
             result["uses_apinext"] = True
