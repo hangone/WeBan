@@ -1698,12 +1698,17 @@ class WeBanClient:
                         clean_title = clean_text(server_title)
                         old_key = key_by_clean.get(clean_title)
                         if old_key is None:
-                            # 新题：直接以服务器原文入库
+                            # 新题：直接以服务器原文入库，并提醒用户
                             answers_json[server_title] = {
                                 "type": answer["type"],
                                 "optionList": list(answer.get("optionList", [])),
                             }
                             key_by_clean[clean_title] = server_title
+                            self.log.info(f"发现新题：{server_title}")
+                            for option in answer.get("optionList", []):
+                                self.log.info(
+                                    f"发现题目：{server_title} 新选项：{option['content']}"
+                                )
                             continue
                         entry = answers_json[old_key]
                         # 标题有变化则以服务器原文更新
@@ -1711,7 +1716,9 @@ class WeBanClient:
                             del answers_json[old_key]
                             answers_json[server_title] = entry
                             key_by_clean[clean_title] = server_title
-                        # 选项按 clean 内容匹配合并，文本与标记以服务器为准
+                        # 选项追加合并：新选项追加；已有选项标记取并集
+                        # （任一变体标 1 则保留 1），文本保留较长原文，同题
+                        # 不同答案的变体互不覆盖（与 _normalize_answers 一致）
                         options = {
                             clean_text(o["content"]): o for o in entry["optionList"]
                         }
@@ -1726,12 +1733,18 @@ class WeBanClient:
                                 self.log.info(
                                     f"发现题目：{server_title} 新选项：{option['content']}"
                                 )
-                            elif (
-                                old["content"] != option["content"]
-                                or old["isCorrect"] != option["isCorrect"]
-                            ):
+                                continue
+                            merged = False
+                            if option["isCorrect"] == 1 and old["isCorrect"] != 1:
+                                old["isCorrect"] = 1
+                                merged = True
+                            if len(option["content"]) > len(old["content"]):
                                 old["content"] = option["content"]
-                                old["isCorrect"] = option["isCorrect"]
+                                merged = True
+                            if merged:
+                                self.log.info(
+                                    f"发现题目：{server_title} 答案合并：{old['content']}"
+                                )
                         entry["optionList"] = list(options.values())
                         entry["type"] = answer["type"]
 
