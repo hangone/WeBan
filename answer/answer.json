@@ -17571,32 +17571,20 @@
   "关于外卖被偷后报复行为的法律风险，说法正确的有：": {
     "optionList": [
       {
-        "attachmentList": [],
         "content": "即使未造成身体伤害，报复行为也可能引发民事纠纷",
-        "isCorrect": 1,
-        "selected": 1,
-        "sequence": 1
+        "isCorrect": 1
       },
       {
-        "attachmentList": [],
         "content": "偷餐者有错在先，失主的任何报复行为都无需担责",
-        "isCorrect": 2,
-        "selected": 1,
-        "sequence": 2
+        "isCorrect": 2
       },
       {
-        "attachmentList": [],
         "content": "报复行为可能触犯《治安管理处罚法》，被拘留、罚款",
-        "isCorrect": 1,
-        "selected": 1,
-        "sequence": 3
+        "isCorrect": 1
       },
       {
-        "attachmentList": [],
         "content": "若造成严重身体伤害，报复行为可能构成刑事犯罪",
-        "isCorrect": 1,
-        "selected": 1,
-        "sequence": 4
+        "isCorrect": 1
       }
     ],
     "type": 2
@@ -19621,32 +19609,20 @@
   "判定宗教活动合法的核心条件是？": {
     "optionList": [
       {
-        "attachmentList": [],
         "content": "参与人数多",
-        "isCorrect": 2,
-        "selected": 1,
-        "sequence": 1
+        "isCorrect": 2
       },
       {
-        "attachmentList": [],
         "content": "场所合规、人员合规",
-        "isCorrect": 1,
-        "selected": 2,
-        "sequence": 2
+        "isCorrect": 1
       },
       {
-        "attachmentList": [],
         "content": "有境外支持",
-        "isCorrect": 2,
-        "selected": 2,
-        "sequence": 3
+        "isCorrect": 2
       },
       {
-        "attachmentList": [],
         "content": "私下组织开展",
-        "isCorrect": 2,
-        "selected": 2,
-        "sequence": 4
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -50708,32 +50684,20 @@
   "维护良好室友关系，正确做法有？": {
     "optionList": [
       {
-        "attachmentList": [],
         "content": "换位思考、将心比心",
-        "isCorrect": 1,
-        "selected": 1,
-        "sequence": 1
+        "isCorrect": 1
       },
       {
-        "attachmentList": [],
         "content": "别人影响自己时，用温和句式沟通",
-        "isCorrect": 1,
-        "selected": 1,
-        "sequence": 2
+        "isCorrect": 1
       },
       {
-        "attachmentList": [],
         "content": "别人习惯和自己不同，立刻指责纠正",
-        "isCorrect": 2,
-        "selected": 1,
-        "sequence": 3
+        "isCorrect": 2
       },
       {
-        "attachmentList": [],
         "content": "刚入学一起制定寝室公约",
-        "isCorrect": 1,
-        "selected": 1,
-        "sequence": 4
+        "isCorrect": 1
       }
     ],
     "type": 2
@@ -56107,18 +56071,12 @@
   "钱塘江的涨潮发生在什么时候？": {
     "optionList": [
       {
-        "attachmentList": [],
         "content": "每天都有",
-        "isCorrect": 1,
-        "selected": 1,
-        "sequence": 1
+        "isCorrect": 1
       },
       {
-        "attachmentList": [],
         "content": "每年的农历8月18日左右",
-        "isCorrect": 2,
-        "selected": 2,
-        "sequence": 2
+        "isCorrect": 2
       }
     ],
     "type": 1
