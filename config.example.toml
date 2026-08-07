@@ -1,5 +1,23 @@
 # WeBan 配置文件
 
+# 账号设置
+[[account]]
+# 学校名称（必填，需要和登录页面显示的学校完全一致，推荐复制过来）
+tenant_name = ""
+# 用户名
+username = ""
+# 密码（默认和用户名一样）
+password = ""
+
+# 支持在账号级别覆盖全局设置，例如：
+# 登录方式 2：Token (可选，优先使用，需要登录后在开发控制台获取)
+# tenant_name = ""
+# user_id = ""
+# token = ""
+# 支持在账号级别覆盖全局设置，例如：
+# study_mode = "force"
+
+# 全局设置
 [settings]
 # 学习模式：
 # false = 不学习，跳过所有学习任务
@@ -54,32 +72,17 @@ cdp_port = 0
 # 开启后会输出更多日志，比如请求体和响应体，验证码图片等
 debug = false
 
+# AI 答题设置
 [ai]
-# 是否启用 AI 搜题功能（当题库无匹配时，优先采用 AI 搜题解答）
-enable = false
-# API 基础路径，例如 OpenAI 官方、DeepSeek、硅基流动等 OpenAI 兼容接口路径
-base_url = "https://api.deepseek.com"
+# 是否启用 AI 搜题功能（当题库无匹配时，优先采用 AI 搜题解答，AI 答题失败将回退到随机答题的配置）
+enable = true
+# API 基础路径，例如 DeepSeek、硅基流动等 OpenAI 兼容接口路径（/chat/completions）
+base_url = "https://opencode.ai/zen/v1"
 # AI 服务的 API Key
 api_key = ""
-# 调用的模型名称，如 gpt-4o-mini、deepseek-chat 等
-model = "deepseek-chat"
+# 调用的模型名称，如 deepseek-v4-flash 等
+model = "deepseek-v4-flash-free"
 # 请求超时时间（秒）
 timeout = 60
 # 请求失败时的最大重试次数
 max_retries = 2
-
-[[account]]
-# 学校名称（必填）
-tenant_name = ""
-# 用户名
-username = ""
-# 密码（默认和用户名一样）
-password = ""
-
-# 支持在账号级别覆盖全局设置，例如：
-# 登录方式 2：Token (可选，优先使用)
-# tenant_name = ""
-# user_id = ""
-# token = ""
-# 支持在账号级别覆盖全局设置，例如：
-# study_mode = "force"
