@@ -5388,6 +5388,39 @@
     ],
     "type": 1
   },
+  "下列哪种行为可能属于缅北诈骗分子的诱骗手段？": {
+    "optionList": [
+      {
+        "attachmentList": [],
+        "content": "正规旅行社推出的泰国泼水节低价跟团游，统一办理签证",
+        "isCorrect": 2,
+        "selected": 2,
+        "sequence": 1
+      },
+      {
+        "attachmentList": [],
+        "content": "公司组织的新加坡团建，全程由行政部门安排行程",
+        "isCorrect": 2,
+        "selected": 2,
+        "sequence": 2
+      },
+      {
+        "attachmentList": [],
+        "content": "家人一起规划的云南大理自由行，提前预订酒店和机票",
+        "isCorrect": 2,
+        "selected": 2,
+        "sequence": 3
+      },
+      {
+        "attachmentList": [],
+        "content": "多年未见的网友邀请你参加云南边境的“小众徒步团”，声称无需护照",
+        "isCorrect": 1,
+        "selected": 1,
+        "sequence": 4
+      }
+    ],
+    "type": 1
+  },
   "下列哪类人群不属于艾滋病毒感染的高危人群：": {
     "optionList": [
       {
@@ -5565,6 +5598,39 @@
       }
     ],
     "type": 1
+  },
+  "下列属于大学生有效守护自身外卖的做法有：": {
+    "optionList": [
+      {
+        "attachmentList": [],
+        "content": "下单时预估送达时间，尽量当面从骑手手中取餐",
+        "isCorrect": 1,
+        "selected": 1,
+        "sequence": 1
+      },
+      {
+        "attachmentList": [],
+        "content": "将外卖地址写到校园有监控、有人看管的区域",
+        "isCorrect": 1,
+        "selected": 1,
+        "sequence": 2
+      },
+      {
+        "attachmentList": [],
+        "content": "让骑手将外卖放在宿舍楼下无人看管的快递架上",
+        "isCorrect": 2,
+        "selected": 2,
+        "sequence": 3
+      },
+      {
+        "attachmentList": [],
+        "content": "优先选择使用校园外卖柜存放外卖",
+        "isCorrect": 1,
+        "selected": 1,
+        "sequence": 4
+      }
+    ],
+    "type": 2
   },
   "下列属于武汉夏季天气特征的有？": {
     "optionList": [
@@ -6124,6 +6190,32 @@
       {
         "content": "性别",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "下列选项中，不属于涉黄隐形代价的是：": {
+    "optionList": [
+      {
+        "attachmentList": [],
+        "content": "学业尽毁、前途断送",
+        "isCorrect": 2,
+        "selected": 2,
+        "sequence": 1
+      },
+      {
+        "attachmentList": [],
+        "content": "家庭破裂、身败名裂",
+        "isCorrect": 2,
+        "selected": 2,
+        "sequence": 2
+      },
+      {
+        "attachmentList": [],
+        "content": "拓展社交圈、获得更多机会",
+        "isCorrect": 1,
+        "selected": 1,
+        "sequence": 3
       }
     ],
     "type": 1
@@ -9660,7 +9752,7 @@
     ],
     "type": 2
   },
-  "为什么高校容易成为间谍的关注对象？（）": {
+  "为什么高校容易成为间谍的关注对象？": {
     "optionList": [
       {
         "content": "涉外交往频繁",
@@ -11462,6 +11554,39 @@
       {
         "content": "签订虚高借款合同、阴阳借款合同等",
         "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "以下哪个地点是相对安全的游泳场所？": {
+    "optionList": [
+      {
+        "attachmentList": [],
+        "content": "设有警戒线、禁止游泳的河道",
+        "isCorrect": 2,
+        "selected": 2,
+        "sequence": 1
+      },
+      {
+        "attachmentList": [],
+        "content": "有救生员值守、水质达标的正规海滨浴场",
+        "isCorrect": 1,
+        "selected": 1,
+        "sequence": 2
+      },
+      {
+        "attachmentList": [],
+        "content": "村口无人看管、水深未知的池塘",
+        "isCorrect": 2,
+        "selected": 2,
+        "sequence": 3
+      },
+      {
+        "attachmentList": [],
+        "content": "正在施工的工地积水坑",
+        "isCorrect": 2,
+        "selected": 2,
+        "sequence": 4
       }
     ],
     "type": 1
@@ -19269,32 +19394,20 @@
   "出现哪种情况更适合做健康心理咨询？": {
     "optionList": [
       {
-        "attachmentList": [],
         "content": "偶尔心情不好、睡一觉就好",
-        "isCorrect": 2,
-        "selected": 1,
-        "sequence": 1
+        "isCorrect": 2
       },
       {
-        "attachmentList": [],
         "content": "不良情绪持续超过两周",
-        "isCorrect": 1,
-        "selected": 2,
-        "sequence": 2
+        "isCorrect": 1
       },
       {
-        "attachmentList": [],
         "content": "想规划未来职业发展",
-        "isCorrect": 2,
-        "selected": 2,
-        "sequence": 3
+        "isCorrect": 2
       },
       {
-        "attachmentList": [],
         "content": "学习压力不大、心情平稳",
-        "isCorrect": 2,
-        "selected": 2,
-        "sequence": 4
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -27049,7 +27162,7 @@
     ],
     "type": 1
   },
-  "大学生的日常生活费基本上都是来自于父母，每个月的金额也相对固定，一些学生想通过做兼职增加收入，以下哪种方式比较可靠？（）": {
+  "大学生的日常生活费基本上都是来自于父母，每个月的金额也相对固定，一些学生想通过做兼职增加收入，以下哪种方式比较可靠？": {
     "optionList": [
       {
         "content": "优先了解学校内的勤工俭学岗位",
@@ -35700,32 +35813,20 @@
   "当自身遭遇心理危机时，以下哪些是科学的自救方法？": {
     "optionList": [
       {
-        "attachmentList": [],
         "content": "停止自我攻击，接纳危机状态，明白心理失衡求助和生病看医生一样正常",
-        "isCorrect": 1,
-        "selected": 1,
-        "sequence": 1
+        "isCorrect": 1
       },
       {
-        "attachmentList": [],
         "content": "立刻停止独处，给信任的人打电话，直白告知自己的状态和需求",
-        "isCorrect": 1,
-        "selected": 1,
-        "sequence": 2
+        "isCorrect": 1
       },
       {
-        "attachmentList": [],
         "content": "危机状态下，保证按时吃饭、规律作息，维持身体的稳定",
-        "isCorrect": 1,
-        "selected": 1,
-        "sequence": 3
+        "isCorrect": 1
       },
       {
-        "attachmentList": [],
         "content": "用4-7-8呼吸法、感官着陆等方法建立“安全锚”，度过情绪峰值",
-        "isCorrect": 1,
-        "selected": 1,
-        "sequence": 4
+        "isCorrect": 1
       }
     ],
     "type": 2
@@ -42515,32 +42616,20 @@
   "某同学3个月内偷12次外卖共计450元，其行为可能面临的处罚/处理措施有：": {
     "optionList": [
       {
-        "attachmentList": [],
         "content": "公安机关判处拘役或管制，并处罚金",
-        "isCorrect": 1,
-        "selected": 1,
-        "sequence": 1
+        "isCorrect": 1
       },
       {
-        "attachmentList": [],
         "content": "学校给予记过或留校察看的校纪处分",
-        "isCorrect": 1,
-        "selected": 1,
-        "sequence": 2
+        "isCorrect": 1
       },
       {
-        "attachmentList": [],
         "content": "向所有外卖失主赔偿相应的经济损失",
-        "isCorrect": 1,
-        "selected": 1,
-        "sequence": 3
+        "isCorrect": 1
       },
       {
-        "attachmentList": [],
         "content": "学校要求其提交书面检讨并接受心理辅导",
-        "isCorrect": 1,
-        "selected": 1,
-        "sequence": 4
+        "isCorrect": 1
       }
     ],
     "type": 2
@@ -56694,7 +56783,7 @@
     ],
     "type": 1
   },
-  "陌生 “客服” 来电称 “您的银行卡异常，需下载‘会议 APP’开启屏幕共享协助处理”，你要怎么做：": {
+  "陌生“客服”来电称“您的银行卡异常，需下载‘会议APP’开启屏幕共享协助处理”，你要怎么做：": {
     "optionList": [
       {
         "content": "按指引下载APP，配合操作",
