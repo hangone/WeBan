@@ -1439,8 +1439,7 @@ class WeBanClient:
         max_retries = int(self.ai_config.get("max_retries", 2))
 
         if not api_key:
-            self.log.warning("AI 搜题已启用，但未配置 api_key，跳过 AI 搜题")
-            return []
+            self.log.warning("AI 搜题已启用，但未配置 api_key")
 
         title = question.get("title", "")
         type_label = question.get("typeLabel", "未知")
@@ -1710,7 +1709,13 @@ class WeBanClient:
                             # 新题：直接以服务器原文入库，并提醒用户
                             answers_json[server_title] = {
                                 "type": answer["type"],
-                                "optionList": list(answer.get("optionList", [])),
+                                "optionList": [
+                                    {
+                                        "content": o["content"],
+                                        "isCorrect": o["isCorrect"],
+                                    }
+                                    for o in answer.get("optionList", [])
+                                ],
                             }
                             key_by_clean[clean_title] = server_title
                             self.log.info(f"发现新题：{server_title}")
@@ -1756,6 +1761,9 @@ class WeBanClient:
                                 )
                         entry["optionList"] = list(options.values())
                         entry["type"] = answer["type"]
+
+        # 所有入库路径统一走规范化，确保只保留 content/isCorrect
+        answers_json = self._normalize_answers(answers_json)
 
         # 写回读取来源（打包内置路径只读，退回可写的 answer/ 目录），
         # 与 _load_answers_json 的加载优先级保持一致，避免同步结果不被加载
