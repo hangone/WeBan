@@ -7582,7 +7582,7 @@
         "isCorrect": 2
       }
     ],
-    "type": 2
+    "type": 1
   },
   "下面躲避雾霾的方式中错误的是：": {
     "optionList": [
@@ -14663,7 +14663,7 @@
     ],
     "type": 1
   },
-  "作为高校学生，应如何避免出现政治性问题？（）": {
+  "作为高校学生，应如何避免出现政治性问题？": {
     "optionList": [
       {
         "content": "坚定理想信念",
@@ -19265,6 +19265,39 @@
       }
     ],
     "type": 2
+  },
+  "出现哪种情况更适合做健康心理咨询？": {
+    "optionList": [
+      {
+        "attachmentList": [],
+        "content": "偶尔心情不好、睡一觉就好",
+        "isCorrect": 2,
+        "selected": 1,
+        "sequence": 1
+      },
+      {
+        "attachmentList": [],
+        "content": "不良情绪持续超过两周",
+        "isCorrect": 1,
+        "selected": 2,
+        "sequence": 2
+      },
+      {
+        "attachmentList": [],
+        "content": "想规划未来职业发展",
+        "isCorrect": 2,
+        "selected": 2,
+        "sequence": 3
+      },
+      {
+        "attachmentList": [],
+        "content": "学习压力不大、心情平稳",
+        "isCorrect": 2,
+        "selected": 2,
+        "sequence": 4
+      }
+    ],
+    "type": 1
   },
   "出现拖延症的原因有哪些？": {
     "optionList": [
@@ -35664,6 +35697,39 @@
     ],
     "type": 2
   },
+  "当自身遭遇心理危机时，以下哪些是科学的自救方法？": {
+    "optionList": [
+      {
+        "attachmentList": [],
+        "content": "停止自我攻击，接纳危机状态，明白心理失衡求助和生病看医生一样正常",
+        "isCorrect": 1,
+        "selected": 1,
+        "sequence": 1
+      },
+      {
+        "attachmentList": [],
+        "content": "立刻停止独处，给信任的人打电话，直白告知自己的状态和需求",
+        "isCorrect": 1,
+        "selected": 1,
+        "sequence": 2
+      },
+      {
+        "attachmentList": [],
+        "content": "危机状态下，保证按时吃饭、规律作息，维持身体的稳定",
+        "isCorrect": 1,
+        "selected": 1,
+        "sequence": 3
+      },
+      {
+        "attachmentList": [],
+        "content": "用4-7-8呼吸法、感官着陆等方法建立“安全锚”，度过情绪峰值",
+        "isCorrect": 1,
+        "selected": 1,
+        "sequence": 4
+      }
+    ],
+    "type": 2
+  },
   "当遇到校园贷的时候，我们到底该怎么办呢？": {
     "optionList": [
       {
@@ -37737,7 +37803,7 @@
     ],
     "type": 2
   },
-  "我国的“全民国家安全教育日”是哪一天？（）": {
+  "我国的“全民国家安全教育日”是哪一天？": {
     "optionList": [
       {
         "content": "2.15",
@@ -39639,7 +39705,7 @@
     ],
     "type": 1
   },
-  "收到短信：“您的征信报告存在逾期记录，添加‘征信专员’微信可修复，手续费 3000 元”，正确的做法是：": {
+  "收到短信：“您的征信报告存在逾期记录，添加‘征信专员’微信可修复，手续费3000元”，正确的做法是：": {
     "optionList": [
       {
         "content": "微信转账缴费，尽快修复征信",
@@ -42445,6 +42511,39 @@
       }
     ],
     "type": 1
+  },
+  "某同学3个月内偷12次外卖共计450元，其行为可能面临的处罚/处理措施有：": {
+    "optionList": [
+      {
+        "attachmentList": [],
+        "content": "公安机关判处拘役或管制，并处罚金",
+        "isCorrect": 1,
+        "selected": 1,
+        "sequence": 1
+      },
+      {
+        "attachmentList": [],
+        "content": "学校给予记过或留校察看的校纪处分",
+        "isCorrect": 1,
+        "selected": 1,
+        "sequence": 2
+      },
+      {
+        "attachmentList": [],
+        "content": "向所有外卖失主赔偿相应的经济损失",
+        "isCorrect": 1,
+        "selected": 1,
+        "sequence": 3
+      },
+      {
+        "attachmentList": [],
+        "content": "学校要求其提交书面检讨并接受心理辅导",
+        "isCorrect": 1,
+        "selected": 1,
+        "sequence": 4
+      }
+    ],
+    "type": 2
   },
   "某同学接到信息，对方能正确报出他的姓名、身份证号码以及银行卡号等信息，告知他银行卡密码出现漏洞，请重新设置密码，这时错误的做法是：": {
     "optionList": [
