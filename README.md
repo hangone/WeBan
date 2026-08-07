@@ -4,15 +4,40 @@
 
 如果本项目帮到了你，可以在右上角点亮 Star，谢谢你！
 
-实现了课程学习和根据题库自动考试，支持多用户多线程运行，自动验证码识别（需要源码运行，安装 ddddocr）。
+实现了课程学习和根据题库自动考试，支持多用户多线程运行，自动验证码识别等。
 
 运行前后会自动合并题库，如果一次没满分可以再考一次。可将 `answer/answer.json` 文件提交 PR 一起完善题库。
 
+## 功能特性
+
+- **课程学习**：自动遍历项目 → 分类 → 课程，模拟翻页、答题、等待学习时长后完课
+- **自动考试**：基于题库自动答题，支持单选/多选，未匹配题目可随机作答或手动输入
+- **验证码识别**：自动识别滑块验证码（需源码运行 + ddddocr），腾讯点选验证码需手动操作
+- **多账号并发**：支持配置多个账号，可多线程同时执行
+- **题库同步**：考试前后自动从服务器同步题库，支持多用户共享
+- **断点续考**：追求满分模式下，一次未满分可再次考试
+- **进度监控**：完课后自动检查进度是否更新，未更新则警告提示
+- **调试模式**：开启 `debug` 可查看完整请求/响应日志
+
 ## 使用
+
+从下面的几种方式下载后运行，配置说明可参考 [config.example.toml](config.example.toml)，账号级配置可覆盖全局设置。
+
+### 构建产物
+
+从 [Releases](https://github.com/hangone/WeBan/releases/latest) 下载文件运行，根据提示输入信息。下载缓慢可以用 [https://gh-proxy.com/](https://gh-proxy.com/) 加速下载。
+
+| 平台 | 下载地址 | 镜像下载地址 |
+|------|---------------|---------------|
+| Windows x64 | [WeBan-windows-x64.exe](https://github.com/hangone/WeBan/releases/latest/download/WeBan-windows-x64.exe) | [WeBan-windows-x64.exe](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-windows-x64.exe) |
+| Linux x64 | [WeBan-linux-x64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-linux-x64) | [WeBan-linux-x64](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-linux-x64) |
+| Linux arm64 | [WeBan-linux-arm64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-linux-arm64) | [WeBan-linux-arm64](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-linux-arm64) |
+| macOS arm64 | [WeBan-macos-arm64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-macos-arm64) | [WeBan-macos-arm64](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-macos-arm64) |
+| macOS x64 | [WeBan-macos-x64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-macos-x64) | [WeBan-macos-x64](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-macos-x64) |
 
 ### 源码运行
 
-1. 安装 Python 3（可选使用 [uv](https://github.com/astral-sh/uv)）和 Git
+1. 安装 Python 3（建议使用 [uv](https://github.com/astral-sh/uv)）和 Git
 
 2. 克隆本仓库
 
@@ -31,21 +56,6 @@ pip install -r requirements.txt # 或 uv sync
 ```bash
 python main.py # 或 uv run main.py
 ```
-
-### 构建产物
-
-从 [Releases](https://github.com/hangone/WeBan/releases/latest) 下载文件运行，根据提示输入信息。下载缓慢可以用 [https://gh-proxy.com/](https://gh-proxy.com/) 加速下载。
-
-- **Online 模式**：体积小，首次运行需联网下载依赖
-- **Bundle 模式**：体积大，完全打包依赖运行
-
-| 平台 | 下载地址 | 镜像下载地址 |
-|------|---------------|---------------|
-| Windows x64 | [WeBan-windows-x64.exe](https://github.com/hangone/WeBan/releases/latest/download/WeBan-windows-x64.exe) | [WeBan-windows-x64.exe](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-windows-x64.exe) |
-| Linux x64 | [WeBan-linux-x64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-linux-x64) | [WeBan-linux-x64](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-linux-x64) |
-| Linux arm64 | [WeBan-linux-arm64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-linux-arm64) | [WeBan-linux-arm64](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-linux-arm64) |
-| macOS arm64 | [WeBan-macos-arm64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-macos-arm64) | [WeBan-macos-arm64](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-macos-arm64) |
-| macOS x64 | [WeBan-macos-x64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-macos-x64) | [WeBan-macos-x64](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-macos-x64) |
 
 ### Docker
 
@@ -99,10 +109,6 @@ docker run -it --rm \
 
 如需自定义 CDP 地址，可在 `config.toml` 中配置 `cdp_host` 和 `cdp_port`。
 
-## 配置说明
-
-首次使用先从 [config.example.toml](config.example.toml) 复制一份 `config.toml` 并填写账号信息。账号级配置可覆盖全局设置。
-
 ### 浏览器检测
 
 程序按以下优先级自动检测可用的浏览器，无需手动配置：
@@ -111,17 +117,6 @@ docker run -it --rm \
 2. **CDP 远程调试**：配置文件 `cdp_host` + `cdp_port`，或 Docker 环境下自动尝试 `host.docker.internal:9222`
 3. **Playwright 浏览器**：`pip install playwright && playwright install chromium`
 4. **系统浏览器**：自动查找已安装的 Chrome / Chromium
-
-## 功能特性
-
-- **课程学习**：自动遍历项目 → 分类 → 课程，模拟翻页、答题、等待学习时长后完课
-- **自动考试**：基于题库自动答题，支持单选/多选，未匹配题目可随机作答或手动输入
-- **验证码识别**：自动识别滑块验证码（需源码运行 + ddddocr），腾讯点选验证码需手动操作
-- **多账号并发**：支持配置多个账号，可多线程同时执行
-- **题库同步**：考试前后自动从服务器同步题库，支持多用户共享
-- **断点续考**：追求满分模式下，一次未满分可再次考试
-- **进度监控**：完课后自动检查进度是否更新，未更新则警告提示
-- **调试模式**：开启 `debug` 可查看完整请求/响应日志
 
 ## 演示
 

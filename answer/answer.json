@@ -5391,32 +5391,20 @@
   "下列哪种行为可能属于缅北诈骗分子的诱骗手段？": {
     "optionList": [
       {
-        "attachmentList": [],
         "content": "正规旅行社推出的泰国泼水节低价跟团游，统一办理签证",
-        "isCorrect": 2,
-        "selected": 2,
-        "sequence": 1
+        "isCorrect": 2
       },
       {
-        "attachmentList": [],
         "content": "公司组织的新加坡团建，全程由行政部门安排行程",
-        "isCorrect": 2,
-        "selected": 2,
-        "sequence": 2
+        "isCorrect": 2
       },
       {
-        "attachmentList": [],
         "content": "家人一起规划的云南大理自由行，提前预订酒店和机票",
-        "isCorrect": 2,
-        "selected": 2,
-        "sequence": 3
+        "isCorrect": 2
       },
       {
-        "attachmentList": [],
         "content": "多年未见的网友邀请你参加云南边境的“小众徒步团”，声称无需护照",
-        "isCorrect": 1,
-        "selected": 1,
-        "sequence": 4
+        "isCorrect": 1
       }
     ],
     "type": 1
@@ -5602,32 +5590,20 @@
   "下列属于大学生有效守护自身外卖的做法有：": {
     "optionList": [
       {
-        "attachmentList": [],
         "content": "下单时预估送达时间，尽量当面从骑手手中取餐",
-        "isCorrect": 1,
-        "selected": 1,
-        "sequence": 1
+        "isCorrect": 1
       },
       {
-        "attachmentList": [],
         "content": "将外卖地址写到校园有监控、有人看管的区域",
-        "isCorrect": 1,
-        "selected": 1,
-        "sequence": 2
+        "isCorrect": 1
       },
       {
-        "attachmentList": [],
         "content": "让骑手将外卖放在宿舍楼下无人看管的快递架上",
-        "isCorrect": 2,
-        "selected": 2,
-        "sequence": 3
+        "isCorrect": 2
       },
       {
-        "attachmentList": [],
         "content": "优先选择使用校园外卖柜存放外卖",
-        "isCorrect": 1,
-        "selected": 1,
-        "sequence": 4
+        "isCorrect": 1
       }
     ],
     "type": 2
@@ -6197,25 +6173,16 @@
   "下列选项中，不属于涉黄隐形代价的是：": {
     "optionList": [
       {
-        "attachmentList": [],
         "content": "学业尽毁、前途断送",
-        "isCorrect": 2,
-        "selected": 2,
-        "sequence": 1
+        "isCorrect": 2
       },
       {
-        "attachmentList": [],
         "content": "家庭破裂、身败名裂",
-        "isCorrect": 2,
-        "selected": 2,
-        "sequence": 2
+        "isCorrect": 2
       },
       {
-        "attachmentList": [],
         "content": "拓展社交圈、获得更多机会",
-        "isCorrect": 1,
-        "selected": 1,
-        "sequence": 3
+        "isCorrect": 1
       }
     ],
     "type": 1
@@ -11561,32 +11528,20 @@
   "以下哪个地点是相对安全的游泳场所？": {
     "optionList": [
       {
-        "attachmentList": [],
         "content": "设有警戒线、禁止游泳的河道",
-        "isCorrect": 2,
-        "selected": 2,
-        "sequence": 1
+        "isCorrect": 2
       },
       {
-        "attachmentList": [],
         "content": "有救生员值守、水质达标的正规海滨浴场",
-        "isCorrect": 1,
-        "selected": 1,
-        "sequence": 2
+        "isCorrect": 1
       },
       {
-        "attachmentList": [],
         "content": "村口无人看管、水深未知的池塘",
-        "isCorrect": 2,
-        "selected": 2,
-        "sequence": 3
+        "isCorrect": 2
       },
       {
-        "attachmentList": [],
         "content": "正在施工的工地积水坑",
-        "isCorrect": 2,
-        "selected": 2,
-        "sequence": 4
+        "isCorrect": 2
       }
     ],
     "type": 1
