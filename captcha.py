@@ -18,7 +18,6 @@ import os
 import platform
 import random
 import shutil
-import subprocess
 import sys
 import threading
 import time
@@ -739,12 +738,15 @@ def detect_browser() -> str | None:
 
     elif system == "Windows":
         local = os.environ.get("LOCALAPPDATA", "")
+        # PROGRAMW6432 是 64 位进程的真实 Program Files；32 位打包（或 WOW64）
+        # 下 PROGRAMFILES 会被重定向到 "... (x86)"，必须显式补上
+        pf64 = os.environ.get("PROGRAMW6432", "")
         pf = os.environ.get("PROGRAMFILES", "")
         pf86 = os.environ.get("PROGRAMFILES(X86)", "")
         _chrome = ["Chrome", "Chrome Beta", "Chrome Dev", "Chrome SxS"]  # SxS = Canary
         _chromium = ["Chromium"]
         _edge = ["Microsoft/Edge", "Microsoft/Edge Beta", "Microsoft/Edge Dev", "Microsoft/Edge SxS"]
-        for base in (local, pf, pf86):
+        for base in dict.fromkeys((local, pf64, pf, pf86)):
             if not base:
                 continue
             for name in _chrome + _chromium:
@@ -756,11 +758,12 @@ def detect_browser() -> str | None:
         if os.path.isfile(p):
             return p
 
-    # PATH 查找
+    # PATH 查找（Windows 下还会匹配 chrome.exe / msedge.exe 等）
     for name in (
         "google-chrome", "google-chrome-stable", "google-chrome-beta", "google-chrome-unstable",
         "chromium", "chromium-browser",
         "microsoft-edge-stable", "microsoft-edge-beta", "microsoft-edge-dev", "microsoft-edge",
+        "chrome", "chrome.exe", "msedge", "msedge.exe",
     ):
         found = shutil.which(name)
         if found:
@@ -788,42 +791,42 @@ def check_browser_health(
 
     # 2. 配置文件指定的浏览器路径
     if browser_path and os.path.isfile(browser_path):
-        return browser_path
-
-    # 3. 自动检测
-    resolved = detect_browser()
-    if not resolved:
-        raise RuntimeError(
-            "未找到 Chrome / Chromium / Edge 浏览器。请通过以下方式之一提供：\n"
-            "  1. 在 config.toml 中配置 cdp_host 和 cdp_port 连接远程浏览器\n"
-            "  2. 在 config.toml 中配置 browser_path 指定浏览器路径\n"
-            "  3. 安装 Playwright: pip install playwright && playwright install chromium\n"
-            "  4. 安装 Chrome、Chromium 或 Edge"
-        )
-    try:
-        args = [
-            resolved,
-            "--headless=new",
-            "--no-first-run",
-            "--disable-gpu",
-            "--no-sandbox",
-            "--dump-dom",
-            "data:text/html,<h1>ok</h1>",
-        ]
-        proc = subprocess.run(
-            args,
-            capture_output=True,
-            timeout=10,
-            check=False,  # 下面手动检查 returncode
-        )
-        if proc.returncode != 0 or b"<h1>ok</h1>" not in proc.stdout:
+        resolved = browser_path
+    else:
+        # 3. 自动检测
+        resolved = detect_browser()
+        if not resolved:
             raise RuntimeError(
-                f"浏览器启动失败 (exit={proc.returncode}): {proc.stderr.decode()[:200]}"
+                "未找到 Chrome / Chromium / Edge 浏览器。请通过以下方式之一提供：\n"
+                "  1. 在 config.toml 中配置 cdp_host 和 cdp_port 连接远程浏览器\n"
+                "  2. 在 config.toml 中配置 browser_path 指定浏览器路径\n"
+                "  3. 安装 Playwright: pip install playwright && playwright install chromium\n"
+                "  4. 安装 Chrome、Chromium 或 Edge"
             )
-    except FileNotFoundError:
-        raise RuntimeError(f"浏览器可执行文件不存在: {resolved}")
-    except subprocess.TimeoutExpired:
-        raise RuntimeError(f"浏览器启动超时: {resolved}")
+
+    # 4. 健康探测：让 nodriver 自己拉起一次再停掉。临时 profile、端口分配、
+    #    退出清理全部由库自动处理，也不会撞上用户已打开的 Chrome 单例锁。
+    async def _probe() -> None:
+        browser = await nodriver.start(
+            headless=True,
+            browser_executable_path=resolved,
+        )
+        try:
+            await browser.get("data:text/html,<h1>ok</h1>")
+        finally:
+            browser.stop()
+
+    probe_loop = nodriver.loop()
+    try:
+        probe_loop.run_until_complete(asyncio.wait_for(_probe(), timeout=15))
+    except FileNotFoundError as e:
+        raise RuntimeError(f"浏览器可执行文件不存在: {resolved}") from e
+    except TimeoutError:
+        raise RuntimeError(f"浏览器启动超时: {resolved}") from None
+    except Exception as e:
+        raise RuntimeError(f"浏览器启动失败: {e}") from e
+    finally:
+        probe_loop.close()
     return resolved
 
 
@@ -1285,7 +1288,8 @@ class CaptchaHandler:
     def handle_course_captcha(self, course_url: str | None = None) -> dict[str, str]:
         """处理课程完成时的图片点选验证码（同步版本）。
 
-        流程：先以无头模式自动识别 (10 次重试)，全部失败后再打开可见浏览器让用户手动完成。
+        流程：先以无头模式自动识别（最多 3 轮 x 6 次，连接异常会重建页面），
+        全部失败后再打开可见浏览器让用户手动完成。
 
         :param course_url: 课程入口 URL，留空则使用默认的 mcwk.mycourse.cn
         :return: {"randstr": str, "ticket": str} — 验证通过后的凭证
@@ -1303,21 +1307,50 @@ class CaptchaHandler:
     async def handle_course_captcha_async(
         self, course_url: str | None = None
     ) -> dict[str, str]:
-        """处理课程完成时的图片点选验证码（异步版本）。"""
+        """处理课程完成时的图片点选验证码（异步版本）。
+
+        自动识别阶段最多 3 轮、每轮 6 次；浏览器连接异常会重建无头页面继续，
+        全部失败后才转手动。
+        """
         entry_url = course_url or COURSE_ENTRY_URL
+        max_auto_rounds = 3
+        attempts_per_round = 6
 
         # 第一阶段: 无头自动识别
         self.log.info("正在自动识别验证码...")
-        browser, tab = await self._build_page(entry_url, headless=True)
-        try:
-            result = await self._auto_solve_captcha(tab, COURSE_CAPTCHA_APP_ID)
-            if result:
-                self.log.success("验证码自动识别成功")
-                return result
-        except Exception as exc:  # noqa: BLE001 -- 浏览器自动化异常，回退到手动处理
-            self.log.warning(f"自动识别异常，将回退到手动: {exc}")
-        finally:
-            self._quit_browser(browser, "自动识别")
+        last_exc: Exception | None = None
+        for round_no in range(1, max_auto_rounds + 1):
+            if round_no > 1:
+                self.log.warning(
+                    f"自动识别未完成，重建无头浏览器重试（第 {round_no}/{max_auto_rounds} 轮）"
+                )
+                await asyncio.sleep(1)
+            try:
+                browser, tab = await self._build_page(entry_url, headless=True)
+            except Exception as exc:  # noqa: BLE001 -- 浏览器启动失败也继续下一轮
+                last_exc = exc
+                self.log.warning(
+                    f"自动识别浏览器启动失败（第 {round_no}/{max_auto_rounds} 轮）: {exc}"
+                )
+                continue
+            try:
+                result = await self._auto_solve_captcha(
+                    tab,
+                    COURSE_CAPTCHA_APP_ID,
+                    max_retry=attempts_per_round,
+                )
+                if result:
+                    self.log.success("验证码自动识别成功")
+                    return result
+            except Exception as exc:  # noqa: BLE001 -- 连接/页面异常后重建重试
+                last_exc = exc
+                self.log.warning(
+                    f"自动识别异常（第 {round_no}/{max_auto_rounds} 轮）: {exc}"
+                )
+            finally:
+                self._quit_browser(browser, "自动识别")
+        if last_exc is not None:
+            self.log.warning(f"自动识别曾发生异常，将回退到手动: {last_exc}")
         await asyncio.sleep(1)  # 等待无头浏览器进程完全退出
 
         # 第二阶段: 打开可见浏览器，让用户手动完成

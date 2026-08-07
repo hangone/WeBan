@@ -190,9 +190,8 @@ class WeBanClient:
         self.study_random_upper = 10
         self.study_force = False
         self.exam_mode = "true"
-        # 时间预估状态（自适应 EMA）
-        self._eta_course_avg: float | None = None  # 每门课实测平均耗时（秒）
-        self._eta_course_last: dict = {}  # project_id -> (时间戳, 已完成课程数)
+        # 时间预估状态（按项目累计实测，样本少时渐进信任实测值）
+        self._eta_course_state: dict = {}  # project_id -> {"started_at", "start_finished"}
         self._eta_exam_avg: float | None = None  # 每场考试实测平均耗时（秒）
         self.browser_path = browser_path
         self.cdp_host = cdp_host
@@ -377,33 +376,36 @@ class WeBanClient:
             push = data["pushNum"] - data["pushFinishedNum"]
         exam_left = data["examNum"] - data["examFinishedNum"]
 
-        # 自适应每课耗时：相邻两次进度查询之间每完成 n 门课，实测一次并更新 EMA
+        # 每门课耗时：项目内累计实测均值，样本少时与理论值渐进混合，
+        # 避免首门课带验证码或单次网络波动让 ETA 大幅跳变。
         finished = (
             data["requiredFinishedNum"]
             + data["pushFinishedNum"]
             + data["optionalFinishedNum"]
         )
         now = time.time()
-        last = self._eta_course_last.get(user_project_id)
-        if last is not None and finished >= last[1]:
-            dt = now - last[0]
-            n = finished - last[1]
-            # 间隔超过 15 分钟视为中断/卡死；单课超过 5 分钟视为异常（卡验证码等），均不采纳
-            if n > 0 and 0 < dt <= 900:
-                per_course = dt / n
-                if per_course <= 300:
-                    if self._eta_course_avg is None:
-                        self._eta_course_avg = per_course
-                    else:
-                        self._eta_course_avg = (
-                            0.7 * self._eta_course_avg + 0.3 * per_course
-                        )
-        self._eta_course_last[user_project_id] = (now, finished)
-
-        # 每门课：等待时长理论均值 + 固定开销（翻页 step 发送/课后习题/完课 API 等）
-        course_est = self._eta_course_avg or (
-            self.study_base_time + self.study_random_upper / 2 + 3
+        state = self._eta_course_state.setdefault(
+            user_project_id, {"started_at": now, "start_finished": finished}
         )
+        completed = max(0, int(finished) - int(state["start_finished"]))
+        measured_avg = None
+        if completed > 0:
+            elapsed = now - float(state["started_at"])
+            if elapsed > 900:
+                # 长时间中断/卡死后从当前进度重新起算，避免污染后续估算
+                state.update(started_at=now, start_finished=finished)
+                completed = 0
+            else:
+                measured_avg = elapsed / completed
+
+        # 每门课：等待时长理论均值 + 固定开销（翻页 step 发送/课后习题/完课 API/验证码等）
+        theoretical_est = self.study_base_time + self.study_random_upper / 2 + 6
+        if measured_avg is None:
+            course_est = theoretical_est
+        else:
+            trust = completed / (completed + 10)
+            course_est = theoretical_est + (measured_avg - theoretical_est) * trust
+            course_est = max(theoretical_est, course_est)
         eta = course_est * (required + optional + push)
         # 每场考试：默认 50 题 × 每题 4.5s + 固定开销 ≈ 4 分钟（有实测后自动替换）
         if exam_left > 0 and self.exam_mode != "false":
@@ -1268,49 +1270,52 @@ class WeBanClient:
         if not total_step:
             return unique_no
 
-        if finish == 2:
-            self.log.info(f"apinext 发送中间步骤，共 {total_step} 步")
-            for step in range(1, total_step + 1):
-                if step_delay:
-                    time.sleep(step_delay)
-                # nonstr_map 的 key 对应 finish=2 的 step，完成步 (finish=1) 不在 map 中
-                nonstr = nonstr_map.get(step, "")
+        def _send_step(step: int, finish: int, nonstr: str, label: str) -> None:
+            """单步发送，网络异常最多重试 3 次（含首次）。
+
+            WeBanAPI 的 session 层已有 HTTPAdapter 全局重试（连接类错误/429/5xx
+            自动退避），这里对重试耗尽后剩余的网络异常再兜底 2 次，避免偶发
+            抖动导致翻页轨迹断步。
+            """
+            for attempt in range(1, 4):
                 try:
                     resp = self.api.apinext(
                         user_course_id,
                         course_id,
                         user_project_id,
                         step=step,
-                        finish=2,
+                        finish=finish,
                         nonstr=nonstr,
                         unique_no=unique_no,
                     )
-                    self.log.info(f"apinext [{step}/{total_step}] finish=2 已发送")
                     if not resp.get("success"):
-                        self.log.warning(
-                            f"apinext [{step}/{total_step}] 返回异常：{resp}"
-                        )
+                        self.log.warning(f"apinext [{label}] 返回异常：{resp}")
+                    else:
+                        self.log.info(f"apinext [{label}] finish={finish} 已发送")
+                    return
                 except OSError as e:
-                    self.log.warning(f"apinext [{step}/{total_step}] 失败：{e}")
+                    if attempt < 3:
+                        self.log.warning(
+                            f"apinext [{label}] 网络异常，重试 {attempt}/2：{e}"
+                        )
+                        time.sleep(attempt)
+                    else:
+                        self.log.warning(f"apinext [{label}] 失败：{e}")
+
+        if finish == 2:
+            self.log.info(f"apinext 发送中间步骤，共 {total_step} 步")
+            for step in range(1, total_step + 1):
+                if step_delay:
+                    time.sleep(step_delay)
+                # nonstr_map 的 key 对应 finish=2 的 step，完成步 (finish=1) 不在 map 中
+                _send_step(step, 2, nonstr_map.get(step, ""), f"{step}/{total_step}")
         else:
             if step_delay:
                 time.sleep(step_delay)
-            try:
-                # finish=1 的 step 需要偏移 total_step + 1（nonstr_map 不含此步）
-                resp = self.api.apinext(
-                    user_course_id,
-                    course_id,
-                    user_project_id,
-                    step=total_step + 1,
-                    finish=1,
-                    nonstr="",
-                    unique_no=unique_no,
-                )
-                if not resp.get("success"):
-                    self.log.warning(f"apinext 完成请求返回异常：{resp}")
-                self.log.info(f"apinext 完成标记 step={total_step + 1} finish=1 已发送")
-            except OSError as e:
-                self.log.warning(f"apinext 完成请求失败：{e}")
+            # finish=1 的 step 需要偏移 total_step + 1（nonstr_map 不含此步）
+            _send_step(
+                total_step + 1, 1, "", f"完成标记 step={total_step + 1}"
+            )
         return unique_no
 
     @staticmethod
