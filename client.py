@@ -654,7 +654,10 @@ class WeBanClient:
 
         course_code = ""
         url_path = urlparse(course_url).path
-        code_match = re.search(r"/course/([^/]+)/", url_path)
+        # 三级路径课程（/course/DAGJAQ/DAGJAQ001/DAGJAQ001.html）取文件名
+        code_match = re.search(r"/course/(?:[^/]+/)*([^/]+)\.html$", url_path)
+        if not code_match:
+            code_match = re.search(r"/course/([^/]+)/", url_path)
         if code_match:
             course_code = code_match.group(1)
         item_info = (
@@ -1197,8 +1200,13 @@ class WeBanClient:
         }
 
         try:
+            # 直接复用播放 URL 的路径，兼容二级/三级路径课程
+            # （/course/A25005/A25005.html 与 /course/DAGJAQ/DAGJAQ001/DAGJAQ001.html）
+            url_path = urlparse(course_url).path if course_url else ""
             html_url = (
-                f"https://mcwk.mycourse.cn/course/{course_code}/{course_code}.html"
+                f"https://mcwk.mycourse.cn{url_path}"
+                if "/course/" in url_path
+                else f"https://mcwk.mycourse.cn/course/{course_code}/{course_code}.html"
             )
             html = _fetch_text(self.api.session, html_url, referer=course_url)
             if not html:
@@ -1370,8 +1378,8 @@ class WeBanClient:
             ]
             script_urls.extend(
                 [
-                    f"https://mcwk.mycourse.cn/course/{course_code}/js/item.js",
-                    f"https://mcwk.mycourse.cn/course/{course_code}/build/js/{course_code}.js",
+                    f"{html_url.rsplit('/', 1)[0]}/js/item.js",
+                    f"{html_url.rsplit('/', 1)[0]}/build/js/{course_code}.js",
                 ]
             )
 
