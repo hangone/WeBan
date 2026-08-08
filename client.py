@@ -171,6 +171,7 @@ class WeBanClient:
         cdp_port: int | None = None,
         debug: bool = False,
         ai_config: dict[str, Any] | None = None,
+        video_speed: float = 1.0,
     ) -> None:
         """
         :param tenant_name: 学校全称
@@ -183,6 +184,8 @@ class WeBanClient:
         :param cdp_port: CDP 远程调试端口
         :param debug: 是否启用调试日志
         :param ai_config: AI 搜题配置
+        :param video_speed: 视频课程学习倍速，完课前按 视频时长/倍速 等待；
+            0 表示不按视频时长等待，只按 study_time 学习时长
         """
         self.log = log
         self.tenant_name = tenant_name.strip()
@@ -190,6 +193,7 @@ class WeBanClient:
         self.study_random_upper = 10
         self.study_force = False
         self.exam_mode = "true"
+        self.video_speed = video_speed
         # 时间预估状态（按项目累计实测，样本少时渐进信任实测值）
         self._eta_course_state: dict = {}  # project_id -> {"started_at", "start_finished"}
         self._eta_exam_avg: float | None = None  # 每场考试实测平均耗时（秒）
@@ -723,6 +727,17 @@ class WeBanClient:
         # 3. 确保满足最低学习时长（服务端要求 study 后至少学习 study_time 秒才接受完课）
         elapsed = time.time() - study_start
         study_time = self.study_base_time + randint(0, self.study_random_upper)
+        # 视频课程按配置倍速播放对齐（video_speed=0 表示不按视频时长等待）
+        video_duration = item_info.get("video_duration", 0)
+        if self.video_speed > 0 and video_duration > 0:
+            video_need = video_duration / self.video_speed
+            if video_need > study_time:
+                self.log.info(
+                    f"视频课程按 {self.video_speed:g} 倍速对齐：等待 "
+                    f"{self._format_duration(video_need)}"
+                    f"（视频时长 {self._format_duration(video_duration)}）"
+                )
+                study_time = video_need
         remaining = study_time - elapsed
         if remaining > 0:
             self.log.info(
@@ -1167,6 +1182,8 @@ class WeBanClient:
             "has_exam": False,
             "total_step": 0,
             "total_step_source": "",
+            "has_video": False,
+            "video_duration": 0.0,
         }
 
         try:
@@ -1176,6 +1193,153 @@ class WeBanClient:
             html = _fetch_text(self.api.session, html_url, referer=course_url)
             if not html:
                 return result
+
+            # 视频课程：提取 <video>/<source> 源，解析实际时长供完课前按 2 倍速等待
+            video_match = None
+            video_block = re.search(r"<video\b[^>]*>(.*?)</video>", html, re.DOTALL)
+            if video_block:
+                # 去掉注释（被注释掉的备选 m3u8 源不算数），再找 <source>
+                clean = re.sub(
+                    r"<!--.*?-->", "", video_block.group(1), flags=re.DOTALL
+                )
+                video_match = re.search(
+                    r"<source\b[^>]*\bsrc=[\"']([^\"']+)[\"']", clean
+                )
+            if not video_match:
+                video_match = re.search(
+                    r"<video\b[^>]*\bsrc=[\"']([^\"']+)[\"']", html
+                )
+            if video_match:
+                video_url = urljoin(html_url, video_match.group(1))
+                result["has_video"] = True
+                video_duration = 0.0
+                try:
+                    if video_url.endswith(".m3u8") or "/m3u8/" in video_url:
+                        # m3u8：累加 EXTINF 时长
+                        playlist = self.api.session.get(video_url, timeout=10)
+                        if playlist.status_code == 200:
+                            segments = re.findall(
+                                r"#EXTINF:\s*([0-9]+(?:\.[0-9]+)?)",
+                                playlist.text,
+                            )
+                            if not segments:
+                                variant = re.search(
+                                    r"#EXT-X-STREAM-INF:[^\n]*\n\s*(\S+)",
+                                    playlist.text,
+                                )
+                                if variant:
+                                    playlist = self.api.session.get(
+                                        urljoin(video_url, variant.group(1)),
+                                        timeout=10,
+                                    )
+                                    if playlist.status_code == 200:
+                                        segments = re.findall(
+                                            r"#EXTINF:\s*([0-9]+(?:\.[0-9]+)?)",
+                                            playlist.text,
+                                        )
+                            video_duration = sum(float(s) for s in segments)
+                    else:
+                        # mp4：Range 抓文件头/尾各 512KB，解析 moov 内 mvhd
+                        head_size = 512 * 1024
+                        head = self.api.session.get(
+                            video_url,
+                            headers={"Range": f"bytes=0-{head_size - 1}"},
+                            timeout=10,
+                        )
+                        buffers: list[bytes] = []
+                        if head.status_code in (200, 206):
+                            buffers.append(head.content[:head_size])
+                            if head.status_code == 206:
+                                match = re.search(
+                                    r"/(\d+)\s*$",
+                                    head.headers.get("Content-Range", ""),
+                                )
+                                if match:
+                                    total = int(match.group(1))
+                                    if total > head_size:
+                                        tail = self.api.session.get(
+                                            video_url,
+                                            headers={
+                                                "Range": (
+                                                    f"bytes={total - head_size}-"
+                                                    f"{total - 1}"
+                                                )
+                                            },
+                                            timeout=10,
+                                        )
+                                        if tail.status_code == 206:
+                                            buffers.append(tail.content)
+                        for buf in buffers:
+                            pos = 0
+                            while pos + 8 <= len(buf) and not video_duration:
+                                size = int.from_bytes(
+                                    buf[pos : pos + 4], "big"
+                                )
+                                box_type = buf[pos + 4 : pos + 8]
+                                if size == 1:  # largesize（64 位）
+                                    if pos + 16 > len(buf):
+                                        break
+                                    size = int.from_bytes(
+                                        buf[pos + 8 : pos + 16], "big"
+                                    )
+                                    header = 16
+                                elif size == 0:  # 延伸到文件尾
+                                    size = len(buf) - pos
+                                    header = 8
+                                else:
+                                    header = 8
+                                if size < header:
+                                    break
+                                if box_type == b"moov":
+                                    q = pos + header
+                                    end = min(pos + size, len(buf))
+                                    while q + 8 <= end:
+                                        inner_size = int.from_bytes(
+                                            buf[q : q + 4], "big"
+                                        )
+                                        if inner_size < 8:
+                                            break
+                                        if buf[q + 4 : q + 8] == b"mvhd":
+                                            version = buf[q + 8]
+                                            if (
+                                                version == 0
+                                                and q + 28 <= len(buf)
+                                            ):
+                                                timescale = int.from_bytes(
+                                                    buf[q + 20 : q + 24],
+                                                    "big",
+                                                )
+                                                duration = int.from_bytes(
+                                                    buf[q + 24 : q + 28],
+                                                    "big",
+                                                )
+                                            elif q + 40 <= len(buf):
+                                                timescale = int.from_bytes(
+                                                    buf[q + 28 : q + 32],
+                                                    "big",
+                                                )
+                                                duration = int.from_bytes(
+                                                    buf[q + 32 : q + 40],
+                                                    "big",
+                                                )
+                                            else:
+                                                timescale = 0
+                                                duration = 0
+                                            if timescale:
+                                                video_duration = (
+                                                    duration / timescale
+                                                )
+                                            break
+                                        q += inner_size
+                                    break
+                                pos += size
+                except OSError:
+                    pass  # 视频元数据获取失败按普通课程处理
+                result["video_duration"] = video_duration
+                self.log.info(
+                    f"视频课程，视频时长 "
+                    f"{self._format_duration(video_duration) if video_duration else '未知'}"
+                )
 
             # 不加载 apicenext.js 的课程：JS 无 nonstrMap，但页面仍有翻页轨迹，浏览器 jupiter 上报 step2 nonstr 为空照样 success）。
             if "apicenext.js" not in html:

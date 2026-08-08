@@ -205,6 +205,7 @@ def run_account(
     cdp_host = get_setting("cdp_host", "") or None
     cdp_port = int(get_setting("cdp_port", 0)) or None
     debug = get_setting("debug", False)
+    video_speed = float(get_setting("video_speed", 1))
 
     # 为该账号创建专属日志文件夹
     account_log_dir = os.path.join(logs_dir, account_name)
@@ -238,6 +239,7 @@ def run_account(
                 cdp_port=cdp_port,
                 debug=debug,
                 ai_config=ai_config,
+                video_speed=video_speed,
             )
         elif tenant_name and username:
             # 密码登录 — password 默认为 username
@@ -252,6 +254,7 @@ def run_account(
                 cdp_port=cdp_port,
                 debug=debug,
                 ai_config=ai_config,
+                video_speed=video_speed,
             )
         else:
             log.error(
