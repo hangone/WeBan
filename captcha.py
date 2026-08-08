@@ -814,19 +814,20 @@ def check_browser_health(
         try:
             await browser.get("data:text/html,<h1>ok</h1>")
         finally:
+            await browser.aclose()
+            proc = browser._process
             browser.stop()
+            if proc is not None:
+                await asyncio.wait_for(proc.wait(), timeout=5)
 
-    probe_loop = nodriver.loop()
     try:
-        probe_loop.run_until_complete(asyncio.wait_for(_probe(), timeout=15))
+        asyncio.run(asyncio.wait_for(_probe(), timeout=15))
     except FileNotFoundError as e:
         raise RuntimeError(f"浏览器可执行文件不存在: {resolved}") from e
     except TimeoutError:
         raise RuntimeError(f"浏览器启动超时: {resolved}") from None
     except Exception as e:
         raise RuntimeError(f"浏览器启动失败: {e}") from e
-    finally:
-        probe_loop.close()
     return resolved
 
 
@@ -997,10 +998,10 @@ class CaptchaHandler:
             self.log.info("页面准备完成")
             return browser, tab
         except TimeoutError:
-            self._quit_browser(browser, "页面构建超时")
+            await self._quit_browser(browser, "页面构建超时")
             raise RuntimeError("页面加载超时，请检查网络连接")
         except Exception:
-            self._quit_browser(browser, "页面构建")
+            await self._quit_browser(browser, "页面构建")
             raise
 
     # ── 验证码触发 / 等待 ──────────────────────────────
@@ -1230,26 +1231,24 @@ class CaptchaHandler:
 
     # ── 公开方法 ────────────────────────────────────────
 
-    def _quit_browser(self, browser: nodriver.Browser, label: str = "") -> None:
-        """安全关闭浏览器，捕获退出异常避免掩盖原始错误。
+    async def _quit_browser(self, browser: nodriver.Browser, label: str = "") -> None:
+        """完整关闭浏览器：websocket 与 Chrome 进程都在事件循环关闭前回收。
+
+        nodriver 的 stop() 用 create_task 排队 aclose 不等待，在 asyncio.run /
+        probe_loop 结束时从未完整执行，导致 listener/socket/子进程 transport
+        泄漏，退出时 GC 报 "Event loop is closed"/ESRCH 噪音。这里先 await
+        公开的 aclose() 关 websocket，再 stop() 终止进程，最后 wait() 回收
+        子进程 transport。
 
         :param browser: nodriver Browser 实例
         :param label: 日志标签 (如 "无感验证码"、"自动识别"、"手动验证")
         """
         try:
-            # 在终止进程前移除 child handler，避免 asyncio child watcher
-            # 在事件循环关闭后尝试回调产生 "Loop is closed" 警告
-            process = getattr(browser, "_process", None)
-            pid = getattr(process, "pid", None)
-            if pid is not None:
-                try:
-                    get_child_watcher = getattr(asyncio, "get_child_watcher", None)
-                    if get_child_watcher is not None:
-                        watcher = get_child_watcher()
-                        watcher.remove_child_handler(pid)
-                except (OSError, RuntimeError, KeyError, ValueError):
-                    pass
-            browser.stop()
+            await browser.aclose()  # 关闭 websocket（取消 listener、关 socket）
+            proc = browser._process  # stop() 会置 None，先捕获
+            browser.stop()  # 终止 Chrome 进程（其内部排队的 aclose 幂等无害）
+            if proc is not None:
+                await asyncio.wait_for(proc.wait(), timeout=5)  # 回收 transport
             if label:
                 self.log.info(f"已关闭浏览器 ({label})")
         except Exception as exc:  # noqa: BLE001 -- nodriver 停止浏览器可能抛任意异常
@@ -1283,7 +1282,7 @@ class CaptchaHandler:
             self.log.success("已获取无感验证码")
             return result
         finally:
-            self._quit_browser(browser, "无感验证码")
+            await self._quit_browser(browser, "无感验证码")
 
     def handle_course_captcha(self, course_url: str | None = None) -> dict[str, str]:
         """处理课程完成时的图片点选验证码（同步版本）。
@@ -1348,7 +1347,7 @@ class CaptchaHandler:
                     f"自动识别异常（第 {round_no}/{max_auto_rounds} 轮）: {exc}"
                 )
             finally:
-                self._quit_browser(browser, "自动识别")
+                await self._quit_browser(browser, "自动识别")
         if last_exc is not None:
             self.log.warning(f"自动识别曾发生异常，将回退到手动: {last_exc}")
         await asyncio.sleep(1)  # 等待无头浏览器进程完全退出
@@ -1364,4 +1363,4 @@ class CaptchaHandler:
             self.log.success("验证码手动验证完成")
             return result
         finally:
-            self._quit_browser(browser, "手动验证")
+            await self._quit_browser(browser, "手动验证")
