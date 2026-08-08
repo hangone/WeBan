@@ -171,6 +171,7 @@ class WeBanClient:
         cdp_port: int | None = None,
         debug: bool = False,
         ai_config: dict[str, Any] | None = None,
+        video_speed: float = 1.0,
     ) -> None:
         """
         :param tenant_name: 学校全称
@@ -183,6 +184,8 @@ class WeBanClient:
         :param cdp_port: CDP 远程调试端口
         :param debug: 是否启用调试日志
         :param ai_config: AI 搜题配置
+        :param video_speed: 视频课程学习倍速，完课前按 视频时长/倍速 等待；
+            0 表示不按视频时长等待，只按 study_time 学习时长
         """
         self.log = log
         self.tenant_name = tenant_name.strip()
@@ -190,6 +193,7 @@ class WeBanClient:
         self.study_random_upper = 10
         self.study_force = False
         self.exam_mode = "true"
+        self.video_speed = video_speed
         # 时间预估状态（按项目累计实测，样本少时渐进信任实测值）
         self._eta_course_state: dict = {}  # project_id -> {"started_at", "start_finished"}
         self._eta_exam_avg: float | None = None  # 每场考试实测平均耗时（秒）
@@ -723,13 +727,14 @@ class WeBanClient:
         # 3. 确保满足最低学习时长（服务端要求 study 后至少学习 study_time 秒才接受完课）
         elapsed = time.time() - study_start
         study_time = self.study_base_time + randint(0, self.study_random_upper)
-        # 视频课程按 2 倍速播放对齐：真人可开 2 倍速，完课前至少等待视频时长的一半
+        # 视频课程按配置倍速播放对齐（video_speed=0 表示不按视频时长等待）
         video_duration = item_info.get("video_duration", 0)
-        if video_duration > 0:
-            video_need = video_duration / 2
+        if self.video_speed > 0 and video_duration > 0:
+            video_need = video_duration / self.video_speed
             if video_need > study_time:
                 self.log.info(
-                    f"视频课程按 2 倍速对齐：等待 {self._format_duration(video_need)}"
+                    f"视频课程按 {self.video_speed:g} 倍速对齐：等待 "
+                    f"{self._format_duration(video_need)}"
                     f"（视频时长 {self._format_duration(video_duration)}）"
                 )
                 study_time = video_need
