@@ -201,6 +201,7 @@ class WeBanClient:
         self.cdp_host = cdp_host
         self.cdp_port = cdp_port
         self.ai_config = ai_config
+        self._ai_key_warned = False  # api_key 未配置提醒只打一次
         if user and all([user.get("userId"), user.get("token")]):
             self.api = WeBanAPI(user=user, debug=debug, log=log)
         elif all([self.tenant_name, account, password]):
@@ -533,9 +534,13 @@ class WeBanClient:
                 (2, "自选课", "optionalNum", "optionalFinishedNum"),
             ]
             for choose_type in choose_types:
-                categories = self.api.list_category(
-                    task["userProjectId"], choose_type[0]
-                )
+                try:
+                    categories = self.api.list_category(
+                        task["userProjectId"], choose_type[0]
+                    )
+                except OSError as e:  # 网络异常（DNS/连接/SSL）跳过本分类，不中断整个账号
+                    self.log.error(f"获取 {choose_type[1]} 分类失败（网络异常）：{e}")
+                    continue
                 if categories.get("code") != "0":
                     self.log.error(f"获取 {choose_type[1]} 分类失败：{categories}")
                     continue
@@ -557,44 +562,49 @@ class WeBanClient:
                         if not force_restudy and int(course.get("finished", 0)) == 1:
                             continue
                         course_prefix = f"{category_prefix}/{course['resourceName']}"
-                        progress_before = self.get_progress(
-                            task["userProjectId"], project_prefix, output=False
-                        )
-                        finished_before = 0
-                        if progress_before.get("code", -1) == "0":
-                            d = progress_before["data"]
-                            finished_before = (
-                                d["requiredFinishedNum"]
-                                + d["pushFinishedNum"]
-                                + d["optionalFinishedNum"]
+                        try:
+                            progress_before = self.get_progress(
+                                task["userProjectId"], project_prefix, output=False
                             )
-                        ok = self._study_one_course(
-                            course,
-                            task,
-                            category_prefix,
-                            project_prefix,
-                            answers_json,
-                            force_restudy,
-                        )
-                        if not ok:
-                            self.log.error(
-                                "检测到行为异常或账号锁定，已停止本账号后续学习"
-                            )
-                            return
-                        progress_after = self.get_progress(
-                            task["userProjectId"], project_prefix
-                        )
-                        if progress_after.get("code", -1) == "0":
-                            d = progress_after["data"]
-                            finished_after = (
-                                d["requiredFinishedNum"]
-                                + d["pushFinishedNum"]
-                                + d["optionalFinishedNum"]
-                            )
-                            if finished_after <= finished_before:
-                                self.log.warning(
-                                    f"{course_prefix}：完课成功但进度未更新，请手动检查"
+                            finished_before = 0
+                            if progress_before.get("code", -1) == "0":
+                                d = progress_before["data"]
+                                finished_before = (
+                                    d["requiredFinishedNum"]
+                                    + d["pushFinishedNum"]
+                                    + d["optionalFinishedNum"]
                                 )
+                            ok = self._study_one_course(
+                                course,
+                                task,
+                                category_prefix,
+                                project_prefix,
+                                answers_json,
+                                force_restudy,
+                            )
+                            if not ok:
+                                self.log.error(
+                                    "检测到行为异常或账号锁定，已停止本账号后续学习"
+                                )
+                                return
+                            progress_after = self.get_progress(
+                                task["userProjectId"], project_prefix
+                            )
+                            if progress_after.get("code", -1) == "0":
+                                d = progress_after["data"]
+                                finished_after = (
+                                    d["requiredFinishedNum"]
+                                    + d["pushFinishedNum"]
+                                    + d["optionalFinishedNum"]
+                                )
+                                if finished_after <= finished_before:
+                                    self.log.warning(
+                                        f"{course_prefix}：完课成功但进度未更新，请手动检查"
+                                    )
+                        except OSError as e:
+                            # 网络异常（DNS/连接/SSL）跳过本门课程，不中断整个账号；
+                            # 未完成的课程下次运行会自动重学
+                            self.log.warning(f"{course_prefix}：网络异常，跳过本门课程（{e}）")
 
             self.log.success(f"{project_prefix} 课程学习完成")
 
@@ -1607,8 +1617,9 @@ class WeBanClient:
         timeout = int(self.ai_config.get("timeout", 60))
         max_retries = int(self.ai_config.get("max_retries", 2))
 
-        if not api_key:
+        if not api_key and not self._ai_key_warned:
             self.log.warning("AI 搜题已启用，但未配置 api_key")
+            self._ai_key_warned = True
 
         title = question.get("title", "")
         type_label = question.get("typeLabel", "未知")
