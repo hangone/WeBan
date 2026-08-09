@@ -586,10 +586,13 @@ class WeBanAPI:
         )
 
     def list_valve(self) -> dict[str, Any]:
-        """获取项目页功能开关
+        """获取项目页功能开关（官方首页参数：tenantCode, userId）
         :return: 功能开关 dict
         """
-        return self._post("/pharos/index/listValve.do")
+        return self._post(
+            "/pharos/index/listValve.do",
+            {"tenantCode": self.tenant_code, "userId": self.user.get("userId", "")},
+        )
 
     def get_next_task(self, user_project_id: str) -> dict[str, Any]:
         """获取项目下一步状态
@@ -608,6 +611,86 @@ class WeBanAPI:
         return self._post(
             "/pharos/project/getSimple.do", {"userProjectId": user_project_id}
         )
+
+    # ---- H5 首页初始化（对齐官方页面登录后请求面） -------------------------
+
+    def carousel_list(self) -> dict[str, Any]:
+        """首页轮播图
+        （官方：POST /carousel/list.do {"tenantCode"}）
+        :return: 轮播列表 dict
+        """
+        return self._post("/pharos/carousel/list.do")
+
+    def get_project_stat(self) -> dict[str, Any]:
+        """首页项目统计
+        （官方：POST /index/getProjectStat.do {}）
+        :return: 项目统计 dict
+        """
+        return self._post("/pharos/index/getProjectStat.do")
+
+    def notice_index(self) -> dict[str, Any]:
+        """公告红点状态（官方：POST /notice/index.do {"userId","tenantCode"}）
+        :return: 公告状态 dict
+        """
+        return self._post("/pharos/notice/index.do")
+
+    def notice_list(self) -> dict[str, Any]:
+        """公告列表第一页（官方：POST /notice/list.do 带 pageNo/pageSize）
+        :return: 公告列表 dict
+        """
+        return self._post(
+            "/pharos/notice/list.do", {"pageNo": 1, "pageSize": 10}
+        )
+
+    def my_get_info(self) -> dict[str, Any]:
+        """用户信息（官方：POST /my/getInfo.do {"userId","tenantCode"}）
+        :return: 用户信息 dict
+        """
+        return self._post("/pharos/my/getInfo.do")
+
+    def notice_list_must(self, batch_code: str = "") -> dict[str, Any]:
+        """必读公告列表（官方：POST /notice/listMust.do {"batchCode"}，
+        登录后首页弹窗逐条展示）
+        :param batch_code: 批次编码，来自登录响应 data.batchCode
+        :return: 必读公告列表 dict，data 为公告数组
+        """
+        return self._post(
+            "/pharos/notice/listMust.do", {"batchCode": batch_code or ""}
+        )
+
+    def view_must_notice(self, notice_id: str | int) -> dict[str, Any]:
+        """确认（已读）必读公告（官方：POST /notice/viewMust.do {"noticeId"}，
+        弹窗阅读完成后点击"下一条/关闭"触发）
+        :param notice_id: 公告 ID
+        :return: 确认结果 dict
+        """
+        return self._post(
+            "/pharos/notice/viewMust.do", {"noticeId": str(notice_id)}
+        )
+
+    def questionnaire_list_by_user_id(self) -> dict[str, Any]:
+        """按用户查问卷列表（官方：POST /questionnaire/listByUserId.do
+        {"userId","batchCode","tenantCode"}，登录后首页检查是否有待答问卷）
+        :return: 问卷列表 dict
+        """
+        return self._post(
+            "/pharos/questionnaire/listByUserId.do",
+            {"batchCode": self.user.get("batchCode", "")},
+        )
+
+    def get_ebook(self) -> dict[str, Any]:
+        """获取协议/电子书内容（官方：POST /login/getEbook.do
+        {"userId","tenantCode"}，首页协议弹窗数据源）
+        :return: 协议内容 dict
+        """
+        return self._post("/pharos/login/getEbook.do")
+
+    def ebook_record_list(self) -> dict[str, Any]:
+        """协议阅读记录（官方：POST /record/ebook/list.do
+        {"userId","tenantCode"}，判断协议是否已读）
+        :return: 阅读记录 dict
+        """
+        return self._post("/pharos/record/ebook/list.do")
 
     # ========================================================================
     # 课程
