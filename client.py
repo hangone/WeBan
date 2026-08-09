@@ -172,6 +172,7 @@ class WeBanClient:
         debug: bool = False,
         ai_config: dict[str, Any] | None = None,
         video_speed: float = 1.0,
+        jupiter_fallback: bool = False,
     ) -> None:
         """
         :param tenant_name: 学校全称
@@ -186,6 +187,11 @@ class WeBanClient:
         :param ai_config: AI 搜题配置
         :param video_speed: 视频课程学习倍速，完课前按 视频时长/倍速 等待；
             0 表示不按视频时长等待，只按 study_time 学习时长
+        :param jupiter_fallback: 对未加载 apicenext.js 的课程也补发 jupiter
+            翻页轨迹。官方页面只有加载 apicenext.js（定义全局 uuid 并调用
+            callApinext）的课程才上报轨迹，默认 False 完全对齐官方行为；
+            个别学校可能要求该校所有微课都有轨迹，
+            实测无轨迹会 10018 时可开启该项
         """
         self.log = log
         self.tenant_name = tenant_name.strip()
@@ -194,6 +200,7 @@ class WeBanClient:
         self.study_force = False
         self.exam_mode = "true"
         self.video_speed = video_speed
+        self.jupiter_fallback = jupiter_fallback
         # 时间预估状态（按项目累计实测，样本少时渐进信任实测值）
         self._eta_course_state: dict = {}  # project_id -> {"started_at", "start_finished"}
         self._eta_exam_avg: float | None = None  # 每场考试实测平均耗时（秒）
@@ -247,6 +254,75 @@ class WeBanClient:
         if m:
             return f"{m}m{sec:02d}s"
         return f"{sec}s"
+
+    def simulate_home_page(self) -> None:
+        """模拟打开官方 H5 首页：对齐登录后页面初始化请求面
+
+        官方浏览器（weiban.mycourse.cn）登录成功后，首页组件 created 依次发起：
+        协议/电子书(getEbook+ebook 记录) → 轮播图 → 用户信息 → 必读公告
+        (listMust 弹窗逐条展示，阅读后逐条 viewMust 确认) → 问卷列表 →
+        学习任务列表(index/listStudyTask.do，"开始学习"入口) → 项目统计/
+        公告红点/功能开关/租户配置/帮助文件等。
+        逐个模拟发送（尽力而为），任一失败只记日志不中断主流程。
+        """
+        batch_code = self.api.user.get("batchCode", "") or ""
+        steps: list[tuple[str, Any]] = [
+            ("协议内容", self.api.get_ebook),
+            ("协议记录", self.api.ebook_record_list),
+            ("轮播图", self.api.carousel_list),
+            ("用户信息", self.api.my_get_info),
+            ("项目统计", self.api.get_project_stat),
+            ("公告状态", self.api.notice_index),
+            ("公告列表", self.api.notice_list),
+            ("功能阀门", self.api.list_valve),
+            ("租户配置", self.api.get_simple_config),
+            ("帮助文件", self.api.get_help),
+            ("学习任务", self.api.list_study_task),
+        ]
+        for name, fn in steps:
+            try:
+                res = fn()
+                if res.get("code", "-1") != "0":
+                    self.log.debug(f"首页{name}返回异常：{res}")
+            except OSError as e:  # 网络异常（DNS/连接/SSL）忽略，不影响主流程
+                self.log.debug(f"首页{name}请求失败（网络异常）：{e}")
+
+        # 必读公告：官方弹窗逐条展示，阅读完成后逐条确认（与浏览器行为一致）
+        try:
+            must = self.api.notice_list_must(batch_code)
+            notices = must.get("data") or []
+            if must.get("code", "-1") != "0" or not isinstance(notices, list):
+                self.log.debug(f"必读公告返回异常：{must}")
+                notices = []
+            for n in notices:
+                nid = n.get("id", "")
+                title = n.get("title", "")
+                ntype = n.get("type", "")
+                file_url = n.get("fileUrl", "")
+                min_read = n.get("minReadLength", 0)
+                self.log.info(
+                    f"必读公告：{title}（ID={nid}，类型={ntype}，"
+                    f"链接={file_url}，阅读时长={min_read}秒）"
+                )
+                # 官方普通类型公告有阅读倒计时（minReadLength 秒），
+                # 倒计时结束才可点击"下一条/关闭"确认；上限 300s 防极端值
+                if ntype not in (3, 4, 5) and isinstance(min_read, (int, float)) and min_read > 0:
+                    time.sleep(min(min_read, 300))
+                try:
+                    self.api.view_must_notice(nid)
+                except OSError as e:
+                    self.log.debug(f"确认必读公告失败（网络异常）：{e}")
+        except OSError as e:
+            self.log.debug(f"必读公告流程失败（网络异常）：{e}")
+
+        # 问卷：官方在必读公告确认后检查待答问卷，仅拉取并提示，不自动作答
+        try:
+            q = self.api.questionnaire_list_by_user_id()
+            qlist = q.get("data") if isinstance(q.get("data"), list) else []
+            if q.get("code", "-1") == "0" and qlist:
+                self.log.info(f"存在 {len(qlist)} 个待答问卷（官方会弹窗提示，请前往网页完成）")
+        except OSError as e:
+            self.log.debug(f"问卷列表请求失败（网络异常）：{e}")
 
     def _prompt(self, message: str) -> str:
         """线程安全的 input 封装，多线程下避免 input 输出交错
@@ -526,6 +602,12 @@ class WeBanClient:
         for task in my_project:
             project_prefix = task["projectName"]
             self.log.info(f"开始处理任务：{project_prefix}")
+            # 对齐官方 H5：进入学习项目页即发 initIndex（项目详情初始化），
+            # 不依赖课程是否加载 apicenext.js
+            try:
+                self.api.init_index(task["userProjectId"])
+            except OSError as e:  # 网络异常不阻断学习
+                self.log.warning(f"初始化学习索引失败（网络异常）：{e}")
             self.get_progress(task["userProjectId"], project_prefix)
 
             choose_types = [
@@ -629,8 +711,9 @@ class WeBanClient:
         answers_json: dict,
         force_restudy: bool,
     ) -> bool:
-        """处理单门课程：有 apinext 的走翻页流程；无 apinext 的也补 jupiter
-翻页轨迹上报，再答题+完课。
+        """处理单门课程：加载 apicenext.js 的走 jupiter 翻页轨迹；
+无 apicenext 的默认只答题+完课（对齐官方页面行为），配置
+jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
 
         :return: True 可继续下一门；False 表示账号异常/锁定，应停止本账号
         """
@@ -680,11 +763,11 @@ class WeBanClient:
         # 无 apinext 的课传 uniqueNo 会被判行为异常 (10018)
         unique_no = str(uuid4()) if uses_apinext else None
 
-        if uses_apinext:
-            self.api.init_index(task["userProjectId"])
-
-        # 1. jupiter finish=2 翻页轨迹（先翻页解锁题目；无 apicenext 的课也补轨迹上报）
-        if total_step:
+        # 1. jupiter finish=2 翻页轨迹：官方仅在加载 apicenext.js 的课程里上报
+        # （页面 item.js 调 callApinext）；非 apicnext 课程默认不发，除非配置
+        # jupiter_fallback=true（个别学校要求全部微课都有轨迹）
+        trace_enabled = uses_apinext or self.jupiter_fallback
+        if total_step and trace_enabled:
             self.log.info(
                 f"total_step={total_step} ({item_info.get('total_step_source', '')})"
             )
@@ -758,8 +841,8 @@ class WeBanClient:
             )
             time.sleep(remaining)
 
-        # 4. jupiter finish=1 完成标记（提交前上报学习完成）
-        if total_step:
+        # 4. jupiter finish=1 完成标记（提交前上报学习完成，与翻页轨迹同条件）
+        if total_step and trace_enabled:
             self.handle_apinext(
                 course["userCourseId"],
                 course["resourceId"],
@@ -1359,7 +1442,8 @@ class WeBanClient:
                     f"{self._format_duration(video_duration) if video_duration else '未知'}"
                 )
 
-            # 不加载 apicenext.js 的课程：JS 无 nonstrMap，但页面仍有翻页轨迹，浏览器 jupiter 上报 step2 nonstr 为空照样 success）。
+            # 不加载 apicenext.js 的课程：JS 无 nonstrMap。仍解析 nav 步数供
+            # jupiter_fallback=true 时使用（默认关闭，完全对齐官方不发轨迹）
             if "apicenext.js" not in html:
                 result["has_exam"] = (
                     "saveExamQuestion" in html or "listQuestions" in html

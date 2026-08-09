@@ -67,7 +67,13 @@ log_format = (
     "<blue>{extra[account]}</blue>|"
     "<cyan>{message}</cyan>"
 )
-logger.add(sink=sys.stdout, colorize=True, format=log_format)
+# 终端输出截断超长消息（DEBUG 模式请求/响应详情可能刷屏）；
+# 日志文件使用完整格式，不截断
+logger.add(
+    sink=sys.stdout,
+    colorize=True,
+    format=log_format.replace("{message}", "{message:.2000}"),
+)
 
 os.makedirs(logs_dir, exist_ok=True)
 logger.add(
@@ -206,6 +212,11 @@ def run_account(
     cdp_port = int(get_setting("cdp_port", 0)) or None
     debug = get_setting("debug", False)
     video_speed = float(get_setting("video_speed", 1))
+    jupiter_fallback = str(get_setting("jupiter_fallback", False)).lower() in (
+        "1",
+        "true",
+        "yes",
+    )
 
     # 为该账号创建专属日志文件夹
     account_log_dir = os.path.join(logs_dir, account_name)
@@ -240,6 +251,7 @@ def run_account(
                 debug=debug,
                 ai_config=ai_config,
                 video_speed=video_speed,
+                jupiter_fallback=jupiter_fallback,
             )
         elif tenant_name and username:
             # 密码登录 — password 默认为 username
@@ -255,6 +267,7 @@ def run_account(
                 debug=debug,
                 ai_config=ai_config,
                 video_speed=video_speed,
+                jupiter_fallback=jupiter_fallback,
             )
         else:
             log.error(
@@ -266,6 +279,9 @@ def run_account(
         if not client.login():
             log.error("登录失败")
             return False
+
+        log.info("登录成功，模拟打开首页")
+        client.simulate_home_page()
 
         log.info("登录成功，开始同步答案")
         with sync_lock:
