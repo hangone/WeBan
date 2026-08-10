@@ -322,7 +322,7 @@ wheels = [
 
 [[package]]
 name = "weban"
-version = "3.9.2"
+version = "3.9.6"
 source = { virtual = "." }
 dependencies = [
     { name = "loguru" },
