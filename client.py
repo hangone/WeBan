@@ -284,6 +284,8 @@ class WeBanClient:
                 res = fn()
                 if res.get("code", "-1") != "0":
                     self.log.debug(f"首页{name}返回异常：{res}")
+            except PermissionError:
+                raise  # Token 失效（被顶号等），立即终止该账号
             except OSError as e:  # 网络异常（DNS/连接/SSL）忽略，不影响主流程
                 self.log.debug(f"首页{name}请求失败（网络异常）：{e}")
 
@@ -310,8 +312,12 @@ class WeBanClient:
                     time.sleep(min(min_read, 300))
                 try:
                     self.api.view_must_notice(nid)
+                except PermissionError:
+                    raise  # Token 失效，立即终止该账号
                 except OSError as e:
                     self.log.debug(f"确认必读公告失败（网络异常）：{e}")
+        except PermissionError:
+            raise  # Token 失效，立即终止该账号
         except OSError as e:
             self.log.debug(f"必读公告流程失败（网络异常）：{e}")
 
@@ -321,6 +327,8 @@ class WeBanClient:
             qlist = q.get("data") if isinstance(q.get("data"), list) else []
             if q.get("code", "-1") == "0" and qlist:
                 self.log.info(f"存在 {len(qlist)} 个待答问卷（官方会弹窗提示，请前往网页完成）")
+        except PermissionError:
+            raise  # Token 失效，立即终止该账号
         except OSError as e:
             self.log.debug(f"问卷列表请求失败（网络异常）：{e}")
 
@@ -606,6 +614,8 @@ class WeBanClient:
             # 不依赖课程是否加载 apicenext.js
             try:
                 self.api.init_index(task["userProjectId"])
+            except PermissionError:
+                raise  # Token 失效，立即终止该账号
             except OSError as e:  # 网络异常不阻断学习
                 self.log.warning(f"初始化学习索引失败（网络异常）：{e}")
             self.get_progress(task["userProjectId"], project_prefix)
@@ -620,6 +630,8 @@ class WeBanClient:
                     categories = self.api.list_category(
                         task["userProjectId"], choose_type[0]
                     )
+                except PermissionError:
+                    raise  # Token 失效，立即终止该账号
                 except OSError as e:  # 网络异常（DNS/连接/SSL）跳过本分类，不中断整个账号
                     self.log.error(f"获取 {choose_type[1]} 分类失败（网络异常）：{e}")
                     continue
@@ -683,6 +695,8 @@ class WeBanClient:
                                     self.log.warning(
                                         f"{course_prefix}：完课成功但进度未更新，请手动检查"
                                     )
+                        except PermissionError:
+                            raise  # Token 失效，立即终止该账号
                         except OSError as e:
                             # 网络异常（DNS/连接/SSL）跳过本门课程，不中断整个账号；
                             # 未完成的课程下次运行会自动重学
@@ -914,6 +928,8 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                     return check_res
                 self.log.success("课程验证码校验通过")
                 finish_kwargs["token"] = check_res.get("data", "")
+            except PermissionError:
+                raise  # Token 失效，立即终止该账号
             except Exception as e:  # noqa: BLE001 -- 浏览器自动化可能抛任意异常，降级为完成失败
                 self.log.error(f"课程验证码处理异常: {e}")
                 return {"code": "-1"}
@@ -997,6 +1013,8 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                     try:
                         pp = self.api.exam_prepare_paper(plan["id"])
                         full_score = pp.get("data", {}).get("paperScore", 100)
+                    except PermissionError:
+                        raise  # Token 失效，立即终止该账号
                     except OSError:
                         pass
                     self.log.info(
@@ -1073,6 +1091,8 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                         self.log.error(f"无感验证码校验失败：{check_res}")
                         continue
                     self.log.success("无感验证码校验通过")
+                except PermissionError:
+                    raise  # Token 失效，立即终止该账号
                 except Exception as e:  # noqa: BLE001 -- 浏览器自动化可能抛任意异常
                     self.log.error(f"无感验证码处理异常: {e}")
                     continue
@@ -1559,6 +1579,8 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                     else:
                         self.log.info(f"apinext [{label}] finish={finish} 已发送")
                     return
+                except PermissionError:
+                    raise  # Token 失效，立即终止该账号
                 except OSError as e:
                     if attempt < 3:
                         self.log.warning(
