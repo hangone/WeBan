@@ -69,7 +69,9 @@ def _log_format_message(record) -> str:
         if len(msg) > 2000:
             msg = msg[:2000]
         record["message"] = msg
-    return log_format  # loguru 会基于修改后的 record 替换占位符
+    # 注意：format 为函数时 loguru 不会自动补结尾换行（字符串格式才会），
+    # 必须显式加 \n，否则终端所有日志挤在一行
+    return log_format + "\n"  # loguru 会基于修改后的 record 替换占位符
 
 # 远程模板下载地址
 CONFIG_EXAMPLE_URL = (
