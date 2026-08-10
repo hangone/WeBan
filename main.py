@@ -2,6 +2,7 @@ import os
 import subprocess
 import sys
 import threading
+import time
 import tomllib
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -52,6 +53,24 @@ config_path = os.path.join(base_path, "config.toml")
 config_example_path = os.path.join(base_path, "config.example.toml")
 logs_dir = os.path.join(base_path, "logs")
 
+# 本次进程启动时间戳，用于日志文件名区分每次运行（如 20260810-132642）
+run_start_ts = time.strftime("%Y%m%d-%H%M%S")
+
+
+def _log_format_message(record) -> str:
+    """终端 sink 的格式化函数。
+
+    DEBUG 级别的请求/响应详情（含 HTML 页面）带大量换行，转义成单行
+    并限制字数，避免刷屏；其余级别（INFO/SUCCESS/WARNING/ERROR 等）
+    保持消息原样，正常换行不受影响。日志文件 sink 不经过此函数。
+    """
+    if record["level"].name == "DEBUG":
+        msg = record["message"].replace("\n", "\\n").replace("\r", "\\r")
+        if len(msg) > 2000:
+            msg = msg[:2000]
+        record["message"] = msg
+    return log_format  # loguru 会基于修改后的 record 替换占位符
+
 # 远程模板下载地址
 CONFIG_EXAMPLE_URL = (
     "https://gh-proxy.com/https://github.com/hangone/WeBan/raw/refs/heads/main/"
@@ -67,17 +86,17 @@ log_format = (
     "<blue>{extra[account]}</blue>|"
     "<cyan>{message}</cyan>"
 )
-# 终端输出截断超长消息（DEBUG 模式请求/响应详情可能刷屏）；
-# 日志文件使用完整格式，不截断
+# 终端输出转义为单行并截断超长消息（DEBUG 模式请求/响应详情可能刷屏）；
+# 日志文件使用完整格式，不转义、不截断
 logger.add(
     sink=sys.stdout,
     colorize=True,
-    format=log_format.replace("{message}", "{message:.2000}"),
+    format=_log_format_message,
 )
 
 os.makedirs(logs_dir, exist_ok=True)
 logger.add(
-    os.path.join(logs_dir, "weban.log"),
+    os.path.join(logs_dir, f"weban-{run_start_ts}.log"),
     encoding="utf-8",
     format=log_format,
     retention="7 days",
@@ -221,7 +240,9 @@ def run_account(
     # 为该账号创建专属日志文件夹
     account_log_dir = os.path.join(logs_dir, account_name)
     os.makedirs(account_log_dir, exist_ok=True)
-    account_log_path = os.path.join(account_log_dir, "weban.log")
+    account_log_path = os.path.join(
+        account_log_dir, f"weban-{run_start_ts}.log"
+    )
 
     # 添加只属于该账号的日志 sink（debug 请求/响应详情走 DEBUG 级别，需放行）
     account_filter = _make_account_filter(account_name)
