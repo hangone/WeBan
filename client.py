@@ -55,6 +55,26 @@ def get_source_str(query: dict) -> str:
     return "WEIBAN"
 
 
+def _check_code_ok(data: dict, allow_200: bool = True) -> bool:
+    """接口业务码是否成功（对齐官方 checkCode）
+
+    主站请求封装（app.js request）：Boolean(data) && Number(code)∈{0,1,200}；
+    完课 JSONP（sdk.js finishWxCourse）：Boolean(data) && Number(code)∈{0,1}，
+    传 allow_200=False 对齐。注意 Number(null)===0，code 为 null 时官方同样视为成功。
+    :param data: 接口响应 dict
+    :param allow_200: 是否允许 code=200（主站接口 True，完课 JSONP False）
+    :return: 业务成功返回 True
+    """
+    if not data:
+        return False
+    code = data.get("code")
+    try:
+        num = int(code) if code is not None else 0
+    except (TypeError, ValueError):
+        return False
+    return num in ((0, 1, 200) if allow_200 else (0, 1))
+
+
 def _extract_map(content: str) -> dict:
     """从 JS 内容中提取 nonstrMap / pageIdMap
 
@@ -282,7 +302,7 @@ class WeBanClient:
         for name, fn in steps:
             try:
                 res = fn()
-                if res.get("code", "-1") != "0":
+                if not _check_code_ok(res):
                     self.log.debug(f"首页{name}返回异常：{res}")
             except PermissionError:
                 raise  # Token 失效（被顶号等），立即终止该账号
@@ -293,7 +313,7 @@ class WeBanClient:
         try:
             must = self.api.notice_list_must(batch_code)
             notices = must.get("data") or []
-            if must.get("code", "-1") != "0" or not isinstance(notices, list):
+            if not _check_code_ok(must) or not isinstance(notices, list):
                 self.log.debug(f"必读公告返回异常：{must}")
                 notices = []
             for n in notices:
@@ -383,6 +403,34 @@ class WeBanClient:
             return "lab"
         return ""
 
+    @staticmethod
+    def _project_startable(task: dict) -> tuple[bool, str]:
+        """判断项目当前是否可学习（对齐官方 H5 项目入口拦截逻辑）
+
+        官方 H5 首页 navToProject：
+        - completion.grey 用 Number(grey)===1 判定（字符串 "1" 同样拦截），
+          命中则 alert(completion.message) 并禁止进入；
+        - 各分类导航（pre/normal/military）用 active===1 严格相等判定，
+          active 不为数字 1 时 alert(message) 并禁止进入；
+        - 学习任务列表过滤 grey!==1 && active===1 才纳入可进入列表。
+        :param task: listMyProject/listStudyTask 返回的项目 dict
+        :return: (是否可学, 服务端提示信息 message，未开始时非空)
+        """
+        completion = task.get("completion") or {}
+        grey = completion.get("grey", 2)  # 1=灰色不可用（未开放/未开始），2=正常
+        active = completion.get("active", 1)  # 1=可进入，2=不可进入
+        # Number(grey)===1：数字 1 或字符串 "1" 都视为灰色拦截
+        try:
+            grey_blocked = int(grey) == 1
+        except (TypeError, ValueError):
+            grey_blocked = False
+        active_ok = active == 1  # 官方 === 严格相等，字符串 "1" 不放行
+        if not grey_blocked and active_ok:
+            return True, ""
+        # 官方仅弹 completion.message；studyStateLabel 只是 message 为空时的兜底
+        message = completion.get("message") or task.get("studyStateLabel") or ""
+        return False, message
+
     def _build_course_url(self, course: dict, task: dict) -> str:
         """根据课程和任务信息构建完整的课程 URL
 
@@ -449,7 +497,7 @@ class WeBanClient:
         :return: show_progress API 原始响应
         """
         progress = self.api.show_progress(user_project_id)
-        if progress.get("code", -1) != "0":
+        if not _check_code_ok(progress):
             if output:
                 self.log.warning(f"{project_prefix} 获取进度失败：{progress}")
             return progress
@@ -588,13 +636,13 @@ class WeBanClient:
         answers_json = self._load_answers_json(warn_on_fail=True)
 
         my_project = self.api.list_my_project()
-        if my_project.get("code", -1) != "0":
+        if not _check_code_ok(my_project):
             self.log.error(f"获取任务列表失败：{my_project}")
             return
 
         my_project = my_project.get("data", [])
         completion = self.api.list_completion()
-        if completion.get("code", -1) != "0":
+        if not _check_code_ok(completion):
             self.log.error(f"获取模块完成情况失败：{completion}")
 
         showable_modules = [
@@ -603,12 +651,19 @@ class WeBanClient:
         if "labProject" in showable_modules:
             self.log.info("加载实验室课程")
             lab_project = self.api.lab_index()
-            if lab_project.get("code", -1) != "0":
+            if not _check_code_ok(lab_project):
                 self.log.error(f"获取实验室课程失败：{lab_project}")
             my_project.append(lab_project.get("data", {}).get("current", {}))
 
         for task in my_project:
             project_prefix = task["projectName"]
+            # 项目未开始（未到开课时间等）：官方 H5 弹 message 并禁止进入，同样提示后跳过
+            startable, notice = self._project_startable(task)
+            if not startable:
+                self.log.warning(
+                    f"{project_prefix}：{notice or '项目尚未开放，暂不可学习'}，跳过"
+                )
+                continue
             self.log.info(f"开始处理任务：{project_prefix}")
             # 对齐官方 H5：进入学习项目页即发 initIndex（项目详情初始化），
             # 不依赖课程是否加载 apicenext.js
@@ -635,7 +690,7 @@ class WeBanClient:
                 except OSError as e:  # 网络异常（DNS/连接/SSL）跳过本分类，不中断整个账号
                     self.log.error(f"获取 {choose_type[1]} 分类失败（网络异常）：{e}")
                     continue
-                if categories.get("code") != "0":
+                if not _check_code_ok(categories):
                     self.log.error(f"获取 {choose_type[1]} 分类失败：{categories}")
                     continue
 
@@ -737,7 +792,13 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
             return True
 
         self.log.info(f"学习： {course_prefix}")
-        self.api.study(course["resourceId"], task["userProjectId"])
+        # 官方 navToDetail 先 study.do，成功才进入课程页/取课程 URL；
+        # 失败（含课程未开始/未开放）toast 服务端 msg 并跳过本门课
+        study_res = self.api.study(course["resourceId"], task["userProjectId"])
+        if not _check_code_ok(study_res):
+            msg = study_res.get("message") or study_res.get("msg") or "课程暂时无法学习"
+            self.log.warning(f"{course_prefix}：{msg}，跳过")
+            return True
         study_start = time.time()
 
         if "userCourseId" not in course:
@@ -870,7 +931,8 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
 
         # 5. 完课
         res = self._finish_course(course, task, query, course_url, unique_no)
-        if res.get("code", "-1") != "0":
+        # 完课走 JSONP（sdk.js finishWxCourse）：checkCode 只认 code∈{0,1}
+        if not _check_code_ok(res, allow_200=False):
             self.log.error(f"{course_prefix} 完成失败：{res}")
             return not self._is_account_blocked(res)
 
@@ -923,7 +985,7 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                     captcha_result["randstr"],
                     captcha_result["ticket"],
                 )
-                if check_res.get("code", -1) != "0":
+                if not _check_code_ok(check_res):
                     self.log.error(f"课程验证码校验失败：{check_res}")
                     return check_res
                 self.log.success("课程验证码校验通过")
@@ -971,13 +1033,13 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
         answers_json = self._load_answers_json()
 
         projects = self.api.list_my_project()
-        if projects.get("code", -1) != "0":
+        if not _check_code_ok(projects):
             self.log.error(f"获取考试列表失败：{projects}")
             return
         projects = projects.get("data", [])
 
         completion = self.api.list_completion()
-        if completion.get("code", -1) != "0":
+        if not _check_code_ok(completion):
             self.log.error(f"获取模块完成情况失败：{completion}")
 
         showable_modules = [
@@ -986,16 +1048,23 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
         if "labProject" in showable_modules:
             self.log.info("加载实验室课程")
             lab_project = self.api.lab_index()
-            if lab_project.get("code", -1) != "0":
+            if not _check_code_ok(lab_project):
                 self.log.error(f"获取实验室课程失败：{lab_project}")
             projects.append(lab_project.get("data", {}).get("current", {}))
 
         for project in projects:
+            # 项目未开始（未到开课时间等）：官方 H5 弹 message 并禁止进入，同样提示后跳过
+            startable, notice = self._project_startable(project)
+            if not startable:
+                self.log.warning(
+                    f"{project['projectName']}：{notice or '项目尚未开放，暂不可考试'}，跳过"
+                )
+                continue
             self.log.info(f"开始考试项目 {project['projectName']}")
             user_project_id = project["userProjectId"]
 
             exam_plans = self.api.exam_list_plan(user_project_id)
-            if exam_plans.get("code", -1) != "0":
+            if not _check_code_ok(exam_plans):
                 self.log.error(f"获取考试计划失败：{exam_plans}")
                 return
             exam_plans = exam_plans["data"]
@@ -1059,13 +1128,13 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                 exam_plan_id = plan["examPlanId"]
 
                 before_paper = self.api.exam_before_paper(plan["id"])
-                if before_paper.get("code", -1) != "0":
+                if not _check_code_ok(before_paper):
                     self.log.error(
                         f"考试项目 {plan_name} 获取考试记录失败：{before_paper}"
                     )
 
                 prepare_paper = self.api.exam_prepare_paper(user_exam_plan_id)
-                if prepare_paper.get("code", -1) != "0":
+                if not _check_code_ok(prepare_paper):
                     self.log.error(f"获取考试信息失败：{prepare_paper}")
                     continue
                 prepare_paper = prepare_paper["data"]
@@ -1087,7 +1156,7 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                         captcha_result["randstr"],
                         captcha_result["ticket"],
                     )
-                    if check_res.get("code", -1) != "0":
+                    if not _check_code_ok(check_res):
                         self.log.error(f"无感验证码校验失败：{check_res}")
                         continue
                     self.log.success("无感验证码校验通过")
@@ -1098,7 +1167,7 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                     continue
 
                 exam_paper = self.api.exam_start_paper(user_exam_plan_id)
-                if exam_paper.get("code", -1) != "0":
+                if not _check_code_ok(exam_paper):
                     self.log.error(f"获取考试题目失败：{exam_paper}")
                     if exam_paper.get("detailCode") == "10018":
                         self.log.warning(
@@ -1261,7 +1330,7 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
 
                 self.log.info("完成考试，正在提交试卷...")
                 submit_res = self.api.exam_submit_paper(user_exam_plan_id)
-                if submit_res.get("code", -1) != "0":
+                if not _check_code_ok(submit_res):
                     raise RuntimeError(f"提交试卷失败，请重新考试：{submit_res}")
                 self.log.success(
                     f"试卷提交成功，考试完成，成绩：{submit_res['data']['score']} 分"
@@ -1710,7 +1779,7 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
             answers_ids,
             exam_plan_id,
         )
-        if res.get("code", -1) != "0":
+        if not _check_code_ok(res):
             self.log.error(f"答题失败，请重新开启考试：{res}")
             return False
         self.log.info("保存答案成功")
@@ -1973,7 +2042,7 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
             for p in self.api.list_my_project(ended=1).get("data", [])
         )
         completion = self.api.list_completion()
-        if completion.get("code", -1) != "0":
+        if not _check_code_ok(completion):
             self.log.error(f"获取模块完成情况失败：{completion}")
 
         showable_modules = [
@@ -1982,7 +2051,7 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
         if "labProject" in showable_modules:
             self.log.info("加载实验室课程")
             lab_project = self.api.lab_index()
-            if lab_project.get("code", -1) != "0":
+            if not _check_code_ok(lab_project):
                 self.log.error(f"获取实验室课程失败：{lab_project}")
             user_project_ids.append(
                 lab_project.get("data", {}).get("current", {}).get("userProjectId")
