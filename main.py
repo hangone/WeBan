@@ -1,4 +1,5 @@
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -106,6 +107,64 @@ logger.add(
 
 # 同步锁，防止同时读写题库
 sync_lock = threading.Lock()
+
+
+# ── 更新检查 ──────────────────────────────────────────────
+
+GITHUB_REPO = "hangone/WeBan"
+# 网络异常时的请求超时（秒）：检查失败也不能让用户久等
+UPDATE_CHECK_TIMEOUT = 3
+
+
+def _parse_version(text: str) -> tuple[int, ...]:
+    """版本号解析为可比较的整数元组（忽略非数字段，如 v3.9.6 → (3,9,6)）"""
+    return tuple(int(part) for part in re.findall(r"\d+", text or ""))
+
+
+def _run_update_check() -> None:
+    """执行一次 GitHub 最新 Release 检查并输出结果（同步实现）。
+
+    有新版 → WARNING 提示下载地址；无新版 → DEBUG；
+    网络/HTTP/解析失败 → WARNING 说明原因并跳过（不重试、不阻塞）。
+    """
+    try:
+        resp = requests.get(
+            f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest",
+            headers={
+                "Accept": "application/vnd.github+json",
+                "User-Agent": f"WeBan/{VERSION}",
+            },
+            timeout=UPDATE_CHECK_TIMEOUT,
+        )
+    except requests.RequestException as e:
+        logger.warning(f"检查更新失败（网络异常）：{e}，已跳过")
+        return
+    if resp.status_code != 200:
+        logger.warning(f"检查更新失败：GitHub API 返回 {resp.status_code}，已跳过")
+        return
+    try:
+        data = resp.json()
+        if not isinstance(data, dict):
+            logger.warning("检查更新失败：响应格式异常，已跳过")
+            return
+    except ValueError:
+        logger.warning("检查更新失败：响应解析异常，已跳过")
+        return
+    latest = data.get("tag_name") or ""
+    if _parse_version(latest) > _parse_version(VERSION):
+        latest_url = data.get("html_url") or (
+            f"https://github.com/{GITHUB_REPO}/releases/latest"
+        )
+        logger.warning(
+            f"发现新版本 {latest}（当前 {VERSION}），请前往 {latest_url} 下载更新"
+        )
+    else:
+        logger.info(f"已是最新版本（{VERSION}）")
+
+
+def _check_update_async() -> None:
+    """异步检查更新：后台线程执行，不阻塞主流程；失败只提示不等待"""
+    threading.Thread(target=_run_update_check, daemon=True, name="update-check").start()
 
 
 # ── 工具函数 ──────────────────────────────────────────────
@@ -371,6 +430,7 @@ def run_account(
 if __name__ == "__main__":
     try:
         logger.info(f"程序启动，当前版本：{VERSION}")
+        _check_update_async()  # 异步检查更新，失败/无新版不阻塞主流程
         logger.info("程序更新地址：https://github.com/hangone/WeBan")
 
         # 加载配置文件
