@@ -14850,6 +14850,10 @@
       {
         "content": "晚上休息好，第二天一早就起来去爬山。",
         "isCorrect": 1
+      },
+      {
+        "content": "深夜独自前往郊外爬山探险",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -19877,6 +19881,27 @@
       }
     ],
     "type": 1
+  },
+  "制定寝室公约的好处有？": {
+    "optionList": [
+      {
+        "content": "提前约定作息、卫生等规则，减少后期争执",
+        "isCorrect": 1
+      },
+      {
+        "content": "刚认识时更容易包容，沟通阻力小",
+        "isCorrect": 1
+      },
+      {
+        "content": "可以完全避免所有矛盾",
+        "isCorrect": 2
+      },
+      {
+        "content": "把潜在矛盾处理方式“制度化”",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
   },
   "刷单兼职可信吗？": {
     "optionList": [
@@ -58836,6 +58861,23 @@
       }
     ],
     "type": 2
+  },
+  "高校对学生涉黄行为的定性与处理，下列说法正确的是：": {
+    "optionList": [
+      {
+        "content": "属于轻微违纪，仅批评教育",
+        "isCorrect": 2
+      },
+      {
+        "content": "列为严重违纪，可直接开除学籍",
+        "isCorrect": 1
+      },
+      {
+        "content": "不纳入校纪处分范围",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "高校常见诈骗案类型有？": {
     "optionList": [
