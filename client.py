@@ -55,6 +55,24 @@ def get_source_str(query: dict) -> str:
     return "WEIBAN"
 
 
+def read_first_existing(paths: list[str]) -> str | None:
+    """按序读取第一个存在的本地文件内容（模板/题库的打包版兜底共用）。
+
+    模板（config.example.toml）与题库（answer.json）的下载都会先尝试
+    jsDelivr 远程源；失败时回退到本地候选文件（打包内置 _MEIPASS 或
+    可执行文件旁），两者共用本函数读取兜底内容。
+    :param paths: 候选路径，按优先级排列（如 bundle 内置优先）
+    :return: 文件文本；全部不存在或不可读返回 None
+    """
+    for path in paths:
+        try:
+            with open(path, encoding="utf-8") as f:
+                return f.read()
+        except OSError:
+            continue
+    return None
+
+
 def _check_code_ok(data: dict, allow_200: bool = True) -> bool:
     """接口业务码是否成功（对齐官方 checkCode）
 
@@ -2118,9 +2136,21 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                 need_download = True
 
         if need_download:
+            # 与模板下载同构：远程 jsDelivr 失败后回退打包内置/本地文件兜底
             self.log.info("题库不存在或格式错误，正在下载...")
+            try:
+                remote = self.api.download_answer()
+                self.log.success("题库已从远程下载")
+            except Exception as e:  # noqa: BLE001 -- 网络失败不应中断整个账号流程
+                self.log.warning(f"题库下载失败：{e}，回退本地内置题库")
+                remote = read_first_existing(
+                    [bundle_answer_path, answer_path, root_answer_path]
+                )
+                if remote is None:
+                    self.log.warning("本地无可用题库，本次跳过题库同步")
+                    return
             with open(answer_path, "w", encoding="utf-8") as f:
-                f.write(self.api.download_answer())
+                f.write(remote)
             try:
                 with open(answer_path, encoding="utf-8") as f:
                     answers_json = json.load(f)
