@@ -108,8 +108,11 @@ class LoggingSession:
 
 
 class WeBanAPI:
-    # 题库下载地址
-    ANSWER_URL = "https://gh-proxy.com/https://github.com/hangone/WeBan/raw/refs/heads/main/answer/answer.json"
+    # 题库下载地址（jsDelivr CDN 稳定；gh-proxy 免费公共代理会限流 403，
+    # github 官方 raw 域名在国内不稳定，均不用）
+    ANSWER_URL = (
+        "https://cdn.jsdelivr.net/gh/hangone/WeBan@main/answer/answer.json"
+    )
 
     def __init__(
         self,
@@ -1364,7 +1367,9 @@ class WeBanAPI:
           }
         }
         """
-        return self.session.get(self.ANSWER_URL, timeout=self.timeout).text
+        resp = self.session.get(self.ANSWER_URL, timeout=self.timeout)
+        resp.raise_for_status()
+        return resp.text
 
     def apinext(
         self,
