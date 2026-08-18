@@ -759,6 +759,41 @@ class WeBanAPI:
             },
         )
 
+    def list_flat_course(
+        self,
+        user_project_id: str,
+        choose_type: int = 3,
+        page_no: int = 1,
+        page_size: int = 12,
+    ) -> dict[str, Any]:
+        """获取课程扁平分页列表（对齐官方 H5 projectMode≠1 的列表路径）
+
+        官方课程主页（weiban.mycourse.cn app.js 课程主页组件）在 tab 切换时
+        调 project/getSimple.do 取 projectMode：mode==1 走 listCategory +
+        listCourse（折叠分类）；mode≠1 全部 tab 走本接口分页拉取。
+        响应：data.paginateData（课程对象数组）+ data.totalPages（总页数）。
+        课程对象字段以官方列表渲染模板与 navToDetail 实际读取为准：
+        resourceId/resourceName/source/finished/imageUrl/isPraise/praiseNum/
+        shareNum/userCourseId（userCourseId 官方仅解构不校验，是否存在
+        由服务端决定，完课链路不依赖它）。
+
+        :param user_project_id: 用户项目 ID
+        :param choose_type: 课程类型（1=推送课, 2=自选课, 3=必修课）
+        :param page_no: 页码（从 1 开始）
+        :param page_size: 每页数量
+        :return: 课程列表 dict（{"code": "0", "data": {"paginateData": [...],
+            "totalPages": N}, "detailCode": "0"}）
+        """
+        return self._post(
+            "/pharos/usercourse/listFlatCourse.do",
+            {
+                "userProjectId": user_project_id,
+                "chooseType": choose_type,
+                "pageSize": page_size,
+                "pageNo": page_no,
+            },
+        )
+
     def init_index(self, user_project_id: str) -> dict[str, Any]:
         """初始化课程索引（开始学习前调用，模拟浏览器行为）
         :param user_project_id: 用户项目 ID

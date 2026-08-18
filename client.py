@@ -681,6 +681,29 @@ class WeBanClient:
                 (2, "自选课", "optionalNum", "optionalFinishedNum"),
             ]
             for choose_type in choose_types:
+                # 官方 H5 课程主页按项目 projectMode 分流课程列表：
+                # mode==1 折叠分类（listCategory+listCourse）；mode≠1 扁平分页
+                # （listFlatCourse.do）。取不到 mode 时按折叠路径（原行为）兜底。
+                try:
+                    simple = self.api.get_project_simple(task["userProjectId"])
+                    project_mode = int(
+                        simple.get("data", {}).get("projectMode", 1) or 1
+                    )
+                except PermissionError:
+                    raise  # Token 失效，立即终止该账号
+                except OSError as e:
+                    self.log.debug(f"获取项目模式失败（网络异常）：{e}")
+                    project_mode = 1
+                if project_mode != 1:
+                    self._study_flat_courses(
+                        task,
+                        choose_type,
+                        project_prefix,
+                        answers_json,
+                        force_restudy,
+                    )
+                    continue
+
                 try:
                     categories = self.api.list_category(
                         task["userProjectId"], choose_type[0]
@@ -710,54 +733,127 @@ class WeBanClient:
                     for course in courses.get("data", []):
                         if not force_restudy and int(course.get("finished", 0)) == 1:
                             continue
-                        course_prefix = f"{category_prefix}/{course['resourceName']}"
-                        try:
-                            progress_before = self.get_progress(
-                                task["userProjectId"], project_prefix, output=False
-                            )
-                            finished_before = 0
-                            if progress_before.get("code", -1) == "0":
-                                d = progress_before["data"]
-                                finished_before = (
-                                    d["requiredFinishedNum"]
-                                    + d["pushFinishedNum"]
-                                    + d["optionalFinishedNum"]
-                                )
-                            ok = self._study_one_course(
-                                course,
-                                task,
-                                category_prefix,
-                                project_prefix,
-                                answers_json,
-                                force_restudy,
-                            )
-                            if not ok:
-                                self.log.error(
-                                    "检测到行为异常或账号锁定，已停止本账号后续学习"
-                                )
-                                return
-                            progress_after = self.get_progress(
-                                task["userProjectId"], project_prefix
-                            )
-                            if progress_after.get("code", -1) == "0":
-                                d = progress_after["data"]
-                                finished_after = (
-                                    d["requiredFinishedNum"]
-                                    + d["pushFinishedNum"]
-                                    + d["optionalFinishedNum"]
-                                )
-                                if finished_after <= finished_before:
-                                    self.log.warning(
-                                        f"{course_prefix}：完课成功但进度未更新，请手动检查"
-                                    )
-                        except PermissionError:
-                            raise  # Token 失效，立即终止该账号
-                        except OSError as e:
-                            # 网络异常（DNS/连接/SSL）跳过本门课程，不中断整个账号；
-                            # 未完成的课程下次运行会自动重学
-                            self.log.warning(f"{course_prefix}：网络异常，跳过本门课程（{e}）")
+                        if not self._learn_course(
+                            course,
+                            task,
+                            category_prefix,
+                            project_prefix,
+                            answers_json,
+                            force_restudy,
+                        ):
+                            return
 
             self.log.success(f"{project_prefix} 课程学习完成")
+
+    def _learn_course(
+        self,
+        course: dict,
+        task: dict,
+        category_prefix: str,
+        project_prefix: str,
+        answers_json: dict,
+        force_restudy: bool,
+    ) -> bool:
+        """学习单门课程并校验进度是否更新（折叠/扁平两条列表路径共用）。
+
+        :return: True 可继续下一门；False 表示账号异常/锁定，应停止本账号
+        """
+        course_prefix = f"{category_prefix}/{course['resourceName']}"
+        try:
+            progress_before = self.get_progress(
+                task["userProjectId"], project_prefix, output=False
+            )
+            finished_before = 0
+            if progress_before.get("code", -1) == "0":
+                d = progress_before["data"]
+                finished_before = (
+                    d["requiredFinishedNum"]
+                    + d["pushFinishedNum"]
+                    + d["optionalFinishedNum"]
+                )
+            ok = self._study_one_course(
+                course,
+                task,
+                category_prefix,
+                project_prefix,
+                answers_json,
+                force_restudy,
+            )
+            if not ok:
+                self.log.error("检测到行为异常或账号锁定，已停止本账号后续学习")
+                return False
+            progress_after = self.get_progress(task["userProjectId"], project_prefix)
+            if progress_after.get("code", -1) == "0":
+                d = progress_after["data"]
+                finished_after = (
+                    d["requiredFinishedNum"]
+                    + d["pushFinishedNum"]
+                    + d["optionalFinishedNum"]
+                )
+                if finished_after <= finished_before:
+                    self.log.warning(
+                        f"{course_prefix}：完课成功但进度未更新，请手动检查"
+                    )
+        except PermissionError:
+            raise  # Token 失效，立即终止该账号
+        except OSError as e:
+            # 网络异常（DNS/连接/SSL）跳过本门课程，不中断整个账号；
+            # 未完成的课程下次运行会自动重学
+            self.log.warning(f"{course_prefix}：网络异常，跳过本门课程（{e}）")
+        return True
+
+    def _study_flat_courses(
+        self,
+        task: dict,
+        choose_type: tuple,
+        project_prefix: str,
+        answers_json: dict,
+        force_restudy: bool,
+    ) -> None:
+        """官方 projectMode≠1 的扁平分页课程列表路径（listFlatCourse.do）
+
+        官方 H5 课程主页按 project/getSimple.do 的 projectMode 分流：
+        mode==1 走折叠分类（listCategory + listCourse），mode≠1 全部 tab
+        走 listFlatCourse.do 分页列表（平铺渲染，无分类层级）。日志前缀的
+        分类名取课程对象的 categoryName（若服务端返回该字段），否则回退到
+        tab 名（如"自选课"）；仅用于日志展示，不影响学习逻辑。
+        """
+        label = choose_type[1]
+        page_no = 1
+        page_size = 12
+        while True:
+            try:
+                res = self.api.list_flat_course(
+                    task["userProjectId"], choose_type[0], page_no, page_size
+                )
+            except PermissionError:
+                raise  # Token 失效，立即终止该账号
+            except OSError as e:  # 网络异常跳过本类型，不中断整个账号
+                self.log.error(f"获取 {label} 课程失败（网络异常）：{e}")
+                return
+            if not _check_code_ok(res):
+                self.log.error(f"获取 {label} 课程失败：{res}")
+                return
+            data = res.get("data") or {}
+            courses = data.get("paginateData") or []
+            for course in courses:
+                if not force_restudy and int(course.get("finished", 0)) == 1:
+                    continue
+                category_name = course.get("categoryName") or label
+                category_prefix = f"{label} {project_prefix}/{category_name}"
+                if not self._learn_course(
+                    course,
+                    task,
+                    category_prefix,
+                    project_prefix,
+                    answers_json,
+                    force_restudy,
+                ):
+                    return
+            total_pages = int(data.get("totalPages", 1) or 1)
+            if page_no >= total_pages:
+                break
+            page_no += 1
 
     @staticmethod
     def _is_account_blocked(res: dict) -> bool:
