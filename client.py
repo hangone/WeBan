@@ -659,6 +659,8 @@ class WeBanClient:
             return
 
         my_project = my_project.get("data", [])
+        if not my_project:
+            self.log.warning("当前没有进行中的学习项目。")
         completion = self.api.list_completion()
         if not _check_code_ok(completion):
             self.log.error(f"获取模块完成情况失败：{completion}")
@@ -1161,6 +1163,8 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
             self.log.error(f"获取考试列表失败：{projects}")
             return
         projects = projects.get("data", [])
+        if not projects:
+            self.log.warning("当前没有进行中的项目可考试。")
 
         completion = self.api.list_completion()
         if not _check_code_ok(completion):
