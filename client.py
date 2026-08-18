@@ -801,14 +801,24 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
             return True
         study_start = time.time()
 
-        if "userCourseId" not in course:
-            self.log.success(f"{course_prefix} 完成")
-            return True
-
+        # 官方 H5 完课不依赖列表对象的 userCourseId：课程页 URL 由
+        # getCourseUrl.do 返回（CourseDetail/navToDetail 均走它），userCourseId
+        # 由服务端填入 URL query，sdk.js finishWxCourse 从页面 URL 读取。
+        # 列表对象是否带 userCourseId 取决于服务端：实测本租户
+        # listCourse.do（chooseType=2 自选课）对象不含该字段（80/80 日志实证，
+        # 必修课 chooseType=3 含）。照官方逻辑从课程 URL 提取，取不到才跳过
+        # （不再假报"完成"）。
         course_url = self._build_course_url(course, task)
         self.log.info(f"{course_prefix}：{course_url.split('?')[0]}")
         query = parse_qs(urlparse(course_url).query)
         source_str = get_source_str(query)
+        if "userCourseId" not in course:
+            uid = query.get("userCourseId")
+            if uid and uid[0]:
+                course["userCourseId"] = uid[0]
+            else:
+                self.log.warning(f"{course_prefix}：未获取到学习记录（userCourseId 为空），跳过")
+                return True
 
         course_code = ""
         url_path = urlparse(course_url).path
