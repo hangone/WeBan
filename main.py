@@ -12,7 +12,7 @@ import requests
 from loguru import logger
 
 from captcha import check_browser_health
-from client import WeBanClient
+from client import WeBanClient, read_first_existing
 
 
 def _resolve_version() -> str:
@@ -51,7 +51,12 @@ else:
     bundle_path = base_path
 
 config_path = os.path.join(base_path, "config.toml")
-config_example_path = os.path.join(base_path, "config.example.toml")
+# 模板可能位于: 打包资源目录(_MEIPASS, onefile 解压) / exe 旁 / 源码目录
+# frozen 时 base_path 是 exe 目录而模板在 bundle 里，必须 bundle 优先
+config_example_candidates = [
+    os.path.join(bundle_path, "config.example.toml"),
+    os.path.join(base_path, "config.example.toml"),
+]
 logs_dir = os.path.join(base_path, "logs")
 
 # 本次进程启动时间戳，用于日志文件名区分每次运行（如 20260810-132642）
@@ -74,10 +79,10 @@ def _log_format_message(record) -> str:
     # 必须显式加 \n，否则终端所有日志挤在一行
     return log_format + "\n"  # loguru 会基于修改后的 record 替换占位符
 
-# 远程模板下载地址
+# 远程模板下载地址（jsDelivr CDN 稳定；gh-proxy 免费公共代理会限流 403，
+# github 官方 raw 域名在国内不稳定，均不用）
 CONFIG_EXAMPLE_URL = (
-    "https://gh-proxy.com/https://github.com/hangone/WeBan/raw/refs/heads/main/"
-    "config.example.toml"
+    "https://cdn.jsdelivr.net/gh/hangone/WeBan@main/config.example.toml"
 )
 
 # ── 日志 ──
@@ -214,13 +219,15 @@ def load_config() -> dict:
             logger.success(f"远程模板已下载到 {config_path}")
             downloaded = True
         except OSError as e:
-            logger.error(f"下载远程模板失败: {e}")
+            logger.warning(f"下载远程模板失败 ({CONFIG_EXAMPLE_URL}): {e}")
 
-        if not downloaded and os.path.exists(config_example_path):
-            import shutil
-
-            shutil.copy(config_example_path, config_path)
-            logger.success(f"已从本地模板创建 {config_path}")
+        if not downloaded:
+            local_template = read_first_existing(config_example_candidates)
+            if local_template is not None:
+                with open(config_path, "w", encoding="utf-8") as f:
+                    f.write(local_template)
+                logger.success(f"已从本地模板创建 {config_path}")
+                downloaded = True
 
         if os.path.exists(config_path):
             logger.info("正在打开配置文件，请填写账号信息后保存...")
