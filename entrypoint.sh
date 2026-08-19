@@ -8,6 +8,7 @@ set -e
 for i in $(seq 1 30); do
   if (echo >/dev/tcp/127.0.0.1/9222) 2>/dev/null; then
     exec "$@"
+    exec /app/WeBan "$@"
   fi
   sleep 0.5
 done

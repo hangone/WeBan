@@ -12,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests
 from loguru import logger
 
-from captcha import check_browser_health
+from captcha import check_browser_health, is_non_interactive
 from client import WeBanClient, read_first_existing
 
 # ── 命令行参数与环境变量（优先级：CLI > 环境变量 > 配置文件）────────
@@ -231,6 +231,24 @@ else:
     _data_dir = None
 
 
+def _detect_non_interactive() -> bool:
+    """判定是否无交互运行。
+
+    优先级：--non-interactive 显式指定 > 环境/自动检测。
+    环境/自动检测复用 captcha.is_non_interactive()：
+    - ENVIRONMENT=docker（或 container）：Dockerfile 默认设置，容器环境
+    - stdin 不是 TTY：Docker 无 -it、cron、管道、后台运行、SSH 无 TTY
+      会话等都无法接收用户输入，自动进入无交互模式。不用某个专用
+      "交互开关"环境变量，因为无交互的环境远不止 docker，且 docker
+      -it 时其实可以交互。
+    """
+    if _OPTS.non_interactive:
+        return True
+    return is_non_interactive()
+
+
+NON_INTERACTIVE = _detect_non_interactive()
+
 
 def _resolve_version() -> str:
     """版本号单一来源：pyproject.toml（打包后从冻结资源读取），importlib.metadata 作回退"""
@@ -267,14 +285,19 @@ else:
     base_path = os.path.dirname(os.path.abspath(__file__))
     bundle_path = base_path
 
-config_path = os.path.join(base_path, "config.toml")
+if _data_dir:
+    # Docker/数据目录模式：config/logs/answer 全部放数据目录（可挂载持久化）
+    config_path = os.path.join(_data_dir, "config.toml")
+    logs_dir = os.path.join(_data_dir, "logs")
+else:
+    config_path = os.path.join(base_path, "config.toml")
+    logs_dir = os.path.join(base_path, "logs")
 # 模板可能位于: 打包资源目录(_MEIPASS, onefile 解压) / exe 旁 / 源码目录
 # frozen 时 base_path 是 exe 目录而模板在 bundle 里，必须 bundle 优先
 config_example_candidates = [
     os.path.join(bundle_path, "config.example.toml"),
     os.path.join(base_path, "config.example.toml"),
 ]
-logs_dir = os.path.join(base_path, "logs")
 
 # 本次进程启动时间戳，用于日志文件名区分每次运行（如 20260810-132642）
 run_start_ts = time.strftime("%Y%m%d-%H%M%S")
@@ -424,13 +447,14 @@ def is_account_valid(account: dict) -> bool:
 
 
 def load_config() -> dict:
-    """加载 config.toml，不存在则下载远程模板并打开编辑器"""
+    """加载 config.toml，不存在则下载远程模板；无交互模式不打开编辑器"""
     if not os.path.exists(config_path):
         logger.info("config.toml 不存在，正在下载远程模板...")
         downloaded = False
         try:
             resp = requests.get(CONFIG_EXAMPLE_URL, timeout=30)
             resp.raise_for_status()
+            os.makedirs(os.path.dirname(config_path), exist_ok=True)
             with open(config_path, "w", encoding="utf-8") as f:
                 f.write(resp.text)
             logger.success(f"远程模板已下载到 {config_path}")
@@ -441,14 +465,20 @@ def load_config() -> dict:
         if not downloaded:
             local_template = read_first_existing(config_example_candidates)
             if local_template is not None:
+                os.makedirs(os.path.dirname(config_path), exist_ok=True)
                 with open(config_path, "w", encoding="utf-8") as f:
                     f.write(local_template)
                 logger.success(f"已从本地模板创建 {config_path}")
                 downloaded = True
 
         if os.path.exists(config_path):
-            logger.info("正在打开配置文件，请填写账号信息后保存...")
-            open_editor(config_path)
+            if NON_INTERACTIVE:
+                logger.warning(
+                    "已创建空配置模板，请在挂载的数据目录中填写账号信息后重试"
+                )
+            else:
+                logger.info("正在打开配置文件，请填写账号信息后保存...")
+                open_editor(config_path)
             # 重新加载
             with open(config_path, "rb") as f:
                 return tomllib.load(f)
@@ -527,6 +557,10 @@ def run_account(
         random_answer = random_answer_raw.strip().lower() in ("1", "true", "yes")
     else:
         random_answer = bool(random_answer_raw)
+    # 无交互模式下不允许手动输入答案，强制随机作答
+    if NON_INTERACTIVE and not random_answer:
+        log = logger.bind(account=account_name)
+        log.warning("无交互模式下强制启用随机作答（random_answer=true）")
         random_answer = True
     study_time = cli_or_env(
         "study_time", _OPTS.study_time, get_setting("study_time", "20,10")
@@ -746,6 +780,11 @@ if __name__ == "__main__":
         valid_accounts = [a for a in accounts if is_account_valid(a)]
 
         if not valid_accounts:
+            if NON_INTERACTIVE:
+                logger.error(
+                    f"没有找到有效的账号配置，请检查 {config_path}"
+                )
+                sys.exit(1)
             logger.warning("没有找到有效的账号配置，正在打开配置文件...")
             open_editor(config_path)
             global_settings, ai_config, accounts = load_all_config()
@@ -755,8 +794,8 @@ if __name__ == "__main__":
                 logger.error("仍然没有有效的账号配置，请检查 config.toml")
                 sys.exit(1)
 
-        # 单账号时提示是否更换
-        if len(valid_accounts) == 1:
+        # 单账号时提示是否更换（无交互模式跳过，直接使用该账号）
+        if len(valid_accounts) == 1 and not NON_INTERACTIVE:
             acct = valid_accounts[0]
             acct_name = (
                 acct.get("username")
@@ -842,6 +881,7 @@ if __name__ == "__main__":
             max_workers_raw = int(global_settings.get("max_workers", 5))
         max_workers = min(len(accounts), max_workers_raw)
 
+        if len(accounts) > 1 and not NON_INTERACTIVE:
             choice = (
                 input(f"检测到 {len(accounts)} 个账号，是否同时运行？(Y/n，默认Y): ")
                 .strip()
@@ -849,7 +889,8 @@ if __name__ == "__main__":
             )
             use_multithread = choice != "n"
         else:
-            use_multithread = False
+            # 无交互模式：多账号默认并发执行
+            use_multithread = len(accounts) > 1
 
         if use_multithread and len(accounts) > 1:
             logger.info(f"使用多线程模式，最大并发数: {max_workers}")
@@ -900,7 +941,8 @@ if __name__ == "__main__":
         logger.error(f"运行失败: {e}")
         traceback.print_exc(file=sys.stderr)
 
-    try:
-        input("按回车键退出")
-    except EOFError:
-        pass
+    if not NON_INTERACTIVE:
+        try:
+            input("按回车键退出")
+        except EOFError:
+            pass

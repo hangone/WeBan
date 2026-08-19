@@ -48,6 +48,11 @@ FROM debian:stable-slim AS without-browser
 COPY --from=builder /build/dist/WeBan /app/WeBan
 WORKDIR /app
 
+# 数据目录（config.toml/logs/answer 均在此，可挂载持久化）与容器环境标识
+ENV WB_DATA_DIR=/app/data \
+    ENVIRONMENT=docker
+VOLUME ["/app/data"]
+
 ENTRYPOINT ["/app/WeBan"]
 
 # ── with-browser: 内置 Chrome headless shell（CDP 模式）────
@@ -57,6 +62,10 @@ COPY --from=builder /build/dist/WeBan /app/WeBan
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 WORKDIR /app
+
+ENV WB_DATA_DIR=/app/data \
+    ENVIRONMENT=docker
+VOLUME ["/app/data"]
 
 ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["/app/WeBan"]

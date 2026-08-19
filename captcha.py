@@ -32,6 +32,21 @@ import requests
 from nodriver import cdp
 from nodriver.cdp.runtime import DeepSerializedValue
 
+# 无交互模式判定（client/main 共用，放本模块避免循环导入）：
+# - ENVIRONMENT=docker（或 container）：Dockerfile 默认设置，标识容器环境
+# - stdin 非 TTY：cron/后台运行/管道/SSH 无 TTY 会话，无法接收输入
+# - 显式 CLI --non-interactive 由 main.py 单独叠加
+def is_non_interactive() -> bool:
+    env = os.environ.get("ENVIRONMENT", "").strip().lower()
+    if env in ("docker", "container"):
+        return True
+    try:
+        if not sys.stdin.isatty():
+            return True
+    except (AttributeError, ValueError):
+        return True
+    return False
+
 
 def _dsv_to_py(dsv):
     """将 nodriver 的 DeepSerializedValue 递归转换为 Python 原生类型。"""
@@ -1351,6 +1366,14 @@ class CaptchaHandler:
         if last_exc is not None:
             self.log.warning(f"自动识别曾发生异常，将回退到手动: {last_exc}")
         await asyncio.sleep(1)  # 等待无头浏览器进程完全退出
+
+        # 无交互模式（Docker 等无终端环境）：不打开可见浏览器等待手动，
+        # 直接抛异常让上层跳过该课程
+        if is_non_interactive():
+            raise RuntimeError(
+                "验证码自动识别连续失败且处于无交互模式，"
+                "无法手动完成验证，已跳过该课程"
+            )
 
         # 第二阶段: 打开可见浏览器，让用户手动完成
         self.log.info("=" * 50)
