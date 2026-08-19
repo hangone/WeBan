@@ -116,6 +116,9 @@ debug = false
 #   无交互时：不弹编辑器、所有确认用默认值、验证码/考试不等待手动输入、
 #   末尾不等待回车。
 #
+# 首次运行（交互式）不需要手动创建本文件：程序会提示输入学校/学号/密码，
+# 验证登录成功后自动把账号写入本文件；登录失败不会生成/修改文件。
+#
 # Docker 运行（无交互、数据持久化）：
 #   docker run -v ./data:/app/data hangyi/weban
 #   - 镜像默认已设 WB_DATA_DIR=/app/data 与 ENVIRONMENT=docker，
