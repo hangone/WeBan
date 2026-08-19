@@ -1052,13 +1052,21 @@ class CaptchaHandler:
         browser = await asyncio.wait_for(self._create_browser(headless), timeout=30)
         try:
             origin = entry_url.split("#")[0].rstrip("/")
+            # CDP 模式（连已有 headless-shell/Chrome）：浏览器可能没有默认
+            # page target（headless-shell 刚启动时 /json 为空），browser.get()
+            # 会因 next(filter(...)) 无 page target 抛异常，必须 new_tab 创建。
+            cdp_mode = bool(self.cdp_host and self.cdp_port)
             try:
-                tab = await asyncio.wait_for(browser.get(f"{origin}/"), timeout=30)
+                tab = await asyncio.wait_for(
+                    browser.get(f"{origin}/", new_tab=cdp_mode), timeout=30
+                )
             except RuntimeError:
-                if not (self.cdp_host and self.cdp_port):
+                if not cdp_mode:
                     raise
-                # CDP 模式下浏览器初始无页面，创建新标签页
-                tab = await asyncio.wait_for(browser.get(f"{origin}/", new_tab=True), timeout=30)
+                # CDP 模式下 new_tab 仍失败则再试一次（可能 target 已存在）
+                tab = await asyncio.wait_for(
+                    browser.get(f"{origin}/", new_tab=True), timeout=30
+                )
             await self._inject_auth(tab)
             self.log.info("正在加载入口页面")
             await asyncio.wait_for(tab.get(entry_url), timeout=30)
@@ -1151,6 +1159,11 @@ class CaptchaHandler:
         ):
             return None
         if not s.get("bgRect"):
+            return None
+        # 弹窗有"淡入"动画：元素刚挂载时 getBoundingClientRect 可能返回
+        # 负坐标（在视口外），此时点击坐标全错。视为未就绪，等动画完成。
+        br = s["bgRect"]
+        if br.get("x", 0) < 0 or br.get("y", 0) < 0:
             return None
         return s
 
