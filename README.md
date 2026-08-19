@@ -23,43 +23,64 @@
 
 ## 使用
 
-从下面的几种方式下载后运行，配置说明可参考 [config.example.toml](config.example.toml)，账号级配置可覆盖全局设置。
+> **零基础三步上手**：① 下载二进制文件 → ② 双击/命令行运行 → ③ 输入学校、学号、密码。不需要安装 Python，不需要写代码。
 
-### 构建产物
+### ⭐ 快速开始（推荐：下载即用）
 
-从 [Releases](https://github.com/hangone/WeBan/releases/latest) 下载文件运行，根据提示输入信息。下载缓慢可以用 [https://gh-proxy.com/](https://gh-proxy.com/) 加速下载。
+**第 1 步：下载你的系统对应的文件**
 
-| 平台 | 下载地址 | 镜像下载地址 |
-|------|---------------|---------------|
-| Windows x64 | [WeBan-windows-x64.exe](https://github.com/hangone/WeBan/releases/latest/download/WeBan-windows-x64.exe) | [WeBan-windows-x64.exe](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-windows-x64.exe) |
-| Linux x64 | [WeBan-linux-x64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-linux-x64) | [WeBan-linux-x64](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-linux-x64) |
-| Linux arm64 | [WeBan-linux-arm64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-linux-arm64) | [WeBan-linux-arm64](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-linux-arm64) |
-| macOS arm64 | [WeBan-macos-arm64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-macos-arm64) | [WeBan-macos-arm64](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-macos-arm64) |
-| macOS x64 | [WeBan-macos-x64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-macos-x64) | [WeBan-macos-x64](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-macos-x64) |
+点这里打开最新版下载页 → [**Releases**](https://github.com/hangone/WeBan/releases/latest)，按自己的电脑系统下载（不确定系统就按下面的表选）：
 
-### 源码运行
+| 你的电脑 | 下载这个文件 | 下载太慢用镜像 |
+|---------|-------------|---------------|
+| Windows（绝大多数电脑） | **WeBan-windows-x64.exe** | [镜像下载](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-windows-x64.exe) |
+| Mac 苹果电脑（Intel 芯片） | **WeBan-macos-x64** | [镜像下载](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-macos-x64) |
+| Mac 苹果电脑（M1/M2/M3/M4 芯片） | **WeBan-macos-arm64** | [镜像下载](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-macos-arm64) |
+| Linux（Ubuntu/Debian/CentOS，64 位） | **WeBan-linux-x64** | [镜像下载](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-linux-x64) |
+| Linux（树莓派/ARM 服务器） | **WeBan-linux-arm64** | [镜像下载](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-linux-arm64) |
 
-1. 安装 Python 3（建议使用 [uv](https://github.com/astral-sh/uv)）和 Git
+> **Mac 怎么判断芯片**：屏幕左上角  → 关于本机，看"芯片"一栏写的是 Apple M 系列（arm64）还是 Intel（x64）。Windows 不确定就选 x64（2010 年后几乎都是）。
 
-2. 克隆本仓库
+**第 2 步：运行**
 
-```bash
-git clone --depth 1 https://github.com/hangone/WeBan
+- **Windows**：双击 `WeBan-windows-x64.exe`（第一次运行如被 SmartScreen 拦截，点"更多信息" → "仍要运行"；杀毒软件误报请添加信任）
+- **Mac**：双击文件，系统提示"无法验证开发者"时，打开 **系统设置 → 隐私与安全性**，点"仍要打开"；或在终端运行：
+  ```bash
+  chmod +x WeBan-macos-*
+  ./WeBan-macos-arm64   # Intel 芯片换成 WeBan-macos-x64
+  ```
+- **Linux**：
+  ```bash
+  chmod +x WeBan-linux-*
+  ./WeBan-linux-x64     # ARM 服务器换成 WeBan-linux-arm64
+  ```
+
+**第 3 步：填账号，开始**
+
+首次运行会自动下载配置文件模板并打开编辑器，按提示填写：
+
+```toml
+[[account]]
+tenant_name = "你的学校全称"   # 要和登录页面显示的一致，例如"北京交通大学-本科生"
+username = "你的学号"
+password = "你的密码"          # 默认和学号一样，可留空
 ```
 
-3. 安装依赖
+保存后重新运行程序，就会自动开始学习和考试。不想手动填文件的，也可以**一条命令直连启动**（无需配置文件）：
 
 ```bash
-pip install -r requirements.txt # 或 uv sync
+# Windows (PowerShell)
+$env:WB_TENANT_NAME="你的学校全称"; $env:WB_USERNAME="你的学号"; $env:WB_PASSWORD="你的密码"; .\WeBan-windows-x64.exe
+
+# mac / Linux
+WB_TENANT_NAME="你的学校全称" WB_USERNAME=你的学号 WB_PASSWORD=你的密码 ./WeBan-macos-arm64
 ```
 
-4. 运行
+> 全部参数对照表见下方"参数总览"；账号想保密的、或一个文件管理多个账号的，用配置文件方式。
 
-```bash
-python main.py # 或 uv run main.py
-```
+### 参数总览
 
-常用参数（`python main.py --help` 查看全部）。**每个配置项都有命令行参数和环境变量两种方式，三类名称一一对应**：配置文件键名（`snake_case`）= 命令行参数（`--kebab-case`）= 环境变量（`WB_SNAKE_CASE`），例如 `study_time` ↔ `--study-time` ↔ `WB_STUDY_TIME`。优先级均为 **命令行 > 环境变量 > 配置文件**：
+**每个配置项都有命令行参数和环境变量两种方式，三类名称一一对应**：配置文件键名（`snake_case`）= 命令行参数（`--kebab-case`）= 环境变量（`WB_SNAKE_CASE`），例如 `study_time` ↔ `--study-time` ↔ `WB_STUDY_TIME`。优先级均为 **命令行 > 环境变量 > 配置文件**：
 
 | 配置文件键 | 参数 | 环境变量 | 说明 |
 |-----------|------|---------|------|
@@ -98,11 +119,37 @@ python main.py # 或 uv run main.py
 ```bash
 # 环境变量
 WB_TENANT_NAME="你的学校全称" WB_USERNAME=你的学号 WB_PASSWORD=你的密码 \
-WB_STUDY_TIME="20,5" WB_VIDEO_SPEED=0 uv run main.py
+WB_STUDY_TIME="20,5" WB_VIDEO_SPEED=0 ./WeBan-macos-arm64
 # 或等价的命令行参数
-uv run main.py --tenant-name "你的学校全称" --username 你的学号 \
+./WeBan-macos-arm64 --tenant-name "你的学校全称" --username 你的学号 \
   --study-time "20,5" --video-speed 0
 ```
+
+### 源码运行
+
+不需要代码基础的用户**跳过本节**（直接下载二进制即可）。开发者/想改代码时用：
+
+1. 安装 Python 3（建议使用 [uv](https://github.com/astral-sh/uv)）和 Git
+
+2. 克隆本仓库
+
+```bash
+git clone --depth 1 https://github.com/hangone/WeBan
+```
+
+3. 安装依赖
+
+```bash
+pip install -r requirements.txt # 或 uv sync
+```
+
+4. 运行
+
+```bash
+python main.py # 或 uv run main.py
+```
+
+运行 `python main.py --help` 可查看全部参数。
 
 ### Docker
 
@@ -187,10 +234,10 @@ docker run --rm \
 
 程序按以下优先级自动检测可用的浏览器，无需手动配置：
 
-1. **用户指定**：环境变量 `CHROMIUM_BINARY` / 配置文件 `browser_path`
-2. **CDP 远程调试**：配置文件 `cdp_host` + `cdp_port`，或 Docker 环境下自动尝试 `host.docker.internal:9222`
-3. **Playwright 浏览器**：`pip install playwright && playwright install chromium`
-4. **系统浏览器**：自动查找已安装的 Chrome / Chromium
+1. **用户指定**：配置文件 `browser_path`（或 `--browser-path` / `WB_BROWSER_PATH`）
+2. **CDP 远程调试**：配置文件 `cdp_host` + `cdp_port`（或 CLI/env），或 Docker 环境下自动尝试 `host.docker.internal:9222`
+3. **Playwright 浏览器**：自动查找 `~/.cache/ms-playwright` 下的 Chromium
+4. **系统浏览器**：自动查找已安装的 Chrome / Chromium / Edge
 
 ## 演示
 
