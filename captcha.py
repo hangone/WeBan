@@ -32,6 +32,13 @@ import requests
 from nodriver import cdp
 from nodriver.cdp.runtime import DeepSerializedValue
 
+# 限制 OpenCV 线程数（默认 1）：1-2 核小服务器上，验证码识别（OpenCV
+# 全核多线程）与 headless-shell 渲染并发会把 CPU 抢满，CDP 命令被饿死
+# （实测 2 核机器每步从 4s 拖到 55s）。1 线程对识别耗时影响小（单张图
+# 也就几秒），但能保证 headless-shell 有 CPU 可用。WB_CV_THREADS 可覆盖。
+cv2.setNumThreads(int(os.environ.get("WB_CV_THREADS", "1") or 1))
+
+
 # 无交互模式判定（client/main 共用，放本模块避免循环导入）：
 # - ENVIRONMENT=docker（或 container）：Dockerfile 默认设置，标识容器环境
 # - stdin 非 TTY：cron/后台运行/管道/SSH 无 TTY 会话，无法接收输入
@@ -240,7 +247,8 @@ def match_cost(
     if not allow_rotate:
         return best
 
-    for angle in (-60, -45, -30, -20, -10, 10, 20, 30, 45, 60, 90, -90):
+    # 覆盖常见旋转的 6 个角度（原 12 个；小服务器 CPU 敏感，减半提速）
+    for angle in (-60, -30, -10, 10, 30, 60):
         rotated = rotate_mask(query, angle)
         score = float(np.sum(cv2.absdiff(rotated, candidate)) / 255.0)
         best = min(best, score)
@@ -274,8 +282,10 @@ def locate_with_template(
 
     best_score = -1.0
     best_center = None
-    scales = np.linspace(1.1, 3.4, 16)
-    angles = range(-90, 91, 10)
+    # 尺度 16→12、角度 19→13：全图 matchTemplate 是识别耗时主体，
+    # 小服务器上 304 次大图匹配会抢占 CPU，降采样后仍保持足够精度
+    scales = np.linspace(1.1, 3.4, 12)
+    angles = range(-90, 91, 15)
 
     for scale in scales:
         new_w = max(8, round(qw * scale))
@@ -1327,8 +1337,13 @@ class CaptchaHandler:
         全部失败后才转手动。
         """
         entry_url = course_url or COURSE_ENTRY_URL
-        max_auto_rounds = 3
-        attempts_per_round = 6
+        # 自动识别重试上限（环境变量可调，小核服务器每次尝试很慢）：
+        # WB_CAPTCHA_ROUNDS 轮数、WB_CAPTCHA_ATTEMPTS 每轮次数。
+        # 默认 2 轮 x 3 次（最多 6 次尝试）——实测单次尝试在 1 核机器约
+        # 4 分钟，18 次全试可能 1 小时+；识别成功率高时 1-2 次即过，
+        # 失败应尽快跳过该课程而不是无限重试。
+        max_auto_rounds = int(os.environ.get("WB_CAPTCHA_ROUNDS", "2"))
+        attempts_per_round = int(os.environ.get("WB_CAPTCHA_ATTEMPTS", "3"))
 
         # 第一阶段: 无头自动识别
         self.log.info("正在自动识别验证码...")
