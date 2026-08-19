@@ -10,14 +10,15 @@
 
 ## 功能特性
 
-- **课程学习**：自动遍历项目 → 分类 → 课程，模拟翻页、答题、等待学习时长后完课
+- **课程学习**：自动遍历项目 → 分类 → 课程，模拟翻页、答题、等待学习时长后完课；按项目交替完成课程与考试
 - **自动考试**：基于题库自动答题，支持单选/多选，未匹配题目可随机作答或手动输入
-- **验证码识别**：自动识别滑块验证码（需源码运行 + ddddocr），腾讯点选验证码需手动操作
+- **验证码识别**：登录滑块验证码自动识别；课程点选验证码自动识别（OpenCV，2 轮 × 3 次），失败才转手动
 - **多账号并发**：支持配置多个账号，可多线程同时执行
 - **题库同步**：考试前后自动从服务器同步题库，支持多用户共享
 - **断点续考**：追求满分模式下，一次未满分可再次考试
 - **进度监控**：完课后自动检查进度是否更新，未更新则警告提示
 - **调试模式**：开启 `debug` 可查看完整请求/响应日志
+- **无交互运行**：Docker / cron / 后台环境自动无交互，数据目录持久化
 
 ## 使用
 
@@ -57,22 +58,87 @@ pip install -r requirements.txt # 或 uv sync
 python main.py # 或 uv run main.py
 ```
 
+常用参数（`python main.py --help` 查看全部）。**每个配置项都有命令行参数和环境变量两种方式，三类名称一一对应**：配置文件键名（`snake_case`）= 命令行参数（`--kebab-case`）= 环境变量（`WB_SNAKE_CASE`），例如 `study_time` ↔ `--study-time` ↔ `WB_STUDY_TIME`。优先级均为 **命令行 > 环境变量 > 配置文件**：
+
+| 配置文件键 | 参数 | 环境变量 | 说明 |
+|-----------|------|---------|------|
+| — | `--config PATH` | `WB_CONFIG` | 配置文件路径（默认: 程序目录/config.toml） |
+| — | `--data-dir PATH` | `WB_DATA_DIR` | 数据目录（config/logs/answer 都在此，适合挂载） |
+| — | `--non-interactive` | — | 无交互模式（环境变量用 `ENVIRONMENT=docker`/`container` 或 stdin 非 TTY 自动判定） |
+| `study_mode` | `--study-mode` | `WB_STUDY_MODE` | 学习模式（`false`/`true`/`force`） |
+| `exam_mode` | `--exam-mode` | `WB_EXAM_MODE` | 考试模式（`false`/`true`/`perfect`/`force`） |
+| `random_answer` | `--random-answer` | `WB_RANDOM_ANSWER` | 题库外题目是否随机作答（`true`/`false`） |
+| `study_time` | `--study-time SEC` | `WB_STUDY_TIME` | 每门课学习时长 `"基础,随机上限"`（秒），如 `"20,5"` |
+| `video_speed` | `--video-speed N` | `WB_VIDEO_SPEED` | 视频课程倍速：`0`=不按视频时长等待、`1`=原速、`2`=半速 |
+| `exam_question_time` | `--exam-question-time SEC` | `WB_EXAM_QUESTION_TIME` | 每道考试题答题等待时长 `"基础,随机上限"`（秒） |
+| `exam_submit_match_rate` | `--exam-submit-match-rate N` | `WB_EXAM_SUBMIT_MATCH_RATE` | 允许交卷的最低题库匹配率（百分比） |
+| `browser_path` | `--browser-path PATH` | `WB_BROWSER_PATH` | 浏览器可执行文件路径 |
+| `cdp_host` | `--cdp-host HOST` | `WB_CDP_HOST` | CDP 浏览器地址 |
+| `cdp_port` | `--cdp-port PORT` | `WB_CDP_PORT` | CDP 浏览器端口 |
+| `jupiter_fallback` | `--jupiter-fallback` | `WB_JUPITER_FALLBACK` | 对未加载 apicenext.js 的课程是否补发 jupiter 翻页轨迹 |
+| `max_workers` | `--max-workers N` | `WB_MAX_WORKERS` | 多账号最大并发数 |
+| `debug` | `--debug` | `WB_DEBUG` | 启用调试日志 |
+| `tenant_name` | `--tenant-name NAME` | `WB_TENANT_NAME` | 单账号学校全称（免配置文件） |
+| `username` | `--username USER` | `WB_USERNAME` | 单账号用户名 |
+| `password` | `--password PASS` | `WB_PASSWORD` | 单账号密码（默认同用户名） |
+| `user_id` | `--user-id ID` | `WB_USER_ID` | 单账号用户 ID（Token 登录） |
+| `token` | `--token TOKEN` | `WB_TOKEN` | 单账号登录 Token（配合 `--tenant-name --user-id`） |
+| `[ai].enable` | `--ai-enable` | `WB_AI_ENABLE` | 是否启用 AI 搜题（`true`/`false`） |
+| `[ai].base_url` | `--ai-base-url URL` | `WB_AI_BASE_URL` | AI 服务 API 基础路径 |
+| `[ai].api_key` | `--ai-api-key KEY` | `WB_AI_API_KEY` | AI 服务 API Key |
+| `[ai].model` | `--ai-model NAME` | `WB_AI_MODEL` | AI 模型名称 |
+| `[ai].timeout` | `--ai-timeout SEC` | `WB_AI_TIMEOUT` | AI 请求超时秒数 |
+| `[ai].max_retries` | `--ai-max-retries N` | `WB_AI_MAX_RETRIES` | AI 请求失败最大重试次数 |
+
+无交互自动判定：`ENVIRONMENT=docker`（或 container）、stdin 非 TTY（cron/后台/管道）、或显式 `--non-interactive`。
+
+**完全不写 config.toml 也能运行**（单账号 + 全部设置走 CLI/env）：
+
+```bash
+# 环境变量
+WB_TENANT_NAME="你的学校全称" WB_USERNAME=你的学号 WB_PASSWORD=你的密码 \
+WB_STUDY_TIME="20,5" WB_VIDEO_SPEED=0 uv run main.py
+# 或等价的命令行参数
+uv run main.py --tenant-name "你的学校全称" --username 你的学号 \
+  --study-time "20,5" --video-speed 0
+```
+
 ### Docker
 
-提供两种镜像变体：
+提供两种镜像变体（多架构 amd64/arm64，发布时随版本推送）：
 
 | 镜像 | Tag | 说明 |
 |------|-----|------|
-| 内置浏览器 | `latest` / `with-browser` / `<版本号>` | 开箱即用 |
+| 内置浏览器 | `latest` / `with-browser` / `<版本号>` | 内置 headless Chrome，开箱即用 |
 | 轻量镜像 | `without-browser` / `<版本号>-without-browser` | 通过 CDP 连接宿主机浏览器 |
 
-#### 完整镜像（内置浏览器）
+容器默认无交互运行（`ENVIRONMENT=docker` 自动判定），数据全部持久化在 `/app/data`：
 
 ```bash
-docker run -it --rm \
-  -v "$PWD/config.toml":/app/config.toml:ro \
-  -v "$PWD/logs":/app/logs \
+mkdir -p data
+docker run --rm \
+  -v "$PWD/data":/app/data \
   hangyi/weban:latest
+```
+
+- 首次运行会在 `./data/` 生成 `config.toml` 模板，填写账号后重新运行即可
+- 日志在 `./data/logs/<账号>/`，题库在 `./data/answer/`，全部挂载持久化
+- 无交互：不弹编辑器、确认用默认值、验证码自动识别失败不等待手动输入（跳过该课）、末尾不等待回车
+- 需要交互（如手动输验证码）时用 `docker run -it`（容器检测到 TTY 自动进入交互模式）
+
+所有配置项均可覆盖（命令行参数 > 环境变量 > 配置文件，名称一一对应，见上方参数表）。示例：
+
+```bash
+# 环境变量（单账号免配置文件）
+docker run --rm -v "$PWD/data":/app/data \
+  -e WB_TENANT_NAME="你的学校全称" -e WB_USERNAME=你的学号 -e WB_PASSWORD=你的密码 \
+  -e WB_STUDY_TIME="20,5" -e WB_VIDEO_SPEED=0 \
+  hangyi/weban:latest
+
+# 命令行参数（经 entrypoint 透传）
+docker run --rm -v "$PWD/data":/app/data \
+  hangyi/weban:latest --tenant-name "你的学校全称" --username 你的学号 \
+  --study-time "20,5" --video-speed 0
 ```
 
 #### 轻量镜像（CDP 连接宿主机浏览器）
@@ -101,13 +167,13 @@ google-chrome --remote-debugging-port=9222
 **第二步：运行容器**
 
 ```bash
-docker run -it --rm \
-  -v "$PWD/config.toml":/app/config.toml:ro \
-  -v "$PWD/logs":/app/logs \
+mkdir -p data
+docker run --rm \
+  -v "$PWD/data":/app/data \
   hangyi/weban:without-browser
 ```
 
-如需自定义 CDP 地址，可在 `config.toml` 中配置 `cdp_host` 和 `cdp_port`。
+如需自定义 CDP 地址，可用 `--cdp-host` / `--cdp-port` 参数或配置文件 `cdp_host` / `cdp_port`。
 
 ### 浏览器检测
 
@@ -136,13 +202,13 @@ docker run -it --rm \
 - ### 学习
 
 1. 学习时长太低不会计入进度
-2. 有腾讯云验证码的还不支持自动完成，会弹出浏览器窗口手动操作
-2. 学习进度不更新可能是被风控，遇到了需要验证码的课程，请去网页上完成一次后重试
+2. 课程点选验证码会自动识别（无头浏览器 + OpenCV，最多 2 轮 × 3 次，可用 WB_CAPTCHA_ROUNDS/WB_CAPTCHA_ATTEMPTS 调整），失败后在交互模式会打开浏览器手动操作，无交互模式（Docker 等）会跳过该课程并告警
+3. 学习进度不更新可能是被风控，遇到了需要验证码的课程，请去网页上完成一次后重试
 
 - ### 考试
 
-
-1. 据观察，考试未提交是不会消耗考试次数的
+1. 考试前有腾讯无感验证码，自动处理（headless 浏览器）
+2. 据观察，考试未提交是不会消耗考试次数的
 
 ## 鸣谢
 

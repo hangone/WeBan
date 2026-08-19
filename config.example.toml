@@ -1,5 +1,38 @@
 # WeBan 配置文件
-
+#
+# 配置优先级（高→低）：
+#   1. 命令行参数（--config / --data-dir / --non-interactive / --study-mode /
+#      --exam-mode / --random-answer / --study-time / --video-speed /
+#      --exam-question-time / --exam-submit-match-rate / --browser-path /
+#      --cdp-host / --cdp-port / --jupiter-fallback / --max-workers / --debug /
+#      --tenant-name / --username / --password / --user-id / --token /
+#      --ai-enable / --ai-base-url / --ai-api-key / --ai-model / --ai-timeout /
+#      --ai-max-retries）
+#   2. 环境变量（同名加 WB_ 前缀：WB_STUDY_MODE / WB_EXAM_MODE /
+#      WB_RANDOM_ANSWER / WB_STUDY_TIME / WB_VIDEO_SPEED /
+#      WB_EXAM_QUESTION_TIME / WB_EXAM_SUBMIT_MATCH_RATE / WB_BROWSER_PATH /
+#      WB_CDP_HOST / WB_CDP_PORT / WB_JUPITER_FALLBACK / WB_MAX_WORKERS /
+#      WB_DEBUG / WB_TENANT_NAME / WB_USERNAME / WB_PASSWORD / WB_USER_ID /
+#      WB_TOKEN / WB_AI_ENABLE / WB_AI_BASE_URL / WB_AI_API_KEY / WB_AI_MODEL /
+#      WB_AI_TIMEOUT / WB_AI_MAX_RETRIES / WB_CONFIG / WB_DATA_DIR）
+#   3. 本配置文件（[settings] 与 [[account]]）
+#
+# 三类名称一一对应：配置文件键名（snake_case）= 命令行参数（--kebab-case）=
+# 环境变量（WB_SNAKE_CASE）。例如 study_time ↔ --study-time ↔ WB_STUDY_TIME。
+#
+# 无交互判定（自动，无需手动配置）：
+#   - ENVIRONMENT=docker（或 container）：容器环境，镜像默认已设置
+#   - stdin 不是 TTY：cron / 后台运行 / 管道 / SSH 无 TTY 会话
+#   - 或显式传 --non-interactive 参数
+#   无交互时：不弹编辑器、所有确认用默认值、验证码/考试不等待手动输入、
+#   末尾不等待回车。
+#
+# Docker 运行（无交互、数据持久化）：
+#   docker run -v ./data:/app/data hangyi/weban
+#   - 镜像默认已设 WB_DATA_DIR=/app/data 与 ENVIRONMENT=docker，
+#     数据目录挂载 ./data:/app/data 后 config.toml/logs/answer 都会持久化
+#   - 首次运行会在数据目录生成 config.example.toml 模板，填写账号后重跑
+#
 # 账号设置
 [[account]]
 # 学校名称（必填，需要和登录页面显示的学校完全一致，推荐复制过来）
