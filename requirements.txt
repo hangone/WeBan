@@ -16,11 +16,11 @@ mss==10.2.0
     # via nodriver
 nodriver==0.50.3
     # via weban
-numpy==2.5.1
+numpy==1.26.4
     # via
     #   opencv-python-headless
     #   weban
-opencv-python-headless==5.0.0.93
+opencv-python-headless==4.10.0.84
     # via weban
 pyaes==1.6.1
     # via weban
@@ -28,9 +28,9 @@ requests==2.34.2
     # via weban
 urllib3==2.7.0
     # via requests
-websockets==16.1.1
+websockets==17.0.1
     # via nodriver
 win32-setctime==1.2.0 ; sys_platform == 'win32'
     # via loguru
-wrapt==2.2.2
+wrapt==2.3.0
     # via deprecated

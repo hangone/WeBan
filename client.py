@@ -13,7 +13,7 @@ from uuid import uuid4
 from loguru import logger
 
 from api import WeBanAPI
-from captcha import CaptchaHandler, LoginCaptchaSolver
+from captcha import CaptchaHandler, LoginCaptchaSolver, is_non_interactive
 
 if getattr(sys, "frozen", False):
     base_path = os.path.dirname(os.path.abspath(sys.executable))
@@ -21,9 +21,17 @@ if getattr(sys, "frozen", False):
 else:
     base_path = os.path.dirname(os.path.abspath(__file__))
     bundle_path = base_path
-answer_dir = os.path.join(base_path, "answer")
+
+# 无交互模式判定复用 captcha.is_non_interactive（ENVIRONMENT=docker / stdin 非 TTY）
+
+# 数据目录模式（main.py --data-dir / WB_DATA_DIR）：answer 也放数据目录，便于挂载持久化
+_data_dir = os.environ.get("WB_DATA_DIR", "")
+if _data_dir:
+    answer_dir = os.path.join(_data_dir, "answer")
+else:
+    answer_dir = os.path.join(base_path, "answer")
 answer_path = os.path.join(answer_dir, "answer.json")
-root_answer_path = os.path.join(base_path, "answer.json")
+root_answer_path = os.path.join(_data_dir, "answer.json") if _data_dir else os.path.join(base_path, "answer.json")
 bundle_answer_path = os.path.join(bundle_path, "answer", "answer.json")
 
 
@@ -599,6 +607,13 @@ class WeBanClient:
                 verify_code = LoginCaptchaSolver.recognize(verify_image, self.log)
                 if not verify_code:
                     continue
+            elif is_non_interactive():
+                # 无交互模式：不阻塞等待手动输入，直接判定失败
+                self.log.error(
+                    "验证码 OCR 连续失败且处于无交互模式，无法手动输入验证码，"
+                    "登录失败（可在宿主机浏览器配合 CDP 或稍后重试）"
+                )
+                break
             else:
                 account_id = (
                     self.api.account or self.api.user.get("userId") or "unknown"
@@ -1138,16 +1153,16 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                 if qlist:
                     self.log.info(f"  {label} {len(qlist)} 道")
                     for i, q in enumerate(qlist):
-                        hit = self._answer_question(
+                        # 无论题库命中还是 fallback 都已提交答案，
+                        # 对用户而言课程题目作答流程已完成
+                        self._answer_question(
                             q,
                             answers_json,
                             course["resourceId"],
                             save_func,
                             source_str,
                         )
-                        self.log.info(
-                            f"    {i + 1}/{len(qlist)} {'✓' if hit else '未命中'}"
-                        )
+                        self.log.info(f"    {i + 1}/{len(qlist)} 已完成")
                         time.sleep(0.5)
         elif question_data:
             self.log.info(f"  list_question: code={question_data.get('code')}")
@@ -1487,8 +1502,10 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                             f"{question['title'][:40]}..."
                         )
                         time.sleep(use_time)
-                    elif random_answer:
+                    elif random_answer or is_non_interactive():
                         # 自动随机作答：单选随机选一个，多选全选
+                        # （无交互模式即使配置 random_answer=false 也走随机，
+                        #   避免阻塞等待终端输入）
                         answers_ids = self._auto_select_answer(question)
                         use_time = question_base_time + randint(
                             0, question_random_upper
