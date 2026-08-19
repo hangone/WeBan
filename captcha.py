@@ -797,6 +797,25 @@ def detect_browser() -> str | None:
     return None
 
 
+def kill_stray_browsers() -> None:
+    """杀掉 nodriver 启动失败/残留的浏览器子进程。
+
+    nodriver.start 连接失败时不会清理已启动的 Chrome 子进程（raise 前没有
+    kill），残留进程会在事件循环关闭时触发 "Event loop is closed" 报错，
+    也可能占用资源导致下次启动更慢。健康探测与 _create_browser 失败后调用。
+    """
+    from nodriver.core import util as _nd_util
+
+    for inst in list(_nd_util.get_registered_instances()):
+        proc = getattr(inst, "_process", None)
+        if proc is not None and proc.returncode is None:
+            try:
+                proc.kill()
+            except (ProcessLookupError, OSError):
+                pass
+    _nd_util.get_registered_instances().clear()
+
+
 def check_browser_health(
     browser_path: str | None = None,
     cdp_host: str | None = None,
@@ -831,6 +850,8 @@ def check_browser_health(
 
     # 4. 健康探测：让 nodriver 自己拉起一次再停掉。临时 profile、端口分配、
     #    退出清理全部由库自动处理，也不会撞上用户已打开的 Chrome 单例锁。
+    #    失败时 nodriver 不会清理已启动的子进程（Chrome 残留进程 + 事件循环
+    #    关闭时的 transport 报错），这里统一清理并重试。
     async def _probe() -> None:
         browser = await nodriver.start(
             headless=True,
@@ -845,15 +866,23 @@ def check_browser_health(
             if proc is not None:
                 await asyncio.wait_for(proc.wait(), timeout=5)
 
-    try:
-        asyncio.run(asyncio.wait_for(_probe(), timeout=15))
-    except FileNotFoundError as e:
-        raise RuntimeError(f"浏览器可执行文件不存在: {resolved}") from e
-    except TimeoutError:
-        raise RuntimeError(f"浏览器启动超时: {resolved}") from None
-    except Exception as e:
-        raise RuntimeError(f"浏览器启动失败: {e}") from e
-    return resolved
+    last_exc: Exception | None = None
+    for attempt in range(1, 4):  # 冷启动慢/资源紧张时 Chrome 可能超过库内 2.75s 窗口
+        try:
+            asyncio.run(asyncio.wait_for(_probe(), timeout=20))
+            return resolved
+        except FileNotFoundError as e:
+            raise RuntimeError(f"浏览器可执行文件不存在: {resolved}") from e
+        except TimeoutError as e:
+            last_exc = e
+        except Exception as e:  # noqa: BLE001 -- 探测任何启动失败都要重试
+            last_exc = e
+        kill_stray_browsers()
+        if attempt < 3:
+            time.sleep(1)
+    if isinstance(last_exc, TimeoutError):
+        raise RuntimeError(f"浏览器启动超时: {resolved}") from last_exc  # noqa: TRY004
+    raise RuntimeError(f"浏览器启动失败: {last_exc}") from last_exc
 
 
 # ── CaptchaHandler ────────────────────────────────────
@@ -936,31 +965,45 @@ class CaptchaHandler:
         ]
         if headless:
             browser_args.append("--headless=new")
-        try:
-            return await nodriver.start(
-                headless=headless,
-                browser_executable_path=browser_path or None,
-                browser_args=browser_args,
-                host=self.cdp_host,
-                port=self.cdp_port,
-            )
-        except Exception as e:
-            if "Failed to connect to browser" in str(e):
-                if self.cdp_host and self.cdp_port:
+        # 非 CDP 模式：nodriver 启动 Chrome 的就绪窗口只有 ~2.75s，冷启动/
+        # 资源紧张时可能超时（"Failed to connect to browser"），重试一次。
+        # CDP 模式连已有浏览器，失败是配置问题，不重试。
+        attempts = 1 if (self.cdp_host and self.cdp_port) else 2
+        last_exc: Exception | None = None
+        for attempt in range(1, attempts + 1):
+            try:
+                return await nodriver.start(
+                    headless=headless,
+                    browser_executable_path=browser_path or None,
+                    browser_args=browser_args,
+                    host=self.cdp_host,
+                    port=self.cdp_port,
+                )
+            except Exception as e:
+                last_exc = e
+                if "Failed to connect to browser" in str(e):
+                    if self.cdp_host and self.cdp_port:
+                        raise RuntimeError(
+                            f"无法连接 CDP 浏览器 ({self.cdp_host}:{self.cdp_port})。"
+                            "请检查：\n"
+                            "  1. 远程浏览器是否已启动并开放调试端口\n"
+                            "  2. config.toml 中 cdp_host 和 cdp_port 是否正确"
+                        ) from e
+                    # nodriver 失败不清理已启动的 Chrome 子进程，杀掉再重试
+                    kill_stray_browsers()
+                    if attempt < attempts:
+                        await asyncio.sleep(1)
+                        continue
                     raise RuntimeError(
-                        f"无法连接 CDP 浏览器 ({self.cdp_host}:{self.cdp_port})。"
-                        "请检查：\n"
-                        "  1. 远程浏览器是否已启动并开放调试端口\n"
-                        "  2. config.toml 中 cdp_host 和 cdp_port 是否正确"
+                        f"无法启动浏览器 ({browser_path or '自动检测'})。"
+                        "请尝试以下解决方案：\n"
+                        "  1. 在 config.toml 中配置 browser_path 指定浏览器路径\n"
+                        "  2. 在 config.toml 中配置 cdp_host 和 cdp_port 连接远程浏览器\n"
+                        "  3. 安装最新版 Chrome 或 Chromium"
                     ) from e
-                raise RuntimeError(
-                    f"无法启动浏览器 ({browser_path or '自动检测'})。"
-                    "请尝试以下解决方案：\n"
-                    "  1. 在 config.toml 中配置 browser_path 指定浏览器路径\n"
-                    "  2. 在 config.toml 中配置 cdp_host 和 cdp_port 连接远程浏览器\n"
-                    "  3. 安装最新版 Chrome 或 Chromium"
-                ) from e
-            raise
+                # 非连接类异常：不重试，直接抛
+                raise
+        raise RuntimeError(f"无法启动浏览器: {last_exc}")
 
     async def _inject_auth(self, tab) -> None:
         """向页面注入 localStorage 认证信息。
