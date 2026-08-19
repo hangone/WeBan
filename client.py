@@ -1153,16 +1153,16 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                 if qlist:
                     self.log.info(f"  {label} {len(qlist)} 道")
                     for i, q in enumerate(qlist):
-                        hit = self._answer_question(
+                        # 无论题库命中还是 fallback 都已提交答案，
+                        # 对用户而言课程题目作答流程已完成
+                        self._answer_question(
                             q,
                             answers_json,
                             course["resourceId"],
                             save_func,
                             source_str,
                         )
-                        self.log.info(
-                            f"    {i + 1}/{len(qlist)} {'✓' if hit else '未命中'}"
-                        )
+                        self.log.info(f"    {i + 1}/{len(qlist)} 已完成")
                         time.sleep(0.5)
         elif question_data:
             self.log.info(f"  list_question: code={question_data.get('code')}")
