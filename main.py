@@ -1,3 +1,4 @@
+import argparse
 import os
 import re
 import subprocess
@@ -13,6 +14,222 @@ from loguru import logger
 
 from captcha import check_browser_health
 from client import WeBanClient, read_first_existing
+
+# ── 命令行参数与环境变量（优先级：CLI > 环境变量 > 配置文件）────────
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    """读取 WB_ 前缀布尔环境变量：1/true/yes 为真，其余为默认"""
+    val = os.environ.get(name)
+    if val is None:
+        return default
+    return val.strip().lower() in ("1", "true", "yes", "on")
+
+
+def _parse_args() -> tuple[argparse.Namespace, list[str]]:
+    """解析命令行参数（--config/--data-dir/--non-interactive 等）。
+
+    返回值 (opts, unknown)：opts 为解析结果；unknown 为未识别参数，
+    保留不改动（历史调用方式兼容）。
+    """
+    parser = argparse.ArgumentParser(
+        prog="WeBan",
+        description="WeBan 学习自动化（多账号，可按项目交替学习+考试）",
+        # 禁用前缀缩写（allow_abbrev）：--tenant 不再被当作 --tenant-name
+        # 的缩写，参数必须写全名，与配置文件键名/环境变量名严格对应
+        allow_abbrev=False,
+    )
+    parser.add_argument(
+        "--config",
+        metavar="PATH",
+        help="配置文件路径（默认: 程序目录/config.toml）",
+    )
+    parser.add_argument(
+        "--data-dir",
+        metavar="PATH",
+        help=(
+            "数据目录：config.toml、logs、answer 都放在此目录下 "
+            "（适合 Docker 挂载持久化，如 docker run -v ./data:/app/data "
+            "-e WB_DATA_DIR=/app/data）"
+        ),
+    )
+    parser.add_argument(
+        "--non-interactive",
+        action="store_true",
+        help="无交互模式：所有输入使用默认值，不打开编辑器，末尾不等待回车",
+    )
+    parser.add_argument(
+        "--study-mode",
+        choices=["false", "true", "force"],
+        help="学习模式（覆盖配置文件）",
+    )
+    parser.add_argument(
+        "--exam-mode",
+        choices=["false", "true", "perfect", "force"],
+        help="考试模式（覆盖配置文件）",
+    )
+    parser.add_argument(
+        "--random-answer",
+        choices=["true", "false"],
+        help="题库外题目是否随机作答（覆盖配置文件）",
+    )
+    parser.add_argument(
+        "--cdp-host",
+        metavar="HOST",
+        help="CDP 浏览器地址（覆盖配置文件）",
+    )
+    parser.add_argument(
+        "--cdp-port",
+        type=int,
+        metavar="PORT",
+        help="CDP 浏览器端口（覆盖配置文件）",
+    )
+    parser.add_argument(
+        "--max-workers",
+        type=int,
+        metavar="N",
+        help="多账号最大并发数（覆盖配置文件）",
+    )
+    parser.add_argument(
+        "--tenant-name",
+        dest="tenant_name",
+        metavar="NAME",
+        help="单账号学校全称（与配置文件 tenant_name 对应；配合 --username 免配置文件，"
+        "可配合环境变量 WB_TENANT_NAME）",
+    )
+    parser.add_argument(
+        "--username",
+        metavar="USER",
+        help="单账号用户名（配合 --tenant-name，免配置文件，可配合环境变量 WB_USERNAME）",
+    )
+    parser.add_argument(
+        "--password",
+        metavar="PASS",
+        help="单账号密码（默认同用户名，可配合环境变量 WB_PASSWORD）",
+    )
+    parser.add_argument(
+        "--study-time",
+        metavar="SEC",
+        help='每门课学习时长 "基础,随机上限"（秒），如 "20,5"（覆盖配置文件）',
+    )
+    parser.add_argument(
+        "--video-speed",
+        type=float,
+        metavar="N",
+        help="视频课程倍速：0=不按视频时长等待，1=按原时长，2=半速（覆盖配置文件）",
+    )
+    parser.add_argument(
+        "--exam-question-time",
+        metavar="SEC",
+        help='每道考试题答题等待时长 "基础,随机上限"（秒），如 "3,3"（覆盖配置文件）',
+    )
+    parser.add_argument(
+        "--exam-submit-match-rate",
+        type=int,
+        metavar="N",
+        help="允许交卷的最低题库匹配率（百分比，覆盖配置文件）",
+    )
+    parser.add_argument(
+        "--browser-path",
+        metavar="PATH",
+        help="浏览器可执行文件路径（覆盖配置文件）",
+    )
+    parser.add_argument(
+        "--jupiter-fallback",
+        choices=["true", "false"],
+        help="对未加载 apicenext.js 的课程是否补发 jupiter 翻页轨迹（覆盖配置文件）",
+    )
+    parser.add_argument(
+        "--user-id",
+        metavar="ID",
+        help="单账号用户 ID（配合 --tenant-name --token 用 Token 登录，可配合环境变量 WB_USER_ID）",
+    )
+    parser.add_argument(
+        "--token",
+        metavar="TOKEN",
+        help="单账号登录 Token（配合 --tenant-name --user-id，可配合环境变量 WB_TOKEN）",
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="启用调试日志（覆盖配置文件）",
+    )
+    # AI 搜题（覆盖配置文件 [ai] 段）
+    parser.add_argument(
+        "--ai-enable",
+        choices=["true", "false"],
+        help="是否启用 AI 搜题（覆盖配置文件 [ai].enable）",
+    )
+    parser.add_argument(
+        "--ai-base-url",
+        metavar="URL",
+        help="AI 服务 API 基础路径（覆盖配置文件 [ai].base_url）",
+    )
+    parser.add_argument(
+        "--ai-api-key",
+        metavar="KEY",
+        help="AI 服务 API Key（覆盖配置文件 [ai].api_key）",
+    )
+    parser.add_argument(
+        "--ai-model",
+        metavar="NAME",
+        help="AI 模型名称（覆盖配置文件 [ai].model）",
+    )
+    parser.add_argument(
+        "--ai-timeout",
+        type=int,
+        metavar="SEC",
+        help="AI 请求超时秒数（覆盖配置文件 [ai].timeout）",
+    )
+    parser.add_argument(
+        "--ai-max-retries",
+        type=int,
+        metavar="N",
+        help="AI 请求失败最大重试次数（覆盖配置文件 [ai].max_retries）",
+    )
+    opts, unknown = parser.parse_known_args()
+    return opts, unknown
+
+
+def merge_ai_config(opts: argparse.Namespace, ai: dict) -> dict:
+    """CLI/环境变量覆盖 AI 配置（[ai] 段）：CLI > 环境变量 > 配置文件。
+
+    未通过 CLI/env 指定的字段保留配置文件原值。
+    """
+    merged = dict(ai)
+    cli_map = {
+        "enable": opts.ai_enable,
+        "base_url": opts.ai_base_url,
+        "api_key": opts.ai_api_key,
+        "model": opts.ai_model,
+        "timeout": opts.ai_timeout,
+        "max_retries": opts.ai_max_retries,
+    }
+    for key, cli_val in cli_map.items():
+        env_val = os.environ.get(f"WB_AI_{key.upper()}")
+        if cli_val is not None:
+            merged[key] = (
+                str(cli_val).strip().lower() in ("1", "true", "yes")
+                if key == "enable"
+                else cli_val
+            )
+        elif env_val is not None:
+            merged[key] = (
+                env_val.strip().lower() in ("1", "true", "yes")
+                if key == "enable"
+                else env_val
+            )
+    return merged
+
+
+# 命令行 > 环境变量 > 自动检测（配置文件在 load_config 后再合并）
+_OPTS, _ = _parse_args()
+if _OPTS.data_dir:
+    _data_dir = _OPTS.data_dir
+elif os.environ.get("WB_DATA_DIR"):
+    _data_dir = os.environ["WB_DATA_DIR"]
+else:
+    _data_dir = None
+
 
 
 def _resolve_version() -> str:
@@ -277,6 +494,15 @@ def run_account(
             return val
         return global_settings.get(key, default)
 
+    def cli_or_env(key: str, cli_val, default=None):
+        """命令行参数 > 环境变量 > 默认值"""
+        if cli_val is not None:
+            return cli_val
+        env_val = os.environ.get(f"WB_{key.upper()}")
+        if env_val is not None:
+            return env_val
+        return default
+
     # 必填字段（password 默认为 username）
     tenant_name = account_config.get("tenant_name", "").strip()
     username = account_config.get("username", "").strip()
@@ -287,19 +513,63 @@ def run_account(
     # 账号标识（用于日志文件夹名）
     account_name = username or user_id or f"account_{account_index}"
 
-    # 合并设置（账号级优先，回退到全局）
-    study_mode = get_setting("study_mode", "true")
-    exam_mode = get_setting("exam_mode", "true")
-    random_answer = get_setting("random_answer", True)
-    study_time = get_setting("study_time", "20,10")
-    exam_question_time = get_setting("exam_question_time", "3,3")
-    exam_submit_match_rate = int(get_setting("exam_submit_match_rate", 90))
-    browser_path = get_setting("browser_path", "") or None
-    cdp_host = get_setting("cdp_host", "") or None
-    cdp_port = int(get_setting("cdp_port", 0)) or None
-    debug = get_setting("debug", False)
-    video_speed = float(get_setting("video_speed", 1))
-    jupiter_fallback = str(get_setting("jupiter_fallback", False)).lower() in (
+    # 合并设置（账号级优先，回退到全局；CLI/环境变量最高优先）
+    study_mode = cli_or_env(
+        "study_mode", _OPTS.study_mode, get_setting("study_mode", "true")
+    )
+    exam_mode = cli_or_env(
+        "exam_mode", _OPTS.exam_mode, get_setting("exam_mode", "true")
+    )
+    random_answer_raw = cli_or_env(
+        "random_answer", _OPTS.random_answer, get_setting("random_answer", True)
+    )
+    if isinstance(random_answer_raw, str):
+        random_answer = random_answer_raw.strip().lower() in ("1", "true", "yes")
+    else:
+        random_answer = bool(random_answer_raw)
+        random_answer = True
+    study_time = cli_or_env(
+        "study_time", _OPTS.study_time, get_setting("study_time", "20,10")
+    )
+    video_speed = float(
+        cli_or_env(
+            "video_speed",
+            _OPTS.video_speed,
+            get_setting("video_speed", 1),
+        )
+    )
+    exam_question_time = cli_or_env(
+        "exam_question_time", _OPTS.exam_question_time, get_setting("exam_question_time", "3,3")
+    )
+    exam_submit_match_rate = int(
+        cli_or_env(
+            "exam_submit_match_rate",
+            _OPTS.exam_submit_match_rate,
+            get_setting("exam_submit_match_rate", 90),
+        )
+    )
+    browser_path = (
+        _OPTS.browser_path
+        or os.environ.get("WB_BROWSER_PATH", "").strip()
+        or get_setting("browser_path", "")
+        or None
+    )
+    cdp_host = cli_or_env(
+        "cdp_host", _OPTS.cdp_host, get_setting("cdp_host", "") or None
+    )
+    cdp_port_raw = cli_or_env(
+        "cdp_port", _OPTS.cdp_port, get_setting("cdp_port", 0) or None
+    )
+    cdp_port = int(cdp_port_raw) if cdp_port_raw else None
+    debug_raw = cli_or_env("debug", _OPTS.debug, get_setting("debug", False))
+    if isinstance(debug_raw, str):
+        debug = debug_raw.strip().lower() in ("1", "true", "yes")
+    else:
+        debug = bool(debug_raw)
+    jupiter_fallback_raw = cli_or_env(
+        "jupiter_fallback", _OPTS.jupiter_fallback, get_setting("jupiter_fallback", False)
+    )
+    jupiter_fallback = str(jupiter_fallback_raw).lower() in (
         "1",
         "true",
         "yes",
@@ -431,6 +701,47 @@ if __name__ == "__main__":
 
         global_settings, ai_config, accounts = load_all_config()
 
+        # 命令行/环境变量直传单账号（免配置文件，如 Docker 单用户）：
+        # --tenant-name + --username [--password] 或 WB_TENANT_NAME + WB_USERNAME [WB_PASSWORD]
+        # 或 --tenant-name + --user-id + --token（Token 登录）
+        cli_tenant = (
+            _OPTS.tenant_name
+            or os.environ.get("WB_TENANT_NAME", "").strip()
+        )
+        cli_username = _OPTS.username or os.environ.get("WB_USERNAME", "").strip()
+        cli_user_id = _OPTS.user_id or os.environ.get("WB_USER_ID", "").strip()
+        cli_token = _OPTS.token or os.environ.get("WB_TOKEN", "").strip()
+        if cli_tenant and cli_username:
+            cli_password = (
+                _OPTS.password or os.environ.get("WB_PASSWORD", "") or cli_username
+            )
+            cli_account = {
+                "tenant_name": cli_tenant,
+                "username": cli_username,
+                "password": cli_password,
+            }
+        elif cli_tenant and cli_user_id and cli_token:
+            cli_account = {
+                "tenant_name": cli_tenant,
+                "user_id": cli_user_id,
+                "token": cli_token,
+            }
+        else:
+            cli_account = None
+        if cli_account is not None:
+            # CLI/env 账号优先于配置文件同用户名账号（避免重复），置于最前
+            accounts = [
+                a
+                for a in accounts
+                if a.get("username") != cli_account.get("username")
+                or a.get("tenant_name") != cli_tenant
+            ]
+            accounts.insert(0, cli_account)
+            logger.info(
+                f"使用命令行/环境变量指定账号：{cli_tenant}/"
+                f"{cli_account.get('username') or cli_account.get('user_id')}"
+            )
+
         # 过滤有效账号
         valid_accounts = [a for a in accounts if is_account_valid(a)]
 
@@ -438,6 +749,7 @@ if __name__ == "__main__":
             logger.warning("没有找到有效的账号配置，正在打开配置文件...")
             open_editor(config_path)
             global_settings, ai_config, accounts = load_all_config()
+            ai_config = merge_ai_config(_OPTS, ai_config)
             valid_accounts = [a for a in accounts if is_account_valid(a)]
             if not valid_accounts:
                 logger.error("仍然没有有效的账号配置，请检查 config.toml")
@@ -459,6 +771,7 @@ if __name__ == "__main__":
             if choice == "y":
                 open_editor(config_path)
                 global_settings, ai_config, accounts = load_all_config()
+                ai_config = merge_ai_config(_OPTS, ai_config)
                 valid_accounts = [a for a in accounts if is_account_valid(a)]
                 if not valid_accounts:
                     logger.error("没有有效的账号配置")
@@ -467,10 +780,26 @@ if __name__ == "__main__":
         accounts = valid_accounts
         logger.info(f"共加载到 {len(accounts)} 个账号")
 
-        # 检测浏览器是否可用（优先级：CDP → 用户路径 → 自动检测）
-        browser_path = global_settings.get("browser_path", "") or None
-        cdp_host = global_settings.get("cdp_host", "") or None
-        cdp_port = int(global_settings.get("cdp_port", 0)) or None
+        # 检测浏览器是否可用（优先级：CLI > 环境变量 > 配置文件 → 自动检测）
+        browser_path = (
+            _OPTS.browser_path
+            or os.environ.get("WB_BROWSER_PATH", "").strip()
+            or global_settings.get("browser_path", "")
+            or None
+        )
+        cdp_host = (
+            _OPTS.cdp_host
+            or os.environ.get("WB_CDP_HOST", "").strip()
+            or global_settings.get("cdp_host", "")
+            or None
+        )
+        cdp_port_raw = (
+            _OPTS.cdp_port
+            if _OPTS.cdp_port is not None
+            else os.environ.get("WB_CDP_PORT", "").strip()
+            or global_settings.get("cdp_port", 0)
+        )
+        cdp_port = int(cdp_port_raw) or None
 
         # 用户未配置时，自动探测可用的 CDP 端口
         if not browser_path and not cdp_host and not cdp_port:
@@ -504,9 +833,15 @@ if __name__ == "__main__":
             global_settings["cdp_port"] = cdp_port
 
         # 是否多线程
-        max_workers = min(len(accounts), int(global_settings.get("max_workers", 5)))
+        max_workers_raw = _OPTS.max_workers
+        if max_workers_raw is None:
+            env_mw = os.environ.get("WB_MAX_WORKERS")
+            if env_mw is not None:
+                max_workers_raw = int(env_mw)
+        if max_workers_raw is None:
+            max_workers_raw = int(global_settings.get("max_workers", 5))
+        max_workers = min(len(accounts), max_workers_raw)
 
-        if len(accounts) > 1:
             choice = (
                 input(f"检测到 {len(accounts)} 个账号，是否同时运行？(Y/n，默认Y): ")
                 .strip()
