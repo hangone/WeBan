@@ -31,13 +31,13 @@
 
 点这里打开最新版下载页 → [**Releases**](https://github.com/hangone/WeBan/releases/latest)，按自己的电脑系统下载（不确定系统就按下面的表选）：
 
-| 你的电脑 | 下载这个文件 | 下载太慢用镜像 |
-|---------|-------------|---------------|
-| Windows（绝大多数电脑） | **WeBan-windows-x64.exe** | [镜像下载](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-windows-x64.exe) |
-| Mac 苹果电脑（Intel 芯片） | **WeBan-macos-x64** | [镜像下载](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-macos-x64) |
-| Mac 苹果电脑（M1/M2/M3/M4 芯片） | **WeBan-macos-arm64** | [镜像下载](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-macos-arm64) |
-| Linux（Ubuntu/Debian/CentOS，64 位） | **WeBan-linux-x64** | [镜像下载](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-linux-x64) |
-| Linux（树莓派/ARM 服务器） | **WeBan-linux-arm64** | [镜像下载](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-linux-arm64) |
+| 你的电脑 | 点击下载（GitHub） | 下载太慢用镜像 |
+|---------|-------------------|---------------|
+| Windows（绝大多数电脑） | [WeBan-windows-x64.exe](https://github.com/hangone/WeBan/releases/latest/download/WeBan-windows-x64.exe) | [镜像](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-windows-x64.exe) |
+| Mac 苹果电脑（Intel 芯片） | [WeBan-macos-x64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-macos-x64) | [镜像](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-macos-x64) |
+| Mac 苹果电脑（M1/M2/M3/M4 芯片） | [WeBan-macos-arm64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-macos-arm64) | [镜像](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-macos-arm64) |
+| Linux（Ubuntu/Debian/CentOS，64 位） | [WeBan-linux-x64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-linux-x64) | [镜像](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-linux-x64) |
+| Linux（树莓派/ARM 服务器） | [WeBan-linux-arm64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-linux-arm64) | [镜像](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-linux-arm64) |
 
 > **Mac 怎么判断芯片**：屏幕左上角  → 关于本机，看"芯片"一栏写的是 Apple M 系列（arm64）还是 Intel（x64）。Windows 不确定就选 x64（2010 年后几乎都是）。
 
@@ -57,16 +57,20 @@
 
 **第 3 步：填账号，开始**
 
-首次运行会自动下载配置文件模板并打开编辑器，按提示填写：
+第一次运行程序时，会自动下载一个叫 `config.toml` 的配置文件，并用记事本/文本编辑器打开它。**你只需要改三行**（其他都别动）：
 
 ```toml
 [[account]]
-tenant_name = "你的学校全称"   # 要和登录页面显示的一致，例如"北京交通大学-本科生"
-username = "你的学号"
-password = "你的密码"          # 默认和学号一样，可留空
+tenant_name = "你的学校全称"   # 例："北京交通大学-本科生"（要和登录页面显示的一致）
+username = "你的学号"          # 例：26551063
+password = "你的密码"          # 默认和学号一样，可以不填
 ```
 
-保存后重新运行程序，就会自动开始学习和考试。不想手动填文件的，也可以**一条命令直连启动**（无需配置文件）：
+保存文件，**再次运行程序**，就会自动开始学习和考试。之后每次运行都会接着上次的进度继续。
+
+> 找不到 `config.toml` 在哪？它就在程序旁边（Windows 是 exe 所在文件夹，Mac/Linux 是运行命令的目录）。用 `--data-dir` 可以指定固定位置（见下方参数表）。
+
+**不想编辑文件？一条命令直接跑**（学校/学号/密码写在命令里，无需配置文件）：
 
 ```bash
 # Windows (PowerShell)
