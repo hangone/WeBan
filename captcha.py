@@ -209,7 +209,7 @@ def rotate_mask(mask: np.ndarray, angle: float) -> np.ndarray:
     h, w = mask.shape
     center = (w / 2, h / 2)
     matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
-    return cv2.warpAffine(mask, matrix, (w, h), flags=cv2.INTER_NEAREST, borderValue=0)
+    return cv2.warpAffine(mask, matrix, (w, h), flags=cv2.INTER_NEAREST, borderValue=(0,))
 
 
 def crop_foreground(mask: np.ndarray) -> np.ndarray | None:

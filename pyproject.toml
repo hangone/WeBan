@@ -4,11 +4,18 @@ version = "3.9.9"
 description = "auto finish weiban"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
+# 版本锁定说明（勿随意升级）：
+# - numpy 锁 <2：numpy 2.x 官方 wheel 基线为 x86-64-v2（要求 AVX/AVX2 指令集），
+#   而 QEMU 虚拟 CPU（便宜的 1H1G 云服务器常见，如 dedione/hk）只有 SSE2，
+#   会导致 import numpy 直接崩溃。numpy 1.26.x 基线为 x86-64（SSE2 即可），
+#   全 CPU 可跑；验证码识别为小矩阵运算，性能差异可忽略。
+# - opencv 锁 ==4.10.0.84：与 numpy 1.26.4 组合在无 AVX2 的 QEMU 上实测可用；
+#   4.11+ 及 5.x 与 numpy 1.x 的二进制兼容性未验证，升级需先在 QEMU 环境实测。
 dependencies = [
     "loguru>=0.7.3",
     "nodriver>=0.50.3",
-    "numpy>=2.4.6",
-    "opencv-python-headless>=4.13.0.92",
+    "numpy>=1.26.4,<2",
+    "opencv-python-headless==4.10.0.84",
     "pyaes>=1.6.1",
     "requests>=2.34.2",
 ]
