@@ -443,12 +443,87 @@ def is_account_valid(account: dict) -> bool:
     return bool(tenant_name) and (bool(username) or (bool(user_id) and bool(token)))
 
 
+def _toml_escape(s: str) -> str:
+    """TOML 基本字符串转义（反斜杠与双引号）"""
+    return s.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def prompt_account_interactive() -> dict | None:
+    """交互式提示输入学校/用户名/密码，返回账号 dict；输入被中断或未填完整返回 None"""
+    print("\n请输入账号信息：")
+    try:
+        tenant_name = input("  学校全称（如：北京交通大学-本科生）: ").strip()
+        username = input("  用户名（学号）: ").strip()
+        password = input("  密码（默认同用户名）: ").strip()
+    except (EOFError, KeyboardInterrupt):
+        logger.warning("输入被中断")
+        return None
+    if not tenant_name or not username:
+        logger.error("学校全称和用户名不能为空")
+        return None
+    return {
+        "tenant_name": tenant_name,
+        "username": username,
+        "password": password or username,
+    }
+
+
+def save_interactive_account(account: dict) -> None:
+    """登录验证通过后把账号写入 config.toml。
+
+    - 文件已存在：追加 [[account]]（TOML 数组表可分散出现，不影响已有设置）
+    - 文件不存在：以配置文件模板为底，填入账号后创建
+    仅在登录验证成功后调用；失败路径不触碰配置文件。
+    """
+    os.makedirs(os.path.dirname(config_path) or ".", exist_ok=True)
+    account_lines = (
+        "\n[[account]]\n"
+        f'tenant_name = "{_toml_escape(account["tenant_name"])}"\n'
+        f'username = "{_toml_escape(account["username"])}"\n'
+        f'password = "{_toml_escape(account["password"])}"\n'
+    )
+    if os.path.exists(config_path):
+        with open(config_path, "a", encoding="utf-8") as f:
+            f.write(account_lines)
+    else:
+        template = read_first_existing(config_example_candidates)
+        if template is not None:
+            content = template
+            for key in ("tenant_name", "username", "password"):
+                # 只替换 [[account]] 段第一个未注释的同名键（count=1 且首个匹配即目标）
+                content = re.sub(
+                    rf'^{key} = ""$',
+                    f'{key} = "{_toml_escape(account[key])}"',
+                    content,
+                    count=1,
+                    flags=re.MULTILINE,
+                )
+        else:
+            content = (
+                "# WeBan 配置文件（由程序自动生成）\n"
+                "[settings]\n"
+                + account_lines
+            )
+        with open(config_path, "w", encoding="utf-8") as f:
+            f.write(content)
+    logger.success(f"登录成功，账号已保存到 {config_path}")
+
+
 # ── 配置加载 ──────────────────────────────────────────────
 
 
 def load_config() -> dict:
-    """加载 config.toml，不存在则下载远程模板；无交互模式不打开编辑器"""
+    """加载 config.toml，不存在时按模式处理：
+    - 无交互模式：下载/创建模板但不打开编辑器（容器/后台）
+    - 交互模式：不生成文件，返回空配置，由主流程提示交互输入账号
+      （登录成功后才写配置文件，登录失败不生成）
+    """
     if not os.path.exists(config_path):
+        if not NON_INTERACTIVE:
+            logger.info(
+                f"未找到配置文件（{config_path}），接下来按提示输入学校、学号、密码即可"
+            )
+            return {"settings": {}, "ai": {}, "account": []}
         logger.info("config.toml 不存在，正在下载远程模板...")
         downloaded = False
         try:
@@ -472,13 +547,9 @@ def load_config() -> dict:
                 downloaded = True
 
         if os.path.exists(config_path):
-            if NON_INTERACTIVE:
-                logger.warning(
-                    "已创建空配置模板，请在挂载的数据目录中填写账号信息后重试"
-                )
-            else:
-                logger.info("正在打开配置文件，请填写账号信息后保存...")
-                open_editor(config_path)
+            logger.warning(
+                "已创建空配置模板，请在挂载的数据目录中填写账号信息后重试"
+            )
             # 重新加载
             with open(config_path, "rb") as f:
                 return tomllib.load(f)
@@ -782,17 +853,58 @@ if __name__ == "__main__":
         if not valid_accounts:
             if NON_INTERACTIVE:
                 logger.error(
-                    f"没有找到有效的账号配置，请检查 {config_path}"
+                    f"没有找到有效的账号配置，请检查 {config_path}" \
+                    + (" 或设置 WB_TENANT_NAME/WB_USERNAME/WB_PASSWORD" if not cli_account else "")
                 )
                 sys.exit(1)
-            logger.warning("没有找到有效的账号配置，正在打开配置文件...")
-            open_editor(config_path)
-            global_settings, ai_config, accounts = load_all_config()
-            ai_config = merge_ai_config(_OPTS, ai_config)
+            # 交互模式：逐项提示输入，登录验证成功后才写入配置文件（失败不生成）
+            logger.warning("未找到有效账号，请按提示输入账号信息")
+            while True:
+                account = prompt_account_interactive()
+                if account is None:
+                    logger.error("输入被中断，退出")
+                    sys.exit(1)
+                # 登录验证（密码错误/学校名错误/网络不可用都会失败）
+                log = logger.bind(account=account["username"])
+                probe = WeBanClient(
+                    account["tenant_name"],
+                    account["username"],
+                    account["password"],
+                    log=log,
+                    browser_path=(
+                        _OPTS.browser_path
+                        or os.environ.get("WB_BROWSER_PATH", "").strip()
+                        or None
+                    ),
+                    cdp_host=(
+                        _OPTS.cdp_host
+                        or os.environ.get("WB_CDP_HOST", "").strip()
+                        or None
+                    ),
+                    cdp_port=(
+                        int(_OPTS.cdp_port)
+                        if _OPTS.cdp_port
+                        else (
+                            int(os.environ["WB_CDP_PORT"])
+                            if os.environ.get("WB_CDP_PORT", "").strip()
+                            else None
+                        )
+                    ),
+                    debug=bool(
+                        _OPTS.debug
+                        or os.environ.get("WB_DEBUG", "").strip()
+                        in ("1", "true", "yes")
+                    ),
+                )
+                log.info(f"正在验证账号 {account['tenant_name']}/{account['username']} ...")
+                if probe.login():
+                    save_interactive_account(account)
+                    # 文件已生成，重载一次让配置文件内其他设置生效
+                    global_settings, ai_config, accounts = load_all_config()
+                    ai_config = merge_ai_config(_OPTS, ai_config)
+                    break
+                log.error("登录失败：学校全称或用户名/密码不正确，请重新输入")
             valid_accounts = [a for a in accounts if is_account_valid(a)]
-            if not valid_accounts:
-                logger.error("仍然没有有效的账号配置，请检查 config.toml")
-                sys.exit(1)
 
         # 单账号时提示是否更换（无交互模式跳过，直接使用该账号）
         if len(valid_accounts) == 1 and not NON_INTERACTIVE:
