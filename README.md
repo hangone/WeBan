@@ -118,10 +118,11 @@ uv run main.py --tenant-name "你的学校全称" --username 你的学号 \
 mkdir -p data
 docker run --rm \
   -v "$PWD/data":/app/data \
+  --cpus 1 \
   hangyi/weban:latest
 ```
 
-- 首次运行会在 `./data/` 生成 `config.toml` 模板，填写账号后重新运行即可
+- 建议 `--cpus 1`（详见下方"CPU 配额与验证码"）；首次运行会在 `./data/` 生成 `config.toml` 模板，填写账号后重新运行即可
 - 日志在 `./data/logs/<账号>/`，题库在 `./data/answer/`，全部挂载持久化
 - 无交互：不弹编辑器、确认用默认值、验证码自动识别失败不等待手动输入（跳过该课）、末尾不等待回车
 - 需要交互（如手动输验证码）时用 `docker run -it`（容器检测到 TTY 自动进入交互模式）
@@ -130,16 +131,22 @@ docker run --rm \
 
 ```bash
 # 环境变量（单账号免配置文件）
-docker run --rm -v "$PWD/data":/app/data \
+docker run --rm -v "$PWD/data":/app/data --cpus 1 \
   -e WB_TENANT_NAME="你的学校全称" -e WB_USERNAME=你的学号 -e WB_PASSWORD=你的密码 \
   -e WB_STUDY_TIME="20,5" -e WB_VIDEO_SPEED=0 \
   hangyi/weban:latest
 
 # 命令行参数（经 entrypoint 透传）
-docker run --rm -v "$PWD/data":/app/data \
+docker run --rm -v "$PWD/data":/app/data --cpus 1 \
   hangyi/weban:latest --tenant-name "你的学校全称" --username 你的学号 \
   --study-time "20,5" --video-speed 0
 ```
+
+#### CPU 配额与验证码
+
+- **docker 下多核正常**：实测（docker 29.x，2 核 1.9GB）`--cpus 1` / `--cpus 2` × 单进程/多进程全部跑通，真实课程点选验证码在 `--cpus 2` 下完整通过（识别 → 点击 → 提交 → 腾讯 SDK 回调成功），无挂起
+- 建议 `--cpus 1`：镜像默认单进程 + 单线程识别（`WB_SINGLE_PROCESS` / `WB_CV_THREADS`），1 核即可跑通全部验证码；多核配额没有性能收益（Chrome 单进程受单核限制），1.9GB 小内存机器用 2 核反而容易内存吃紧
+- **podman 已知特例**：podman（如 `podman run --cpus 2`）下 headless-shell 点选验证码**提交后可能挂起**（CDP evaluate 无响应 60s+，1 核正常）——这是 podman 的 CPU 配额调度问题，非程序缺陷；podman 部署请用 `--cpus 1`
 
 #### 轻量镜像（CDP 连接宿主机浏览器）
 
