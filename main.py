@@ -376,36 +376,16 @@ def run_account(
         with sync_lock:
             client.sync_answers()
 
-        # ── 学习 ──
-        study = study_mode != "false"
-
-        if study:
-            mode_desc = {"true": "正常", "force": "强制重新学习"}.get(
-                study_mode, study_mode
-            )
-            log.info(f"开始学习 (模式: {mode_desc})")
-            client.exam_mode = exam_mode  # 进度预估需要知道考试是否计入
-            client.run_study(study_time, study_mode)
-        else:
-            log.info("学习模式已关闭，跳过所有学习任务")
-
-        # ── 考试 ──
-        exam = exam_mode != "false"
-        if exam:
-            mode_desc = {
-                "true": "正常",
-                "perfect": "追求满分",
-                "force": "强制重考",
-            }.get(exam_mode, exam_mode)
-            log.info(f"开始考试 (模式: {mode_desc})")
-            client.run_exam(
-                exam_mode=exam_mode,
-                random_answer=random_answer,
-                exam_question_time=exam_question_time,
-                exam_submit_match_rate=exam_submit_match_rate,
-            )
-        else:
-            log.info("考试模式已关闭，跳过所有考试任务")
+        # ── 学习 + 考试（按项目交替：完成一个项目的课程和考试后切换下一个） ──
+        client.exam_mode = exam_mode  # 进度预估需要知道考试是否计入
+        client.run_project_cycle(
+            study_time=study_time,
+            study_mode=study_mode,
+            exam_mode=exam_mode,
+            random_answer=random_answer,
+            exam_question_time=exam_question_time,
+            exam_submit_match_rate=exam_submit_match_rate,
+        )
 
         # ── 最终同步 ──
         log.info("最终同步答案")
