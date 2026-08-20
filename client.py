@@ -1353,8 +1353,12 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                     except OSError:
                         pass
                     self.log.info(
-                        f"{plan_name} 已考过 {exam_finish_num} 次，"
+                        f"{plan_name} 已考过 {exam_finish_num}/{exam_odd_num} 次，"
                         f"最高 {exam_score}/{full_score}（及格线 {pass_score}）"
+                    )
+                elif exam_odd_num > 0:
+                    self.log.info(
+                        f"{plan_name} 未考试，可考 {exam_odd_num} 次"
                     )
 
                 # ── 根据 exam_mode 判断是否跳过 ──
