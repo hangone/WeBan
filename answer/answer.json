@@ -8053,6 +8053,23 @@
     ],
     "type": 1
   },
+  "不小心陷入涉黄陷阱或被胁迫敲诈时，正确做法是：": {
+    "optionList": [
+      {
+        "content": "隐瞒不说，独自承受",
+        "isCorrect": 2
+      },
+      {
+        "content": "第一时间告诉老师、家长或拨打110报警",
+        "isCorrect": 1
+      },
+      {
+        "content": "妥协顺从对方要求",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "不少大学生容易陷入网络虚拟世界无法自拔，形成网瘾。那么网络成瘾对大学生的危害主要表现在哪里?": {
     "optionList": [
       {
@@ -9241,6 +9258,27 @@
       {
         "content": "错误",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "为了有效守护自己的外卖，以下哪种做法是不推荐的？": {
+    "optionList": [
+      {
+        "content": "外卖送达后尽快前往取餐",
+        "isCorrect": 2
+      },
+      {
+        "content": "让骑手将外卖放在无监控的偏僻角落",
+        "isCorrect": 1
+      },
+      {
+        "content": "要求骑手当面交接",
+        "isCorrect": 2
+      },
+      {
+        "content": "优先选择有外卖柜的地址下单",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -16263,6 +16301,27 @@
       },
       {
         "content": "错误",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "假冒宗教教职人员开展宗教活动，属于？": {
+    "optionList": [
+      {
+        "content": "合法宗教活动",
+        "isCorrect": 2
+      },
+      {
+        "content": "非法宗教活动",
+        "isCorrect": 1
+      },
+      {
+        "content": "个人自由行为",
+        "isCorrect": 2
+      },
+      {
+        "content": "公益宣传活动",
         "isCorrect": 2
       }
     ],
@@ -52805,6 +52864,27 @@
       {
         "content": "正确",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "若出现伤害自己、自杀的念头，甚至有具体计划，或彻底失去生活自理能力，进入重度抑郁风险状态，核心应对原则是：": {
+    "optionList": [
+      {
+        "content": "先观察1-2周，看情况是否好转再决定是否求助",
+        "isCorrect": 2
+      },
+      {
+        "content": "立刻行动，优先保证生命安全，尽快前往正规医院就诊",
+        "isCorrect": 1
+      },
+      {
+        "content": "只找朋友倾诉，不告知家人和老师",
+        "isCorrect": 2
+      },
+      {
+        "content": "拒绝所有外界帮助，独自待在封闭空间里",
+        "isCorrect": 2
       }
     ],
     "type": 1
