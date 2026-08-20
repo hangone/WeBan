@@ -704,7 +704,7 @@ def run_account(
         if token_val and user_id:
             # Token 登录（优先）
             user = {"userId": user_id, "token": token_val}
-            log.info("使用 Token 登录")
+            log.info(f"使用 Token 登录（{tenant_name}）")
             client = WeBanClient(
                 tenant_name,
                 user=user,
@@ -719,7 +719,7 @@ def run_account(
             )
         elif tenant_name and username:
             # 密码登录 — password 默认为 username
-            log.info("使用密码登录")
+            log.info(f"使用密码登录（{tenant_name}）")
             client = WeBanClient(
                 tenant_name,
                 username,
@@ -744,7 +744,7 @@ def run_account(
             log.error("登录失败")
             return False
 
-        log.info("登录成功，模拟打开首页")
+        log.info(f"登录成功（{tenant_name}），模拟打开首页")
         client.simulate_home_page()
 
         log.info("登录成功，开始同步答案")
