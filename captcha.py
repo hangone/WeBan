@@ -11,9 +11,7 @@
 """
 
 import asyncio
-import gc
 import json
-import logging
 import os
 import platform
 import random
@@ -21,7 +19,6 @@ import shutil
 import sys
 import threading
 import time
-from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -75,36 +72,6 @@ def _dsv_to_py(dsv):
     return dsv
 
 
-@contextmanager
-def _suppress_asyncio_childwatcher():
-    """抑制 asyncio 在事件循环关闭后的子进程相关警告和异常。
-
-    asyncio.run() 关闭循环后，子进程 transport 和 child watcher 回调
-    在 GC 阶段触发，此时循环已关闭。需要在 GC 完成后再恢复日志级别。
-    """
-    import atexit
-    from asyncio.base_subprocess import BaseSubprocessTransport
-
-    logger = logging.getLogger("asyncio")
-    prev = logger.level
-    logger.setLevel(logging.CRITICAL)
-    try:
-        yield
-    finally:
-        gc.collect()
-        time.sleep(0.1)
-        gc.collect()
-        logger.setLevel(prev)
-        # 程序退出时 patch transport 析构，抑制 "Event loop is closed" 异常
-        _orig_del = BaseSubprocessTransport.__del__
-
-        def _safe_del(self):
-            try:
-                _orig_del(self)
-            except RuntimeError:
-                pass
-
-        atexit.register(setattr, BaseSubprocessTransport, "__del__", _safe_del)
 
 
 # 腾讯验证码 SDK 地址
@@ -797,23 +764,44 @@ def detect_browser() -> str | None:
     return None
 
 
-def kill_stray_browsers() -> None:
-    """杀掉 nodriver 启动失败/残留的浏览器子进程。
-
-    nodriver.start 连接失败时不会清理已启动的 Chrome 子进程（raise 前没有
-    kill），残留进程会在事件循环关闭时触发 "Event loop is closed" 报错，
-    也可能占用资源导致下次启动更慢。健康探测与 _create_browser 失败后调用。
-    """
+async def kill_stray_browsers() -> None:
+    """关闭 nodriver 残留实例，并在事件循环关闭前回收子进程 transport。"""
     from nodriver.core import util as _nd_util
 
-    for inst in list(_nd_util.get_registered_instances()):
+    instances = list(_nd_util.get_registered_instances())
+    for inst in instances:
         proc = getattr(inst, "_process", None)
-        if proc is not None and proc.returncode is None:
-            try:
-                proc.kill()
-            except (ProcessLookupError, OSError):
-                pass
-    _nd_util.get_registered_instances().clear()
+        try:
+            await asyncio.wait_for(inst.aclose(), timeout=5)
+        except (Exception, asyncio.CancelledError):  # noqa: BLE001
+            await asyncio.sleep(0)
+        try:
+            if proc is not None:
+                if proc.returncode is None:
+                    try:
+                        proc.kill()
+                    except (ProcessLookupError, OSError):
+                        await asyncio.sleep(0)
+                try:
+                    await asyncio.wait_for(proc.wait(), timeout=5)
+                except (Exception, asyncio.CancelledError):  # noqa: BLE001
+                    await asyncio.sleep(0)
+        finally:
+            # Process.wait() 只等待子进程退出，不保证 stdout/stderr pipe
+            # transport 已关闭；显式关闭它，避免 asyncio.run() 收尾后由
+            # BaseSubprocessTransport.__del__ 在已关闭 loop 上补清理。
+            transport = getattr(proc, "_transport", None)
+            if transport is not None:
+                try:
+                    transport.close()
+                except (Exception, asyncio.CancelledError):  # noqa: BLE001
+                    await asyncio.sleep(0)
+        config = getattr(inst, "config", None)
+        if config is not None and not config.uses_custom_data_dir:
+            shutil.rmtree(config.user_data_dir, ignore_errors=True)
+    for _ in range(3):
+        await asyncio.sleep(0)
+    _nd_util.get_registered_instances().difference_update(instances)
 
 
 def check_browser_health(
@@ -829,15 +817,12 @@ def check_browser_health(
     :return: 浏览器路径或 CDP 地址
     :raises RuntimeError: 无可用浏览器时
     """
-    # 1. CDP 远程调试
     if cdp_host and cdp_port:
         return f"{cdp_host}:{cdp_port}"
 
-    # 2. 配置文件指定的浏览器路径
     if browser_path and os.path.isfile(browser_path):
         resolved = browser_path
     else:
-        # 3. 自动检测
         resolved = detect_browser()
         if not resolved:
             raise RuntimeError(
@@ -848,26 +833,20 @@ def check_browser_health(
                 "  4. 安装 Chrome、Chromium 或 Edge"
             )
 
-    # 4. 健康探测：让 nodriver 自己拉起一次再停掉。临时 profile、端口分配、
-    #    退出清理全部由库自动处理，也不会撞上用户已打开的 Chrome 单例锁。
-    #    失败时 nodriver 不会清理已启动的子进程（Chrome 残留进程 + 事件循环
-    #    关闭时的 transport 报错），这里统一清理并重试。
+    # 健康探测也必须在同一个事件循环内完成浏览器进程和 pipe transport
+    # 的清理；nodriver.start() 连接失败时可能已启动但未返回 Browser。
     async def _probe() -> None:
-        browser = await nodriver.start(
-            headless=True,
-            browser_executable_path=resolved,
-        )
         try:
+            browser = await nodriver.start(
+                headless=True,
+                browser_executable_path=resolved,
+            )
             await browser.get("data:text/html,<h1>ok</h1>")
         finally:
-            await browser.aclose()
-            proc = browser._process
-            browser.stop()
-            if proc is not None:
-                await asyncio.wait_for(proc.wait(), timeout=5)
+            await kill_stray_browsers()
 
     last_exc: Exception | None = None
-    for attempt in range(1, 4):  # 冷启动慢/资源紧张时 Chrome 可能超过库内 2.75s 窗口
+    for attempt in range(1, 4):
         try:
             asyncio.run(asyncio.wait_for(_probe(), timeout=20))
             return resolved
@@ -877,7 +856,6 @@ def check_browser_health(
             last_exc = e
         except Exception as e:  # noqa: BLE001 -- 探测任何启动失败都要重试
             last_exc = e
-        kill_stray_browsers()
         if attempt < 3:
             time.sleep(1)
     if isinstance(last_exc, TimeoutError):
@@ -989,8 +967,8 @@ class CaptchaHandler:
                             "  1. 远程浏览器是否已启动并开放调试端口\n"
                             "  2. config.toml 中 cdp_host 和 cdp_port 是否正确"
                         ) from e
-                    # nodriver 失败不清理已启动的 Chrome 子进程，杀掉再重试
-                    kill_stray_browsers()
+                    # nodriver 失败不清理已启动的 Chrome 子进程，清理后重试
+                    await kill_stray_browsers()
                     if attempt < attempts:
                         await asyncio.sleep(1)
                         continue
@@ -1313,23 +1291,32 @@ class CaptchaHandler:
     # ── 公开方法 ────────────────────────────────────────
 
     async def _quit_browser(self, browser: nodriver.Browser, label: str = "") -> None:
-        """完整关闭浏览器：websocket 与 Chrome 进程都在事件循环关闭前回收。
-
-        nodriver 的 stop() 用 create_task 排队 aclose 不等待，在 asyncio.run /
-        probe_loop 结束时从未完整执行，导致 listener/socket/子进程 transport
-        泄漏，退出时 GC 报 "Event loop is closed"/ESRCH 噪音。这里先 await
-        公开的 aclose() 关 websocket，再 stop() 终止进程，最后 wait() 回收
-        子进程 transport。
-
-        :param browser: nodriver Browser 实例
-        :param label: 日志标签 (如 "无感验证码"、"自动识别"、"手动验证")
-        """
+        """关闭 websocket、Chrome 进程和 asyncio subprocess transport。"""
+        proc = getattr(browser, "_process", None)
+        transport = getattr(proc, "_transport", None) if proc is not None else None
         try:
-            await browser.aclose()  # 关闭 websocket（取消 listener、关 socket）
-            proc = browser._process  # stop() 会置 None，先捕获
-            browser.stop()  # 终止 Chrome 进程（其内部排队的 aclose 幂等无害）
-            if proc is not None:
-                await asyncio.wait_for(proc.wait(), timeout=5)  # 回收 transport
+            try:
+                await browser.aclose()
+            finally:
+                if proc is not None:
+                    try:
+                        if proc.returncode is None:
+                            proc.kill()
+                        await asyncio.wait_for(proc.wait(), timeout=5)
+                    except (Exception, asyncio.CancelledError):  # noqa: BLE001
+                        await asyncio.sleep(0)
+                    if transport is not None:
+                        try:
+                            transport.close()
+                        except (Exception, asyncio.CancelledError):  # noqa: BLE001
+                            await asyncio.sleep(0)
+                    for _ in range(3):
+                        await asyncio.sleep(0)
+                from nodriver.core import util as _nd_util
+                _nd_util.get_registered_instances().discard(browser)
+                config = getattr(browser, "config", None)
+                if config is not None and not config.uses_custom_data_dir:
+                    shutil.rmtree(config.user_data_dir, ignore_errors=True)
             if label:
                 self.log.info(f"已关闭浏览器 ({label})")
         except Exception as exc:  # noqa: BLE001 -- nodriver 停止浏览器可能抛任意异常
@@ -1348,8 +1335,7 @@ class CaptchaHandler:
         try:
             asyncio.get_running_loop()
         except RuntimeError:
-            with _suppress_asyncio_childwatcher():
-                return asyncio.run(self.handle_exam_captcha_async(user_exam_plan_id))
+            return asyncio.run(self.handle_exam_captcha_async(user_exam_plan_id))
         raise RuntimeError(
             "handle_exam_captcha() 无法在已运行的事件循环中调用，请改用 handle_exam_captcha_async()"
         )
@@ -1378,8 +1364,7 @@ class CaptchaHandler:
         try:
             asyncio.get_running_loop()
         except RuntimeError:
-            with _suppress_asyncio_childwatcher():
-                return asyncio.run(self.handle_course_captcha_async(course_url))
+            return asyncio.run(self.handle_course_captcha_async(course_url))
         raise RuntimeError(
             "handle_course_captcha() 无法在已运行的事件循环中调用，请改用 handle_course_captcha_async()"
         )
