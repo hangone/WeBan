@@ -134,7 +134,7 @@ base_url = "https://opencode.ai/zen/v1"
 # AI 服务的 API Key
 api_key = ""
 # 调用的模型名称，如 deepseek-v4-flash 等
-model = "deepseek-v4-flash-free"
+model = "mimo-v2.5-free"
 # 请求超时时间（秒）
 timeout = 60
 # 请求失败时的最大重试次数
