@@ -2521,6 +2521,27 @@
     ],
     "type": 1
   },
+  "“法轮功”邪教对教徒产生的肉体伤害有哪些？": {
+    "optionList": [
+      {
+        "content": "让他们自残",
+        "isCorrect": 1
+      },
+      {
+        "content": "让他们相互照顾",
+        "isCorrect": 2
+      },
+      {
+        "content": "让他们自焚",
+        "isCorrect": 1
+      },
+      {
+        "content": "让他们自杀",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "“流行性腮腺炎”会传染吗？": {
     "optionList": [
       {
@@ -37038,6 +37059,27 @@
       },
       {
         "content": "吸气8秒→憋气7秒→呼气4秒",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "心理咨询师一般不接待熟人，主要因为：": {
+    "optionList": [
+      {
+        "content": "陌生关系更安全、有利于保密和信任",
+        "isCorrect": 1
+      },
+      {
+        "content": "熟人太麻烦、不好沟通",
+        "isCorrect": 2
+      },
+      {
+        "content": "熟人费用不好收",
+        "isCorrect": 2
+      },
+      {
+        "content": "熟人会泄露咨询师隐私",
         "isCorrect": 2
       }
     ],
