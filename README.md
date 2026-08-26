@@ -31,15 +31,15 @@
 
 点这里打开最新版下载页 → [**Releases**](https://github.com/hangone/WeBan/releases/latest)，按自己的电脑系统下载（不确定系统就按下面的表选）：
 
-| 你的电脑 | 点击下载（GitHub） | 下载太慢用镜像 |
-|---------|-------------------|---------------|
-| Windows（绝大多数电脑） | [WeBan-windows-x64.exe](https://github.com/hangone/WeBan/releases/latest/download/WeBan-windows-x64.exe) | [镜像](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-windows-x64.exe) |
-| Mac 苹果电脑（Intel 芯片） | [WeBan-macos-x64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-macos-x64) | [镜像](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-macos-x64) |
-| Mac 苹果电脑（M1/M2/M3/M4 芯片） | [WeBan-macos-arm64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-macos-arm64) | [镜像](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-macos-arm64) |
-| Linux（Ubuntu/Debian/CentOS，64 位） | [WeBan-linux-x64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-linux-x64) | [镜像](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-linux-x64) |
-| Linux（树莓派/ARM 服务器） | [WeBan-linux-arm64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-linux-arm64) | [镜像](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-linux-arm64) |
+| 你的电脑                             | 点击下载（GitHub）                                                                                       | 下载太慢用镜像                                                                                               |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Windows（绝大多数电脑）              | [WeBan-windows-x64.exe](https://github.com/hangone/WeBan/releases/latest/download/WeBan-windows-x64.exe) | [镜像](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-windows-x64.exe) |
+| Mac 苹果电脑（Intel 芯片）           | [WeBan-macos-x64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-macos-x64)             | [镜像](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-macos-x64)       |
+| Mac 苹果电脑（M1/M2/M3/M4 芯片）     | [WeBan-macos-arm64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-macos-arm64)         | [镜像](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-macos-arm64)     |
+| Linux（Ubuntu/Debian/CentOS，64 位） | [WeBan-linux-x64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-linux-x64)             | [镜像](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-linux-x64)       |
+| Linux（树莓派/ARM 服务器）           | [WeBan-linux-arm64](https://github.com/hangone/WeBan/releases/latest/download/WeBan-linux-arm64)         | [镜像](https://gh-proxy.com/https://github.com/hangone/WeBan/releases/latest/download/WeBan-linux-arm64)     |
 
-> **Mac 怎么判断芯片**：屏幕左上角  → 关于本机，看"芯片"一栏写的是 Apple M 系列（arm64）还是 Intel（x64）。Windows 不确定就选 x64（2010 年后几乎都是）。
+> **Mac 怎么判断芯片**：屏幕左上角 → 关于本机，看"芯片"一栏写的是 Apple M 系列（arm64）还是 Intel（x64）。Windows 不确定就选 x64（2010 年后几乎都是）。
 
 **第 2 步：运行**
 
@@ -86,35 +86,35 @@ WB_TENANT_NAME="你的学校全称" WB_USERNAME=你的学号 WB_PASSWORD=你的�
 
 **每个配置项都有命令行参数和环境变量两种方式，三类名称一一对应**：配置文件键名（`snake_case`）= 命令行参数（`--kebab-case`）= 环境变量（`WB_SNAKE_CASE`），例如 `study_time` ↔ `--study-time` ↔ `WB_STUDY_TIME`。优先级均为 **命令行 > 环境变量 > 配置文件**：
 
-| 配置文件键 | 参数 | 环境变量 | 说明 |
-|-----------|------|---------|------|
-| — | `--config PATH` | `WB_CONFIG` | 配置文件路径（默认: 程序目录/config.toml） |
-| — | `--data-dir PATH` | `WB_DATA_DIR` | 数据目录（config/logs/answer 都在此，适合挂载） |
-| — | `--non-interactive` | — | 无交互模式（环境变量用 `ENVIRONMENT=docker`/`container` 或 stdin 非 TTY 自动判定） |
-| `study_mode` | `--study-mode` | `WB_STUDY_MODE` | 学习模式（`false`/`true`/`force`） |
-| `exam_mode` | `--exam-mode` | `WB_EXAM_MODE` | 考试模式（`false`/`true`/`perfect`/`force`） |
-| `random_answer` | `--random-answer` | `WB_RANDOM_ANSWER` | 题库外题目是否随机作答（`true`/`false`） |
-| `study_time` | `--study-time SEC` | `WB_STUDY_TIME` | 每门课学习时长 `"基础,随机上限"`（秒），如 `"20,5"` |
-| `video_speed` | `--video-speed N` | `WB_VIDEO_SPEED` | 视频课程倍速：`0`=不按视频时长等待、`1`=原速、`2`=半速 |
-| `exam_question_time` | `--exam-question-time SEC` | `WB_EXAM_QUESTION_TIME` | 每道考试题答题等待时长 `"基础,随机上限"`（秒） |
-| `exam_submit_match_rate` | `--exam-submit-match-rate N` | `WB_EXAM_SUBMIT_MATCH_RATE` | 允许交卷的最低题库匹配率（百分比） |
-| `browser_path` | `--browser-path PATH` | `WB_BROWSER_PATH` | 浏览器可执行文件路径 |
-| `cdp_host` | `--cdp-host HOST` | `WB_CDP_HOST` | CDP 浏览器地址 |
-| `cdp_port` | `--cdp-port PORT` | `WB_CDP_PORT` | CDP 浏览器端口 |
-| `jupiter_fallback` | `--jupiter-fallback` | `WB_JUPITER_FALLBACK` | 对未加载 apicenext.js 的课程是否补发 jupiter 翻页轨迹 |
-| `max_workers` | `--max-workers N` | `WB_MAX_WORKERS` | 多账号最大并发数 |
-| `debug` | `--debug` | `WB_DEBUG` | 启用调试日志 |
-| `tenant_name` | `--tenant-name NAME` | `WB_TENANT_NAME` | 单账号学校全称（免配置文件） |
-| `username` | `--username USER` | `WB_USERNAME` | 单账号用户名 |
-| `password` | `--password PASS` | `WB_PASSWORD` | 单账号密码（默认同用户名） |
-| `user_id` | `--user-id ID` | `WB_USER_ID` | 单账号用户 ID（Token 登录） |
-| `token` | `--token TOKEN` | `WB_TOKEN` | 单账号登录 Token（配合 `--tenant-name --user-id`） |
-| `[ai].enable` | `--ai-enable` | `WB_AI_ENABLE` | 是否启用 AI 搜题（`true`/`false`） |
-| `[ai].base_url` | `--ai-base-url URL` | `WB_AI_BASE_URL` | AI 服务 API 基础路径 |
-| `[ai].api_key` | `--ai-api-key KEY` | `WB_AI_API_KEY` | AI 服务 API Key |
-| `[ai].model` | `--ai-model NAME` | `WB_AI_MODEL` | AI 模型名称 |
-| `[ai].timeout` | `--ai-timeout SEC` | `WB_AI_TIMEOUT` | AI 请求超时秒数 |
-| `[ai].max_retries` | `--ai-max-retries N` | `WB_AI_MAX_RETRIES` | AI 请求失败最大重试次数 |
+| 配置文件键               | 参数                         | 环境变量                    | 说明                                                                               |
+| ------------------------ | ---------------------------- | --------------------------- | ---------------------------------------------------------------------------------- |
+| —                        | `--config PATH`              | `WB_CONFIG`                 | 配置文件路径（默认: 程序目录/config.toml）                                         |
+| —                        | `--data-dir PATH`            | `WB_DATA_DIR`               | 数据目录（config/logs/answer 都在此，适合挂载）                                    |
+| —                        | `--non-interactive`          | —                           | 无交互模式（环境变量用 `ENVIRONMENT=docker`/`container` 或 stdin 非 TTY 自动判定） |
+| `study_mode`             | `--study-mode`               | `WB_STUDY_MODE`             | 学习模式（`false`/`true`/`force`）                                                 |
+| `exam_mode`              | `--exam-mode`                | `WB_EXAM_MODE`              | 考试模式（`false`/`true`/`perfect`/`force`）                                       |
+| `random_answer`          | `--random-answer`            | `WB_RANDOM_ANSWER`          | 题库外题目是否随机作答（`true`/`false`）                                           |
+| `study_time`             | `--study-time SEC`           | `WB_STUDY_TIME`             | 每门课学习时长 `"基础,随机上限"`（秒），如 `"20,5"`                                |
+| `video_speed`            | `--video-speed N`            | `WB_VIDEO_SPEED`            | 视频课程倍速：`0`=不按视频时长等待、`1`=原速、`2`=半速                             |
+| `exam_question_time`     | `--exam-question-time SEC`   | `WB_EXAM_QUESTION_TIME`     | 每道考试题答题等待时长 `"基础,随机上限"`（秒）                                     |
+| `exam_submit_match_rate` | `--exam-submit-match-rate N` | `WB_EXAM_SUBMIT_MATCH_RATE` | 允许交卷的最低题库匹配率（百分比）                                                 |
+| `browser_path`           | `--browser-path PATH`        | `WB_BROWSER_PATH`           | 浏览器可执行文件路径                                                               |
+| `cdp_host`               | `--cdp-host HOST`            | `WB_CDP_HOST`               | CDP 浏览器地址                                                                     |
+| `cdp_port`               | `--cdp-port PORT`            | `WB_CDP_PORT`               | CDP 浏览器端口                                                                     |
+| `jupiter_fallback`       | `--jupiter-fallback`         | `WB_JUPITER_FALLBACK`       | 对未加载 apicenext.js 的课程是否补发 jupiter 翻页轨迹                              |
+| `max_workers`            | `--max-workers N`            | `WB_MAX_WORKERS`            | 多账号最大并发数                                                                   |
+| `debug`                  | `--debug`                    | `WB_DEBUG`                  | 启用调试日志                                                                       |
+| `tenant_name`            | `--tenant-name NAME`         | `WB_TENANT_NAME`            | 单账号学校全称（免配置文件）                                                       |
+| `username`               | `--username USER`            | `WB_USERNAME`               | 单账号用户名                                                                       |
+| `password`               | `--password PASS`            | `WB_PASSWORD`               | 单账号密码（默认同用户名）                                                         |
+| `user_id`                | `--user-id ID`               | `WB_USER_ID`                | 单账号用户 ID（Token 登录）                                                        |
+| `token`                  | `--token TOKEN`              | `WB_TOKEN`                  | 单账号登录 Token（配合 `--tenant-name --user-id`）                                 |
+| `[ai].enable`            | `--ai-enable`                | `WB_AI_ENABLE`              | 是否启用 AI 搜题（`true`/`false`）                                                 |
+| `[ai].base_url`          | `--ai-base-url URL`          | `WB_AI_BASE_URL`            | AI 服务 API 基础路径                                                               |
+| `[ai].api_key`           | `--ai-api-key KEY`           | `WB_AI_API_KEY`             | AI 服务 API Key                                                                    |
+| `[ai].model`             | `--ai-model NAME`            | `WB_AI_MODEL`               | AI 模型名称                                                                        |
+| `[ai].timeout`           | `--ai-timeout SEC`           | `WB_AI_TIMEOUT`             | AI 请求超时秒数                                                                    |
+| `[ai].max_retries`       | `--ai-max-retries N`         | `WB_AI_MAX_RETRIES`         | AI 请求失败最大重试次数                                                            |
 
 无交互自动判定：`ENVIRONMENT=docker`（或 container）、stdin 非 TTY（cron/后台/管道）、或显式 `--non-interactive`。
 
@@ -159,10 +159,10 @@ python main.py # 或 uv run main.py
 
 提供两种镜像变体（多架构 amd64/arm64，发布时随版本推送）：
 
-| 镜像 | Tag | 说明 |
-|------|-----|------|
-| 内置浏览器 | `latest` / `with-browser` / `<版本号>` | 内置 headless Chrome，开箱即用 |
-| 轻量镜像 | `without-browser` / `<版本号>-without-browser` | 通过 CDP 连接宿主机浏览器 |
+| 镜像       | Tag                                            | 说明                           |
+| ---------- | ---------------------------------------------- | ------------------------------ |
+| 内置浏览器 | `latest` / `with-browser` / `<版本号>`         | 内置 headless Chrome，开箱即用 |
+| 轻量镜像   | `without-browser` / `<版本号>-without-browser` | 通过 CDP 连接宿主机浏览器      |
 
 容器默认无交互运行（`ENVIRONMENT=docker` 自动判定），数据全部持久化在 `/app/data`：
 
@@ -279,7 +279,7 @@ docker run --rm \
 1. 本项目仅供学习交流使用，请勿用于商业用途。
 2. 欢迎 Star 喵，欢迎 PR 喵。
 3. 截图时注意打码个人信息。
-4. **如果看不懂上面说的也可以直接扫码备注微信号，乐意效劳。**
+4. **如果看不懂上面说的也可以直接扫码备注微信号(不要wxid_开头的，搜不到)，乐意效劳。**
 
    |             微信             |
    | :--------------------------: |
