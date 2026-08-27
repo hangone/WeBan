@@ -44,10 +44,12 @@
 **第 2 步：运行**
 
 - **Windows**：双击 `WeBan-windows-x64.exe`（第一次运行如被 SmartScreen 拦截，点"更多信息" → "仍要运行"；杀毒软件误报请添加信任）
-- **Mac**：双击文件，系统提示"无法验证开发者"时，打开 **系统设置 → 隐私与安全性**，点"仍要打开"；或在终端运行：
+- **Mac**：在文件目录打开终端运行：
   ```bash
   chmod +x WeBan-macos-*
+  xattr -cr WeBan-macos-*
   ./WeBan-macos-arm64   # Intel 芯片换成 WeBan-macos-x64
+  # 然后可能会卡一会，是苹果在验证签名，等就行
   ```
 - **Linux**：
   ```bash
