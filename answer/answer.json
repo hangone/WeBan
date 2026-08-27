@@ -7901,7 +7901,7 @@
         "isCorrect": 2
       }
     ],
-    "type": 2
+    "type": 1
   },
   "下面躲避雾霾的方式中错误的是：": {
     "optionList": [
@@ -17791,6 +17791,27 @@
       }
     ],
     "type": 2
+  },
+  "关于“野泳”（在野外江河、湖泊、水库等非游泳区域游泳），以下哪项描述是最危险的认知？": {
+    "optionList": [
+      {
+        "content": "水面平静代表水下也安全",
+        "isCorrect": 1
+      },
+      {
+        "content": "野外水域情况复杂，可能有暗流、水草和漩涡",
+        "isCorrect": 2
+      },
+      {
+        "content": "水下温度可能很低，容易导致抽筋",
+        "isCorrect": 2
+      },
+      {
+        "content": "岸边湿滑，不易攀爬",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "关于“黄金72小时”，下面说法正确的是：": {
     "optionList": [
@@ -46789,6 +46810,27 @@
       {
         "content": "法律意识",
         "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
+  "法轮功的邪恶本质有哪些？": {
+    "optionList": [
+      {
+        "content": "反暴行",
+        "isCorrect": 2
+      },
+      {
+        "content": "反社会",
+        "isCorrect": 1
+      },
+      {
+        "content": "反科学",
+        "isCorrect": 1
+      },
+      {
+        "content": "反人类",
+        "isCorrect": 1
       }
     ],
     "type": 2
