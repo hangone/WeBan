@@ -1177,6 +1177,9 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
         # 视频课程按配置倍速播放对齐（video_speed=0 表示不按视频时长等待）
         video_duration = item_info.get("video_duration", 0)
         if self.video_speed > 0 and video_duration > 0:
+            if video_duration > 3600:
+                self.log.warning("视频超过60分钟，按60分钟处理")
+                video_duration = 3600
             video_need = video_duration / self.video_speed
             if video_need > study_time:
                 self.log.info(
@@ -1190,7 +1193,15 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
             self.log.info(
                 f"等待学习时长 {self._format_duration(remaining)} (已用 {self._format_duration(elapsed)}/{self._format_duration(study_time)})"
             )
-            time.sleep(remaining)
+            if self.video_speed > 0 and video_duration > 0:
+                deadline = time.monotonic() + remaining
+                while remaining > 0:
+                    time.sleep(min(30, remaining))
+                    remaining = max(0, deadline - time.monotonic())
+                    if remaining > 0:
+                        self.log.info(f"视频剩余 {self._format_duration(remaining)}")
+            else:
+                time.sleep(remaining)
 
         # 4. jupiter finish=1 完成标记（提交前上报学习完成，与翻页轨迹同条件）
         if total_step and trace_enabled:
