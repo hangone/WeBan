@@ -139,3 +139,6 @@ model = "nemotron-3-ultra-free"
 timeout = 60
 # 请求失败时的最大重试次数
 max_retries = 2
+# 在此新增自定义请求体，使用json格式，写进一行里。本功能可用于自定义模型思考深度、强制json输出等，具体可查询各厂商文档
+# 以智谱为例：custom_body = '{"reasoning_effort": "max", "response_format": {"type": "json_object"}}'
+custom_body = '{"response_format": {"type": "json_object"}}'

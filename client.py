@@ -2129,12 +2129,32 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
         payload = {
             "model": model,
             "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0,
-            "response_format": {"type": "json_object"},
+            "temperature": 0
         }
+
+        # 用户自定义 body：兼容单行 JSON 字符串（config.toml）与 dict（TOML 内联表）
+        user_payload = self.ai_config.get("custom_body") or {}
+        if isinstance(user_payload, str):
+            try:
+                user_payload = json.loads(user_payload)
+            except json.JSONDecodeError as e:
+                self.log.error(f"AI 搜题 - [ai].custom_body 不是合法 JSON（{e}），已忽略")
+                user_payload = {}
+        if not isinstance(user_payload, dict):
+            self.log.error("AI 搜题 - [ai].custom_body 必须是 JSON 对象（{...}），已忽略")
+            user_payload = {}
+
+        reserved_keys = ("model", "messages", "temperature") # 禁止用户设置这些body，因为这会和系统内置的产生冲突
 
         url = f"{base_url.rstrip('/')}/chat/completions"
         content = None
+        resp = None
+
+        for k,v in user_payload.items():
+            if k in reserved_keys:
+                self.log.warning(f"AI 搜题 - {k} 为系统保留字段，已忽略")
+                continue
+            payload[k] = v
 
         for attempt in range(1, max_retries + 1):
             try:
@@ -2156,14 +2176,19 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                 break
 
             except (OSError, ValueError, KeyError, IndexError, TypeError) as e:
+                api_detail = (
+                    f"，响应体：{resp.text[:300]}" if resp is not None else ""
+                )
                 if attempt < max_retries:
                     wait = attempt * 2
                     self.log.warning(
-                        f"AI 搜题第 {attempt} 次请求失败，{wait}s 后重试：{e}"
+                        f"AI 搜题第 {attempt} 次请求失败，{wait}s 后重试：{e}{api_detail}"
                     )
                     time.sleep(wait)
                 else:
-                    self.log.error(f"AI 搜题请求失败（已重试 {max_retries} 次）：{e}")
+                    self.log.error(
+                        f"AI 搜题请求失败（已重试 {max_retries} 次）：{e}{api_detail}"
+                    )
                     return []
 
         if not content:
