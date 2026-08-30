@@ -129,7 +129,7 @@ debug = false
 [ai]
 # 是否启用 AI 搜题功能（当题库无匹配时，优先采用 AI 搜题解答，AI 答题失败将回退到随机答题的配置）
 enable = true
-# API 基础路径，例如 DeepSeek、硅基流动等 OpenAI 兼容接口路径（/chat/completions）
+# API 基础路径，例如 DeepSeek、硅基流动等 OpenAI 兼容接口路径（本软件会自动补上/chat/completions路径，填写时请注意）
 base_url = "https://opencode.ai/zen/v1"
 # AI 服务的 API Key
 api_key = ""
