@@ -1,4 +1,5 @@
 import argparse
+import importlib
 import os
 import re
 import subprocess
@@ -13,7 +14,6 @@ import requests
 from loguru import logger
 
 from captcha import check_browser_health, is_non_interactive
-from client import WeBanClient, read_first_existing
 
 # ── 命令行参数与环境变量（优先级：CLI > 环境变量 > 配置文件）────────
 
@@ -229,6 +229,16 @@ elif os.environ.get("WB_DATA_DIR"):
     _data_dir = os.environ["WB_DATA_DIR"]
 else:
     _data_dir = None
+
+# client.py 读取 WB_DATA_DIR 的时机在模块导入时；必须先设置环境变量，
+# 否则 --data-dir 只会影响 main.py 自己的日志/配置路径，题库仍会落到
+# PyInstaller 的 _MEIPASS 临时目录（该目录不可写）。
+if _data_dir:
+    os.environ["WB_DATA_DIR"] = os.path.abspath(_data_dir)
+
+_client = importlib.import_module("client")
+WeBanClient = _client.WeBanClient
+read_first_existing = _client.read_first_existing
 
 
 def _detect_non_interactive() -> bool:
