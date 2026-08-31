@@ -1,16 +1,20 @@
+from __future__ import annotations
+
 import hashlib
 import json
+import re
 import time
 from base64 import b64encode, urlsafe_b64decode, urlsafe_b64encode
 from random import randint
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Self
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from uuid import uuid4
 
 import pyaes
 import requests
 from loguru import logger
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
+
+from errors import AccountBlockedError, APIResponseError, TokenInvalidError
 
 
 def pkcs7_pad(data: bytes, block_size: int = 16) -> bytes:
@@ -18,28 +22,194 @@ def pkcs7_pad(data: bytes, block_size: int = 16) -> bytes:
     return data + bytes([pad_len] * pad_len)
 
 
-def handle_response(response: requests.Response) -> dict[str, Any]:
-    """处理接口响应"""
+_SENSITIVE_KEYS = {
+    "account",
+    "authorization",
+    "cookie",
+    "keynumber",
+    "openid",
+    "password",
+    "randstr",
+    "realname",
+    "ticket",
+    "token",
+    "userid",
+    "username",
+    "uniquevalue",
+    "verifycode",
+    "x-token",
+}
+_MAX_LOG_BODY = 2048
+
+
+def _is_sensitive_key(key: object) -> bool:
+    normalized = re.sub(r"[^a-z0-9-]", "", str(key).lower())
+    return normalized in _SENSITIVE_KEYS or normalized.endswith("token")
+
+
+def _redact_value(value: Any, *, parent_key: str = "") -> Any:
+    if _is_sensitive_key(parent_key):
+        return "<redacted>"
+    if isinstance(value, dict):
+        return {
+            key: (
+                "<redacted>"
+                if _is_sensitive_key(key)
+                else _redact_value(item, parent_key=str(key))
+            )
+            for key, item in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [_redact_value(item, parent_key=parent_key) for item in value]
+    return value
+
+
+def _redact_text(text: str, limit: int = _MAX_LOG_BODY) -> str:
+    """对响应摘要做结构化和文本两层脱敏，并限制长度。"""
+
+    candidate = text
+    try:
+        parsed = json.loads(text)
+    except (json.JSONDecodeError, TypeError):
+        parsed = None
+    if parsed is not None:
+        candidate = json.dumps(
+            _redact_value(parsed),
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+    key_pattern = "|".join(re.escape(key) for key in sorted(_SENSITIVE_KEYS))
+    candidate = re.sub(
+        rf'(?i)(["\']?(?:{key_pattern})["\']?\s*[:=]\s*)'
+        r'(?:"[^"]*"|\'[^\']*\'|[^,\s&}\]]+)',
+        r"\1<redacted>",
+        candidate,
+    )
+    if len(candidate) > limit:
+        return candidate[:limit] + "…"
+    return candidate
+
+
+def _sanitize_url(url: str) -> str:
+    try:
+        parts = urlsplit(url)
+        query = [
+            (key, "<redacted>" if _is_sensitive_key(key) else value)
+            for key, value in parse_qsl(parts.query, keep_blank_values=True)
+        ]
+        return urlunsplit(
+            (parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment)
+        )
+    except ValueError:
+        return _redact_text(url, 512)
+
+
+def _response_summary(response: requests.Response) -> str:
+    return _redact_text(response.text or "<empty>")
+
+
+def _raise_if_account_blocked(
+    payload: dict[str, Any],
+    *,
+    endpoint: str,
+    status_code: int | None = None,
+) -> None:
+    detail = str(payload.get("detailCode", ""))
+    code = str(payload.get("code", ""))
+    message = str(
+        payload.get("msg") or payload.get("message") or payload.get("detail") or ""
+    )
+    raw = str(payload.get("raw", ""))
+    if (
+        detail in {"10018", "701"}
+        or code == "701"
+        or "Account locked" in message
+        or "Account locked" in raw
+        or "行为存在异常" in message
+    ):
+        raise AccountBlockedError(
+            message or "系统检测到行为异常或账号已锁定",
+            detail_code=detail or code,
+            status_code=status_code,
+            endpoint=endpoint,
+        )
+
+
+def handle_response(
+    response: requests.Response,
+    *,
+    endpoint: str = "",
+    strict: bool = False,
+    log: Any = logger,
+) -> dict[str, Any]:
+    """处理接口响应；API 内部使用 strict=True 产生结构化错误。"""
+
+    safe_endpoint = _sanitize_url(
+        endpoint or getattr(response, "url", "") or "<unknown>"
+    )
+    if response.status_code == 701 or "Account locked" in response.text:
+        raise AccountBlockedError(
+            "Account locked",
+            detail_code="701",
+            status_code=response.status_code,
+            endpoint=safe_endpoint,
+        )
     if response.status_code != 200:
         if response.status_code == 403:
-            raise PermissionError("Token 无效，不允许同时登录，请重试")
+            raise TokenInvalidError(
+                "Token 无效，不允许同时登录，请重试",
+                status_code=403,
+                endpoint=safe_endpoint,
+            )
         if response.status_code == 401:
-            raise PermissionError("Token 无效，请检查账号信息")
-        print(f"请求失败：{response.status_code} {response.text}")
+            raise TokenInvalidError(
+                "Token 无效，请检查账号信息",
+                status_code=401,
+                endpoint=safe_endpoint,
+            )
+        summary = _response_summary(response)
+        if strict:
+            raise APIResponseError(
+                "请求失败",
+                status_code=response.status_code,
+                endpoint=safe_endpoint,
+                summary=summary,
+            )
+        log.error(f"请求失败：{response.status_code} {summary}")
         return {}
     try:
-        return response.json()
+        result = response.json()
     except json.JSONDecodeError:
-        print(f"响应内容不是有效的 JSON：{response.text}")
+        summary = _response_summary(response)
+        if strict:
+            raise APIResponseError(
+                "响应内容不是有效的 JSON",
+                status_code=response.status_code,
+                endpoint=safe_endpoint,
+                summary=summary,
+            )
+        log.error(f"响应内容不是有效的 JSON：{summary}")
         return {}
+    if not isinstance(result, dict):
+        summary = _redact_text(json.dumps(result, ensure_ascii=False, default=str))
+        if strict:
+            raise APIResponseError(
+                "响应 JSON 顶层不是对象",
+                status_code=response.status_code,
+                endpoint=safe_endpoint,
+                summary=summary,
+            )
+        return {}
+    _raise_if_account_blocked(
+        result,
+        endpoint=safe_endpoint,
+        status_code=response.status_code,
+    )
+    return result
 
 
 class LoggingSession:
-    """统一的网络请求：自动重试、debug 日志、基本浏览器头。
-
-    内部构造带 HTTPAdapter Retry 的 requests.Session（429/5xx 自动重试，
-    backoff_factor=1），外层捕获 RequestException 记日志后抛回。
-    """
+    """统一网络请求；只有显式标记的只读请求才会自动重试。"""
 
     DEFAULT_HEADERS: ClassVar[dict[str, str]] = {
         "User-Agent": (
@@ -49,54 +219,86 @@ class LoggingSession:
         "Accept": "application/json, text/plain, */*",
         "Accept-Language": "zh-CN,zh;q=0.9",
     }
+    RETRY_STATUS: ClassVar[frozenset[int]] = frozenset({429, 500, 502, 503, 504})
+    MAX_RETRIES: ClassVar[int] = 5
 
-    def __init__(self, log=logger, debug: bool = False):
+    def __init__(self, log: Any = logger, debug: bool = False):
         session = requests.Session()
-        retry = Retry(
-            total=5,
-            backoff_factor=1,
-            status_forcelist=[429, 500, 502, 503, 504],
-            allowed_methods=["GET", "POST"],
-        )
-        session.mount("https://", HTTPAdapter(max_retries=retry))
         session.headers.update(self.DEFAULT_HEADERS)
         self._session = session
         self.log = log
         self.debug = debug
+        self._closed = False
 
     @property
     def headers(self):
         return self._session.headers
 
-    def request(self, method: str, url: str, **kwargs) -> requests.Response:
-        # debug 日志只记录 mycourse.cn 域名的请求/响应，其余域名（题库、
-        # 腾讯 CDN、AI 等）不记录，避免无关噪音和二进制乱码
+    def request(
+        self,
+        method: str,
+        url: str,
+        *,
+        _retryable: bool = False,
+        **kwargs,
+    ) -> requests.Response:
+        if self._closed:
+            raise RuntimeError("HTTP Session 已关闭")
+        safe_url = _sanitize_url(url)
         if self.debug and "mycourse.cn" in url:
-            parts = [f"{method} {url}"]
+            parts = [f"{method} {safe_url}"]
             for key in ("params", "data", "json"):
                 val = kwargs.get(key)
                 if val is not None:
+                    if "/pharos/login/login.do" in url and key == "data":
+                        val = "<redacted>"
+                    else:
+                        val = _redact_value(val)
                     parts.append(f"{key}={val}")
             self.log.debug(" | ".join(parts))
-        try:
-            response = self._session.request(method, url, **kwargs)
-        except requests.RequestException as e:
-            self.log.error(f"{method} {url} 请求异常: {e}")
-            raise
+
+        max_attempts = self.MAX_RETRIES + 1 if _retryable else 1
+        response: requests.Response | None = None
+        for attempt in range(1, max_attempts + 1):
+            try:
+                response = self._session.request(method, url, **kwargs)
+            except requests.RequestException as exc:
+                if attempt >= max_attempts:
+                    self.log.error(
+                        f"{method} {safe_url} 请求异常: {_redact_text(str(exc), 512)}"
+                    )
+                    raise
+                time.sleep(min(2 ** (attempt - 1), 8))
+                continue
+            if response.status_code not in self.RETRY_STATUS or attempt >= max_attempts:
+                break
+            retry_after = response.headers.get("Retry-After", "")
+            try:
+                delay = max(0.0, min(float(retry_after), 30.0))
+            except (TypeError, ValueError):
+                delay = min(2 ** (attempt - 1), 8)
+            try:
+                response.close()
+            except AttributeError:
+                # 轻量测试替身可能没有 raw；真实 requests.Response 会正常释放。
+                pass
+            time.sleep(delay)
+
+        assert response is not None
         if self.debug and "mycourse.cn" in url:
             content_type = response.headers.get("Content-Type", "")
             if not content_type or not content_type.lower().startswith(
                 ("text/", "application/json", "application/javascript")
             ):
                 self.log.debug(
-                    f"{method} {url} | status={response.status_code} | "
+                    f"{method} {safe_url} | status={response.status_code} | "
                     f"content-type={content_type or 'unknown'} | "
                     f"body={len(response.content)} bytes (binary, skipped)"
                 )
             else:
                 self.log.debug(
-                    f"{method} {url} | status={response.status_code} | "
-                    f"response={response.text}"
+                    f"{method} {safe_url} | status={response.status_code} | "
+                    f"response={_response_summary(response)}"
                 )
         return response
 
@@ -106,13 +308,34 @@ class LoggingSession:
     def post(self, url: str, **kwargs) -> requests.Response:
         return self.request("POST", url, **kwargs)
 
+    def request_retryable(self, method: str, url: str, **kwargs) -> requests.Response:
+        return self.request(method, url, _retryable=True, **kwargs)
+
+    def get_retryable(self, url: str, **kwargs) -> requests.Response:
+        return self.request_retryable("GET", url, **kwargs)
+
+    def post_retryable(self, url: str, **kwargs) -> requests.Response:
+        return self.request_retryable("POST", url, **kwargs)
+
+    def close(self) -> None:
+        if not self._closed:
+            self._session.cookies.clear()
+            for key in ("Authorization", "Cookie", "X-Token"):
+                self._session.headers.pop(key, None)
+            self._session.close()
+            self._closed = True
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
+
 
 class WeBanAPI:
     # 题库下载地址（jsDelivr CDN 稳定；gh-proxy 免费公共代理会限流 403，
     # github 官方 raw 域名在国内不稳定，均不用）
-    ANSWER_URL = (
-        "https://cdn.jsdelivr.net/gh/hangone/WeBan@main/answer/answer.json"
-    )
+    ANSWER_URL = "https://cdn.jsdelivr.net/gh/hangone/WeBan@main/answer/answer.json"
 
     def __init__(
         self,
@@ -122,7 +345,7 @@ class WeBanAPI:
         user: dict[str, str] | None = None,
         timeout: int | tuple = (9.05, 15),
         debug: bool = False,
-        log=logger,
+        log: Any = logger,
     ):
         self.account = account
         self.password = password
@@ -133,6 +356,47 @@ class WeBanAPI:
         self.user = user or {"userId": "", "token": ""}
         self.session.headers["X-Token"] = self.user["token"]
         self.log = log
+
+    def _request(
+        self,
+        method: str,
+        url: str,
+        *,
+        retryable: bool = False,
+        **kwargs,
+    ) -> requests.Response:
+        """发送请求；测试替身无 retryable 接口时保持原请求契约。"""
+
+        method_name = method.lower()
+        if retryable:
+            retry_sender = getattr(self.session, f"{method_name}_retryable", None)
+            if retry_sender is not None:
+                return retry_sender(url, **kwargs)
+        sender = getattr(self.session, method_name)
+        return sender(url, **kwargs)
+
+    def _handle(self, response: requests.Response, endpoint: str) -> dict[str, Any]:
+        return handle_response(
+            response,
+            endpoint=endpoint,
+            strict=True,
+            log=self.log,
+        )
+
+    def close(self) -> None:
+        """关闭连接池并清除内存中的敏感登录字段。"""
+
+        close = getattr(self.session, "close", None)
+        if close is not None:
+            close()
+        self.password = None
+        self.user.pop("token", None)
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
 
     @staticmethod
     def get_timestamp(int_len: int = 10, frac_len: int = 3) -> str:
@@ -174,6 +438,8 @@ class WeBanAPI:
         endpoint: str,
         data: dict | None = None,
         timestamp_args: tuple | None = None,
+        *,
+        retryable: bool = False,
     ) -> dict[str, Any]:
         """
         通用 POST 请求，封装所有端点共用的模板代码。
@@ -195,12 +461,19 @@ class WeBanAPI:
         data.setdefault("tenantCode", self.tenant_code)
         if self.user.get("userId"):
             data.setdefault("userId", self.user["userId"])
-        response = self.session.post(
-            url, params=params, data=data, timeout=self.timeout
+        response = self._request(
+            "POST",
+            url,
+            retryable=retryable,
+            params=params,
+            data=data,
+            timeout=self.timeout,
         )
-        return handle_response(response)
+        return self._handle(response, url)
 
-    def _mercury_request(self, params: dict) -> dict[str, Any]:
+    def _mercury_request(
+        self, params: dict, *, retryable: bool = False
+    ) -> dict[str, Any]:
         """
         mercuryprovider 通用请求。会将 appKey/format/v/timestamp/clientId 标准参数与传入 params 合并，
         按 key 字母序拼接成 sign_str，用固定密钥 75uet0kwvnc90xo 做包装式 SHA1 签名。
@@ -222,12 +495,15 @@ class WeBanAPI:
             sign_str += k + str(merged[k])
         sign_str += secret_key
         merged["sign"] = hashlib.sha1(sign_str.encode()).hexdigest().upper()
-        response = self.session.post(
-            "https://resource.mycourse.cn/mercuryprovider/router",
+        url = "https://resource.mycourse.cn/mercuryprovider/router"
+        response = self._request(
+            "POST",
+            url,
+            retryable=retryable,
             data=merged,
             timeout=self.timeout,
         )
-        return handle_response(response)
+        return self._handle(response, url)
 
     # ========================================================================
     # 登录相关
@@ -259,10 +535,14 @@ class WeBanAPI:
         }
         """
         url = f"{self.baseurl}/pharos/login/getTenantListWithLetter.do"
-        response = self.session.post(
-            url, params={"timestamp": self.get_timestamp()}, timeout=self.timeout
+        response = self._request(
+            "POST",
+            url,
+            retryable=True,
+            params={"timestamp": self.get_timestamp()},
+            timeout=self.timeout,
         )
-        return handle_response(response)
+        return self._handle(response, url)
 
     def get_tenant_config(self, tenant_code: str | None = None) -> dict[str, Any]:
         """
@@ -290,10 +570,15 @@ class WeBanAPI:
         url = f"{self.baseurl}/pharos/login/getTenantConfig.do"
         params = {"timestamp": self.get_timestamp()}
         data = {"tenantCode": tenant_code or self.tenant_code}
-        response = self.session.post(
-            url, params=params, data=data, timeout=self.timeout
+        response = self._request(
+            "POST",
+            url,
+            retryable=True,
+            params=params,
+            data=data,
+            timeout=self.timeout,
         )
-        return handle_response(response)
+        return self._handle(response, url)
 
     def get_simple_config(self, tenant_code: str | None = None) -> dict[str, Any]:
         """
@@ -304,6 +589,7 @@ class WeBanAPI:
         return self._post(
             "/pharos/tenantconfig/getSimpleConfig.do",
             {"tenantCode": tenant_code or self.tenant_code},
+            retryable=True,
         )
 
     def get_help(self, tenant_code: str | None = None) -> dict[str, Any]:
@@ -319,7 +605,9 @@ class WeBanAPI:
         }
         """
         return self._post(
-            "/pharos/login/getHelp.do", {"tenantCode": tenant_code or self.tenant_code}
+            "/pharos/login/getHelp.do",
+            {"tenantCode": tenant_code or self.tenant_code},
+            retryable=True,
         )
 
     def rand_letter_image(self, verify_time: str | None) -> bytes:
@@ -329,7 +617,15 @@ class WeBanAPI:
         """
         url = f"{self.baseurl}/pharos/login/randLetterImage.do"
         params = {"time": verify_time or self.get_timestamp(frac_len=0)}
-        response = self.session.get(url, params=params, timeout=self.timeout)
+        response = self._request(
+            "GET",
+            url,
+            retryable=True,
+            params=params,
+            timeout=self.timeout,
+        )
+        if response.status_code != 200:
+            self._handle(response, url)
         return response.content
 
     def login(self, verify_code: str, verify_time: int | None) -> dict[str, Any]:
@@ -384,13 +680,15 @@ class WeBanAPI:
             "verifyCode": verify_code,
         }
         encrypted = self.encrypt(json.dumps(payload, separators=(",", ":")))
-        response = self.session.post(
-            f"{self.baseurl}/pharos/login/login.do",
+        url = f"{self.baseurl}/pharos/login/login.do"
+        response = self._request(
+            "POST",
+            url,
             params={"timestamp": self.get_timestamp()},
             data={"data": encrypted},
             timeout=self.timeout,
         )
-        result = handle_response(response)
+        result = self._handle(response, url)
         if result.get("data", {}).get("token"):
             self.user = result["data"]
             self.session.headers["X-Token"] = self.user["token"]
@@ -443,7 +741,7 @@ class WeBanAPI:
           "detailCode": "0"
         }
         """
-        return self._post("/pharos/index/listCompletion.do")
+        return self._post("/pharos/index/listCompletion.do", retryable=True)
 
     def lab_index(self) -> dict[str, Any]:
         """
@@ -480,7 +778,11 @@ class WeBanAPI:
         }
         """
         # 该端点要求 timestamp 带 1 位小数（如 1234567890.1）
-        return self._post("/pharos/lab/index.do", timestamp_args=(10, 1))
+        return self._post(
+            "/pharos/lab/index.do",
+            timestamp_args=(10, 1),
+            retryable=True,
+        )
 
     def list_study_task(self) -> dict[str, Any]:
         """获取学习任务列表
@@ -519,7 +821,7 @@ class WeBanAPI:
           "detailCode": "0"
         }
         """
-        return self._post("/pharos/index/listStudyTask.do")
+        return self._post("/pharos/index/listStudyTask.do", retryable=True)
 
     def list_my_project(self, ended: int = 2) -> dict[str, Any]:
         """
@@ -550,7 +852,11 @@ class WeBanAPI:
           "detailCode": "0"
         }
         """
-        return self._post("/pharos/index/listMyProject.do", {"ended": ended})
+        return self._post(
+            "/pharos/index/listMyProject.do",
+            {"ended": ended},
+            retryable=True,
+        )
 
     def show_progress(self, user_project_id: str) -> dict[str, Any]:
         """获取学习任务进度
@@ -585,7 +891,9 @@ class WeBanAPI:
         }
         """
         return self._post(
-            "/pharos/project/showProgress.do", {"userProjectId": user_project_id}
+            "/pharos/project/showProgress.do",
+            {"userProjectId": user_project_id},
+            retryable=True,
         )
 
     def list_valve(self) -> dict[str, Any]:
@@ -595,6 +903,7 @@ class WeBanAPI:
         return self._post(
             "/pharos/index/listValve.do",
             {"tenantCode": self.tenant_code, "userId": self.user.get("userId", "")},
+            retryable=True,
         )
 
     def get_next_task(self, user_project_id: str) -> dict[str, Any]:
@@ -603,7 +912,9 @@ class WeBanAPI:
         :return: 下一步状态 dict
         """
         return self._post(
-            "/pharos/project/getNextTask.do", {"userProjectId": user_project_id}
+            "/pharos/project/getNextTask.do",
+            {"userProjectId": user_project_id},
+            retryable=True,
         )
 
     def get_project_simple(self, user_project_id: str) -> dict[str, Any]:
@@ -612,7 +923,9 @@ class WeBanAPI:
         :return: 项目基础信息 dict
         """
         return self._post(
-            "/pharos/project/getSimple.do", {"userProjectId": user_project_id}
+            "/pharos/project/getSimple.do",
+            {"userProjectId": user_project_id},
+            retryable=True,
         )
 
     # ---- H5 首页初始化（对齐官方页面登录后请求面） -------------------------
@@ -622,34 +935,36 @@ class WeBanAPI:
         （官方：POST /carousel/list.do {"tenantCode"}）
         :return: 轮播列表 dict
         """
-        return self._post("/pharos/carousel/list.do")
+        return self._post("/pharos/carousel/list.do", retryable=True)
 
     def get_project_stat(self) -> dict[str, Any]:
         """首页项目统计
         （官方：POST /index/getProjectStat.do {}）
         :return: 项目统计 dict
         """
-        return self._post("/pharos/index/getProjectStat.do")
+        return self._post("/pharos/index/getProjectStat.do", retryable=True)
 
     def notice_index(self) -> dict[str, Any]:
         """公告红点状态（官方：POST /notice/index.do {"userId","tenantCode"}）
         :return: 公告状态 dict
         """
-        return self._post("/pharos/notice/index.do")
+        return self._post("/pharos/notice/index.do", retryable=True)
 
     def notice_list(self) -> dict[str, Any]:
         """公告列表第一页（官方：POST /notice/list.do 带 pageNo/pageSize）
         :return: 公告列表 dict
         """
         return self._post(
-            "/pharos/notice/list.do", {"pageNo": 1, "pageSize": 10}
+            "/pharos/notice/list.do",
+            {"pageNo": 1, "pageSize": 10},
+            retryable=True,
         )
 
     def my_get_info(self) -> dict[str, Any]:
         """用户信息（官方：POST /my/getInfo.do {"userId","tenantCode"}）
         :return: 用户信息 dict
         """
-        return self._post("/pharos/my/getInfo.do")
+        return self._post("/pharos/my/getInfo.do", retryable=True)
 
     def notice_list_must(self, batch_code: str = "") -> dict[str, Any]:
         """必读公告列表（官方：POST /notice/listMust.do {"batchCode"}，
@@ -658,7 +973,9 @@ class WeBanAPI:
         :return: 必读公告列表 dict，data 为公告数组
         """
         return self._post(
-            "/pharos/notice/listMust.do", {"batchCode": batch_code or ""}
+            "/pharos/notice/listMust.do",
+            {"batchCode": batch_code or ""},
+            retryable=True,
         )
 
     def view_must_notice(self, notice_id: str | int) -> dict[str, Any]:
@@ -667,9 +984,7 @@ class WeBanAPI:
         :param notice_id: 公告 ID
         :return: 确认结果 dict
         """
-        return self._post(
-            "/pharos/notice/viewMust.do", {"noticeId": str(notice_id)}
-        )
+        return self._post("/pharos/notice/viewMust.do", {"noticeId": str(notice_id)})
 
     def questionnaire_list_by_user_id(self) -> dict[str, Any]:
         """按用户查问卷列表（官方：POST /questionnaire/listByUserId.do
@@ -679,6 +994,7 @@ class WeBanAPI:
         return self._post(
             "/pharos/questionnaire/listByUserId.do",
             {"batchCode": self.user.get("batchCode", "")},
+            retryable=True,
         )
 
     def get_ebook(self) -> dict[str, Any]:
@@ -686,14 +1002,14 @@ class WeBanAPI:
         {"userId","tenantCode"}，首页协议弹窗数据源）
         :return: 协议内容 dict
         """
-        return self._post("/pharos/login/getEbook.do")
+        return self._post("/pharos/login/getEbook.do", retryable=True)
 
     def ebook_record_list(self) -> dict[str, Any]:
         """协议阅读记录（官方：POST /record/ebook/list.do
         {"userId","tenantCode"}，判断协议是否已读）
         :return: 阅读记录 dict
         """
-        return self._post("/pharos/record/ebook/list.do")
+        return self._post("/pharos/record/ebook/list.do", retryable=True)
 
     # ========================================================================
     # 课程
@@ -723,6 +1039,7 @@ class WeBanAPI:
         return self._post(
             "/pharos/usercourse/listCategory.do",
             {"userProjectId": user_project_id, "chooseType": choose_type},
+            retryable=True,
         )
 
     def list_course(
@@ -760,6 +1077,7 @@ class WeBanAPI:
                 "chooseType": choose_type,
                 "categoryCode": category_code,
             },
+            retryable=True,
         )
 
     def list_flat_course(
@@ -795,6 +1113,7 @@ class WeBanAPI:
                 "pageSize": page_size,
                 "pageNo": page_no,
             },
+            retryable=True,
         )
 
     def init_index(self, user_project_id: str) -> dict[str, Any]:
@@ -836,6 +1155,7 @@ class WeBanAPI:
         return self._post(
             "/pharos/usercourse/getCourseUrl.do",
             {"courseId": course_id, "userProjectId": user_project_id},
+            retryable=True,
         )
 
     def invoke_captcha(
@@ -858,9 +1178,9 @@ class WeBanAPI:
             "userId": self.user["userId"],
             "tenantCode": self.tenant_code,
         }
-        response = self.session.get(fetch_url, params=params, timeout=self.timeout)
+        response = self._request("GET", fetch_url, params=params, timeout=self.timeout)
         params["questionId"] = (
-            handle_response(response).get("captcha", {}).get("questionId", "")
+            self._handle(response, fetch_url).get("captcha", {}).get("questionId", "")
         )
         # 三组固定基准坐标 + 随机 ±5px 抖动，服务端容差校验
         coords = [
@@ -869,10 +1189,14 @@ class WeBanAPI:
         ]
         data = {"coordinateXYs": json.dumps(coords, separators=(",", ":"))}
         time.sleep(3)
-        response = self.session.post(
-            check_url, params=params, data=data, timeout=self.timeout
+        response = self._request(
+            "POST",
+            check_url,
+            params=params,
+            data=data,
+            timeout=self.timeout,
         )
-        return handle_response(response)
+        return self._handle(response, check_url)
 
     def finish_by_token(
         self,
@@ -914,22 +1238,25 @@ class WeBanAPI:
                 "Referer": referer or "https://mcwk.mycourse.cn/",
                 "X-Token": None,
             }
-            response = self.session.get(
+            response = self._request(
+                "GET",
                 url,
                 params={**data, "callback": cb, "_": ts + 1},
                 headers=headers,
                 timeout=self.timeout,
             )
         else:
-            response = self.session.post(url, data=data, timeout=self.timeout)
+            response = self._request("POST", url, data=data, timeout=self.timeout)
 
         if response.status_code == 701 or "Account locked" in response.text:
-            return {
-                "code": "-1",
-                "detailCode": "701",
-                "msg": "Account locked",
-                "raw": response.text,
-            }
+            raise AccountBlockedError(
+                "Account locked",
+                detail_code="701",
+                status_code=response.status_code,
+                endpoint=url,
+            )
+        if response.status_code != 200:
+            return self._handle(response, url)
 
         try:
             result = response.json()
@@ -941,7 +1268,24 @@ class WeBanAPI:
             try:
                 result = json.loads(text)
             except json.JSONDecodeError:
-                return {"raw": response.text}
+                raise APIResponseError(
+                    "完课响应不是有效的 JSON/JSONP",
+                    status_code=response.status_code,
+                    endpoint=_sanitize_url(url),
+                    summary=_response_summary(response),
+                ) from None
+        if not isinstance(result, dict):
+            raise APIResponseError(
+                "完课响应 JSON 顶层不是对象",
+                status_code=response.status_code,
+                endpoint=_sanitize_url(url),
+                summary=_redact_text(str(result)),
+            )
+        _raise_if_account_blocked(
+            result,
+            endpoint=_sanitize_url(url),
+            status_code=response.status_code,
+        )
         return result
 
     def finish_lyra(self, user_activity_id: str) -> dict[str, Any]:
@@ -950,12 +1294,14 @@ class WeBanAPI:
         :return: 完成结果 dict
         {"msg":"ok","code":"0","detailCode":"0"}
         """
-        response = self.session.post(
-            "https://lyra.mycourse.cn/lyraapi/study/course/finish.api",
+        url = "https://lyra.mycourse.cn/lyraapi/study/course/finish.api"
+        response = self._request(
+            "POST",
+            url,
             data={"userActivityId": user_activity_id},
             timeout=self.timeout,
         )
-        return handle_response(response)
+        return self._handle(response, url)
 
     # ========================================================================
     # 考试
@@ -992,7 +1338,9 @@ class WeBanAPI:
         }
         """
         return self._post(
-            "/pharos/exam/listPlan.do", {"userProjectId": user_project_id}
+            "/pharos/exam/listPlan.do",
+            {"userProjectId": user_project_id},
+            retryable=True,
         )
 
     def exam_before_paper(self, user_exam_plan_id: str) -> dict[str, Any]:
@@ -1008,7 +1356,9 @@ class WeBanAPI:
         }
         """
         return self._post(
-            "/pharos/exam/beforePaper.do", {"userExamPlanId": user_exam_plan_id}
+            "/pharos/exam/beforePaper.do",
+            {"userExamPlanId": user_exam_plan_id},
+            retryable=True,
         )
 
     def exam_prepare_paper(self, user_exam_plan_id: str) -> dict[str, Any]:
@@ -1028,7 +1378,9 @@ class WeBanAPI:
         }
         """
         return self._post(
-            "/pharos/exam/preparePaper.do", {"userExamPlanId": user_exam_plan_id}
+            "/pharos/exam/preparePaper.do",
+            {"userExamPlanId": user_exam_plan_id},
+            retryable=True,
         )
 
     def exam_check(
@@ -1083,10 +1435,14 @@ class WeBanAPI:
             "Referer": "https://mcwk.mycourse.cn/",
             "X-Token": None,
         }
-        response = self.session.post(
-            url, data=data, headers=headers, timeout=self.timeout
+        response = self._request(
+            "POST",
+            url,
+            data=data,
+            headers=headers,
+            timeout=self.timeout,
         )
-        return handle_response(response)
+        return self._handle(response, url)
 
     def exam_check_verify_code(
         self, user_exam_plan_id: str, verfy_code: str, verify_time: int | None
@@ -1319,6 +1675,7 @@ class WeBanAPI:
         return self._post(
             "/pharos/exam/reviewPaper.do",
             {"userExamId": user_exam_id, "isRetake": is_retake},
+            retryable=True,
         )
 
     def exam_list_history(self, exam_plan_id: str, exam_type: int) -> dict[str, Any]:
@@ -1346,6 +1703,7 @@ class WeBanAPI:
         return self._post(
             "/pharos/exam/listHistory.do",
             {"examPlanId": exam_plan_id, "examType": exam_type},
+            retryable=True,
         )
 
     # ========================================================================
@@ -1367,7 +1725,12 @@ class WeBanAPI:
           }
         }
         """
-        resp = self.session.get(self.ANSWER_URL, timeout=self.timeout)
+        resp = self._request(
+            "GET",
+            self.ANSWER_URL,
+            retryable=True,
+            timeout=self.timeout,
+        )
         resp.raise_for_status()
         return resp.text
 
@@ -1421,12 +1784,14 @@ class WeBanAPI:
         # 双重 Base64：仿 JS 前端 CryptoJS.enc.Base64.stringify(CryptoJS.enc.Utf8.parse(Base64(ciphertext)))
         # 后端先做 atob 再 AES-CBC 解密，因此需要两次编码
         encrypted_b64 = b64encode(b64encode(encrypted)).decode()
-        response = self.session.post(
-            f"{self.baseurl}/jupiterapi/api/statusercourse/v1/next",
+        url = f"{self.baseurl}/jupiterapi/api/statusercourse/v1/next"
+        response = self._request(
+            "POST",
+            url,
             json={"data": encrypted_b64},
             timeout=self.timeout,
         )
-        return handle_response(response)
+        return self._handle(response, url)
 
     def list_question(self, course_id: str) -> dict[str, Any]:
         """获取课后习题列表（course_id 为 resourceId UUID）
@@ -1468,7 +1833,8 @@ class WeBanAPI:
         }
         """
         return self._mercury_request(
-            {"service": "mercury.microlecture.listQuestion", "id": course_id}
+            {"service": "mercury.microlecture.listQuestion", "id": course_id},
+            retryable=True,
         )
 
     def save_question(
