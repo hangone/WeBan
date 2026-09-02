@@ -104,6 +104,18 @@ COURSE_FLOW_TIMEOUT = 900.0
 _NODRIVER_START_LOCK = threading.Lock()
 
 
+def _env_positive_int(name: str, default: int, *, maximum: int = 50) -> int:
+    """读取可调重试次数；非法或越界值回退默认，避免验证码流程因配置抛错。"""
+    raw = os.environ.get(name, "")
+    try:
+        value = int(raw.strip())
+    except (TypeError, ValueError):
+        return default
+    if value < 1:
+        return default
+    return min(value, maximum)
+
+
 def _close_step_timeout() -> float:
     """为关闭流程各步骤分配总预算中的一小段。"""
     return max(min(CLOSE_TIMEOUT / 6, 2.0), 0.01)
@@ -963,6 +975,11 @@ def _validated_browser_options(
         raise RuntimeError("cdp_host 只能填写主机名或 IP，不应包含协议、路径或空格")
     if host is not None and ":" in host and not host.startswith("["):
         host = f"[{host}]"
+
+    # CDP 是显式的浏览器来源；此时不应因为遗留的 browser_path 失效而
+    # 阻止连接既有浏览器。调用方仍保留规范化后的 CDP 主机和端口。
+    if host is not None and cdp_port is not None:
+        return None, host, cdp_port
 
     if path is not None:
         expanded = Path(os.path.expandvars(path)).expanduser()
@@ -1909,6 +1926,7 @@ class CaptchaHandler:
             snapshot = state.get("storage") if state else None
             if tab is not None and isinstance(snapshot, dict):
                 origin = state.get("origin") if state else None
+                restore_storage = False
                 try:
                     current_origin = await _bounded(
                         self._evaluate(
@@ -1920,33 +1938,53 @@ class CaptchaHandler:
                         timeout=_close_step_timeout(),
                         label="确认 localStorage origin",
                     )
-                    if origin and current_origin != origin:
+                    if (
+                        isinstance(origin, str)
+                        and isinstance(current_origin, str)
+                        and current_origin == origin
+                    ):
+                        restore_storage = True
+                    elif isinstance(origin, str) and origin:
                         await _bounded(
                             tab.get(f"{origin}/"),
                             timeout=_close_step_timeout(),
                             label="返回 localStorage origin",
                         )
-                except Exception as exc:  # noqa: BLE001 -- 仍需尝试原地恢复
-                    self.log.warning(f"确认浏览器 localStorage origin 失败: {exc}")
-                    if origin:
-                        with suppress(Exception):
-                            await _bounded(
-                                tab.get(f"{origin}/"),
-                                timeout=_close_step_timeout(),
-                                label="返回 localStorage origin",
+                        confirmed_origin = await _bounded(
+                            self._evaluate(
+                                tab,
+                                "(() => window.location.origin)()",
+                                return_by_value=True,
+                                interruptible=False,
+                            ),
+                            timeout=_close_step_timeout(),
+                            label="再次确认 localStorage origin",
+                        )
+                        restore_storage = (
+                            isinstance(confirmed_origin, str)
+                            and confirmed_origin == origin
+                        )
+                        if not restore_storage:
+                            self.log.warning(
+                                "返回 localStorage origin 后校验不匹配，跳过恢复"
                             )
-                try:
-                    await _bounded(
-                        self._restore_local_storage(
-                            tab,
-                            snapshot,
-                            interruptible=False,
-                        ),
-                        timeout=_close_step_timeout(),
-                        label="恢复浏览器 localStorage",
+                except Exception as exc:  # noqa: BLE001 -- 仍需尝试原地恢复
+                    self.log.warning(
+                        f"确认浏览器 localStorage origin 失败，跳过恢复: {exc}"
                     )
-                except Exception as exc:  # noqa: BLE001 -- 清理必须继续
-                    self.log.warning(f"恢复浏览器 localStorage 失败: {exc}")
+                if restore_storage:
+                    try:
+                        await _bounded(
+                            self._restore_local_storage(
+                                tab,
+                                snapshot,
+                                interruptible=False,
+                            ),
+                            timeout=_close_step_timeout(),
+                            label="恢复浏览器 localStorage",
+                        )
+                    except Exception as exc:  # noqa: BLE001 -- 清理必须继续
+                        self.log.warning(f"恢复浏览器 localStorage 失败: {exc}")
             if tab is not None and state and state.get("close_tab"):
                 with suppress(Exception):
                     await _bounded(
@@ -2084,8 +2122,8 @@ class CaptchaHandler:
         # 默认 2 轮 x 3 次（最多 6 次尝试）——实测单次尝试在 1 核机器约
         # 4 分钟，18 次全试可能 1 小时+；识别成功率高时 1-2 次即过，
         # 失败应尽快跳过该课程而不是无限重试。
-        max_auto_rounds = int(os.environ.get("WB_CAPTCHA_ROUNDS", "2"))
-        attempts_per_round = int(os.environ.get("WB_CAPTCHA_ATTEMPTS", "3"))
+        max_auto_rounds = _env_positive_int("WB_CAPTCHA_ROUNDS", 2)
+        attempts_per_round = _env_positive_int("WB_CAPTCHA_ATTEMPTS", 3)
 
         # 第一阶段: 无头自动识别
         self.log.info("正在自动识别验证码...")

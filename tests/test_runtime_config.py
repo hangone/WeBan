@@ -12,6 +12,7 @@ from runtime_config import (
     ResolvedPaths,
     atomic_write_text,
     build_runtime_config,
+    load_toml,
     parse_args,
     resolve_interaction_policy,
     resolve_paths,
@@ -249,6 +250,38 @@ def test_nonexistent_explicit_browser_is_rejected(tmp_path: Path) -> None:
         )
 
 
+def test_complete_cdp_takes_precedence_over_invalid_browser_path(
+    tmp_path: Path,
+) -> None:
+    opts = parse_args([])
+    runtime = build_runtime_config(
+        opts,
+        _document(
+            settings={
+                "browser_path": "missing-browser.exe",
+                "cdp_host": "127.0.0.1",
+                "cdp_port": 9222,
+            }
+        ),
+        _paths(tmp_path, opts),
+        {},
+        stdin_is_tty=True,
+    )
+
+    settings = runtime.accounts[0].settings
+    assert settings.browser_path is None
+    assert settings.cdp_host == "127.0.0.1"
+    assert settings.cdp_port == 9222
+
+
+def test_invalid_utf8_config_is_reported_as_config_error(tmp_path: Path) -> None:
+    path = tmp_path / "config.toml"
+    path.write_bytes(b'[settings]\nname = "\xff"\n')
+
+    with pytest.raises(ConfigError, match="编码错误"):
+        load_toml(path)
+
+
 def test_account_scalars_are_normalized_to_strings(tmp_path: Path) -> None:
     opts = parse_args([])
     runtime = build_runtime_config(
@@ -348,3 +381,33 @@ def test_atomic_write_replaces_content_and_leaves_no_temp_file(
     assert not list(target.parent.glob("*.tmp"))
     if os.name != "nt":
         assert stat.S_IMODE(target.stat().st_mode) == 0o600
+
+
+def test_atomic_write_failure_after_fdopen_never_closes_foreign_descriptor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """文件对象已接管描述符后再失败，不得再次 os.close 同一编号。"""
+
+    import runtime_config
+
+    closed: list[int] = []
+    real_close = os.close
+
+    def tracking_close(fd: int) -> None:
+        closed.append(fd)
+        real_close(fd)
+
+    def failing_replace(src: object, dst: object) -> None:
+        del src, dst
+        raise OSError("replace failed")
+
+    monkeypatch.setattr(runtime_config.os, "close", tracking_close)
+    monkeypatch.setattr(runtime_config.os, "replace", failing_replace)
+
+    target = tmp_path / "config.toml"
+    with pytest.raises(OSError, match="replace failed"):
+        atomic_write_text(target, "content")
+
+    assert closed == []
+    assert not target.exists()
+    assert not list(tmp_path.glob("*.tmp"))

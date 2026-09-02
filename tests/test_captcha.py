@@ -63,6 +63,29 @@ def make_handler(
     )
 
 
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        (None, 2),
+        ("", 2),
+        ("abc", 2),
+        ("0", 2),
+        ("-3", 2),
+        (" 4 ", 4),
+        ("999", 50),
+    ],
+)
+def test_env_retry_count_falls_back_safely(
+    monkeypatch: pytest.MonkeyPatch, raw: str | None, expected: int
+) -> None:
+    if raw is None:
+        monkeypatch.delenv("WB_CAPTCHA_ROUNDS", raising=False)
+    else:
+        monkeypatch.setenv("WB_CAPTCHA_ROUNDS", raw)
+
+    assert captcha._env_positive_int("WB_CAPTCHA_ROUNDS", 2) == expected
+
+
 def test_check_browser_health_requests_real_cdp_version(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -83,6 +106,33 @@ def test_check_browser_health_requests_real_cdp_version(
 
     assert result == "127.0.0.1:9222"
     assert calls == [("http://127.0.0.1:9222/json/version", captcha.CDP_HEALTH_TIMEOUT)]
+
+
+def test_check_browser_health_prefers_cdp_over_missing_browser_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+
+    def fake_get(url: str, *, timeout: float) -> FakeResponse:
+        del timeout
+        calls.append(url)
+        return FakeResponse(
+            {
+                "Browser": "Chrome/128.0",
+                "webSocketDebuggerUrl": "ws://127.0.0.1:9222/devtools/browser/id",
+            }
+        )
+
+    monkeypatch.setattr(captcha.requests, "get", fake_get)
+
+    result = captcha.check_browser_health(
+        browser_path="missing-browser.exe",
+        cdp_host="127.0.0.1",
+        cdp_port=9222,
+    )
+
+    assert result == "127.0.0.1:9222"
+    assert calls == ["http://127.0.0.1:9222/json/version"]
 
 
 def test_check_browser_health_rejects_non_cdp_http_service(
@@ -413,6 +463,98 @@ def test_build_page_uses_origin_and_restores_local_storage(
     assert tab.navigated_to == ["https://example.test/course/item?id=3#section"]
     assert any("previous-user" in script for script in tab.scripts)
     assert any("localStorage.clear()" in script for script in tab.scripts)
+    assert tab.closed is True
+    assert browser.closed is True
+
+
+def test_cleanup_skips_local_storage_restore_when_origin_navigation_fails() -> None:
+    class FailingNavigationTab:
+        def __init__(self) -> None:
+            self.scripts: list[str] = []
+            self.navigated_to: list[str] = []
+            self.closed = False
+
+        async def evaluate(
+            self,
+            expression: str,
+            *,
+            return_by_value: bool = False,
+        ) -> object:
+            self.scripts.append(expression)
+            if return_by_value and "window.location.origin" in expression:
+                return "https://other.test"
+            return None
+
+        async def get(self, url: str) -> None:
+            self.navigated_to.append(url)
+            raise RuntimeError("navigation failed")
+
+        async def close(self) -> None:
+            self.closed = True
+
+    handler = make_handler(port=19328)
+    browser = FakeBrowser()
+    tab = FailingNavigationTab()
+    handler._browser_states[id(browser)] = {
+        "tab": tab,
+        "storage": {"user": "previous-user"},
+        "close_tab": True,
+        "origin": "https://example.test",
+    }
+
+    browser_any: Any = browser
+    asyncio.run(handler._quit_browser(browser_any, "navigation-failure"))
+
+    assert tab.navigated_to == ["https://example.test/"]
+    assert not any("localStorage.clear()" in script for script in tab.scripts)
+    assert tab.closed is True
+    assert browser.closed is True
+
+
+def test_cleanup_skips_local_storage_restore_after_origin_redirect() -> None:
+    class RedirectingTab:
+        def __init__(self) -> None:
+            self.current_origin = "https://other.test"
+            self.origin_checks = 0
+            self.scripts: list[str] = []
+            self.navigated_to: list[str] = []
+            self.closed = False
+
+        async def evaluate(
+            self,
+            expression: str,
+            *,
+            return_by_value: bool = False,
+        ) -> object:
+            self.scripts.append(expression)
+            if return_by_value and "window.location.origin" in expression:
+                self.origin_checks += 1
+                return self.current_origin
+            return None
+
+        async def get(self, url: str) -> None:
+            self.navigated_to.append(url)
+            self.current_origin = "https://redirected.test"
+
+        async def close(self) -> None:
+            self.closed = True
+
+    handler = make_handler(port=19329)
+    browser = FakeBrowser()
+    tab = RedirectingTab()
+    handler._browser_states[id(browser)] = {
+        "tab": tab,
+        "storage": {"user": "previous-user"},
+        "close_tab": True,
+        "origin": "https://example.test",
+    }
+
+    browser_any: Any = browser
+    asyncio.run(handler._quit_browser(browser_any, "origin-redirect"))
+
+    assert tab.navigated_to == ["https://example.test/"]
+    assert tab.origin_checks == 2
+    assert not any("localStorage.clear()" in script for script in tab.scripts)
     assert tab.closed is True
     assert browser.closed is True
 

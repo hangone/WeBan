@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 import sys
@@ -57,6 +58,10 @@ root_answer_path = (
 )
 bundle_answer_path = os.path.join(bundle_path, "answer", "answer.json")
 
+# 完课接口返回成功后，showProgress 的计数可能稍后才可见。轮询次数和
+# 退避上限必须固定，避免网络异常或服务端永不更新时无限阻塞任务。
+PROGRESS_POLL_DELAYS = (0.5, 1.0, 2.0, 4.0)
+
 
 def clean_text(text):
     """生成保守模糊键，保留会改变语义的正负号和比较符。
@@ -105,22 +110,58 @@ def get_source_str(query: dict) -> str:
     return "WEIBAN"
 
 
-def read_first_existing(paths: list[str]) -> str | None:
-    """按序读取第一个存在的本地文件内容（模板/题库的打包版兜底共用）。
+def _course_finished(course: dict) -> bool:
+    """课程列表对象的 finished 字段是否表示已完成（1=完成，2=未完成）。
 
-    模板（config.example.toml）与题库（answer.json）的下载都会先尝试
-    jsDelivr 远程源；失败时回退到本地候选文件（打包内置 _MEIPASS 或
-    可执行文件旁），两者共用本函数读取兜底内容。
-    :param paths: 候选路径，按优先级排列（如 bundle 内置优先）
-    :return: 文件文本；全部不存在或不可读返回 None
+    服务端偶发返回 null/字符串，解析失败一律视为未完成，宁可多学一门也不能
+    因为 TypeError 让整个项目中断。JSON 里的 1e309 会解析成 inf，
+    int(inf) 抛 OverflowError，同样按未完成处理。
     """
-    for path in paths:
-        try:
-            with open(path, encoding="utf-8") as f:
-                return f.read()
-        except OSError:
-            continue
-    return None
+    try:
+        return int(course.get("finished", 0)) == 1
+    except (TypeError, ValueError, OverflowError):
+        return False
+
+
+# 试卷分值的合理上界：官方满分为 100，留出余量拒绝 inf/巨大值。
+_MAX_SCORE = 10_000.0
+
+
+def _finite_score(value: object) -> float | None:
+    """把分数字段解析为有限、非负且在合理范围内的 float，否则返回 None。
+
+    JSON 允许 1e309/-1e309 之类字面量，Python 会得到 ±inf；某些代理还可能
+    透传 NaN。它们进入 >= 比较会产生错误的跳过/不跳过判定，必须拒收。
+    """
+    if isinstance(value, bool):
+        return None
+    try:
+        parsed = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if not math.isfinite(parsed) or parsed < 0 or parsed > _MAX_SCORE:
+        return None
+    return parsed
+
+
+def _brief_response(response: object, limit: int = 200) -> str:
+    """只提取业务码和短消息用于日志，不回显完整响应正文。
+
+    客户端可能被脱离 main.py 的 LogRedactor 直接使用，因此这里自行去掉
+    控制字符并截断长度，避免把 token、个人信息或超长内容写进日志。
+    """
+    if not isinstance(response, dict):
+        return f"<{type(response).__name__}>"
+    parts: list[str] = []
+    for key in ("code", "detailCode", "msg", "message"):
+        if key in response:
+            text = re.sub(r"[\x00-\x1f\x7f]", "?", str(response[key]))
+            if len(text) > limit:
+                text = f"{text[:limit]}…"
+            parts.append(f"{key}={text}")
+    data = response.get("data")
+    parts.append(f"data=<{type(data).__name__}>")
+    return ", ".join(parts)
 
 
 def _check_code_ok(data: dict, allow_200: bool = True) -> bool:
@@ -462,6 +503,9 @@ class WeBanClient:
                 self.log.debug(f"必读公告返回异常：{must}")
                 notices = []
             for n in notices:
+                if not isinstance(n, dict) or not n.get("id"):
+                    self.log.debug(f"跳过结构无效的必读公告：{n}")
+                    continue
                 nid = n.get("id", "")
                 title = n.get("title", "")
                 ntype = n.get("type", "")
@@ -496,7 +540,7 @@ class WeBanClient:
         try:
             q = self.api.questionnaire_list_by_user_id()
             qlist = q.get("data") if isinstance(q.get("data"), list) else []
-            if q.get("code", "-1") == "0" and qlist:
+            if _check_code_ok(q) and qlist:
                 self.log.info(
                     f"存在 {len(qlist)} 个待答问卷（官方会弹窗提示，请前往网页完成）"
                 )
@@ -781,17 +825,30 @@ class WeBanClient:
             self.log.error("学校全称不能为空")
             return ""
         tenant_list = self.api.get_tenant_list_with_letter()
-        if tenant_list.get("code", -1) == "0":
-            self.log.info("获取学校列表成功")
+        groups = tenant_list.get("data") if _check_code_ok(tenant_list) else None
+        if not isinstance(groups, list):
+            self.log.error(
+                f"获取学校列表失败或结构无效：{_brief_response(tenant_list)}"
+            )
+            return ""
+        self.log.info("获取学校列表成功")
         tenant_names = []
         maybe_names = []
-        for item in tenant_list.get("data", []):
-            for entry in item.get("list", []):
-                name = entry.get("name", "")
+        for item in groups:
+            entries = item.get("list") if isinstance(item, dict) else None
+            if not isinstance(entries, list):
+                continue
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    continue
+                name = str(entry.get("name") or "")
+                code = str(entry.get("code") or "")
+                if not name or not code:
+                    continue
                 tenant_names.append(name)
                 if self.tenant_name == name.strip():
-                    self.log.success(f"找到学校代码: {entry['code']}")
-                    return entry["code"]
+                    self.log.success(f"找到学校代码: {code}")
+                    return code
                 if self.tenant_name in name:
                     maybe_names.append(name)
         self.log.error(f"{tenant_names}")
@@ -946,7 +1003,12 @@ class WeBanClient:
                         f"请在 {captcha_path} 查看验证码图片并输入验证码："
                     )
                 finally:
-                    captcha_path.unlink(missing_ok=True)
+                    try:
+                        captcha_path.unlink(missing_ok=True)
+                    except OSError as exc:
+                        # 图片可能仍被浏览器/杀毒软件占用；清理失败不应
+                        # 吞掉已经输入的验证码，更不能阻止登录请求。
+                        self.log.debug(f"验证码图片清理失败：{exc}")
             res = self.api.login(verify_code, int(verify_time))
             if res.get("detailCode") == "67":
                 self.log.warning("验证码识别失败，正在重试")
@@ -1297,7 +1359,7 @@ class WeBanClient:
                         project_ok = False
                         break
                     for course in course_list:
-                        if not force_restudy and int(course.get("finished", 0)) == 1:
+                        if not force_restudy and _course_finished(course):
                             continue
                         if not self._learn_course(
                             course,
@@ -1339,31 +1401,37 @@ class WeBanClient:
     def _check_project_course_done(self, task: dict, project_prefix: str) -> bool:
         """校验项目各类型课程完成数是否达到需求数，不足时告警。
 
-        服务端进度更新可能有延迟，因此只告警不重试；覆盖折叠/扁平两种
-        列表路径学完后的盲区（如扁平分页提前结束导致漏学）。
+        服务端进度更新可能有延迟，因此在有界退避窗口内重读；覆盖折叠/扁平
+        两种列表路径学完后的盲区（如扁平分页提前结束导致漏学）。
         """
         try:
-            progress = self.get_progress(
-                task["userProjectId"], project_prefix, output=False
-            )
-            if not _check_code_ok(progress):
-                return False
-            data = progress.get("data", {})
-            completed = True
-            for _, label, need_key, finished_key in [
-                (3, "必修课", "requiredNum", "requiredFinishedNum"),
-                (1, "推送课", "pushNum", "pushFinishedNum"),
-                (2, "自选课", "optionalNum", "optionalFinishedNum"),
-            ]:
-                need = int(data.get(need_key, 0) or 0)
-                finished = int(data.get(finished_key, 0) or 0)
-                if need > 0 and finished < need:
-                    completed = False
-                    self.log.warning(
-                        f"{project_prefix} {label}完成 {finished}/{need}，"
-                        f"未达到需求数，请检查是否漏学"
-                    )
-            return completed
+            for attempt in range(len(PROGRESS_POLL_DELAYS) + 1):
+                progress = self.get_progress(
+                    task["userProjectId"], project_prefix, output=False
+                )
+                if not _check_code_ok(progress):
+                    return False
+                data = progress.get("data", {})
+                completed = True
+                for _, label, need_key, finished_key in [
+                    (3, "必修课", "requiredNum", "requiredFinishedNum"),
+                    (1, "推送课", "pushNum", "pushFinishedNum"),
+                    (2, "自选课", "optionalNum", "optionalFinishedNum"),
+                ]:
+                    need = int(data.get(need_key, 0) or 0)
+                    finished = int(data.get(finished_key, 0) or 0)
+                    if need > 0 and finished < need:
+                        completed = False
+                        if attempt == len(PROGRESS_POLL_DELAYS):
+                            self.log.warning(
+                                f"{project_prefix} {label}完成 {finished}/{need}，"
+                                f"未达到需求数，请检查是否漏学"
+                            )
+                if completed:
+                    return True
+                if attempt < len(PROGRESS_POLL_DELAYS):
+                    self._sleep(PROGRESS_POLL_DELAYS[attempt])
+            return False
         except (InterruptedError, PermissionError):
             raise  # Token 失效，立即终止该账号
         except (OSError, APIResponseError, ResponseValidationError) as e:
@@ -1410,16 +1478,29 @@ class WeBanClient:
             )
             if not ok:
                 return False
-            progress_after = self.get_progress(task["userProjectId"], project_prefix)
-            if not _check_code_ok(progress_after):
-                self.log.error(f"{course_prefix}：学习后进度响应无效")
-                return False
-            d = progress_after["data"]
-            finished_after = (
-                d["requiredFinishedNum"]
-                + d["pushFinishedNum"]
-                + d["optionalFinishedNum"]
-            )
+            progress_after = None
+            finished_after = finished_before
+            for attempt in range(len(PROGRESS_POLL_DELAYS) + 1):
+                progress_after = self.get_progress(
+                    task["userProjectId"], project_prefix
+                )
+                if not _check_code_ok(progress_after):
+                    self.log.error(f"{course_prefix}：学习后进度响应无效")
+                    return False
+                d = progress_after["data"]
+                finished_after = (
+                    d["requiredFinishedNum"]
+                    + d["pushFinishedNum"]
+                    + d["optionalFinishedNum"]
+                )
+                if force_restudy or finished_after > finished_before:
+                    break
+                if attempt < len(PROGRESS_POLL_DELAYS):
+                    self.log.debug(
+                        f"{course_prefix}：完课接口成功但进度尚未更新，"
+                        f"{PROGRESS_POLL_DELAYS[attempt]:g}s 后重试"
+                    )
+                    self._sleep(PROGRESS_POLL_DELAYS[attempt])
             if not force_restudy and finished_after <= finished_before:
                 self.log.warning(
                     f"{course_prefix}：完课接口成功但进度未更新，标记为不完整"
@@ -1500,7 +1581,7 @@ class WeBanClient:
             page_no += 1
 
         for course in courses_all:
-            if not force_restudy and int(course.get("finished", 0)) == 1:
+            if not force_restudy and _course_finished(course):
                 continue
             category_name = course.get("categoryName") or label
             category_prefix = f"{label} {project_prefix}/{category_name}"
@@ -1546,7 +1627,7 @@ class WeBanClient:
         """
         course_prefix = f"{category_prefix}/{course['resourceName']}"
 
-        if not force_restudy and int(course.get("finished", 0)) == 1:
+        if not force_restudy and _course_finished(course):
             return True
 
         self.log.info(f"学习： {course_prefix}")
@@ -1912,26 +1993,40 @@ class WeBanClient:
                 try:
                     exam_odd_num = int(plan["examOddNum"])
                     exam_finish_num = int(plan["examFinishNum"])
-                    exam_score = float(plan["examScore"])
-                    pass_score = float(plan["passScore"])
-                except (TypeError, ValueError):
+                except (TypeError, ValueError, OverflowError):
                     self.log.error(f"{plan_name} 考试计划计数字段无效")
                     mark_failed(f"{plan_name}: 考试计划计数无效")
                     continue
+                exam_score = _finite_score(plan["examScore"])
+                pass_score = _finite_score(plan["passScore"])
+                if exam_score is None or pass_score is None:
+                    # 非有限分数会让 >= 判定失真（如 -inf 被当成"已及格"），
+                    # 宁可跳过该计划也不能基于它决定是否交卷。
+                    self.log.error(f"{plan_name} 考试计划分数字段无效")
+                    mark_failed(f"{plan_name}: 考试计划分数无效")
+                    continue
 
                 # ── 已考过的考试，显示历史成绩 ──
-                full_score = 100
+                # 满分仅用于日志和 perfect 模式的跳过判断；preparePaper 在此
+                # 处失败或结构异常时按默认 100 分继续，不能拖垮整个账号。
+                full_score = 100.0
                 if exam_finish_num > 0:
                     try:
                         pp = self.api.exam_prepare_paper(plan["id"])
-                        full_score = pp.get("data", {}).get("paperScore", 100)
                     except PermissionError:
                         raise  # Token 失效，立即终止该账号
-                    except OSError:
-                        pass
+                    except (OSError, APIResponseError) as exc:
+                        self.log.debug(f"{plan_name} 读取试卷总分失败：{exc}")
+                    else:
+                        pp_data = pp.get("data") if _check_code_ok(pp) else None
+                        if isinstance(pp_data, dict):
+                            parsed_full = _finite_score(pp_data.get("paperScore"))
+                            # 0 分满分同样不可信，保持默认 100
+                            if parsed_full:
+                                full_score = parsed_full
                     self.log.info(
                         f"{plan_name} 已考过 {exam_finish_num}/{exam_odd_num} 次，"
-                        f"最高 {exam_score}/{full_score}（及格线 {pass_score}）"
+                        f"最高 {exam_score:g}/{full_score:g}（及格线 {pass_score:g}）"
                     )
                 elif exam_odd_num > 0:
                     self.log.info(f"{plan_name} 未考试，可考 {exam_odd_num} 次")
@@ -2936,8 +3031,28 @@ class WeBanClient:
 
     @staticmethod
     def _is_valid_answers(answers_json: Any) -> bool:
-        """校验题库是否为有效字典且非空"""
-        return isinstance(answers_json, dict) and bool(answers_json)
+        """至少包含一道能在规范化后保留的题目。"""
+
+        if not isinstance(answers_json, dict):
+            return False
+        for title, question in answers_json.items():
+            if (
+                not isinstance(title, str)
+                or not title
+                or not isinstance(question, dict)
+            ):
+                continue
+            raw_options = question.get("optionList")
+            if not isinstance(raw_options, list):
+                continue
+            if any(
+                isinstance(option, dict)
+                and isinstance(option.get("content"), str)
+                and bool(_exact_text(option["content"]))
+                for option in raw_options
+            ):
+                return True
+        return False
 
     @staticmethod
     def _normalize_answers(answers_json: dict) -> dict:
@@ -3044,6 +3159,7 @@ class WeBanClient:
         """从考试复盘增量同步题库，并通过 AnswerStore 原子提交。"""
 
         store = self._answer_store()
+        remote_baseline: dict[str, Any] = {}
         try:
             answers_json = self._normalize_answers(store.load())
         except AnswerStoreError:
@@ -3051,23 +3167,35 @@ class WeBanClient:
             try:
                 remote = self.api.download_answer()
                 downloaded = json.loads(remote)
-            except (OSError, ValueError, APIResponseError) as exc:
+            except (OSError, TypeError, ValueError, APIResponseError) as exc:
                 self.log.error(f"题库下载或解析失败：{exc}")
                 return WorkflowResult.failed_result("没有可用题库")
-            answers_json = self._normalize_answers(downloaded)
-            if not self._is_valid_answers(answers_json):
+            if not self._is_valid_answers(downloaded):
                 self.log.error("下载的题库格式无效，应为非空 JSON 对象")
                 return WorkflowResult.failed_result("下载题库格式无效")
-            store.write(answers_json)
-            self.log.success("题库已从远程下载并原子保存")
+            answers_json = self._normalize_answers(downloaded)
+            if not self._is_valid_answers(answers_json):
+                self.log.error("下载的题库格式无效，应包含至少一道有效题目")
+                return WorkflowResult.failed_result("下载题库格式无效")
+            remote_baseline = answers_json
+            self.log.info("题库已从远程下载，待同步事务中合并保存")
 
         failures = 0
         reviewed_questions: list[dict] = []
         user_project_ids: list[str] = []
 
+        # 题库同步是辅助阶段：项目/模块列表的网络或协议错误只计入 failures
+        # 并降级为 incomplete，不能让整个账号在学习开始前就失败。
         for ended in (2, 1):
             self._raise_if_stopped()
-            response = self.api.list_my_project(ended=ended)
+            try:
+                response = self.api.list_my_project(ended=ended)
+            except PermissionError:
+                raise
+            except (OSError, APIResponseError) as exc:
+                self.log.warning(f"获取项目列表失败（ended={ended}）：{exc}")
+                failures += 1
+                continue
             projects = response.get("data") if _check_code_ok(response) else None
             if not isinstance(projects, list):
                 self.log.error(f"获取项目列表失败：{response}")
@@ -3080,7 +3208,14 @@ class WeBanClient:
                     self.log.warning(f"跳过结构无效的项目：{project}")
                     failures += 1
 
-        completion = self.api.list_completion()
+        try:
+            completion = self.api.list_completion()
+        except PermissionError:
+            raise
+        except (OSError, APIResponseError) as exc:
+            self.log.warning(f"获取模块完成情况失败：{exc}")
+            failures += 1
+            completion = {}
         modules = completion.get("data") if _check_code_ok(completion) else None
         if isinstance(modules, list):
             show_lab = any(
@@ -3090,7 +3225,14 @@ class WeBanClient:
                 for item in modules
             )
             if show_lab:
-                lab_project = self.api.lab_index()
+                try:
+                    lab_project = self.api.lab_index()
+                except PermissionError:
+                    raise
+                except (OSError, APIResponseError) as exc:
+                    self.log.warning(f"获取实验室项目失败：{exc}")
+                    failures += 1
+                    lab_project = {}
                 lab_data = (
                     lab_project.get("data") if _check_code_ok(lab_project) else None
                 )
@@ -3099,10 +3241,10 @@ class WeBanClient:
                 )
                 if isinstance(current, dict) and current.get("userProjectId"):
                     user_project_ids.append(str(current["userProjectId"]))
-                else:
+                elif lab_project:
                     self.log.warning(f"跳过无效实验室项目：{lab_project}")
                     failures += 1
-        else:
+        elif completion:
             self.log.warning(f"获取模块完成情况失败：{completion}")
             failures += 1
 
@@ -3184,6 +3326,10 @@ class WeBanClient:
 
         def merge_latest(current: dict[str, Any]) -> dict[str, Any]:
             merged = self._normalize_answers(current)
+            # 远程题库只是缺失本地题库时的基线。将它放入最终 update
+            # 事务内合并，避免锁外的独立 write 覆盖其他进程刚写入的答案。
+            for title, question in self._normalize_answers(remote_baseline).items():
+                merged.setdefault(title, question)
             for reviewed in reviewed_questions:
                 if not self._merge_reviewed_answer(merged, reviewed):
                     self.log.warning(f"跳过无效复盘题目：{reviewed}")

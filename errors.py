@@ -83,9 +83,10 @@ class WorkflowResult:
             if priority[self.status] >= priority[other.status]
             else other.status
         )
+        deciding_result = self if status is self.status else other
         return WorkflowResult(
             status=status,
-            message=message or other.message or self.message,
+            message=message or deciding_result.message,
             completed=self.completed + other.completed,
             failed=self.failed + other.failed,
             skipped=self.skipped + other.skipped,

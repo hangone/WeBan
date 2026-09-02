@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import os
 import threading
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
@@ -221,7 +222,7 @@ def test_run_account_returns_structured_success(tmp_path: Path) -> None:
         runtime,
         0,
         threading.Event(),
-        main.RuntimeDependencies(FakeClient, lambda *_: "ok"),
+        main.RuntimeDependencies(FakeClient),
         base_logger.bind(account="系统"),
         "20260830-120000",
     )
@@ -275,7 +276,7 @@ def test_run_account_reports_incomplete_workflow_and_closes_client(
         runtime,
         0,
         threading.Event(),
-        main.RuntimeDependencies(IncompleteClient, lambda *_: "ok"),
+        main.RuntimeDependencies(IncompleteClient),
         base_logger.bind(account="系统"),
         "20260830-120000",
     )
@@ -301,7 +302,6 @@ def test_runtime_adapter_injects_paths_policy_and_safe_captcha_dir(
         pass
 
     captcha_module.is_non_interactive = lambda: False  # type: ignore[attr-defined]
-    captcha_module.check_browser_health = lambda *_: "ok"  # type: ignore[attr-defined]
     client_module.is_non_interactive = lambda: False  # type: ignore[attr-defined]
     client_module.CaptchaHandler = FakeCaptchaHandler  # type: ignore[attr-defined]
     client_module.WeBanClient = FakeClient  # type: ignore[attr-defined]
@@ -367,3 +367,54 @@ def test_noninteractive_missing_config_never_prompts(
     assert log_files
     for log_file in log_files:
         log_file.unlink()
+
+
+def test_main_restores_runtime_environment_after_embedded_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runtime = _runtime(tmp_path)
+    captcha_module = ModuleType("captcha")
+    client_module = ModuleType("client")
+    client_module.CaptchaHandler = object  # type: ignore[attr-defined]
+    client_module.WeBanClient = object  # type: ignore[attr-defined]
+
+    class CapturingLogger:
+        def info(self, _: str) -> None:
+            return None
+
+        def error(self, _: str) -> None:
+            return None
+
+    def execute_accounts(*args: Any, **kwargs: Any) -> main.RunSummary:
+        del args, kwargs
+        assert os.environ["WB_DATA_DIR"] == str(runtime.paths.data_dir)
+        assert os.environ["WB_NON_INTERACTIVE"] == "1"
+        return main.RunSummary(
+            (main.AccountRunResult(0, "account-0", main.AccountRunStatus.SUCCESS),)
+        )
+
+    monkeypatch.setattr(
+        main,
+        "_build_runtime",
+        lambda *_: (SimpleNamespace(), {}, runtime, False),
+    )
+    monkeypatch.setattr(
+        main,
+        "_setup_logging",
+        lambda *_: (CapturingLogger(), "20260831-120000"),
+    )
+    monkeypatch.setattr(
+        main,
+        "_load_business_modules",
+        lambda: (captcha_module, client_module),
+    )
+    monkeypatch.setattr(main, "_check_update_async", lambda *_: None)
+    monkeypatch.setattr(main, "_execute_accounts", execute_accounts)
+    monkeypatch.setenv("WB_DATA_DIR", "before-run")
+    monkeypatch.delenv("WB_NON_INTERACTIVE", raising=False)
+
+    exit_code = main.main(env={})
+
+    assert exit_code == main.EXIT_SUCCESS
+    assert os.environ["WB_DATA_DIR"] == "before-run"
+    assert "WB_NON_INTERACTIVE" not in os.environ

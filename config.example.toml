@@ -87,7 +87,7 @@ browser_path = ""
 # CDP 远程调试（连接已有浏览器实例，适用于 Docker 等无法直接启动浏览器的场景）
 # 在宿主机启动 Chrome 时加上: chrome --remote-debugging-port=9222
 # 然后填写以下两项，nodriver 将通过 CDP 连接该浏览器，不再启动本地浏览器
-# 注意: cdp_host 和 cdp_port 需同时设置才生效
+# 注意: cdp_host 和 cdp_port 需同时设置才生效；完整 CDP 配置优先于 browser_path
 # Docker 环境会自动检测，无需手动配置
 # CDP 等同于浏览器完全控制权：只连接专用浏览器配置，不要暴露到公网，
 # 并用防火墙限制可访问来源。内置浏览器镜像的 CDP 仅监听容器回环地址。

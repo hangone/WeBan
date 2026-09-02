@@ -261,8 +261,8 @@ docker run --rm \
 
 程序按以下优先级自动检测可用的浏览器，无需手动配置：
 
-1. **用户指定**：配置文件 `browser_path`（或 `--browser-path` / `WB_BROWSER_PATH`）
-2. **CDP 远程调试**：配置文件 `cdp_host` + `cdp_port`（或 CLI/env），或 Docker 环境下自动尝试 `host.docker.internal:9222`
+1. **CDP 远程调试**：配置文件 `cdp_host` + `cdp_port`（或 CLI/env），或自动探测默认 CDP 端点；完整 CDP 配置优先于 `browser_path`
+2. **用户指定**：配置文件 `browser_path`（或 `--browser-path` / `WB_BROWSER_PATH`）
 3. **Playwright 浏览器**：自动查找 `~/.cache/ms-playwright` 下的 Chromium
 4. **系统浏览器**：自动查找已安装的 Chrome / Chromium / Edge
 

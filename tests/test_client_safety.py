@@ -11,6 +11,7 @@ import client as client_module
 from client import WeBanClient, clean_text
 from errors import (
     AccountBlockedError,
+    APIResponseError,
     ResponseValidationError,
     WorkflowResult,
     WorkflowStatus,
@@ -21,6 +22,28 @@ class _NullLog:
     def __getattr__(self, name: str):
         del name
         return lambda *args, **kwargs: None
+
+
+def _progress_response(
+    finished: int,
+    *,
+    required: int = 1,
+    optional: int = 0,
+    push: int = 0,
+) -> dict:
+    return {
+        "code": "0",
+        "data": {
+            "requiredNum": required,
+            "requiredFinishedNum": finished,
+            "optionalNum": optional,
+            "optionalFinishedNum": 0,
+            "pushNum": push,
+            "pushFinishedNum": 0,
+            "examNum": 0,
+            "examFinishedNum": 0,
+        },
+    }
 
 
 class _CourseAPI:
@@ -96,6 +119,126 @@ def _course_client(api: _CourseAPI, *, uses_apinext: bool) -> WeBanClient:
     return client
 
 
+@pytest.mark.parametrize(
+    "response",
+    [
+        {"code": "0", "data": None},
+        {"code": "-1"},
+        {"code": "0", "data": [None, {"list": None}, {"list": [None, {}]}]},
+    ],
+    ids=["null-data", "business-failure", "malformed-entries"],
+)
+def test_tenant_lookup_returns_empty_on_malformed_list(response: dict) -> None:
+    client = object.__new__(WeBanClient)
+    client.log = _NullLog()
+    client.tenant_name = "测试学校"
+    client.api = SimpleNamespace(get_tenant_list_with_letter=lambda: response)
+
+    assert client.get_tenant_code() == ""
+
+
+def test_tenant_lookup_matches_trimmed_name() -> None:
+    client = object.__new__(WeBanClient)
+    client.log = _NullLog()
+    client.tenant_name = "测试学校"
+    client.api = SimpleNamespace(
+        get_tenant_list_with_letter=lambda: {
+            "code": "0",
+            "data": [{"list": [{"name": " 测试学校 ", "code": "0000123"}]}],
+        }
+    )
+
+    assert client.get_tenant_code() == "0000123"
+
+
+@pytest.mark.parametrize(
+    ("course", "expected"),
+    [
+        ({"finished": 1}, True),
+        ({"finished": "1"}, True),
+        ({"finished": 2}, False),
+        ({"finished": None}, False),
+        ({"finished": "unknown"}, False),
+        ({"finished": float("inf")}, False),
+        ({"finished": float("nan")}, False),
+        ({}, False),
+    ],
+)
+def test_course_finished_tolerates_unexpected_values(
+    course: dict, expected: bool
+) -> None:
+    assert client_module._course_finished(course) is expected
+
+
+def test_course_finished_handles_json_overflow_literal() -> None:
+    # JSON 1e309 在 Python 中解析为 inf，int(inf) 抛 OverflowError
+    course = json.loads('{"finished": 1e309}')
+    assert client_module._course_finished(course) is False
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (100, 100.0),
+        ("60", 60.0),
+        (0, 0.0),
+        (float("inf"), None),
+        (float("-inf"), None),
+        (float("nan"), None),
+        (-1, None),
+        (1e9, None),
+        (True, None),
+        (None, None),
+        ("abc", None),
+    ],
+)
+def test_finite_score_rejects_non_finite_and_out_of_range(
+    value: object, expected: float | None
+) -> None:
+    assert client_module._finite_score(value) == expected
+
+
+def test_brief_response_strips_body_and_control_characters() -> None:
+    response = {
+        "code": "-1",
+        "msg": "bad\x00\x1bline\n" + "x" * 500,
+        "data": {"token": "secret-token", "realName": "张三"},
+    }
+
+    brief = client_module._brief_response(response)
+
+    assert "secret-token" not in brief
+    assert "张三" not in brief
+    assert "\x00" not in brief and "\x1b" not in brief and "\n" not in brief
+    assert "data=<dict>" in brief
+    assert len(brief) < 300
+    assert client_module._brief_response(["not", "a", "dict"]) == "<list>"
+
+
+def test_tenant_lookup_failure_log_does_not_echo_response_body() -> None:
+    class RecordingLog(_NullLog):
+        def __init__(self) -> None:
+            self.errors: list[str] = []
+
+        def error(self, message: str) -> None:
+            self.errors.append(message)
+
+    log = RecordingLog()
+    client = object.__new__(WeBanClient)
+    client.log = log
+    client.tenant_name = "测试学校"
+    client.api = SimpleNamespace(
+        get_tenant_list_with_letter=lambda: {
+            "code": "-1",
+            "data": {"token": "leaked-token"},
+        }
+    )
+
+    assert client.get_tenant_code() == ""
+    assert log.errors
+    assert all("leaked-token" not in line for line in log.errors)
+
+
 def test_apinext_and_finish_share_one_unique_number(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -155,6 +298,141 @@ def test_failed_jupiter_step_stops_before_questions_and_finish(
 
     assert api.list_question_calls == 0
     assert api.finish_calls == []
+
+
+def test_course_completion_polls_until_delayed_progress_is_visible() -> None:
+    responses = [
+        _progress_response(0),
+        _progress_response(0),
+        _progress_response(1),
+    ]
+    calls = 0
+    delays: list[float] = []
+    client = object.__new__(WeBanClient)
+    client.log = _NullLog()
+
+    def get_progress(*args, **kwargs) -> dict:
+        nonlocal calls
+        del args, kwargs
+        response = responses[min(calls, len(responses) - 1)]
+        calls += 1
+        return response
+
+    client.get_progress = get_progress
+    client._sleep = lambda seconds: delays.append(seconds)
+    client._study_one_course = lambda *args, **kwargs: True
+
+    assert client._learn_course(
+        {"resourceId": "course", "resourceName": "课程"},
+        {"userProjectId": "project"},
+        "分类",
+        "项目",
+        {},
+        False,
+    )
+    assert calls == 3
+    assert delays == [client_module.PROGRESS_POLL_DELAYS[0]]
+
+
+def test_course_completion_with_no_progress_update_remains_incomplete() -> None:
+    response = _progress_response(0)
+    responses = [response] * (len(client_module.PROGRESS_POLL_DELAYS) + 2)
+    calls = 0
+    delays: list[float] = []
+    client = object.__new__(WeBanClient)
+    client.log = _NullLog()
+
+    def get_progress(*args, **kwargs) -> dict:
+        nonlocal calls
+        del args, kwargs
+        calls += 1
+        return responses[min(calls - 1, len(responses) - 1)]
+
+    client.get_progress = get_progress
+    client._sleep = lambda seconds: delays.append(seconds)
+    client._study_one_course = lambda *args, **kwargs: True
+
+    assert not client._learn_course(
+        {"resourceId": "course", "resourceName": "课程"},
+        {"userProjectId": "project"},
+        "分类",
+        "项目",
+        {},
+        False,
+    )
+    assert calls == len(client_module.PROGRESS_POLL_DELAYS) + 2
+    assert delays == list(client_module.PROGRESS_POLL_DELAYS)
+
+
+def test_project_completion_polls_before_declaring_study_incomplete() -> None:
+    responses = [_progress_response(0), _progress_response(1)]
+    calls = 0
+    delays: list[float] = []
+    client = object.__new__(WeBanClient)
+    client.log = _NullLog()
+
+    def get_progress(*args, **kwargs) -> dict:
+        nonlocal calls
+        del args, kwargs
+        response = responses[min(calls, len(responses) - 1)]
+        calls += 1
+        return response
+
+    client.get_progress = get_progress
+    client._sleep = lambda seconds: delays.append(seconds)
+
+    assert client._check_project_course_done({"userProjectId": "project"}, "项目")
+    assert calls == 2
+    assert delays == [client_module.PROGRESS_POLL_DELAYS[0]]
+
+
+def test_manual_captcha_cleanup_failure_does_not_skip_api_login(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class LoginAPI:
+        def __init__(self) -> None:
+            self.user = {"userId": ""}
+            self.login_calls: list[tuple[str, int]] = []
+
+        def get_timestamp(self, length: int, offset: int) -> int:
+            assert (length, offset) == (13, 0)
+            return 123
+
+        def rand_letter_image(self, timestamp: int) -> bytes:
+            assert timestamp == 123
+            return b"captcha"
+
+        def login(self, verify_code: str, verify_time: int) -> dict:
+            self.login_calls.append((verify_code, verify_time))
+            self.user["userId"] = "user"
+            return {"code": "0"}
+
+    api = LoginAPI()
+    client = object.__new__(WeBanClient)
+    client.api = api
+    client.log = _NullLog()
+    client.non_interactive = False
+    client.captcha_debug_dir = tmp_path
+    client._prompt = lambda message: "ABCD"
+
+    monkeypatch.setattr(
+        client_module.LoginCaptchaSolver,
+        "recognize",
+        lambda image, log: None,
+    )
+    monkeypatch.setattr(client_module.webbrowser, "open", lambda url: True)
+    real_unlink = Path.unlink
+
+    def fail_captcha_unlink(path: Path, *, missing_ok: bool = False) -> None:
+        if path == tmp_path / "verify_code.png":
+            raise OSError("captcha file is still in use")
+        real_unlink(path, missing_ok=missing_ok)
+
+    monkeypatch.setattr(Path, "unlink", fail_captcha_unlink)
+
+    assert client.login() == api.user
+    assert api.login_calls == [("ABCD", 123)]
 
 
 def test_parse_item_js_does_not_stop_before_later_nonstr_map(
@@ -284,11 +562,20 @@ class _ExamAPI:
         before: dict,
         paper: dict | None = None,
         odd_num: int = 2,
+        finish_num: int = 0,
+        history_prepare: dict | Exception | None = None,
+        exam_score: object = 0,
+        pass_score: object = 60,
     ) -> None:
         self.user = {"userId": "user", "realName": "用户"}
         self.before = before
         self.paper = paper
         self.odd_num = odd_num
+        self.finish_num = finish_num
+        self.exam_score = exam_score
+        self.pass_score = pass_score
+        # 已考过的计划会先用 preparePaper 读取满分；None 表示与正式响应一致
+        self.history_prepare = history_prepare
         self.prepare_calls = 0
         self.start_calls = 0
         self.record_calls = 0
@@ -304,9 +591,9 @@ class _ExamAPI:
                     "examPlanId": "plan",
                     "examPlanName": "考试",
                     "examOddNum": self.odd_num,
-                    "examFinishNum": 0,
-                    "examScore": 0,
-                    "passScore": 60,
+                    "examFinishNum": self.finish_num,
+                    "examScore": self.exam_score,
+                    "passScore": self.pass_score,
                 }
             ],
         }
@@ -318,6 +605,11 @@ class _ExamAPI:
     def exam_prepare_paper(self, plan_id: str) -> dict:
         del plan_id
         self.prepare_calls += 1
+        if self.finish_num > 0 and self.prepare_calls == 1:
+            if isinstance(self.history_prepare, Exception):
+                raise self.history_prepare
+            if self.history_prepare is not None:
+                return self.history_prepare
         return {
             "code": "0",
             "data": {
@@ -430,6 +722,122 @@ def test_valid_fully_mapped_paper_can_be_recorded_and_submitted(
     assert result.status is WorkflowStatus.SUCCESS
     assert api.record_calls == 1
     assert api.submit_calls == 1
+
+
+@pytest.mark.parametrize(
+    "history_prepare",
+    [
+        {"code": "0", "data": None},
+        {"code": "-1"},
+        {"code": "0", "data": {"paperScore": "not-a-number"}},
+        {"code": "0", "data": {"paperScore": float("inf")}},
+        {"code": "0", "data": {"paperScore": float("nan")}},
+        APIResponseError(
+            "请求失败",
+            status_code=502,
+            endpoint="preparePaper",
+            summary="bad gateway",
+        ),
+    ],
+    ids=[
+        "null-data",
+        "business-failure",
+        "bad-score",
+        "inf-score",
+        "nan-score",
+        "http-error",
+    ],
+)
+def test_history_score_probe_failure_does_not_abort_exam(
+    monkeypatch: pytest.MonkeyPatch, history_prepare: dict | Exception
+) -> None:
+    api = _ExamAPI(
+        before={"code": "0", "data": {"isExistedNotSubmit": False}},
+        paper={"code": "0", "data": {"questionList": [_question("已知题")]}},
+        finish_num=1,
+        history_prepare=history_prepare,
+    )
+    client = _exam_client(api, {"已知题": _entry((0,))})
+    monkeypatch.setattr(client_module.time, "sleep", lambda _: None)
+
+    result = client.run_exam(
+        exam_mode="force",
+        exam_question_time="0,0",
+        exam_submit_match_rate=90,
+        only_project={
+            "projectName": "项目",
+            "userProjectId": "project",
+            "completion": {"grey": 2, "active": 1},
+        },
+    )
+
+    assert result.status is WorkflowStatus.SUCCESS
+    assert api.submit_calls == 1
+
+
+def test_negative_infinite_paper_score_never_marks_perfect_mode_as_done(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # 旧实现里 0 >= -inf 为真，perfect 模式会把这场考试当成"已满分"跳过
+    api = _ExamAPI(
+        before={"code": "0", "data": {"isExistedNotSubmit": False}},
+        paper={"code": "0", "data": {"questionList": [_question("已知题")]}},
+        finish_num=1,
+        history_prepare={"code": "0", "data": {"paperScore": float("-inf")}},
+    )
+    client = _exam_client(api, {"已知题": _entry((0,))})
+    monkeypatch.setattr(client_module.time, "sleep", lambda _: None)
+
+    result = client.run_exam(
+        exam_mode="perfect",
+        exam_question_time="0,0",
+        exam_submit_match_rate=90,
+        only_project={
+            "projectName": "项目",
+            "userProjectId": "project",
+            "completion": {"grey": 2, "active": 1},
+        },
+    )
+
+    assert result.status is WorkflowStatus.SUCCESS
+    assert api.submit_calls == 1
+
+
+@pytest.mark.parametrize(
+    ("exam_score", "pass_score"),
+    [
+        (float("-inf"), 60),
+        (float("inf"), 60),
+        (float("nan"), 60),
+        (0, float("nan")),
+        (0, float("-inf")),
+        (0, 1e12),
+    ],
+    ids=[
+        "neg-inf-score",
+        "inf-score",
+        "nan-score",
+        "nan-pass",
+        "neg-inf-pass",
+        "huge-pass",
+    ],
+)
+def test_non_finite_plan_scores_fail_closed_without_touching_paper(
+    exam_score: object, pass_score: object
+) -> None:
+    api = _ExamAPI(
+        before={"code": "0", "data": {"isExistedNotSubmit": False}},
+        paper={"code": "0", "data": {"questionList": [_question("已知题")]}},
+        finish_num=1,
+        exam_score=exam_score,
+        pass_score=pass_score,
+    )
+    result = _run_one_exam(_exam_client(api, {"已知题": _entry((0,))}))
+
+    assert result.status is WorkflowStatus.INCOMPLETE
+    assert api.prepare_calls == 0
+    assert api.start_calls == 0
+    assert api.submit_calls == 0
 
 
 def test_review_merge_replaces_single_choice_truth_instead_of_union() -> None:
@@ -573,6 +981,133 @@ def test_sync_propagates_account_lock_without_further_work(
     with pytest.raises(AccountBlockedError) as caught:
         client.sync_answers()
     assert caught.value.status is WorkflowStatus.LOCKED
+
+
+def test_sync_downgrades_project_listing_network_error_to_incomplete(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root_path = tmp_path / "answer.json"
+    root_path.write_text(
+        json.dumps({"旧题": _entry((0,))}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(client_module, "root_answer_path", str(root_path))
+    monkeypatch.setattr(
+        client_module,
+        "answer_path",
+        str(tmp_path / "answer" / "answer.json"),
+    )
+    monkeypatch.setattr(
+        client_module,
+        "bundle_answer_path",
+        str(tmp_path / "bundle" / "answer.json"),
+    )
+
+    class FlakyAPI:
+        def list_my_project(self, ended: int = 2) -> dict:
+            if ended == 2:
+                raise APIResponseError(
+                    "请求失败",
+                    status_code=503,
+                    endpoint="listMyProject",
+                    summary="unavailable",
+                )
+            return {"code": "0", "data": []}
+
+        def list_completion(self) -> dict:
+            raise OSError("connection reset")
+
+    client = object.__new__(WeBanClient)
+    client.api = FlakyAPI()
+    client.log = _NullLog()
+
+    result = client.sync_answers()
+
+    assert result.status is WorkflowStatus.INCOMPLETE
+    assert result.failed == 2
+    assert "旧题" in json.loads(root_path.read_text(encoding="utf-8"))
+
+
+def test_remote_answer_baseline_is_merged_inside_final_store_update() -> None:
+    class Store:
+        def __init__(self) -> None:
+            self.write_calls = 0
+            self.update_calls = 0
+            self.result: dict | None = None
+
+        def load(self) -> dict:
+            raise client_module.AnswerStoreError("missing")
+
+        def write(self, value: dict) -> None:
+            del value
+            self.write_calls += 1
+
+        def update(self, mutator, *, default) -> dict:
+            del default
+            self.update_calls += 1
+            # 模拟远程下载期间另一进程已经写入的新题目。
+            result = mutator({"并发题": _entry((0,))})
+            assert isinstance(result, dict)
+            self.result = result
+            return result
+
+    class RemoteAPI:
+        def download_answer(self) -> str:
+            return json.dumps({"远程题": _entry((1,))}, ensure_ascii=False)
+
+        def list_my_project(self, ended: int = 2) -> dict:
+            del ended
+            return {"code": "0", "data": []}
+
+        def list_completion(self) -> dict:
+            return {"code": "0", "data": []}
+
+    store = Store()
+    client = object.__new__(WeBanClient)
+    client.api = RemoteAPI()
+    client.log = _NullLog()
+    client.__dict__["_answer_store_instance"] = store
+
+    result = client.sync_answers()
+
+    assert result.status is WorkflowStatus.SUCCESS
+    assert store.write_calls == 0
+    assert store.update_calls == 1
+    assert store.result is not None
+    assert {"远程题", "并发题"}.issubset(store.result)
+
+
+@pytest.mark.parametrize("payload", ["[]", "null", '"text"'])
+def test_remote_answer_rejects_non_object_before_normalizing(payload: str) -> None:
+    class Store:
+        def load(self) -> dict:
+            raise client_module.AnswerStoreError("missing")
+
+        def update(self, mutator, *, default) -> dict:
+            del mutator, default
+            raise AssertionError("invalid remote data must not be committed")
+
+    class RemoteAPI:
+        def download_answer(self) -> str:
+            return payload
+
+    client = object.__new__(WeBanClient)
+    client.api = RemoteAPI()
+    client.log = _NullLog()
+    client.__dict__["_answer_store_instance"] = Store()
+
+    result = client.sync_answers()
+
+    assert result.status is WorkflowStatus.FAILED
+
+
+def test_answer_validator_rejects_nonempty_object_without_usable_questions() -> None:
+    assert not WeBanClient._is_valid_answers({"无效题目": {}})
+    assert not WeBanClient._is_valid_answers(
+        {"无效题目": {"optionList": [{"content": ""}]}}
+    )
+    assert WeBanClient._is_valid_answers({"有效题目": _entry((0,))})
 
 
 def test_project_cycle_skips_exam_when_study_is_incomplete() -> None:

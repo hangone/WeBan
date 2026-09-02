@@ -40,6 +40,12 @@ _SENSITIVE_KEYS = {
     "x-token",
 }
 _MAX_LOG_BODY = 2048
+_SENSITIVE_PAIR_PATTERN = re.compile(
+    r'(?i)(["\']?(?:'
+    + "|".join(re.escape(key) for key in sorted(_SENSITIVE_KEYS))
+    + r')["\']?\s*[:=]\s*)'
+    r'(?:"[^"]*"|\'[^\']*\'|[^,\s&}\]]+)'
+)
 
 
 def _is_sensitive_key(key: object) -> bool:
@@ -78,13 +84,7 @@ def _redact_text(text: str, limit: int = _MAX_LOG_BODY) -> str:
             ensure_ascii=False,
             separators=(",", ":"),
         )
-    key_pattern = "|".join(re.escape(key) for key in sorted(_SENSITIVE_KEYS))
-    candidate = re.sub(
-        rf'(?i)(["\']?(?:{key_pattern})["\']?\s*[:=]\s*)'
-        r'(?:"[^"]*"|\'[^\']*\'|[^,\s&}\]]+)',
-        r"\1<redacted>",
-        candidate,
-    )
+    candidate = _SENSITIVE_PAIR_PATTERN.sub(r"\1<redacted>", candidate)
     if len(candidate) > limit:
         return candidate[:limit] + "…"
     return candidate

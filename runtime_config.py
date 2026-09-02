@@ -328,6 +328,8 @@ def load_toml(path: Path) -> dict[str, Any]:
             document = tomllib.load(file)
     except OSError as exc:
         raise ConfigError(f"无法读取配置文件：{path}") from exc
+    except UnicodeError as exc:
+        raise ConfigError(f"配置文件编码错误：{path}") from exc
     except tomllib.TOMLDecodeError as exc:
         raise ConfigError(f"配置文件 TOML 格式错误：{exc}") from exc
     if not isinstance(document, dict):
@@ -597,24 +599,6 @@ def _resolve_account_settings(
         minimum=0,
         maximum=100,
     )
-    browser_value = _pick(
-        opts,
-        env,
-        "browser_path",
-        account=raw_account,
-        settings=global_settings,
-        default=DEFAULT_SETTINGS["browser_path"],
-    )
-    browser_text = _optional_text(browser_value, "browser_path")
-    browser_path: str | None = None
-    if browser_text:
-        resolved_browser = _absolute_path(
-            browser_text, relative_to=paths.config_path.parent
-        )
-        if not resolved_browser.is_file():
-            raise ConfigError(f"browser_path 指向的文件不存在：{resolved_browser}")
-        browser_path = str(resolved_browser)
-
     cdp_host = _optional_text(
         _pick(
             opts,
@@ -640,6 +624,27 @@ def _resolve_account_settings(
         raise ConfigError("cdp_host 与 cdp_port 必须同时设置")
     if cdp_host and "://" in cdp_host:
         raise ConfigError("cdp_host 只填写主机名或 IP，不能包含 URL scheme")
+
+    # CDP 是显式的远程浏览器选择，优先于 browser_path。只有未配置完整
+    # CDP 时才解析并校验本地浏览器路径，避免无关的失效路径阻断 CDP 连接。
+    browser_path: str | None = None
+    if cdp_host is None:
+        browser_value = _pick(
+            opts,
+            env,
+            "browser_path",
+            account=raw_account,
+            settings=global_settings,
+            default=DEFAULT_SETTINGS["browser_path"],
+        )
+        browser_text = _optional_text(browser_value, "browser_path")
+        if browser_text:
+            resolved_browser = _absolute_path(
+                browser_text, relative_to=paths.config_path.parent
+            )
+            if not resolved_browser.is_file():
+                raise ConfigError(f"browser_path 指向的文件不存在：{resolved_browser}")
+            browser_path = str(resolved_browser)
 
     debug = _strict_bool(
         _pick(
@@ -944,7 +949,11 @@ def atomic_write_text(path: Path, content: str, *, mode: int = 0o600) -> None:
             os.chmod(temp_path, mode)
         except OSError:
             pass
-        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as file:
+        file = os.fdopen(descriptor, "w", encoding="utf-8", newline="\n")
+        # fdopen 成功后描述符归文件对象所有；多线程下重复 close 可能误关
+        # 其他线程刚复用的同号描述符（如日志文件）。
+        descriptor = -1
+        with file:
             file.write(content)
             file.flush()
             os.fsync(file.fileno())
@@ -963,10 +972,11 @@ def atomic_write_text(path: Path, content: str, *, mode: int = 0o600) -> None:
             finally:
                 os.close(directory_fd)
     except BaseException:
-        try:
-            os.close(descriptor)
-        except OSError:
-            pass
+        if descriptor >= 0:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
         temp_path.unlink(missing_ok=True)
         raise
 

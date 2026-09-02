@@ -6,7 +6,6 @@ import inspect
 import json
 import os
 import re
-import socket
 import subprocess
 import sys
 import threading
@@ -15,7 +14,7 @@ import tomllib
 from collections.abc import Callable, Iterator, Mapping
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from enum import Enum
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as distribution_version
@@ -50,6 +49,7 @@ EXIT_PARTIAL_FAILURE = 3
 EXIT_INTERRUPTED = 130
 
 _SYNC_LOCK = threading.Lock()
+_RUNTIME_ENV_KEYS = ("WB_DATA_DIR", "WB_NON_INTERACTIVE")
 
 
 def _resolve_version() -> str:
@@ -212,8 +212,13 @@ class InterruptibleTime:
 
 @dataclass(frozen=True)
 class RuntimeDependencies:
+    """入口注入到账号任务中的业务构造器。
+
+    浏览器可用性不在启动期预检：CaptchaHandler 会在首次真正需要验证码时
+    才探测 CDP/本地浏览器，避免纯同步或无验证码的运行被无关的浏览器缺失阻断。
+    """
+
     client_class: type[Any]
-    check_browser_health: Callable[[str | None, str | None, int | None], str]
 
 
 def _set_module_attr(module: ModuleType, name: str, value: object) -> None:
@@ -293,10 +298,7 @@ def _apply_runtime_adapters(
         return original_handler(*args, **kwargs)
 
     _set_module_attr(client_module, "CaptchaHandler", configured_captcha_handler)
-    return RuntimeDependencies(
-        client_class=client_module.__dict__["WeBanClient"],
-        check_browser_health=captcha_module.__dict__["check_browser_health"],
-    )
+    return RuntimeDependencies(client_class=client_module.__dict__["WeBanClient"])
 
 
 class AccountRunStatus(str, Enum):
@@ -795,70 +797,6 @@ def open_editor(
     read_input("编辑完成后按回车键继续...")
 
 
-def _discover_cdp() -> tuple[str, int] | None:
-    for host, port in (
-        ("127.0.0.1", 9222),
-        ("127.0.0.1", 9223),
-        ("host.docker.internal", 9222),
-        ("host.docker.internal", 9223),
-    ):
-        try:
-            with socket.create_connection((host, port), timeout=1):
-                response = requests.get(f"http://{host}:{port}/json/version", timeout=3)
-            data = response.json()
-            if response.ok and isinstance(data, dict) and data.get("Browser"):
-                return host, port
-        except (OSError, requests.RequestException, ValueError):
-            continue
-    return None
-
-
-def _prepare_browsers(
-    runtime: RuntimeConfig,
-    dependencies: RuntimeDependencies,
-    logger: Any,
-) -> RuntimeConfig:
-    needed_accounts = [
-        account
-        for account in runtime.accounts
-        if account.settings.study_mode != "false"
-        or account.settings.exam_mode != "false"
-    ]
-    if not needed_accounts:
-        return runtime
-
-    discovered = None
-    if any(
-        not account.settings.browser_path
-        and not account.settings.cdp_host
-        and not account.settings.cdp_port
-        for account in needed_accounts
-    ):
-        discovered = _discover_cdp()
-        if discovered:
-            logger.info("自动探测到本地 CDP 浏览器")
-
-    updated_accounts: list[ResolvedAccount] = []
-    checked: set[tuple[str | None, str | None, int | None]] = set()
-    for account in runtime.accounts:
-        settings = account.settings
-        if (
-            discovered
-            and not settings.browser_path
-            and not settings.cdp_host
-            and not settings.cdp_port
-        ):
-            settings = replace(settings, cdp_host=discovered[0], cdp_port=discovered[1])
-        if settings.study_mode != "false" or settings.exam_mode != "false":
-            key = (settings.browser_path, settings.cdp_host, settings.cdp_port)
-            if key not in checked:
-                dependencies.check_browser_health(*key)
-                checked.add(key)
-        updated_accounts.append(replace(account, settings=settings))
-    logger.info("浏览器检测通过")
-    return replace(runtime, accounts=tuple(updated_accounts))
-
-
 def _execute_accounts(
     runtime: RuntimeConfig,
     stop_event: threading.Event,
@@ -985,6 +923,7 @@ def main(
     except KeyboardInterrupt:
         return EXIT_INTERRUPTED
 
+    runtime_env_before = {name: os.environ.get(name) for name in _RUNTIME_ENV_KEYS}
     try:
         logger.info(f"程序启动，当前版本：{VERSION}")
         if created_template:
@@ -1111,6 +1050,11 @@ def main(
         logger.error(f"未预期启动错误（{type(exc).__name__}）：{exc}")
         return EXIT_FAILURE
     finally:
+        for name, value in runtime_env_before.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
         # Loguru 文件 sink 在 Windows 上持有独占句柄；显式移除可保证
         # 嵌入调用、测试及临时数据目录在 main() 返回后立即可清理。
         base_logger.remove()
