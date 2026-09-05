@@ -389,8 +389,20 @@ def test_cleanup_removes_only_owned_temporary_profile(tmp_path: Path) -> None:
     assert not profile.exists()
 
 
+@pytest.mark.parametrize(
+    ("entry_url", "initial_origin"),
+    [
+        ("https://example.test/course/item?id=3#section", "https://example.test"),
+        ("https://example.test:443/course", "https://example.test:443"),
+        ("https://EXAMPLE.test/course", "https://EXAMPLE.test"),
+        ("http://example.test/course", "http://example.test"),
+    ],
+    ids=["unchanged", "default-port", "hostname-case", "https-redirect"],
+)
 def test_build_page_uses_origin_and_restores_local_storage(
     monkeypatch: pytest.MonkeyPatch,
+    entry_url: str,
+    initial_origin: str,
 ) -> None:
     class FakeTab:
         def __init__(self) -> None:
@@ -407,10 +419,11 @@ def test_build_page_uses_origin_and_restores_local_storage(
             self.scripts.append(expression)
             if "localStorage.length" in expression:
                 return {
+                    "origin": "https://example.test",
                     "items": {
                         "user": "previous-user",
                         "theme": "dark",
-                    }
+                    },
                 }
             if return_by_value and "typeof TencentCaptcha" in expression:
                 return True
@@ -450,17 +463,18 @@ def test_build_page_uses_origin_and_restores_local_storage(
 
     async def scenario() -> None:
         built_browser, built_tab = await handler._build_page(
-            "https://example.test/course/item?id=3#section",
+            entry_url,
             headless=True,
         )
         assert (built_browser, built_tab) == (browser, tab)
+        assert handler._browser_states[id(browser)]["origin"] == "https://example.test"
         browser_any: Any = browser
         await handler._quit_browser(browser_any, "test")
 
     asyncio.run(scenario())
 
-    assert browser.opened == [("https://example.test/", True)]
-    assert tab.navigated_to == ["https://example.test/course/item?id=3#section"]
+    assert browser.opened == [(f"{initial_origin}/", True)]
+    assert tab.navigated_to == [entry_url]
     assert any("previous-user" in script for script in tab.scripts)
     assert any("localStorage.clear()" in script for script in tab.scripts)
     assert tab.closed is True
@@ -568,11 +582,29 @@ def test_empty_local_storage_snapshot_is_valid() -> None:
             return_by_value: bool = False,
         ) -> object:
             del expression, return_by_value
-            return {"items": {}}
+            return {"origin": "https://example.test", "items": {}}
 
     handler = make_handler(port=19325)
 
-    assert asyncio.run(handler._snapshot_local_storage(EmptyStorageTab())) == {}
+    assert asyncio.run(handler._snapshot_local_storage(EmptyStorageTab())) == (
+        "https://example.test",
+        {},
+    )
+
+
+def test_local_storage_snapshot_requires_its_origin() -> None:
+    class MissingOriginTab:
+        async def evaluate(
+            self,
+            expression: str,
+            *,
+            return_by_value: bool = False,
+        ) -> object:
+            return {"items": {"user": "previous-user"}}
+
+    handler = make_handler(port=19371)
+    with pytest.raises(RuntimeError, match="localStorage 快照"):
+        asyncio.run(handler._snapshot_local_storage(MissingOriginTab()))
 
 
 def test_sdk_loading_has_hard_timeout(

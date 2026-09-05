@@ -3208,6 +3208,7 @@ class WeBanClient:
                     self.log.warning(f"跳过结构无效的项目：{project}")
                     failures += 1
 
+        completion_failed = False
         try:
             completion = self.api.list_completion()
         except PermissionError:
@@ -3215,6 +3216,7 @@ class WeBanClient:
         except (OSError, APIResponseError) as exc:
             self.log.warning(f"获取模块完成情况失败：{exc}")
             failures += 1
+            completion_failed = True
             completion = {}
         modules = completion.get("data") if _check_code_ok(completion) else None
         if isinstance(modules, list):
@@ -3225,6 +3227,7 @@ class WeBanClient:
                 for item in modules
             )
             if show_lab:
+                lab_failed = False
                 try:
                     lab_project = self.api.lab_index()
                 except PermissionError:
@@ -3232,6 +3235,7 @@ class WeBanClient:
                 except (OSError, APIResponseError) as exc:
                     self.log.warning(f"获取实验室项目失败：{exc}")
                     failures += 1
+                    lab_failed = True
                     lab_project = {}
                 lab_data = (
                     lab_project.get("data") if _check_code_ok(lab_project) else None
@@ -3241,10 +3245,10 @@ class WeBanClient:
                 )
                 if isinstance(current, dict) and current.get("userProjectId"):
                     user_project_ids.append(str(current["userProjectId"]))
-                elif lab_project:
+                elif not lab_failed:
                     self.log.warning(f"跳过无效实验室项目：{lab_project}")
                     failures += 1
-        elif completion:
+        elif not completion_failed:
             self.log.warning(f"获取模块完成情况失败：{completion}")
             failures += 1
 

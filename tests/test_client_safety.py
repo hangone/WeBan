@@ -1029,6 +1029,64 @@ def test_sync_downgrades_project_listing_network_error_to_incomplete(
     assert "旧题" in json.loads(root_path.read_text(encoding="utf-8"))
 
 
+@pytest.mark.parametrize("endpoint", ["completion", "lab"])
+@pytest.mark.parametrize(
+    "response",
+    [
+        {},
+        {"code": "0", "data": None},
+        OSError("connection reset"),
+        APIResponseError(
+            "请求失败", status_code=503, endpoint="list", summary="unavailable"
+        ),
+    ],
+    ids=["empty-object", "null-data", "network-error", "http-error"],
+)
+def test_sync_counts_module_failure_once_and_preserves_answers(
+    tmp_path: Path, endpoint: str, response: dict | Exception
+) -> None:
+    class ModuleAPI:
+        def __init__(self) -> None:
+            self.lab_calls = 0
+
+        def list_my_project(self, ended: int = 2) -> dict:
+            return {"code": "0", "data": []}
+
+        def list_completion(self) -> dict:
+            if endpoint == "completion":
+                if isinstance(response, Exception):
+                    raise response
+                return response
+            return {
+                "code": "0",
+                "data": [{"module": "labProject", "showable": 1}],
+            }
+
+        def lab_index(self) -> dict:
+            self.lab_calls += 1
+            if isinstance(response, Exception):
+                raise response
+            return response
+
+    answers = {"旧题": _entry((0,))}
+    store = client_module.AnswerStore(
+        tmp_path / "answer.json", validator=WeBanClient._is_valid_answers
+    )
+    store.write(answers)
+    api = ModuleAPI()
+    client = object.__new__(WeBanClient)
+    client.api = api
+    client.log = _NullLog()
+    client.__dict__["_answer_store_instance"] = store
+
+    result = client.sync_answers()
+
+    assert result.status is WorkflowStatus.INCOMPLETE
+    assert result.failed == 1
+    assert api.lab_calls == (1 if endpoint == "lab" else 0)
+    assert store.load() == WeBanClient._normalize_answers(answers)
+
+
 def test_remote_answer_baseline_is_merged_inside_final_store_update() -> None:
     class Store:
         def __init__(self) -> None:

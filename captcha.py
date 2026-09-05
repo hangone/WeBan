@@ -1487,7 +1487,8 @@ class CaptchaHandler:
                 raise
         raise RuntimeError(f"无法启动浏览器: {last_exc}")
 
-    async def _snapshot_local_storage(self, tab) -> dict[str, str]:
+    async def _snapshot_local_storage(self, tab) -> tuple[str, dict[str, str]]:
+        """在同一次页面求值中保存数据及其实际 origin，包含规范化和跳转结果。"""
         wrapped = await self._eval_json(
             tab,
             """\
@@ -1497,18 +1498,21 @@ class CaptchaHandler:
                     const key = localStorage.key(i);
                     if (key !== null) result[key] = localStorage.getItem(key);
                 }
-                return {items: result};
+                return {origin: window.location.origin, items: result};
             })()
             """,
         )
         if wrapped is None:
             raise RuntimeError("无法保存共享浏览器的 localStorage")
-        snapshot = wrapped.get("items", wrapped)
-        if not isinstance(snapshot, dict):
+        origin = wrapped.get("origin")
+        snapshot = wrapped.get("items")
+        if not isinstance(origin, str) or not isinstance(snapshot, dict):
             raise RuntimeError(  # noqa: TRY004 -- 对外统一为浏览器生命周期失败
                 "浏览器返回了无效的 localStorage 快照"
             )
-        return {str(key): str(value) for key, value in snapshot.items()}
+        return _origin_from_url(origin), {
+            str(key): str(value) for key, value in snapshot.items()
+        }
 
     async def _restore_local_storage(
         self,
@@ -1600,7 +1604,7 @@ class CaptchaHandler:
             "tab": None,
             "storage": None,
             "close_tab": cdp_mode,
-            "origin": origin,
+            "origin": None,
         }
         self._browser_states[id(browser)] = state
         try:
@@ -1613,7 +1617,7 @@ class CaptchaHandler:
                 label="验证码 origin 页面加载",
             )
             state["tab"] = tab
-            state["storage"] = await self._snapshot_local_storage(tab)
+            state["origin"], state["storage"] = await self._snapshot_local_storage(tab)
             await self._inject_auth(tab)
             self.log.info("正在加载入口页面")
             await self._bound(
