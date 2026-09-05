@@ -24,8 +24,13 @@ dependencies = [
 dev = [
     "pyinstaller>=6.20.0",
     "pyright>=1.1.409",
+    "pytest>=9.1.1",
     "ruff>=0.15.15",
 ]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
 
 [tool.pyright]
 pythonVersion = "3.12"

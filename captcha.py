@@ -16,11 +16,16 @@ import os
 import platform
 import random
 import shutil
+import socket
 import sys
+import tempfile
 import threading
 import time
+from collections.abc import AsyncIterator, Awaitable, Iterable
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Any, ClassVar
+from urllib.parse import urlsplit
 
 import cv2
 import nodriver
@@ -72,8 +77,6 @@ def _dsv_to_py(dsv):
     return dsv
 
 
-
-
 # 腾讯验证码 SDK 地址
 TCAPTCHA_SDK_URL = "https://turing.captcha.qcloud.com/TJCaptcha.js"
 
@@ -84,6 +87,97 @@ COURSE_CAPTCHA_APP_ID = "195119536"  # 图片点选验证码（课程完成）
 # 默认入口页面
 EXAM_ENTRY_URL = "https://weiban.mycourse.cn/#/course"
 COURSE_ENTRY_URL = "https://mcwk.mycourse.cn/"
+
+# 所有浏览器/CDP 操作都必须有上限，避免远端端口“能连但不响应”时永久挂起。
+CDP_HEALTH_TIMEOUT = 5.0
+CDP_DISCOVERY_TIMEOUT = 2.0
+CDP_CALL_TIMEOUT = 15.0
+BROWSER_START_TIMEOUT = 30.0
+PAGE_LOAD_TIMEOUT = 30.0
+SDK_LOAD_TIMEOUT = 12.0
+IMAGE_WORK_TIMEOUT = 120.0
+CLOSE_TIMEOUT = 10.0
+ENDPOINT_LOCK_TIMEOUT = 960.0
+EXAM_FLOW_TIMEOUT = 180.0
+COURSE_FLOW_TIMEOUT = 900.0
+
+_NODRIVER_START_LOCK = threading.Lock()
+
+
+def _env_positive_int(name: str, default: int, *, maximum: int = 50) -> int:
+    """读取可调重试次数；非法或越界值回退默认，避免验证码流程因配置抛错。"""
+    raw = os.environ.get(name, "")
+    try:
+        value = int(raw.strip())
+    except (TypeError, ValueError):
+        return default
+    if value < 1:
+        return default
+    return min(value, maximum)
+
+
+def _close_step_timeout() -> float:
+    """为关闭流程各步骤分配总预算中的一小段。"""
+    return max(min(CLOSE_TIMEOUT / 6, 2.0), 0.01)
+
+
+async def _bounded[T](
+    awaitable: Awaitable[T],
+    *,
+    timeout: float,
+    label: str,
+    stop_event: threading.Event | None = None,
+) -> T:
+    """执行有硬超时的异步操作，并允许共享停止事件立即取消。"""
+    task = asyncio.ensure_future(awaitable)
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+    try:
+        while True:
+            if stop_event is not None and stop_event.is_set():
+                raise InterruptedError("运行已被中断")
+            remaining = deadline - loop.time()
+            if remaining <= 0:
+                raise TimeoutError
+            poll_interval = min(0.1, remaining) if stop_event is not None else remaining
+            done, _ = await asyncio.wait({task}, timeout=poll_interval)
+            if task in done:
+                return await task
+    except TimeoutError as exc:
+        raise RuntimeError(f"{label}超时（{timeout:g} 秒）") from exc
+    finally:
+        if not task.done():
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
+
+
+@asynccontextmanager
+async def _async_thread_lock(
+    lock: Any,
+    *,
+    timeout: float,
+    label: str,
+    stop_event: threading.Event | None = None,
+) -> AsyncIterator[None]:
+    """不阻塞事件循环地获取跨线程锁，取消时不会遗留已获取的锁。"""
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+    acquired = False
+    while not acquired:
+        if stop_event is not None and stop_event.is_set():
+            raise InterruptedError("运行已被中断")
+        acquired = lock.acquire(blocking=False)
+        if acquired:
+            break
+        if loop.time() >= deadline:
+            raise RuntimeError(f"{label}等待超时（{timeout:g} 秒）")
+        await asyncio.sleep(0.05)
+    try:
+        yield
+    finally:
+        lock.release()
+
 
 # ── JS 片段（自动识别用）──────────────────────────────
 
@@ -176,7 +270,9 @@ def rotate_mask(mask: np.ndarray, angle: float) -> np.ndarray:
     h, w = mask.shape
     center = (w / 2, h / 2)
     matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
-    return cv2.warpAffine(mask, matrix, (w, h), flags=cv2.INTER_NEAREST, borderValue=(0,))
+    return cv2.warpAffine(
+        mask, matrix, (w, h), flags=cv2.INTER_NEAREST, borderValue=(0,)
+    )
 
 
 def crop_foreground(mask: np.ndarray) -> np.ndarray | None:
@@ -519,6 +615,41 @@ def render_debug(
     return vis
 
 
+def _write_png_atomic(path: Path, image: np.ndarray) -> None:
+    """写入调试图片并保证失败时不遗留半成品临时文件。"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temp_name = tempfile.mkstemp(
+        dir=path.parent,
+        prefix=f".{path.stem}-",
+        suffix=path.suffix,
+    )
+    os.close(fd)
+    temp_path = Path(temp_name)
+    try:
+        if not cv2.imwrite(str(temp_path), image):
+            raise OSError(f"无法写入验证码调试图片: {path}")
+        os.replace(temp_path, path)
+    finally:
+        temp_path.unlink(missing_ok=True)
+
+
+def _save_debug_images(
+    debug_dir: Path,
+    stem: str,
+    main_img: np.ndarray,
+    prompt_img: np.ndarray,
+    ordered_points: list[tuple[int, int] | None],
+    candidates: list[dict],
+) -> None:
+    """在线程中生成并原子保存一组验证码调试图片。"""
+    _write_png_atomic(debug_dir / f"{stem}_main.png", main_img)
+    _write_png_atomic(debug_dir / f"{stem}_prompt.png", prompt_img)
+    _write_png_atomic(
+        debug_dir / f"{stem}_debug.png",
+        render_debug(main_img, ordered_points, candidates),
+    )
+
+
 def fetch_image(url: str) -> np.ndarray:
     """通过 HTTP 下载验证码图片并解码为 BGR 数组。
 
@@ -561,7 +692,9 @@ class LoginCaptchaSolver:
     _initialized: bool = False
     _lock = threading.Lock()
     _charset = "0123456789abcdefghijklmnopqrstuvwxyz"
-    _idx_to_char: ClassVar[dict[int, str]] = {i: c for c, i in {c: i for i, c in enumerate(_charset)}.items()}
+    _idx_to_char: ClassVar[dict[int, str]] = {
+        i: c for c, i in {c: i for i, c in enumerate(_charset)}.items()
+    }
     _char_size = 28
 
     @classmethod
@@ -581,13 +714,20 @@ class LoginCaptchaSolver:
                             model_path = Path(__file__).parent / "captcha_model.onnx"
 
                         if not model_path.exists():
-                            log.warning(f"验证码模型文件不存在: {model_path}")
+                            log.warning(
+                                f"验证码模型文件不存在: {model_path}。"
+                                "登录验证码自动识别已禁用；交互模式可人工输入，"
+                                "无交互模式将安全失败，不会猜测验证码"
+                            )
                             cls._ocr = False
                         else:
-                            # OpenCV 失败只会抛 cv2.error（模型文件已提前检查存在）
                             cls._ocr = cv2.dnn.readNetFromONNX(str(model_path))
-                    except cv2.error:
-                        log.warning("OpenCV DNN 初始化失败，自动验证码识别功能将不可用")
+                    except Exception as exc:  # noqa: BLE001 -- 可选模型损坏必须安全降级
+                        log.warning(
+                            "验证码模型加载失败，登录验证码自动识别已禁用；"
+                            "交互模式可人工输入，无交互模式将安全失败"
+                            f"（{type(exc).__name__}）"
+                        )
                         cls._ocr = False
                     cls._initialized = True
         return cls._ocr if cls._ocr is not False else None
@@ -673,10 +813,22 @@ def _registry_candidates() -> list[str]:
     # Chrome/Edge 通过 App Paths 注册
     # winreg 仅 Windows 存在，typeshed 按平台裁剪导致 Darwin 下属性不可见
     for hive, subkey in [
-        (winreg.HKEY_CURRENT_USER, r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe"),  # type: ignore[attr-defined]
-        (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe"),  # type: ignore[attr-defined]
-        (winreg.HKEY_CURRENT_USER, r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe"),  # type: ignore[attr-defined]
-        (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe"),  # type: ignore[attr-defined]
+        (
+            winreg.HKEY_CURRENT_USER,
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe",
+        ),  # type: ignore[attr-defined]
+        (
+            winreg.HKEY_LOCAL_MACHINE,
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe",
+        ),  # type: ignore[attr-defined]
+        (
+            winreg.HKEY_CURRENT_USER,
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe",
+        ),  # type: ignore[attr-defined]
+        (
+            winreg.HKEY_LOCAL_MACHINE,
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe",
+        ),  # type: ignore[attr-defined]
     ]:
         try:
             with winreg.OpenKey(hive, subkey) as key:  # type: ignore[attr-defined]
@@ -705,16 +857,36 @@ def detect_browser() -> str | None:
 
     if system == "Darwin":
         _apps = "/Applications"
-        _chrome = ["Google Chrome", "Google Chrome Beta", "Google Chrome Dev", "Google Chrome Canary"]
+        _chrome = [
+            "Google Chrome",
+            "Google Chrome Beta",
+            "Google Chrome Dev",
+            "Google Chrome Canary",
+        ]
         _chromium = ["Chromium"]
-        _edge = ["Microsoft Edge", "Microsoft Edge Beta", "Microsoft Edge Dev", "Microsoft Edge Canary"]
+        _edge = [
+            "Microsoft Edge",
+            "Microsoft Edge Beta",
+            "Microsoft Edge Dev",
+            "Microsoft Edge Canary",
+        ]
         for name in _chrome + _chromium + _edge:
             candidates.append(f"{_apps}/{name}.app/Contents/MacOS/{name}")
 
     elif system == "Linux":
-        _chrome = ["google-chrome", "google-chrome-stable", "google-chrome-beta", "google-chrome-unstable"]
+        _chrome = [
+            "google-chrome",
+            "google-chrome-stable",
+            "google-chrome-beta",
+            "google-chrome-unstable",
+        ]
         _chromium = ["chromium", "chromium-browser"]
-        _edge = ["microsoft-edge-stable", "microsoft-edge-beta", "microsoft-edge-dev", "microsoft-edge"]
+        _edge = [
+            "microsoft-edge-stable",
+            "microsoft-edge-beta",
+            "microsoft-edge-dev",
+            "microsoft-edge",
+        ]
         for name in _chrome + _chromium + _edge:
             candidates.append(f"/usr/bin/{name}")
             candidates.append(f"/snap/bin/{name}")
@@ -737,7 +909,12 @@ def detect_browser() -> str | None:
         pf86 = os.environ.get("PROGRAMFILES(X86)", "")
         _chrome = ["Chrome", "Chrome Beta", "Chrome Dev", "Chrome SxS"]  # SxS = Canary
         _chromium = ["Chromium"]
-        _edge = ["Microsoft/Edge", "Microsoft/Edge Beta", "Microsoft/Edge Dev", "Microsoft/Edge SxS"]
+        _edge = [
+            "Microsoft/Edge",
+            "Microsoft/Edge Beta",
+            "Microsoft/Edge Dev",
+            "Microsoft/Edge SxS",
+        ]
         for base in dict.fromkeys((local, pf64, pf, pf86)):
             if not base:
                 continue
@@ -752,10 +929,20 @@ def detect_browser() -> str | None:
 
     # PATH 查找（Windows 下还会匹配 chrome.exe / msedge.exe 等）
     for name in (
-        "google-chrome", "google-chrome-stable", "google-chrome-beta", "google-chrome-unstable",
-        "chromium", "chromium-browser",
-        "microsoft-edge-stable", "microsoft-edge-beta", "microsoft-edge-dev", "microsoft-edge",
-        "chrome", "chrome.exe", "msedge", "msedge.exe",
+        "google-chrome",
+        "google-chrome-stable",
+        "google-chrome-beta",
+        "google-chrome-unstable",
+        "chromium",
+        "chromium-browser",
+        "microsoft-edge-stable",
+        "microsoft-edge-beta",
+        "microsoft-edge-dev",
+        "microsoft-edge",
+        "chrome",
+        "chrome.exe",
+        "msedge",
+        "msedge.exe",
     ):
         found = shutil.which(name)
         if found:
@@ -764,44 +951,181 @@ def detect_browser() -> str | None:
     return None
 
 
-async def kill_stray_browsers() -> None:
-    """关闭 nodriver 残留实例，并在事件循环关闭前回收子进程 transport。"""
+def _validated_browser_options(
+    browser_path: str | None,
+    cdp_host: str | None,
+    cdp_port: int | None,
+) -> tuple[str | None, str | None, int | None]:
+    """规范化浏览器参数；配置不完整时禁止静默回退。"""
+    path = os.fspath(browser_path).strip() if browser_path is not None else None
+    path = path or None
+    host = str(cdp_host).strip() if cdp_host is not None else None
+    host = host or None
+
+    if (host is None) != (cdp_port is None):
+        raise RuntimeError("CDP 配置不完整：cdp_host 和 cdp_port 必须同时提供")
+    if cdp_port is not None:
+        if isinstance(cdp_port, bool) or not isinstance(cdp_port, int):
+            raise RuntimeError("CDP 端口必须是 1 到 65535 的整数")
+        if not 1 <= cdp_port <= 65535:
+            raise RuntimeError("CDP 端口必须在 1 到 65535 之间")
+    if host is not None and (
+        "://" in host or "/" in host or any(char.isspace() for char in host)
+    ):
+        raise RuntimeError("cdp_host 只能填写主机名或 IP，不应包含协议、路径或空格")
+    if host is not None and ":" in host and not host.startswith("["):
+        host = f"[{host}]"
+
+    # CDP 是显式的浏览器来源；此时不应因为遗留的 browser_path 失效而
+    # 阻止连接既有浏览器。调用方仍保留规范化后的 CDP 主机和端口。
+    if host is not None and cdp_port is not None:
+        return None, host, cdp_port
+
+    if path is not None:
+        expanded = Path(os.path.expandvars(path)).expanduser()
+        if not expanded.is_file():
+            raise RuntimeError(f"显式指定的浏览器可执行文件不存在: {expanded}")
+        if os.name != "nt" and not os.access(expanded, os.X_OK):
+            raise RuntimeError(f"显式指定的浏览器文件不可执行: {expanded}")
+        path = str(expanded.resolve())
+
+    return path, host, cdp_port
+
+
+def _cdp_http_host(host: str) -> str:
+    """为 HTTP URL 格式化主机名（兼容 IPv6 字面量）。"""
+    if ":" in host and not host.startswith("["):
+        return f"[{host}]"
+    return host
+
+
+def _origin_from_url(url: str) -> str:
+    """提取 RFC origin，禁止把课程路径或 fragment 当成 origin。"""
+    parsed = urlsplit(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise RuntimeError(f"验证码入口 URL 无效: {url!r}")
+    if parsed.username or parsed.password:
+        raise RuntimeError("验证码入口 URL 不应包含用户名或密码")
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
+def _check_cdp_health(
+    host: str,
+    port: int,
+    *,
+    timeout: float = CDP_HEALTH_TIMEOUT,
+) -> None:
+    """请求标准 CDP 版本端点，拒绝普通 HTTP 服务冒充调试端口。"""
+    url = f"http://{_cdp_http_host(host)}:{port}/json/version"
+    try:
+        response = requests.get(url, timeout=timeout)
+        response.raise_for_status()
+        payload = response.json()
+    except (requests.RequestException, ValueError, TypeError) as exc:
+        raise RuntimeError(
+            f"CDP 健康检查失败 ({host}:{port}/json/version): {exc}"
+        ) from exc
+
+    if (
+        not isinstance(payload, dict)
+        or not isinstance(payload.get("Browser"), str)
+        or not payload["Browser"].strip()
+    ):
+        raise RuntimeError(
+            f"CDP 健康检查失败 ({host}:{port}/json/version): 响应缺少 Browser 字段"
+        )
+    websocket_url = payload.get("webSocketDebuggerUrl")
+    if websocket_url is not None and not str(websocket_url).startswith(
+        ("ws://", "wss://")
+    ):
+        raise RuntimeError(
+            f"CDP 健康检查失败 ({host}:{port}/json/version): webSocketDebuggerUrl 无效"
+        )
+
+
+def _detect_default_cdp_endpoint() -> tuple[str, int] | None:
+    """快速探测历史默认 CDP 端点，供验证码首次使用时懒发现。"""
+    candidates = (
+        ("127.0.0.1", 9222),
+        ("127.0.0.1", 9223),
+        ("host.docker.internal", 9222),
+        ("host.docker.internal", 9223),
+    )
+    for host, port in candidates:
+        try:
+            with socket.create_connection((host, port), timeout=0.5):
+                pass
+            _check_cdp_health(host, port, timeout=CDP_DISCOVERY_TIMEOUT)
+            return host, port
+        except (OSError, RuntimeError):
+            continue
+    return None
+
+
+async def _remove_temporary_profile(instance: Any) -> None:
+    config = getattr(instance, "config", None)
+    if config is None or getattr(config, "uses_custom_data_dir", True):
+        return
+    user_data_dir = getattr(config, "user_data_dir", None)
+    if not user_data_dir:
+        return
+    try:
+        await _bounded(
+            asyncio.to_thread(shutil.rmtree, user_data_dir, ignore_errors=True),
+            timeout=_close_step_timeout(),
+            label="清理浏览器临时目录",
+        )
+    except RuntimeError:
+        # 删除目录失败不应阻止 unregister；系统临时目录后续仍可自行回收。
+        pass
+
+
+async def _close_browser_instance(instance: Any) -> None:
+    """只清理传入实例，不触碰其他账号或调用方注册的浏览器。"""
     from nodriver.core import util as _nd_util
 
-    instances = list(_nd_util.get_registered_instances())
-    for inst in instances:
-        proc = getattr(inst, "_process", None)
-        try:
-            await asyncio.wait_for(inst.aclose(), timeout=5)
-        except (Exception, asyncio.CancelledError):  # noqa: BLE001
+    proc = getattr(instance, "_process", None)
+    try:
+        with suppress(Exception):
+            await _bounded(
+                instance.aclose(),
+                timeout=_close_step_timeout(),
+                label="关闭浏览器连接",
+            )
+        if proc is not None:
+            if getattr(proc, "returncode", None) is None:
+                with suppress(ProcessLookupError, OSError):
+                    proc.kill()
+            with suppress(Exception):
+                await _bounded(
+                    proc.wait(),
+                    timeout=_close_step_timeout(),
+                    label="等待浏览器进程退出",
+                )
+    finally:
+        # Process.wait() 不保证 stdout/stderr pipe transport 已关闭。
+        transport = getattr(proc, "_transport", None)
+        if transport is not None:
+            with suppress(Exception):
+                transport.close()
+        _nd_util.get_registered_instances().discard(instance)
+        await _remove_temporary_profile(instance)
+        for _ in range(3):
             await asyncio.sleep(0)
-        try:
-            if proc is not None:
-                if proc.returncode is None:
-                    try:
-                        proc.kill()
-                    except (ProcessLookupError, OSError):
-                        await asyncio.sleep(0)
-                try:
-                    await asyncio.wait_for(proc.wait(), timeout=5)
-                except (Exception, asyncio.CancelledError):  # noqa: BLE001
-                    await asyncio.sleep(0)
-        finally:
-            # Process.wait() 只等待子进程退出，不保证 stdout/stderr pipe
-            # transport 已关闭；显式关闭它，避免 asyncio.run() 收尾后由
-            # BaseSubprocessTransport.__del__ 在已关闭 loop 上补清理。
-            transport = getattr(proc, "_transport", None)
-            if transport is not None:
-                try:
-                    transport.close()
-                except (Exception, asyncio.CancelledError):  # noqa: BLE001
-                    await asyncio.sleep(0)
-        config = getattr(inst, "config", None)
-        if config is not None and not config.uses_custom_data_dir:
-            shutil.rmtree(config.user_data_dir, ignore_errors=True)
-    for _ in range(3):
-        await asyncio.sleep(0)
-    _nd_util.get_registered_instances().difference_update(instances)
+
+
+async def kill_stray_browsers(instances: Iterable[Any] | None = None) -> None:
+    """关闭指定 nodriver 实例。
+
+    ``instances`` 留空保留旧接口语义；验证码内部始终显式传入本次创建的实例，
+    避免并行账号之间互相关闭浏览器。
+    """
+    if instances is None:
+        from nodriver.core import util as _nd_util
+
+        instances = tuple(_nd_util.get_registered_instances())
+    for instance in tuple(instances):
+        await _close_browser_instance(instance)
 
 
 def check_browser_health(
@@ -817,10 +1141,14 @@ def check_browser_health(
     :return: 浏览器路径或 CDP 地址
     :raises RuntimeError: 无可用浏览器时
     """
-    if cdp_host and cdp_port:
-        return f"{cdp_host}:{cdp_port}"
+    browser_path, cdp_host, cdp_port = _validated_browser_options(
+        browser_path, cdp_host, cdp_port
+    )
+    if cdp_host is not None and cdp_port is not None:
+        _check_cdp_health(cdp_host, cdp_port)
+        return f"{_cdp_http_host(cdp_host)}:{cdp_port}"
 
-    if browser_path and os.path.isfile(browser_path):
+    if browser_path is not None:
         resolved = browser_path
     else:
         resolved = detect_browser()
@@ -833,33 +1161,49 @@ def check_browser_health(
                 "  4. 安装 Chrome、Chromium 或 Edge"
             )
 
-    # 健康探测也必须在同一个事件循环内完成浏览器进程和 pipe transport
-    # 的清理；nodriver.start() 连接失败时可能已启动但未返回 Browser。
     async def _probe() -> None:
-        try:
-            browser = await nodriver.start(
-                headless=True,
-                browser_executable_path=resolved,
-            )
-            await browser.get("data:text/html,<h1>ok</h1>")
-        finally:
-            await kill_stray_browsers()
+        from nodriver.core import util as _nd_util
+
+        # nodriver 启动失败时不会返回 Browser，只能通过注册表差集定位残留。
+        # 串行化“快照→启动→差集清理”，确保差集只属于本次探测。
+        async with _async_thread_lock(
+            _NODRIVER_START_LOCK,
+            timeout=ENDPOINT_LOCK_TIMEOUT,
+            label="浏览器启动",
+        ):
+            before = set(_nd_util.get_registered_instances())
+            browser = None
+            try:
+                browser = await _bounded(
+                    nodriver.start(
+                        headless=True,
+                        browser_executable_path=resolved,
+                    ),
+                    timeout=BROWSER_START_TIMEOUT,
+                    label="浏览器启动",
+                )
+                await _bounded(
+                    browser.get("data:text/html,<h1>ok</h1>"),
+                    timeout=PAGE_LOAD_TIMEOUT,
+                    label="浏览器探测页加载",
+                )
+            finally:
+                owned = set(_nd_util.get_registered_instances()) - before
+                if browser is not None:
+                    owned.add(browser)
+                await kill_stray_browsers(owned)
 
     last_exc: Exception | None = None
     for attempt in range(1, 4):
         try:
-            asyncio.run(asyncio.wait_for(_probe(), timeout=20))
+            asyncio.run(_probe())
             return resolved
         except FileNotFoundError as e:
             raise RuntimeError(f"浏览器可执行文件不存在: {resolved}") from e
-        except TimeoutError as e:
-            last_exc = e
         except Exception as e:  # noqa: BLE001 -- 探测任何启动失败都要重试
             last_exc = e
         if attempt < 3:
             time.sleep(1)
-    if isinstance(last_exc, TimeoutError):
-        raise RuntimeError(f"浏览器启动超时: {resolved}") from last_exc  # noqa: TRY004
     raise RuntimeError(f"浏览器启动失败: {last_exc}") from last_exc
 
 
@@ -868,6 +1212,9 @@ def check_browser_health(
 
 class CaptchaHandler:
     """通过浏览器处理腾讯验证码"""
+
+    _endpoint_locks: ClassVar[dict[str, Any]] = {}
+    _endpoint_locks_guard: ClassVar[Any] = threading.Lock()
 
     def __init__(
         self,
@@ -879,6 +1226,8 @@ class CaptchaHandler:
         cdp_host: str | None = None,
         cdp_port: int | None = None,
         debug_dir: Path | None = None,
+        non_interactive: bool | None = None,
+        stop_event: threading.Event | None = None,
     ) -> None:
         """初始化验证码处理器。
 
@@ -890,7 +1239,12 @@ class CaptchaHandler:
         :param cdp_host: CDP 远程调试地址，配合 cdp_port 使用时不启动本地浏览器
         :param cdp_port: CDP 远程调试端口，配合 cdp_host 使用时不启动本地浏览器
         :param debug_dir: 调试图片保存目录，留空则默认 logs/<user_id>/captcha
+        :param non_interactive: 是否禁止人工验证码；留空则按当前运行环境判断
+        :param stop_event: 进程级停止事件，用于中断浏览器和识别等待
         """
+        browser_path, cdp_host, cdp_port = _validated_browser_options(
+            browser_path, cdp_host, cdp_port
+        )
         self._auth = {
             "userId": user_id,
             "token": token,
@@ -901,13 +1255,147 @@ class CaptchaHandler:
         self.cdp_host = cdp_host
         self.cdp_port = cdp_port
         self._debug_dir = debug_dir or Path("logs") / user_id / "captcha"
+        self.non_interactive = (
+            is_non_interactive() if non_interactive is None else non_interactive
+        )
+        self.stop_event = stop_event or threading.Event()
+        self._closed = False
+        self._browser_ready = False
+        self._health_lock: Any = threading.Lock()
+        self._browser_states: dict[int, dict[str, Any]] = {}
+
+    @property
+    def _endpoint_key(self) -> str | None:
+        if self.cdp_host is None or self.cdp_port is None:
+            return None
+        host = self.cdp_host.casefold()
+        if host in {"localhost", "127.0.0.1", "[::1]"}:
+            host = "loopback"
+        return f"{host}:{self.cdp_port}"
+
+    @asynccontextmanager
+    async def _exclusive_endpoint(self) -> AsyncIterator[None]:
+        """同一共享 CDP 端点一次只允许一个验证码流程修改页面状态。"""
+        self._raise_if_stopped()
+        endpoint = self._endpoint_key
+        if endpoint is None:
+            yield
+            return
+        with self._endpoint_locks_guard:
+            lock = self._endpoint_locks.setdefault(endpoint, threading.Lock())
+        async with _async_thread_lock(
+            lock,
+            timeout=ENDPOINT_LOCK_TIMEOUT,
+            label=f"共享 CDP 端点 {endpoint}",
+            stop_event=self.stop_event,
+        ):
+            yield
+
+    def _raise_if_stopped(self) -> None:
+        if self._closed:
+            raise RuntimeError("验证码处理器已关闭")
+        if self.stop_event.is_set():
+            raise InterruptedError("运行已被中断")
+
+    async def _sleep(self, seconds: float) -> None:
+        """异步等待并以较短轮询间隔响应线程停止事件。"""
+
+        self._raise_if_stopped()
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + max(0.0, float(seconds))
+        while True:
+            self._raise_if_stopped()
+            remaining = deadline - loop.time()
+            if remaining <= 0:
+                return
+            await asyncio.sleep(min(0.1, remaining))
+
+    async def _bound[T](
+        self,
+        awaitable: Awaitable[T],
+        *,
+        timeout: float,
+        label: str,
+    ) -> T:
+        return await _bounded(
+            awaitable,
+            timeout=timeout,
+            label=label,
+            stop_event=self.stop_event,
+        )
+
+    async def _ensure_browser_ready(self) -> None:
+        """首次真正需要验证码时再探测最终账号配置。"""
+        self._raise_if_stopped()
+        if self._browser_ready:
+            return
+        async with _async_thread_lock(
+            self._health_lock,
+            timeout=ENDPOINT_LOCK_TIMEOUT,
+            label="浏览器健康检查",
+            stop_event=self.stop_event,
+        ):
+            if self._browser_ready:
+                return
+            if (
+                self.browser_path is None
+                and self.cdp_host is None
+                and self.cdp_port is None
+            ):
+                discovered = await self._bound(
+                    asyncio.to_thread(_detect_default_cdp_endpoint),
+                    timeout=4 * (CDP_DISCOVERY_TIMEOUT + 0.5) + 1,
+                    label="默认 CDP 端点探测",
+                )
+                if discovered is not None:
+                    self.cdp_host, self.cdp_port = discovered
+                    self._browser_ready = True
+                    self.log.info(
+                        f"自动探测到 CDP 浏览器 {self.cdp_host}:{self.cdp_port}"
+                    )
+                    return
+            timeout = (
+                3 * (BROWSER_START_TIMEOUT + PAGE_LOAD_TIMEOUT + CLOSE_TIMEOUT + 1) + 5
+            )
+            resolved = await self._bound(
+                asyncio.to_thread(
+                    check_browser_health,
+                    self.browser_path,
+                    self.cdp_host,
+                    self.cdp_port,
+                ),
+                timeout=timeout,
+                label="浏览器健康检查",
+            )
+            if self.cdp_host is None:
+                self.browser_path = resolved
+            self._browser_ready = True
 
     # ── 浏览器 / 页面构建 ──────────────────────────────
 
-    @staticmethod
-    async def _eval_json(tab, expression: str) -> dict | None:
+    async def _evaluate(
+        self,
+        tab,
+        expression: str,
+        *,
+        return_by_value: bool = False,
+        interruptible: bool = True,
+    ):
+        if not interruptible:
+            return await _bounded(
+                tab.evaluate(expression, return_by_value=return_by_value),
+                timeout=CDP_CALL_TIMEOUT,
+                label="CDP 脚本执行",
+            )
+        return await self._bound(
+            tab.evaluate(expression, return_by_value=return_by_value),
+            timeout=CDP_CALL_TIMEOUT,
+            label="CDP 脚本执行",
+        )
+
+    async def _eval_json(self, tab, expression: str) -> dict | None:
         """执行 JS 并将结果转为 Python dict（处理 nodriver 的 RemoteObject 反序列化）。"""
-        res: Any = await tab.evaluate(expression, return_by_value=True)
+        res: Any = await self._evaluate(tab, expression, return_by_value=True)
         if isinstance(res, cdp.runtime.RemoteObject):
             if (
                 res.deep_serialized_value
@@ -928,11 +1416,10 @@ class CaptchaHandler:
 
         窗口尺寸 428x818 模拟移动端以匹配腾讯验证码的移动版 UI。
         """
-        # CDP 模式优先，不需要本地浏览器
-        if self.cdp_host and self.cdp_port:
-            browser_path = self.browser_path or "cdp"
-        else:
-            browser_path = self.browser_path or detect_browser()
+        from nodriver.core import util as _nd_util
+
+        cdp_mode = self.cdp_host is not None and self.cdp_port is not None
+        browser_path = None if cdp_mode else self.browser_path
         browser_args = [
             "--window-size=428,818",
             "--mute-audio",
@@ -946,31 +1433,48 @@ class CaptchaHandler:
         # 非 CDP 模式：nodriver 启动 Chrome 的就绪窗口只有 ~2.75s，冷启动/
         # 资源紧张时可能超时（"Failed to connect to browser"），重试一次。
         # CDP 模式连已有浏览器，失败是配置问题，不重试。
-        attempts = 1 if (self.cdp_host and self.cdp_port) else 2
+        attempts = 1 if cdp_mode else 2
         last_exc: Exception | None = None
         for attempt in range(1, attempts + 1):
             try:
-                return await nodriver.start(
-                    headless=headless,
-                    browser_executable_path=browser_path or None,
-                    browser_args=browser_args,
-                    host=self.cdp_host,
-                    port=self.cdp_port,
-                )
+                async with _async_thread_lock(
+                    _NODRIVER_START_LOCK,
+                    timeout=ENDPOINT_LOCK_TIMEOUT,
+                    label="浏览器启动",
+                    stop_event=self.stop_event,
+                ):
+                    before = set(_nd_util.get_registered_instances())
+                    try:
+                        return await self._bound(
+                            nodriver.start(
+                                headless=headless,
+                                browser_executable_path=browser_path,
+                                browser_args=browser_args,
+                                host=self.cdp_host,
+                                port=self.cdp_port,
+                            ),
+                            timeout=BROWSER_START_TIMEOUT,
+                            label="浏览器启动",
+                        )
+                    except BaseException:
+                        owned = set(_nd_util.get_registered_instances()) - before
+                        await kill_stray_browsers(owned)
+                        raise
             except Exception as e:
                 last_exc = e
-                if "Failed to connect to browser" in str(e):
-                    if self.cdp_host and self.cdp_port:
+                connection_failed = "Failed to connect to browser" in str(
+                    e
+                ) or "浏览器启动超时" in str(e)
+                if connection_failed:
+                    if cdp_mode:
                         raise RuntimeError(
                             f"无法连接 CDP 浏览器 ({self.cdp_host}:{self.cdp_port})。"
                             "请检查：\n"
                             "  1. 远程浏览器是否已启动并开放调试端口\n"
                             "  2. config.toml 中 cdp_host 和 cdp_port 是否正确"
                         ) from e
-                    # nodriver 失败不清理已启动的 Chrome 子进程，清理后重试
-                    await kill_stray_browsers()
                     if attempt < attempts:
-                        await asyncio.sleep(1)
+                        await self._sleep(1)
                         continue
                     raise RuntimeError(
                         f"无法启动浏览器 ({browser_path or '自动检测'})。"
@@ -983,37 +1487,99 @@ class CaptchaHandler:
                 raise
         raise RuntimeError(f"无法启动浏览器: {last_exc}")
 
+    async def _snapshot_local_storage(self, tab) -> tuple[str, dict[str, str]]:
+        """在同一次页面求值中保存数据及其实际 origin，包含规范化和跳转结果。"""
+        wrapped = await self._eval_json(
+            tab,
+            """\
+            (() => {
+                const result = {};
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key !== null) result[key] = localStorage.getItem(key);
+                }
+                return {origin: window.location.origin, items: result};
+            })()
+            """,
+        )
+        if wrapped is None:
+            raise RuntimeError("无法保存共享浏览器的 localStorage")
+        origin = wrapped.get("origin")
+        snapshot = wrapped.get("items")
+        if not isinstance(origin, str) or not isinstance(snapshot, dict):
+            raise RuntimeError(  # noqa: TRY004 -- 对外统一为浏览器生命周期失败
+                "浏览器返回了无效的 localStorage 快照"
+            )
+        return _origin_from_url(origin), {
+            str(key): str(value) for key, value in snapshot.items()
+        }
+
+    async def _restore_local_storage(
+        self,
+        tab,
+        snapshot: dict[str, str],
+        *,
+        interruptible: bool = True,
+    ) -> None:
+        encoded = json.dumps(snapshot, ensure_ascii=False)
+        await self._evaluate(
+            tab,
+            f"""\
+            (() => {{
+                const snapshot = {encoded};
+                localStorage.clear();
+                for (const [key, value] of Object.entries(snapshot)) {{
+                    localStorage.setItem(key, value);
+                }}
+            }})()
+            """,
+            interruptible=interruptible,
+        )
+
     async def _inject_auth(self, tab) -> None:
         """向页面注入 localStorage 认证信息。
 
         :param tab: nodriver Tab
         """
-        await tab.evaluate(f"""\
+        await self._evaluate(
+            tab,
+            f"""\
             const user = {json.dumps(self._auth)};
             localStorage.setItem('user', JSON.stringify(user));
-        """)
+        """,
+        )
 
     async def _ensure_captcha_sdk(self, tab) -> None:
         """确保页面已加载腾讯验证码 SDK，轮询等待就绪。
 
         :param tab: nodriver Tab
         """
-        await tab.evaluate(f"""\
-            if (typeof TencentCaptcha === 'undefined') {{
-                const script = document.createElement('script');
-                script.src = '{TCAPTCHA_SDK_URL}';
-                script.async = false;
-                document.head.appendChild(script);
-            }}
-        """)
-        for _ in range(20):
-            loaded = await tab.evaluate(
-                "(() => typeof TencentCaptcha !== 'undefined')()", return_by_value=True
-            )
-            if loaded is True:
-                return
-            await asyncio.sleep(0.5)
-        self.log.warning("腾讯验证码 SDK 加载超时")
+        try:
+            async with asyncio.timeout(SDK_LOAD_TIMEOUT):
+                await self._evaluate(
+                    tab,
+                    f"""\
+                    if (typeof TencentCaptcha === 'undefined') {{
+                        const script = document.createElement('script');
+                        script.src = '{TCAPTCHA_SDK_URL}';
+                        script.async = false;
+                        document.head.appendChild(script);
+                    }}
+                """,
+                )
+                while True:
+                    loaded = await self._evaluate(
+                        tab,
+                        "(() => typeof TencentCaptcha !== 'undefined')()",
+                        return_by_value=True,
+                    )
+                    if loaded is True:
+                        return
+                    await self._sleep(0.25)
+        except TimeoutError as exc:
+            raise RuntimeError(
+                f"腾讯验证码 SDK 加载超时（{SDK_LOAD_TIMEOUT:g} 秒）"
+            ) from exc
 
     async def _build_page(self, entry_url: str, headless: bool = False):
         """启动浏览器，注入认证信息，加载 SDK。
@@ -1023,37 +1589,45 @@ class CaptchaHandler:
         :return: (browser, tab) 元组
         :raises: 任何页面操作异常时自动关闭浏览器，避免进程泄漏
 
-        先用 about:blank 建立域名（避免加载完整 SPA），注入 localStorage
-        认证后再导航到目标页面。
+        先打开入口 URL 的标准 origin，注入 localStorage 认证后再导航到目标页面。
         """
+        await self._ensure_browser_ready()
         self.log.info("正在打开验证码入口页面")
-        browser = await asyncio.wait_for(self._create_browser(headless), timeout=30)
+        origin = _origin_from_url(entry_url)
+        browser = await self._bound(
+            self._create_browser(headless),
+            timeout=BROWSER_START_TIMEOUT * 2 + CLOSE_TIMEOUT + 2,
+            label="创建验证码浏览器",
+        )
+        cdp_mode = self.cdp_host is not None and self.cdp_port is not None
+        state: dict[str, Any] = {
+            "tab": None,
+            "storage": None,
+            "close_tab": cdp_mode,
+            "origin": None,
+        }
+        self._browser_states[id(browser)] = state
         try:
-            origin = entry_url.split("#")[0].rstrip("/")
             # CDP 模式（连已有 headless-shell/Chrome）：浏览器可能没有默认
             # page target（headless-shell 刚启动时 /json 为空），browser.get()
             # 会因 next(filter(...)) 无 page target 抛异常，必须 new_tab 创建。
-            cdp_mode = bool(self.cdp_host and self.cdp_port)
-            try:
-                tab = await asyncio.wait_for(
-                    browser.get(f"{origin}/", new_tab=cdp_mode), timeout=30
-                )
-            except RuntimeError:
-                if not cdp_mode:
-                    raise
-                # CDP 模式下 new_tab 仍失败则再试一次（可能 target 已存在）
-                tab = await asyncio.wait_for(
-                    browser.get(f"{origin}/", new_tab=True), timeout=30
-                )
+            tab = await self._bound(
+                browser.get(f"{origin}/", new_tab=cdp_mode),
+                timeout=PAGE_LOAD_TIMEOUT,
+                label="验证码 origin 页面加载",
+            )
+            state["tab"] = tab
+            state["origin"], state["storage"] = await self._snapshot_local_storage(tab)
             await self._inject_auth(tab)
             self.log.info("正在加载入口页面")
-            await asyncio.wait_for(tab.get(entry_url), timeout=30)
+            await self._bound(
+                tab.get(entry_url),
+                timeout=PAGE_LOAD_TIMEOUT,
+                label="验证码入口页面加载",
+            )
             await self._ensure_captcha_sdk(tab)
             self.log.info("页面准备完成")
             return browser, tab
-        except TimeoutError:
-            await self._quit_browser(browser, "页面构建超时")
-            raise RuntimeError("页面加载超时，请检查网络连接")
         except Exception:
             await self._quit_browser(browser, "页面构建")
             raise
@@ -1066,7 +1640,7 @@ class CaptchaHandler:
         :param tab: 浏览器标签页对象
         :param app_id: 腾讯验证码 appId
         """
-        await tab.evaluate(_SHOW_JS.replace("__APP_ID__", json.dumps(app_id)))
+        await self._evaluate(tab, _SHOW_JS.replace("__APP_ID__", json.dumps(app_id)))
 
     async def _wait_captcha_result(self, tab, timeout: float = 120.0) -> dict[str, str]:
         """轮询等待验证码回调结果。
@@ -1078,18 +1652,21 @@ class CaptchaHandler:
 
         ret 值含义：0=验证通过，2=用户主动关闭，其他=验证失败。
         """
-        deadline = time.time() + timeout
-        while time.time() < deadline:
-            res = await self._eval_json(tab, "(() => window.__captchaResult)()")
-            if res is None:
-                await asyncio.sleep(0.3)
-                continue
-            if isinstance(res, dict) and res.get("ret") == 0 and res.get("ticket"):
-                return {"randstr": res["randstr"], "ticket": res["ticket"]}
-            raise RuntimeError(
-                f"验证码未通过: ret={res.get('ret') if isinstance(res, dict) else res}"
-            )
-        raise RuntimeError("等待验证码回调超时")
+        try:
+            async with asyncio.timeout(timeout):
+                while True:
+                    res = await self._eval_json(tab, "(() => window.__captchaResult)()")
+                    if res is None:
+                        await self._sleep(0.3)
+                        continue
+                    if res.get("ret") == 0 and res.get("ticket") and res.get("randstr"):
+                        return {
+                            "randstr": str(res["randstr"]),
+                            "ticket": str(res["ticket"]),
+                        }
+                    raise RuntimeError(f"验证码未通过: ret={res.get('ret')}")
+        except TimeoutError as exc:
+            raise RuntimeError(f"等待验证码回调超时（{timeout:g} 秒）") from exc
 
     async def _run_captcha(self, tab, app_id: str) -> dict[str, str]:
         """触发验证码并阻塞等待用户手动完成。
@@ -1104,8 +1681,9 @@ class CaptchaHandler:
 
     # ── 自动识别 ────────────────────────────────────────
 
-    @staticmethod
-    async def _wait_until(predicate, timeout: float = 10.0, interval: float = 0.3):
+    async def _wait_until(
+        self, predicate, timeout: float = 10.0, interval: float = 0.3
+    ):
         """轮询等待条件为真。
 
         :param predicate: 无参异步函数，返回真值时停止等待
@@ -1113,22 +1691,31 @@ class CaptchaHandler:
         :param interval: 轮询间隔秒数
         :return: predicate 的最后一次返回值
         """
-        deadline = time.time() + timeout
-        while time.time() < deadline:
-            value = await predicate()
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        last_value = None
+        while loop.time() < deadline:
+            remaining = deadline - loop.time()
+            if remaining <= 0:
+                break
+            value = await self._bound(
+                predicate(),
+                timeout=min(CDP_CALL_TIMEOUT, remaining),
+                label="验证码状态查询",
+            )
             if value:
                 return value
-            await asyncio.sleep(interval)
-        return await predicate()
+            last_value = value
+            await self._sleep(interval)
+        return last_value
 
-    @staticmethod
-    async def _maybe_state(tab):
+    async def _maybe_state(self, tab):
         """检查验证码图片是否已加载就绪。
 
         :param tab: 浏览器标签页对象
         :return: 包含 bgUrl/ansUrl/bgRect 等字段的 dict，未就绪返回 None
         """
-        s = await CaptchaHandler._eval_json(tab, _QUERY_JS)
+        s = await self._eval_json(tab, _QUERY_JS)
         if not s:
             return None
         if not (
@@ -1145,36 +1732,42 @@ class CaptchaHandler:
             return None
         return s
 
-    @staticmethod
-    async def _btn_enabled(tab):
+    async def _btn_enabled(self, tab):
         """检查提交按钮是否已启用。
 
         :param tab: 浏览器标签页对象
         :return: 按钮状态 dict，未启用返回 None
         """
-        s = await CaptchaHandler._eval_json(tab, _QUERY_JS)
+        s = await self._eval_json(tab, _QUERY_JS)
         if not s:
             return None
         if "--disabled" in (s.get("btnCls") or ""):
             return None
         return s
 
-    @staticmethod
-    async def _click_refresh(tab) -> None:
+    async def _click_refresh(self, tab) -> None:
         """点击验证码刷新按钮换一组图片。
 
         :param tab: 浏览器标签页对象
         """
-        state = await CaptchaHandler._eval_json(tab, _QUERY_JS)
+        state = await self._eval_json(tab, _QUERY_JS)
         rect = (state or {}).get("refreshRect")
         if not rect:
             return
         rx = int(rect["x"] + rect["w"] / 2)
         ry = int(rect["y"] + rect["h"] / 2)
-        await tab.mouse_move(rx, ry)
-        await asyncio.sleep(0.15)
-        await tab.mouse_click(rx, ry)
-        await asyncio.sleep(1.5)
+        await self._bound(
+            tab.mouse_move(rx, ry),
+            timeout=CDP_CALL_TIMEOUT,
+            label="移动验证码鼠标",
+        )
+        await self._sleep(0.15)
+        await self._bound(
+            tab.mouse_click(rx, ry),
+            timeout=CDP_CALL_TIMEOUT,
+            label="点击验证码刷新按钮",
+        )
+        await self._sleep(1.5)
 
     async def _auto_solve_once(
         self, tab, attempt: int, save_debug: bool
@@ -1194,28 +1787,45 @@ class CaptchaHandler:
             return None
 
         try:
-            main_img = fetch_image(state["bgUrl"])
-            prompt_img = fetch_image(state["ansUrl"])
-        except (OSError, RuntimeError) as exc:
+            main_img, prompt_img = await self._bound(
+                asyncio.gather(
+                    asyncio.to_thread(fetch_image, state["bgUrl"]),
+                    asyncio.to_thread(fetch_image, state["ansUrl"]),
+                ),
+                timeout=IMAGE_WORK_TIMEOUT,
+                label="下载验证码图片",
+            )
+        except (OSError, RuntimeError, requests.RequestException) as exc:
             self.log.warning(f"自动识别: 抓图失败 - {exc}")
             return None
 
         nat_h, nat_w = main_img.shape[:2]
         bg_rect = state["bgRect"]
 
-        ordered, candidates = detect_points(prompt_img, main_img)
+        ordered, candidates = await self._bound(
+            asyncio.to_thread(detect_points, prompt_img, main_img),
+            timeout=IMAGE_WORK_TIMEOUT,
+            label="验证码图片识别",
+        )
 
         if save_debug:
-            self._debug_dir.mkdir(parents=True, exist_ok=True)
             stamp = int(time.time() * 1000)
-            cv2.imwrite(str(self._debug_dir / f"{stamp}_a{attempt}_main.png"), main_img)
-            cv2.imwrite(
-                str(self._debug_dir / f"{stamp}_a{attempt}_prompt.png"), prompt_img
-            )
-            cv2.imwrite(
-                str(self._debug_dir / f"{stamp}_a{attempt}_debug.png"),
-                render_debug(main_img, ordered, candidates),
-            )
+            try:
+                await self._bound(
+                    asyncio.to_thread(
+                        _save_debug_images,
+                        self._debug_dir,
+                        f"{stamp}_a{attempt}",
+                        main_img,
+                        prompt_img,
+                        ordered,
+                        candidates,
+                    ),
+                    timeout=IMAGE_WORK_TIMEOUT,
+                    label="保存验证码调试图片",
+                )
+            except (OSError, RuntimeError) as exc:
+                self.log.warning(f"自动识别: 调试图片保存失败 - {exc}")
 
         if any(p is None for p in ordered):
             self.log.warning(f"自动识别: 识别有缺失 {ordered}")
@@ -1234,14 +1844,27 @@ class CaptchaHandler:
         for idx, (vx, vy) in enumerate(viewport_points, start=1):
             cx = vx + random.randint(-3, 3)
             cy = vy + random.randint(-3, 3)
-            await tab.mouse_move(cx, cy)
-            await asyncio.sleep(0.15 + random.random() * 0.15)
-            await tab.mouse_click(cx, cy)
+            await self._bound(
+                tab.mouse_move(cx, cy),
+                timeout=CDP_CALL_TIMEOUT,
+                label=f"移动到验证码第 {idx} 个目标",
+            )
+            await self._sleep(0.15 + random.random() * 0.15)
+            await self._bound(
+                tab.mouse_click(cx, cy),
+                timeout=CDP_CALL_TIMEOUT,
+                label=f"点击验证码第 {idx} 个目标",
+            )
             self.log.info(f"自动识别: 点击 #{idx} at ({cx}, {cy})")
-            await asyncio.sleep(0.25 + random.random() * 0.25)
+            await self._sleep(0.25 + random.random() * 0.25)
 
         # 等待提交按钮启用后点击
-        await self._wait_until(lambda: self._btn_enabled(tab), timeout=3)
+        enabled_state = await self._wait_until(
+            lambda: self._btn_enabled(tab), timeout=3
+        )
+        if not enabled_state:
+            self.log.warning("自动识别: 提交按钮未在时限内启用")
+            return None
 
         final_state = await self._eval_json(tab, _QUERY_JS)
         btn_rect = (final_state or {}).get("btnRect") or state["btnRect"]
@@ -1251,9 +1874,17 @@ class CaptchaHandler:
 
         bx = int(btn_rect["x"] + btn_rect["w"] / 2)
         by = int(btn_rect["y"] + btn_rect["h"] / 2)
-        await tab.mouse_move(bx, by)
-        await asyncio.sleep(0.2)
-        await tab.mouse_click(bx, by)
+        await self._bound(
+            tab.mouse_move(bx, by),
+            timeout=CDP_CALL_TIMEOUT,
+            label="移动到验证码提交按钮",
+        )
+        await self._sleep(0.2)
+        await self._bound(
+            tab.mouse_click(bx, by),
+            timeout=CDP_CALL_TIMEOUT,
+            label="点击验证码提交按钮",
+        )
 
         # 等待验证码回调
         try:
@@ -1275,11 +1906,11 @@ class CaptchaHandler:
         """
         for attempt in range(1, max_retry + 1):
             # 清除上一轮的回调结果，避免 _wait_captcha_result 读到过期值
-            await tab.evaluate("window.__captchaResult = null;")
+            await self._evaluate(tab, "window.__captchaResult = null;")
 
             if attempt == 1:
                 await self._trigger_captcha(tab, app_id)
-                await asyncio.sleep(2)
+                await self._sleep(2)
             else:
                 await self._click_refresh(tab)
 
@@ -1291,35 +1922,118 @@ class CaptchaHandler:
     # ── 公开方法 ────────────────────────────────────────
 
     async def _quit_browser(self, browser: nodriver.Browser, label: str = "") -> None:
-        """关闭 websocket、Chrome 进程和 asyncio subprocess transport。"""
-        proc = getattr(browser, "_process", None)
-        transport = getattr(proc, "_transport", None) if proc is not None else None
-        try:
-            try:
-                await browser.aclose()
-            finally:
-                if proc is not None:
+        """恢复共享状态，并只关闭当前流程拥有的标签页和连接。"""
+        state = self._browser_states.pop(id(browser), None)
+
+        async def _graceful_close() -> None:
+            tab = state.get("tab") if state else None
+            snapshot = state.get("storage") if state else None
+            if tab is not None and isinstance(snapshot, dict):
+                origin = state.get("origin") if state else None
+                restore_storage = False
+                try:
+                    current_origin = await _bounded(
+                        self._evaluate(
+                            tab,
+                            "(() => window.location.origin)()",
+                            return_by_value=True,
+                            interruptible=False,
+                        ),
+                        timeout=_close_step_timeout(),
+                        label="确认 localStorage origin",
+                    )
+                    if (
+                        isinstance(origin, str)
+                        and isinstance(current_origin, str)
+                        and current_origin == origin
+                    ):
+                        restore_storage = True
+                    elif isinstance(origin, str) and origin:
+                        await _bounded(
+                            tab.get(f"{origin}/"),
+                            timeout=_close_step_timeout(),
+                            label="返回 localStorage origin",
+                        )
+                        confirmed_origin = await _bounded(
+                            self._evaluate(
+                                tab,
+                                "(() => window.location.origin)()",
+                                return_by_value=True,
+                                interruptible=False,
+                            ),
+                            timeout=_close_step_timeout(),
+                            label="再次确认 localStorage origin",
+                        )
+                        restore_storage = (
+                            isinstance(confirmed_origin, str)
+                            and confirmed_origin == origin
+                        )
+                        if not restore_storage:
+                            self.log.warning(
+                                "返回 localStorage origin 后校验不匹配，跳过恢复"
+                            )
+                except Exception as exc:  # noqa: BLE001 -- 仍需尝试原地恢复
+                    self.log.warning(
+                        f"确认浏览器 localStorage origin 失败，跳过恢复: {exc}"
+                    )
+                if restore_storage:
                     try:
-                        if proc.returncode is None:
-                            proc.kill()
-                        await asyncio.wait_for(proc.wait(), timeout=5)
-                    except (Exception, asyncio.CancelledError):  # noqa: BLE001
-                        await asyncio.sleep(0)
-                    if transport is not None:
-                        try:
-                            transport.close()
-                        except (Exception, asyncio.CancelledError):  # noqa: BLE001
-                            await asyncio.sleep(0)
-                    for _ in range(3):
-                        await asyncio.sleep(0)
-                from nodriver.core import util as _nd_util
-                _nd_util.get_registered_instances().discard(browser)
-                config = getattr(browser, "config", None)
-                if config is not None and not config.uses_custom_data_dir:
-                    shutil.rmtree(config.user_data_dir, ignore_errors=True)
+                        await _bounded(
+                            self._restore_local_storage(
+                                tab,
+                                snapshot,
+                                interruptible=False,
+                            ),
+                            timeout=_close_step_timeout(),
+                            label="恢复浏览器 localStorage",
+                        )
+                    except Exception as exc:  # noqa: BLE001 -- 清理必须继续
+                        self.log.warning(f"恢复浏览器 localStorage 失败: {exc}")
+            if tab is not None and state and state.get("close_tab"):
+                with suppress(Exception):
+                    await _bounded(
+                        tab.close(),
+                        timeout=_close_step_timeout(),
+                        label="关闭验证码标签页",
+                    )
+            await _close_browser_instance(browser)
+
+        try:
+            await _bounded(
+                _graceful_close(),
+                timeout=CLOSE_TIMEOUT,
+                label="验证码浏览器关闭流程",
+            )
             if label:
                 self.log.info(f"已关闭浏览器 ({label})")
         except Exception as exc:  # noqa: BLE001 -- nodriver 停止浏览器可能抛任意异常
+            # 即使 websocket 不响应，也立即终止本次创建的本地进程并注销实例。
+            from nodriver.core import util as _nd_util
+
+            tab = state.get("tab") if state else None
+            if tab is not None and state and state.get("close_tab"):
+                with suppress(Exception):
+                    await _bounded(
+                        tab.close(),
+                        timeout=_close_step_timeout(),
+                        label="强制关闭验证码标签页",
+                    )
+            with suppress(Exception):
+                await _bounded(
+                    browser.aclose(),
+                    timeout=_close_step_timeout(),
+                    label="强制关闭浏览器连接",
+                )
+            proc = getattr(browser, "_process", None)
+            if proc is not None and getattr(proc, "returncode", None) is None:
+                with suppress(ProcessLookupError, OSError):
+                    proc.kill()
+            transport = getattr(proc, "_transport", None)
+            if transport is not None:
+                with suppress(Exception):
+                    transport.close()
+            _nd_util.get_registered_instances().discard(browser)
+            await _remove_temporary_profile(browser)
             if label:
                 self.log.warning(f"关闭浏览器异常 ({label}): {exc}")
 
@@ -1342,6 +2056,20 @@ class CaptchaHandler:
 
     async def handle_exam_captcha_async(self, user_exam_plan_id: str) -> dict[str, str]:
         """处理考试前的无感验证码（异步版本）。"""
+        self._raise_if_stopped()
+        await self._ensure_browser_ready()
+        async with self._exclusive_endpoint():
+            try:
+                async with asyncio.timeout(EXAM_FLOW_TIMEOUT):
+                    return await self._handle_exam_captcha_flow(user_exam_plan_id)
+            except TimeoutError as exc:
+                raise RuntimeError(
+                    f"无感验证码处理超时（{EXAM_FLOW_TIMEOUT:g} 秒）"
+                ) from exc
+
+    async def _handle_exam_captcha_flow(self, user_exam_plan_id: str) -> dict[str, str]:
+        """已取得端点互斥锁的考试验证码流程。"""
+        del user_exam_plan_id
         self.log.info("正在处理无感验证码")
         browser, tab = await self._build_page(EXAM_ENTRY_URL, headless=True)
         try:
@@ -1377,14 +2105,29 @@ class CaptchaHandler:
         自动识别阶段最多 3 轮、每轮 6 次；浏览器连接异常会重建无头页面继续，
         全部失败后才转手动。
         """
+        self._raise_if_stopped()
+        await self._ensure_browser_ready()
+        async with self._exclusive_endpoint():
+            try:
+                async with asyncio.timeout(COURSE_FLOW_TIMEOUT):
+                    return await self._handle_course_captcha_flow(course_url)
+            except TimeoutError as exc:
+                raise RuntimeError(
+                    f"课程验证码处理超时（{COURSE_FLOW_TIMEOUT:g} 秒）"
+                ) from exc
+
+    async def _handle_course_captcha_flow(
+        self, course_url: str | None = None
+    ) -> dict[str, str]:
+        """已取得端点互斥锁的课程验证码流程。"""
         entry_url = course_url or COURSE_ENTRY_URL
         # 自动识别重试上限（环境变量可调，小核服务器每次尝试很慢）：
         # WB_CAPTCHA_ROUNDS 轮数、WB_CAPTCHA_ATTEMPTS 每轮次数。
         # 默认 2 轮 x 3 次（最多 6 次尝试）——实测单次尝试在 1 核机器约
         # 4 分钟，18 次全试可能 1 小时+；识别成功率高时 1-2 次即过，
         # 失败应尽快跳过该课程而不是无限重试。
-        max_auto_rounds = int(os.environ.get("WB_CAPTCHA_ROUNDS", "2"))
-        attempts_per_round = int(os.environ.get("WB_CAPTCHA_ATTEMPTS", "3"))
+        max_auto_rounds = _env_positive_int("WB_CAPTCHA_ROUNDS", 2)
+        attempts_per_round = _env_positive_int("WB_CAPTCHA_ATTEMPTS", 3)
 
         # 第一阶段: 无头自动识别
         self.log.info("正在自动识别验证码...")
@@ -1394,9 +2137,11 @@ class CaptchaHandler:
                 self.log.warning(
                     f"自动识别未完成，重建无头浏览器重试（第 {round_no}/{max_auto_rounds} 轮）"
                 )
-                await asyncio.sleep(1)
+                await self._sleep(1)
             try:
                 browser, tab = await self._build_page(entry_url, headless=True)
+            except InterruptedError:
+                raise
             except Exception as exc:  # noqa: BLE001 -- 浏览器启动失败也继续下一轮
                 last_exc = exc
                 self.log.warning(
@@ -1412,6 +2157,8 @@ class CaptchaHandler:
                 if result:
                     self.log.success("验证码自动识别成功")
                     return result
+            except InterruptedError:
+                raise
             except Exception as exc:  # noqa: BLE001 -- 连接/页面异常后重建重试
                 last_exc = exc
                 self.log.warning(
@@ -1421,14 +2168,13 @@ class CaptchaHandler:
                 await self._quit_browser(browser, "自动识别")
         if last_exc is not None:
             self.log.warning(f"自动识别曾发生异常，将回退到手动: {last_exc}")
-        await asyncio.sleep(1)  # 等待无头浏览器进程完全退出
+        await self._sleep(1)  # 等待无头浏览器进程完全退出
 
         # 无交互模式（Docker 等无终端环境）：不打开可见浏览器等待手动，
         # 直接抛异常让上层跳过该课程
-        if is_non_interactive():
+        if self.non_interactive:
             raise RuntimeError(
-                "验证码自动识别连续失败且处于无交互模式，"
-                "无法手动完成验证，已跳过该课程"
+                "验证码自动识别连续失败且处于无交互模式，无法手动完成验证，已跳过该课程"
             )
 
         # 第二阶段: 打开可见浏览器，让用户手动完成
@@ -1443,3 +2189,13 @@ class CaptchaHandler:
             return result
         finally:
             await self._quit_browser(browser, "手动验证")
+
+    def close(self) -> None:
+        """清除敏感认证信息；每次流程持有的浏览器均在流程 finally 中关闭。"""
+
+        if self._closed:
+            return
+        if self._browser_states:
+            self.log.warning("关闭验证码处理器时仍存在未完成的浏览器流程")
+        self._auth.clear()
+        self._closed = True
