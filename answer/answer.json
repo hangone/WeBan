@@ -23807,6 +23807,27 @@
     ],
     "type": 1
   },
+  "国家对易制毒化学品的（）实行分类管理和许可制度。": {
+    "optionList": [
+      {
+        "content": "生产经营",
+        "isCorrect": 1
+      },
+      {
+        "content": "购买",
+        "isCorrect": 1
+      },
+      {
+        "content": "运输和进口",
+        "isCorrect": 1
+      },
+      {
+        "content": "出口",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
   "国家对机动车实行(   )制度。机动车经公安机关交通管理部门登记后，方可上道路行驶。": {
     "optionList": [
       {
