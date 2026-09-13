@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1
+
 # WeBan Docker 镜像
 # 目标:
 #   with-browser   — 内置浏览器，开箱即用
@@ -24,13 +26,22 @@ assert n==1, 'version field not found'; open(p,'w',encoding='utf-8').write(s2)" 
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-install-project
 
-COPY *.py captcha_model.onnx config.example.toml ./
+COPY *.py config.example.toml ./
 COPY answer/ answer/
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv run pyinstaller --noconfirm --onefile \
+    --mount=type=bind,target=/context \
+    set -eu; \
+    if [ -f /context/captcha_model.onnx ]; then \
+      set -- --add-data "/context/captcha_model.onnx:."; \
+      echo "Including optional captcha_model.onnx"; \
+    else \
+      set --; \
+      echo "WARNING: captcha_model.onnx not found; login OCR will use runtime fallback" >&2; \
+    fi; \
+    uv run --frozen pyinstaller --noconfirm --onefile \
     --name WeBan \
-    --add-data "captcha_model.onnx:." \
+    "$@" \
     --add-data "answer/answer.json:answer/answer.json" \
     --add-data "config.example.toml:." \
     --add-data "pyproject.toml:." \

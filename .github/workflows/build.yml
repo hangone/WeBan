@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - "v*"
+  pull_request:
   workflow_dispatch:
 
 env:
@@ -47,9 +48,35 @@ jobs:
           echo "app_version=${app_version}" >> "$GITHUB_OUTPUT"
           echo "产物版本：${app_version}"
 
+  quality:
+    name: Quality gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
+        with:
+          python-version: "3.12"
+          cache-python: true
+          enable-cache: true
+        env:
+          UV_PYTHON_PREFERENCE: only-managed
+
+      - name: Install locked dependencies
+        run: uv sync --frozen
+
+      - name: Run tests
+        run: uv run --frozen pytest
+
+      - name: Run Ruff
+        run: uv run --frozen ruff check .
+
+      - name: Run Pyright
+        run: uv run --frozen pyright
+
   build:
     name: Build ${{ matrix.os }}
-    needs: version
+    needs: [version, quality]
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -84,7 +111,7 @@ jobs:
         env:
           UV_PYTHON_PREFERENCE: only-managed
 
-      - run: uv sync
+      - run: uv sync --frozen
 
       - name: Build executable
         shell: bash
@@ -96,9 +123,16 @@ jobs:
           name="WeBan-${os_name}-${arch}${ext}"
 
           sep=$(python -c "import os; print(os.pathsep)")
-          uv run pyinstaller --noconfirm --onefile \
+          model_args=()
+          if [[ -f captcha_model.onnx ]]; then
+            model_args+=(--add-data "captcha_model.onnx${sep}.")
+          else
+            echo "::warning file=captcha_model.onnx::模型缺失，冻结程序将禁用登录验证码 OCR 并按运行环境降级"
+          fi
+
+          uv run --frozen pyinstaller --noconfirm --onefile \
             --name "$name" \
-            --add-data "captcha_model.onnx${sep}." \
+            "${model_args[@]}" \
             --add-data "answer/answer.json${sep}answer/answer.json" \
             --add-data "config.example.toml${sep}." \
             --add-data "pyproject.toml${sep}." \
@@ -111,15 +145,54 @@ jobs:
 
           echo "name=$name" >> "$GITHUB_ENV"
 
+      - name: Smoke test executable
+        shell: bash
+        run: |
+          "./dist/${name}" --help
+
       - uses: actions/upload-artifact@v7
         with:
           name: ${{ env.name }}
           path: dist/${{ env.name }}*
           if-no-files-found: error
 
+  docker-smoke:
+    name: Docker smoke tests
+    needs: [version, quality]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build without-browser target
+        env:
+          APP_VERSION: ${{ needs.version.outputs.app_version }}
+        run: >-
+          docker build
+          --target without-browser
+          --build-arg "APP_VERSION=${APP_VERSION}"
+          --tag weban-smoke:without-browser
+          .
+
+      - name: Smoke test without-browser target
+        run: docker run --rm weban-smoke:without-browser --help
+
+      - name: Build with-browser target
+        env:
+          APP_VERSION: ${{ needs.version.outputs.app_version }}
+        run: >-
+          docker build
+          --target with-browser
+          --build-arg "APP_VERSION=${APP_VERSION}"
+          --tag weban-smoke:with-browser
+          .
+
+      - name: Smoke test with-browser target
+        run: docker run --rm weban-smoke:with-browser --help
+
   docker:
     name: Docker ${{ matrix.variant }} ${{ matrix.platform }}
-    needs: version
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [version, quality, docker-smoke]
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -167,6 +240,7 @@ jobs:
 
   docker-merge:
     name: Docker merge ${{ matrix.variant }}
+    if: startsWith(github.ref, 'refs/tags/v')
     needs: docker
     runs-on: ubuntu-latest
     strategy:

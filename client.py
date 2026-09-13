@@ -1,19 +1,39 @@
+from __future__ import annotations
+
 import json
+import math
 import os
 import re
 import sys
 import threading
 import time
+import unicodedata
 import webbrowser
+from pathlib import Path
 from random import randint
-from typing import Any
-from urllib.parse import parse_qs, urljoin, urlparse
+from typing import Any, Self
+from urllib.parse import (
+    parse_qs,
+    parse_qsl,
+    urlencode,
+    urljoin,
+    urlparse,
+    urlsplit,
+    urlunsplit,
+)
 from uuid import uuid4
 
 from loguru import logger
 
+from answer_store import AnswerStore, AnswerStoreError
 from api import WeBanAPI
 from captcha import CaptchaHandler, LoginCaptchaSolver, is_non_interactive
+from errors import (
+    AccountBlockedError,
+    APIResponseError,
+    ResponseValidationError,
+    WorkflowResult,
+)
 
 if getattr(sys, "frozen", False):
     base_path = os.path.dirname(os.path.abspath(sys.executable))
@@ -31,19 +51,46 @@ if _data_dir:
 else:
     answer_dir = os.path.join(base_path, "answer")
 answer_path = os.path.join(answer_dir, "answer.json")
-root_answer_path = os.path.join(_data_dir, "answer.json") if _data_dir else os.path.join(base_path, "answer.json")
+root_answer_path = (
+    os.path.join(_data_dir, "answer.json")
+    if _data_dir
+    else os.path.join(base_path, "answer.json")
+)
 bundle_answer_path = os.path.join(bundle_path, "answer", "answer.json")
+
+# 完课接口返回成功后，showProgress 的计数可能稍后才可见。轮询次数和
+# 退避上限必须固定，避免网络异常或服务端永不更新时无限阻塞任务。
+PROGRESS_POLL_DELAYS = (0.5, 1.0, 2.0, 4.0)
 
 
 def clean_text(text):
-    """只保留字母、数字和汉字，自动去除所有符号和空格
+    """生成保守模糊键，保留会改变语义的正负号和比较符。
 
-    去除标点/空格后做模糊匹配，确保如「以下说法正确的是（）」能命中
-    题库中「以下说法正确的是」。
+    普通标点和空格仍会被忽略，但 ``+ - < > = ≤ ≥ ≠`` 不再被删除，
+    避免“正/负”“大于/小于”题目碰撞。
     :param text: 原始文本
-    :return: 仅含字母、数字和汉字的文本
+    :return: 用于唯一模糊匹配的文本
     """
-    return re.sub(r"[^\w一-龥]", "", text)
+    normalized = unicodedata.normalize("NFKC", str(text))
+    return re.sub(r"[^\w一-龥+\-<>=≤≥≠]", "", normalized)
+
+
+def _exact_text(text: object) -> str:
+    """Unicode 归一化并移除空白，保留其余全部符号。"""
+
+    normalized = unicodedata.normalize("NFKC", str(text)).strip()
+    return re.sub(r"\s+", "", normalized)
+
+
+def _option_signature(question: dict) -> frozenset[str]:
+    options = question.get("optionList")
+    if not isinstance(options, list):
+        return frozenset()
+    return frozenset(
+        clean_text(option.get("content", ""))
+        for option in options
+        if isinstance(option, dict) and clean_text(option.get("content", ""))
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -63,22 +110,58 @@ def get_source_str(query: dict) -> str:
     return "WEIBAN"
 
 
-def read_first_existing(paths: list[str]) -> str | None:
-    """按序读取第一个存在的本地文件内容（模板/题库的打包版兜底共用）。
+def _course_finished(course: dict) -> bool:
+    """课程列表对象的 finished 字段是否表示已完成（1=完成，2=未完成）。
 
-    模板（config.example.toml）与题库（answer.json）的下载都会先尝试
-    jsDelivr 远程源；失败时回退到本地候选文件（打包内置 _MEIPASS 或
-    可执行文件旁），两者共用本函数读取兜底内容。
-    :param paths: 候选路径，按优先级排列（如 bundle 内置优先）
-    :return: 文件文本；全部不存在或不可读返回 None
+    服务端偶发返回 null/字符串，解析失败一律视为未完成，宁可多学一门也不能
+    因为 TypeError 让整个项目中断。JSON 里的 1e309 会解析成 inf，
+    int(inf) 抛 OverflowError，同样按未完成处理。
     """
-    for path in paths:
-        try:
-            with open(path, encoding="utf-8") as f:
-                return f.read()
-        except OSError:
-            continue
-    return None
+    try:
+        return int(course.get("finished", 0)) == 1
+    except (TypeError, ValueError, OverflowError):
+        return False
+
+
+# 试卷分值的合理上界：官方满分为 100，留出余量拒绝 inf/巨大值。
+_MAX_SCORE = 10_000.0
+
+
+def _finite_score(value: object) -> float | None:
+    """把分数字段解析为有限、非负且在合理范围内的 float，否则返回 None。
+
+    JSON 允许 1e309/-1e309 之类字面量，Python 会得到 ±inf；某些代理还可能
+    透传 NaN。它们进入 >= 比较会产生错误的跳过/不跳过判定，必须拒收。
+    """
+    if isinstance(value, bool):
+        return None
+    try:
+        parsed = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if not math.isfinite(parsed) or parsed < 0 or parsed > _MAX_SCORE:
+        return None
+    return parsed
+
+
+def _brief_response(response: object, limit: int = 200) -> str:
+    """只提取业务码和短消息用于日志，不回显完整响应正文。
+
+    客户端可能被脱离 main.py 的 LogRedactor 直接使用，因此这里自行去掉
+    控制字符并截断长度，避免把 token、个人信息或超长内容写进日志。
+    """
+    if not isinstance(response, dict):
+        return f"<{type(response).__name__}>"
+    parts: list[str] = []
+    for key in ("code", "detailCode", "msg", "message"):
+        if key in response:
+            text = re.sub(r"[\x00-\x1f\x7f]", "?", str(response[key]))
+            if len(text) > limit:
+                text = f"{text[:limit]}…"
+            parts.append(f"{key}={text}")
+    data = response.get("data")
+    parts.append(f"data=<{type(data).__name__}>")
+    return ", ".join(parts)
 
 
 def _check_code_ok(data: dict, allow_200: bool = True) -> bool:
@@ -86,12 +169,13 @@ def _check_code_ok(data: dict, allow_200: bool = True) -> bool:
 
     主站请求封装（app.js request）：Boolean(data) && Number(code)∈{0,1,200}；
     完课 JSONP（sdk.js finishWxCourse）：Boolean(data) && Number(code)∈{0,1}，
-    传 allow_200=False 对齐。注意 Number(null)===0，code 为 null 时官方同样视为成功。
+    传 allow_200=False 对齐。缺少 code 不是成功响应；显式 code=null 仍按
+    Number(null)===0 保留官方兼容语义。
     :param data: 接口响应 dict
     :param allow_200: 是否允许 code=200（主站接口 True，完课 JSONP False）
     :return: 业务成功返回 True
     """
-    if not data:
+    if not data or "code" not in data:
         return False
     code = data.get("code")
     try:
@@ -219,6 +303,11 @@ class WeBanClient:
         ai_config: dict[str, Any] | None = None,
         video_speed: float = 1.0,
         jupiter_fallback: bool = False,
+        data_dir: str | os.PathLike[str] | None = None,
+        answer_store: AnswerStore | None = None,
+        non_interactive: bool | None = None,
+        captcha_debug_dir: str | os.PathLike[str] | None = None,
+        stop_event: threading.Event | None = None,
     ) -> None:
         """
         :param tenant_name: 学校全称
@@ -238,8 +327,13 @@ class WeBanClient:
             callApinext）的课程才上报轨迹，默认 False 完全对齐官方行为；
             个别学校可能要求该校所有微课都有轨迹，
             实测无轨迹会 10018 时可开启该项
+        :param data_dir: 统一数据目录；仅在未显式提供 answer_store 时使用
+        :param answer_store: 由入口创建的共享题库存储
+        :param non_interactive: 显式无交互策略，禁止回退到 input/可见浏览器
+        :param captcha_debug_dir: 当前账号隔离后的验证码调试目录
+        :param stop_event: 进程级停止事件，用于中断长等待和验证码流程
         """
-        self.log = log
+        self.log: Any = log
         self.tenant_name = tenant_name.strip()
         self.study_base_time = 20
         self.study_random_upper = 10
@@ -255,20 +349,42 @@ class WeBanClient:
         self.cdp_port = cdp_port
         self.ai_config = ai_config
         self._ai_key_warned = False  # api_key 未配置提醒只打一次
+        self.non_interactive = (
+            is_non_interactive() if non_interactive is None else bool(non_interactive)
+        )
+        self.stop_event = stop_event or threading.Event()
+        resolved_data_dir = Path(data_dir or _data_dir or base_path).resolve(
+            strict=False
+        )
+        self.data_dir = resolved_data_dir
+        self.captcha_debug_dir = Path(
+            captcha_debug_dir
+            if captcha_debug_dir is not None
+            else resolved_data_dir / "logs" / "captcha"
+        ).resolve(strict=False)
+        self._answer_store_instance = answer_store or self._build_answer_store(
+            resolved_data_dir
+        )
         if user and all([user.get("userId"), user.get("token")]):
-            self.api = WeBanAPI(user=user, debug=debug, log=log)
+            self.api: Any = WeBanAPI(user=user, debug=debug, log=log)
         elif all([self.tenant_name, account, password]):
             self.api = WeBanAPI(
                 account=account, password=password, debug=debug, log=log
             )
         else:
             self.api = WeBanAPI(debug=debug, log=log)
-        self.tenant_code = self.get_tenant_code()
-        if self.tenant_code:
-            self.api.set_tenant_code(self.tenant_code)
-        else:
-            raise ValueError("学校代码获取失败，请检查学校全称是否正确")
-        self._captcha_handler = None
+        self._closed = False
+        try:
+            self.tenant_code = self.get_tenant_code()
+            if self.tenant_code:
+                self.api.set_tenant_code(self.tenant_code)
+            else:
+                raise ValueError("学校代码获取失败，请检查学校全称是否正确")
+        except BaseException:
+            self.api.close()
+            self._closed = True
+            raise
+        self._captcha_handler: Any | None = None
 
     # ---- properties / helpers ------------------------------------------------
 
@@ -286,6 +402,9 @@ class WeBanClient:
                 browser_path=self.browser_path,
                 cdp_host=self.cdp_host,
                 cdp_port=self.cdp_port,
+                debug_dir=self.captcha_debug_dir,
+                non_interactive=self.non_interactive,
+                stop_event=self.stop_event,
             )
         return self._captcha_handler
 
@@ -300,6 +419,44 @@ class WeBanClient:
         if m:
             return f"{m}m{sec:02d}s"
         return f"{sec}s"
+
+    def _raise_if_stopped(self) -> None:
+        stop_event = getattr(self, "stop_event", None)
+        if stop_event is not None and stop_event.is_set():
+            raise InterruptedError("运行已被中断")
+
+    def _sleep(self, seconds: float) -> None:
+        """使用共享停止事件替代不可中断的 time.sleep。"""
+
+        self._raise_if_stopped()
+        delay = max(0.0, float(seconds))
+        stop_event = getattr(self, "stop_event", None)
+        if stop_event is None:
+            time.sleep(delay)
+            return
+        if stop_event.wait(delay):
+            raise InterruptedError("运行已被中断")
+
+    def close(self) -> None:
+        """释放账号客户端持有的网络连接和验证码处理器引用。"""
+
+        if self._closed:
+            return
+        handler = self._captcha_handler
+        self._captcha_handler = None
+        close_handler = getattr(handler, "close", None)
+        try:
+            if close_handler is not None:
+                close_handler()
+        finally:
+            self.api.close()
+            self._closed = True
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
 
     def simulate_home_page(self) -> None:
         """模拟打开官方 H5 首页：对齐登录后页面初始化请求面
@@ -326,14 +483,17 @@ class WeBanClient:
             ("学习任务", self.api.list_study_task),
         ]
         for name, fn in steps:
+            self._raise_if_stopped()
             try:
                 res = fn()
                 if not _check_code_ok(res):
                     self.log.debug(f"首页{name}返回异常：{res}")
+            except InterruptedError:
+                raise
             except PermissionError:
                 raise  # Token 失效（被顶号等），立即终止该账号
-            except OSError as e:  # 网络异常（DNS/连接/SSL）忽略，不影响主流程
-                self.log.debug(f"首页{name}请求失败（网络异常）：{e}")
+            except (OSError, APIResponseError) as e:
+                self.log.debug(f"首页{name}请求失败：{e}")
 
         # 必读公告：官方弹窗逐条展示，阅读完成后逐条确认（与浏览器行为一致）
         try:
@@ -343,6 +503,9 @@ class WeBanClient:
                 self.log.debug(f"必读公告返回异常：{must}")
                 notices = []
             for n in notices:
+                if not isinstance(n, dict) or not n.get("id"):
+                    self.log.debug(f"跳过结构无效的必读公告：{n}")
+                    continue
                 nid = n.get("id", "")
                 title = n.get("title", "")
                 ntype = n.get("type", "")
@@ -354,68 +517,214 @@ class WeBanClient:
                 )
                 # 官方普通类型公告有阅读倒计时（minReadLength 秒），
                 # 倒计时结束才可点击"下一条/关闭"确认；上限 300s 防极端值
-                if ntype not in (3, 4, 5) and isinstance(min_read, (int, float)) and min_read > 0:
-                    time.sleep(min(min_read, 300))
+                if (
+                    ntype not in (3, 4, 5)
+                    and isinstance(min_read, (int, float))
+                    and min_read > 0
+                ):
+                    self._sleep(min(min_read, 300))
                 try:
                     self.api.view_must_notice(nid)
+                except InterruptedError:
+                    raise
                 except PermissionError:
                     raise  # Token 失效，立即终止该账号
-                except OSError as e:
-                    self.log.debug(f"确认必读公告失败（网络异常）：{e}")
-        except PermissionError:
+                except (OSError, APIResponseError) as e:
+                    self.log.debug(f"确认必读公告失败：{e}")
+        except (InterruptedError, PermissionError):
             raise  # Token 失效，立即终止该账号
-        except OSError as e:
-            self.log.debug(f"必读公告流程失败（网络异常）：{e}")
+        except (OSError, APIResponseError) as e:
+            self.log.debug(f"必读公告流程失败：{e}")
 
         # 问卷：官方在必读公告确认后检查待答问卷，仅拉取并提示，不自动作答
         try:
             q = self.api.questionnaire_list_by_user_id()
             qlist = q.get("data") if isinstance(q.get("data"), list) else []
-            if q.get("code", "-1") == "0" and qlist:
-                self.log.info(f"存在 {len(qlist)} 个待答问卷（官方会弹窗提示，请前往网页完成）")
+            if _check_code_ok(q) and qlist:
+                self.log.info(
+                    f"存在 {len(qlist)} 个待答问卷（官方会弹窗提示，请前往网页完成）"
+                )
+        except InterruptedError:
+            raise
         except PermissionError:
             raise  # Token 失效，立即终止该账号
-        except OSError as e:
-            self.log.debug(f"问卷列表请求失败（网络异常）：{e}")
+        except (OSError, APIResponseError) as e:
+            self.log.debug(f"问卷列表请求失败：{e}")
 
     def _prompt(self, message: str) -> str:
         """线程安全的 input 封装，多线程下避免 input 输出交错
         :param message: 提示信息
         :return: 去除首尾空白的用户输入
         """
+        self._raise_if_stopped()
+        if self.non_interactive:
+            raise RuntimeError("无交互模式禁止读取终端输入")
         with self._stdin_lock:
             return input(message).strip()
 
+    @classmethod
+    def _build_answer_store(cls, data_dir: Path) -> AnswerStore:
+        """在统一数据目录内选择写入路径，并保留历史/打包题库作恢复源。"""
+
+        legacy_path = data_dir / "answer.json"
+        current_path = data_dir / "answer" / "answer.json"
+        target = legacy_path if legacy_path.exists() else current_path
+        bundled_path = Path(bundle_path) / "answer" / "answer.json"
+        fallbacks = tuple(
+            path
+            for path in (legacy_path, current_path, bundled_path)
+            if os.path.normcase(str(path.resolve(strict=False)))
+            != os.path.normcase(str(target.resolve(strict=False)))
+        )
+        return AnswerStore(
+            target,
+            fallbacks=fallbacks,
+            validator=cls._is_valid_answers,
+        )
+
+    def _answer_store(self) -> AnswerStore:
+        store = getattr(self, "_answer_store_instance", None)
+        if store is not None:
+            return store
+
+        # 兼容只构造最小测试替身和旧式嵌入调用；正常客户端始终在
+        # __init__ 中使用显式 data_dir 创建实例。
+        target = root_answer_path if os.path.exists(root_answer_path) else answer_path
+        fallbacks = tuple(
+            path
+            for path in (root_answer_path, answer_path, bundle_answer_path)
+            if os.path.normcase(os.path.abspath(path))
+            != os.path.normcase(os.path.abspath(target))
+        )
+        store = AnswerStore(
+            target,
+            fallbacks=fallbacks,
+            validator=self._is_valid_answers,
+        )
+        self._answer_store_instance = store
+        return store
+
     def _load_answers_json(self, warn_on_fail: bool = False) -> dict:
-        """加载题库，返回 {clean_text(题目): {clean_text(正确选项), ...}}
+        """通过安全存储加载并规范化原始题库。
 
         :param warn_on_fail: True 时加载失败只警告不抛异常（学习模式容错），
             False 时抛出异常（考试模式必须要有题库）
-        :return: 清洗后的题目标题 → 正确答案内容集合的映射
+        :return: 原始题目标题 → 规范化题目对象
         """
-        answers: dict = {}
-        # 优先级: 根目录 answer.json > answer/answer.json > 打包内置
-        if os.path.exists(root_answer_path):
-            load_path = root_answer_path
-        elif os.path.exists(answer_path):
-            load_path = answer_path
-        else:
-            load_path = bundle_answer_path
         try:
-            with open(load_path, encoding="utf-8") as f:
-                for title, options in json.load(f).items():
-                    title = clean_text(title)
-                    answers.setdefault(title, set()).update(
-                        clean_text(a["content"])
-                        for a in options.get("optionList", [])
-                        if a["isCorrect"] == 1
-                    )
-        except Exception:
+            return self._normalize_answers(self._answer_store().load())
+        except (AnswerStoreError, OSError, UnicodeError, ValueError):
             if warn_on_fail:
                 self.log.warning("题库加载失败，课后习题将随机作答")
+                return {}
             else:
                 raise
-        return answers
+
+    @staticmethod
+    def _match_answer_contents(
+        answers_json: dict,
+        question: dict,
+    ) -> set[str] | None:
+        """按精确标题优先、唯一兼容模糊标题兜底查找答案。"""
+
+        title = str(question.get("title", ""))
+        current_signature = _option_signature(question)
+        if not title or not current_signature:
+            return None
+
+        # 兼容旧调用方传入的 clean_title -> set 映射。
+        legacy = answers_json.get(clean_text(title))
+        if isinstance(legacy, (set, frozenset, list, tuple)):
+            values = {clean_text(item) for item in legacy if clean_text(item)}
+            return values or None
+
+        entries = [
+            (str(stored_title), stored)
+            for stored_title, stored in answers_json.items()
+            if isinstance(stored, dict)
+        ]
+
+        def compatible(entry: dict) -> bool:
+            return (
+                bool(_option_signature(entry))
+                and _option_signature(entry) == current_signature
+            )
+
+        raw_matches = [
+            entry for stored_title, entry in entries if stored_title == title
+        ]
+        if raw_matches:
+            return (
+                WeBanClient._correct_answer_contents(raw_matches[0])
+                if len(raw_matches) == 1 and compatible(raw_matches[0])
+                else None
+            )
+
+        exact_key = _exact_text(title)
+        exact_matches = [
+            entry
+            for stored_title, entry in entries
+            if _exact_text(stored_title) == exact_key
+        ]
+        if exact_matches:
+            candidates = [entry for entry in exact_matches if compatible(entry)]
+            return (
+                WeBanClient._correct_answer_contents(candidates[0])
+                if len(candidates) == 1
+                else None
+            )
+
+        fuzzy_key = clean_text(title)
+        candidates = [
+            entry
+            for stored_title, entry in entries
+            if clean_text(stored_title) == fuzzy_key and compatible(entry)
+        ]
+        if len(candidates) != 1:
+            return None
+        return WeBanClient._correct_answer_contents(candidates[0])
+
+    @staticmethod
+    def _correct_answer_contents(entry: dict) -> set[str] | None:
+        answers = {
+            clean_text(option.get("content", ""))
+            for option in entry.get("optionList", [])
+            if isinstance(option, dict)
+            and option.get("isCorrect") == 1
+            and clean_text(option.get("content", ""))
+        }
+        return answers or None
+
+    @classmethod
+    def _answer_ids_for_question(
+        cls,
+        answers_json: dict,
+        question: dict,
+    ) -> list[str]:
+        """仅在全部答案都能映射为当前试卷合法 ID 时返回结果。"""
+
+        answer_contents = cls._match_answer_contents(answers_json, question)
+        options = question.get("optionList")
+        if not answer_contents or not isinstance(options, list):
+            return []
+        answer_ids = [
+            str(option.get("id", ""))
+            for option in options
+            if isinstance(option, dict)
+            and clean_text(option.get("content", "")) in answer_contents
+            and option.get("id")
+        ]
+        if len(set(answer_ids)) != len(answer_ids):
+            return []
+        if len(answer_ids) != len(answer_contents):
+            return []
+        try:
+            question_type = int(question.get("type", 1))
+        except (TypeError, ValueError):
+            return []
+        if question_type == 2:
+            return answer_ids if answer_ids else []
+        return answer_ids if len(answer_ids) == 1 else []
 
     @staticmethod
     def get_project_type(project_category: int) -> str:
@@ -466,20 +775,45 @@ class WeBanClient:
         :param task: 任务数据（含 userProjectId）
         :return: 完整的课程播放 URL
         """
-        url = self.api.get_course_url(course["resourceId"], task["userProjectId"])[
-            "data"
-        ]
-        url += f"&userProjectId={task['userProjectId']}"
-        url += f"&userId={self.api.user['userId']}"
-        url += f"&courseId={course['resourceId']}"
-        url += f"&userName={self.api.user.get('userName', self.api.user.get('realName', ''))}"
+        response = self.api.get_course_url(course["resourceId"], task["userProjectId"])
+        url = response.get("data") if _check_code_ok(response) else None
+        if not isinstance(url, str) or not url.startswith(("http://", "https://")):
+            raise ResponseValidationError(f"课程链接响应无效：{response}")
         link = course.get("praiseNum", "")
-        url += (
-            f"&projectType=special&projectId=undefined&protocol=true&link={link}"
-            "&weiban=weiban&certificateId=undefined&userActivityState=undefined"
-            "&step=undefined&index=undefined&viewStep=undefined"
+        parts = urlsplit(url)
+        query = parse_qsl(parts.query, keep_blank_values=True)
+        query.extend(
+            [
+                ("userProjectId", str(task["userProjectId"])),
+                ("userId", str(self.api.user["userId"])),
+                ("courseId", str(course["resourceId"])),
+                (
+                    "userName",
+                    str(
+                        self.api.user.get("userName", self.api.user.get("realName", ""))
+                    ),
+                ),
+                ("projectType", "special"),
+                ("projectId", "undefined"),
+                ("protocol", "true"),
+                ("link", str(link)),
+                ("weiban", "weiban"),
+                ("certificateId", "undefined"),
+                ("userActivityState", "undefined"),
+                ("step", "undefined"),
+                ("index", "undefined"),
+                ("viewStep", "undefined"),
+            ]
         )
-        return url
+        return urlunsplit(
+            (
+                parts.scheme,
+                parts.netloc,
+                parts.path,
+                urlencode(query),
+                parts.fragment,
+            )
+        )
 
     # ---- tenant / progress --------------------------------------------------
 
@@ -491,17 +825,30 @@ class WeBanClient:
             self.log.error("学校全称不能为空")
             return ""
         tenant_list = self.api.get_tenant_list_with_letter()
-        if tenant_list.get("code", -1) == "0":
-            self.log.info("获取学校列表成功")
+        groups = tenant_list.get("data") if _check_code_ok(tenant_list) else None
+        if not isinstance(groups, list):
+            self.log.error(
+                f"获取学校列表失败或结构无效：{_brief_response(tenant_list)}"
+            )
+            return ""
+        self.log.info("获取学校列表成功")
         tenant_names = []
         maybe_names = []
-        for item in tenant_list.get("data", []):
-            for entry in item.get("list", []):
-                name = entry.get("name", "")
+        for item in groups:
+            entries = item.get("list") if isinstance(item, dict) else None
+            if not isinstance(entries, list):
+                continue
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    continue
+                name = str(entry.get("name") or "")
+                code = str(entry.get("code") or "")
+                if not name or not code:
+                    continue
                 tenant_names.append(name)
                 if self.tenant_name == name.strip():
-                    self.log.success(f"找到学校代码: {entry['code']}")
-                    return entry["code"]
+                    self.log.success(f"找到学校代码: {code}")
+                    return code
                 if self.tenant_name in name:
                     maybe_names.append(name)
         self.log.error(f"{tenant_names}")
@@ -527,7 +874,36 @@ class WeBanClient:
             if output:
                 self.log.warning(f"{project_prefix} 获取进度失败：{progress}")
             return progress
-        data = progress.get("data", {})
+        data = progress.get("data")
+        required_keys = (
+            "requiredNum",
+            "requiredFinishedNum",
+            "optionalNum",
+            "optionalFinishedNum",
+            "pushNum",
+            "pushFinishedNum",
+            "examNum",
+            "examFinishedNum",
+        )
+        if not isinstance(data, dict):
+            message = "进度响应 data 不是对象"
+            if output:
+                self.log.error(f"{project_prefix} {message}")
+            return {"code": "-1", "detailCode": "client_validation", "msg": message}
+        try:
+            counts = {key: int(data[key]) for key in required_keys}
+        except (KeyError, TypeError, ValueError):
+            message = "进度响应缺少合法计数字段"
+            if output:
+                self.log.error(f"{project_prefix} {message}：{progress}")
+            return {"code": "-1", "detailCode": "client_validation", "msg": message}
+        if any(value < 0 for value in counts.values()):
+            message = "进度响应包含负数计数"
+            if output:
+                self.log.error(f"{project_prefix} {message}：{progress}")
+            return {"code": "-1", "detailCode": "client_validation", "msg": message}
+        data = {**data, **counts}
+        progress = {**progress, "data": data}
         if self.study_force:
             # force 模式会重新学习所有课程，剩余量按总数计算
             required = data["requiredNum"]
@@ -594,11 +970,13 @@ class WeBanClient:
         失败 10 次后转为手动输入（打开图片浏览器），再额外给 3 次机会。
         :return: 成功返回 self.api.user，失败返回 None
         """
+        self._raise_if_stopped()
         if self.api.user.get("userId"):
             return self.api.user
         retry_limit = 10
         # 前 10 次 OCR 自动识别，后 3 次手动输入
         for i in range(retry_limit + 3):
+            self._raise_if_stopped()
             if i > 0:
                 self.log.warning(f"登录失败，正在重试 {i}/{retry_limit + 2} 次")
             verify_time = self.api.get_timestamp(13, 0)
@@ -607,7 +985,7 @@ class WeBanClient:
                 verify_code = LoginCaptchaSolver.recognize(verify_image, self.log)
                 if not verify_code:
                     continue
-            elif is_non_interactive():
+            elif self.non_interactive:
                 # 无交互模式：不阻塞等待手动输入，直接判定失败
                 self.log.error(
                     "验证码 OCR 连续失败且处于无交互模式，无法手动输入验证码，"
@@ -615,22 +993,22 @@ class WeBanClient:
                 )
                 break
             else:
-                account_id = (
-                    self.api.account or self.api.user.get("userId") or "unknown"
-                )
-                captcha_dir = os.path.join(base_path, "logs", account_id)
-                os.makedirs(captcha_dir, exist_ok=True)
-                captcha_path = os.path.join(captcha_dir, "verify_code.png")
-                with open(captcha_path, "wb") as f:
+                self.captcha_debug_dir.mkdir(parents=True, exist_ok=True)
+                captcha_path = self.captcha_debug_dir / "verify_code.png"
+                with captcha_path.open("wb") as f:
                     f.write(verify_image)
-                webbrowser.open(f"file://{captcha_path}")
-                verify_code = self._prompt(
-                    f"[{account_id}] 请在 {captcha_path} 查看验证码图片输入验证码："
-                )
                 try:
-                    os.remove(captcha_path)
-                except OSError:
-                    pass
+                    webbrowser.open(captcha_path.as_uri())
+                    verify_code = self._prompt(
+                        f"请在 {captcha_path} 查看验证码图片并输入验证码："
+                    )
+                finally:
+                    try:
+                        captcha_path.unlink(missing_ok=True)
+                    except OSError as exc:
+                        # 图片可能仍被浏览器/杀毒软件占用；清理失败不应
+                        # 吞掉已经输入的验证码，更不能阻止登录请求。
+                        self.log.debug(f"验证码图片清理失败：{exc}")
             res = self.api.login(verify_code, int(verify_time))
             if res.get("detailCode") == "67":
                 self.log.warning("验证码识别失败，正在重试")
@@ -645,29 +1023,39 @@ class WeBanClient:
 
     # ---- project list & per-project cycle ----------------------------------
 
-    def _get_project_list(self) -> list[dict]:
+    def _get_project_list(self) -> list[dict] | None:
         """获取账号全部进行中的项目列表（含实验室课程合并）"""
-        my_project = self.api.list_my_project()
-        if not _check_code_ok(my_project):
-            self.log.error(f"获取任务列表失败：{my_project}")
-            return []
-        my_project = my_project.get("data", [])
+        response = self.api.list_my_project()
+        my_project = response.get("data") if _check_code_ok(response) else None
+        if not isinstance(my_project, list) or not all(
+            isinstance(project, dict) for project in my_project
+        ):
+            self.log.error(f"获取任务列表失败或结构无效：{response}")
+            return None
+        my_project = list(my_project)
 
         completion = self.api.list_completion()
-        if not _check_code_ok(completion):
-            self.log.error(f"获取模块完成情况失败：{completion}")
-        else:
-            showable_modules = [
-                d["module"] for d in completion.get("data", []) if d["showable"] == 1
-            ]
-            if "labProject" in showable_modules:
-                self.log.info("加载实验室课程")
-                lab_project = self.api.lab_index()
-                if not _check_code_ok(lab_project):
-                    self.log.error(f"获取实验室课程失败：{lab_project}")
-                current = lab_project.get("data", {}).get("current") or {}
-                if current:
-                    my_project.append(current)
+        modules = completion.get("data") if _check_code_ok(completion) else None
+        if not isinstance(modules, list) or not all(
+            isinstance(item, dict) and "module" in item and "showable" in item
+            for item in modules
+        ):
+            self.log.error(f"获取模块完成情况失败或结构无效：{completion}")
+            return None
+        showable_modules = [item["module"] for item in modules if item["showable"] == 1]
+        if "labProject" in showable_modules:
+            self.log.info("加载实验室课程")
+            lab_project = self.api.lab_index()
+            data = lab_project.get("data") if _check_code_ok(lab_project) else None
+            if not isinstance(data, dict):
+                self.log.error(f"获取实验室课程失败：{lab_project}")
+                return None
+            current = data.get("current") or {}
+            if current:
+                if not isinstance(current, dict):
+                    self.log.error(f"实验室课程结构无效：{lab_project}")
+                    return None
+                my_project.append(current)
         return my_project
 
     def run_project_cycle(
@@ -678,7 +1066,7 @@ class WeBanClient:
         random_answer: bool,
         exam_question_time: str,
         exam_submit_match_rate: int,
-    ) -> None:
+    ) -> WorkflowResult:
         """按项目交替执行：每个项目先完成课程学习，再完成考试，然后
         切换到下一个项目（用户要求的顺序：项目 A 学习+考试 → 项目 B 学习+考试）。
 
@@ -688,7 +1076,7 @@ class WeBanClient:
         exam = exam_mode != "false"
         if not study and not exam:
             self.log.info("学习与考试均未开启，跳过")
-            return
+            return WorkflowResult.success("学习与考试均未开启", skipped=1)
 
         if study:
             mode_desc = {"true": "正常", "force": "强制重新学习"}.get(
@@ -704,27 +1092,56 @@ class WeBanClient:
             self.log.info(f"考试模式: {mode_desc}")
 
         projects = self._get_project_list()
+        if projects is None:
+            return WorkflowResult.failed_result("项目列表加载失败")
         if not projects:
             self.log.warning("当前没有进行中的项目。")
-            return
+            return WorkflowResult.success("当前没有进行中的项目", skipped=1)
 
+        overall = WorkflowResult.success()
         for project in projects:
+            self._raise_if_stopped()
             project_name = project.get("projectName", "未知项目")
             user_project_id = project.get("userProjectId", "")
             self.log.info(f"===== 开始处理项目：{project_name} =====")
             if not user_project_id:
                 self.log.warning(f"{project_name}：缺少 userProjectId，跳过")
+                overall = overall.combine(
+                    WorkflowResult.incomplete(
+                        f"{project_name} 缺少 userProjectId",
+                        skipped=1,
+                    )
+                )
                 continue
+            study_result = WorkflowResult.success()
             if study:
-                self.run_study(study_time, study_mode, only_project=project)
+                study_result = self.run_study(
+                    study_time,
+                    study_mode,
+                    only_project=project,
+                )
+                overall = overall.combine(study_result)
             if exam:
-                self.run_exam(
+                if study and not study_result.ok:
+                    self.log.error(
+                        f"{project_name} 学习阶段未完整确认，安全跳过该项目考试"
+                    )
+                    overall = overall.combine(
+                        WorkflowResult.incomplete(
+                            f"{project_name} 因学习不完整跳过考试",
+                            skipped=1,
+                        )
+                    )
+                    continue
+                exam_result = self.run_exam(
                     exam_mode=exam_mode,
                     random_answer=random_answer,
                     exam_question_time=exam_question_time,
                     exam_submit_match_rate=exam_submit_match_rate,
                     only_project=project,
                 )
+                overall = overall.combine(exam_result)
+        return overall
 
     # ---- study --------------------------------------------------------------
 
@@ -733,7 +1150,7 @@ class WeBanClient:
         study_time: str | int,
         study_mode: str = "true",
         only_project: dict | None = None,
-    ) -> None:
+    ) -> WorkflowResult:
         """主学习流程入口：遍历所有项目 → 分类 → 课程，逐门学习
         :param study_time: 每门课学习时长 "基础时间,随机上限"（秒），如 "20,10"
         :param study_mode: 学习模式，"force" 时忽略完成状态全部重新学习
@@ -762,37 +1179,66 @@ class WeBanClient:
             my_project = [only_project]
         else:
             my_project = self._get_project_list()
+        if my_project is None:
+            return WorkflowResult.failed_result("学习项目列表加载失败")
         if not my_project:
             self.log.warning("当前没有进行中的学习项目。")
+            return WorkflowResult.success("当前没有学习项目", skipped=1)
 
+        completed = 0
+        failed = 0
+        skipped = 0
+        details: list[str] = []
         for task in my_project:
-            project_prefix = task["projectName"]
+            self._raise_if_stopped()
+            if not isinstance(task, dict) or not all(
+                task.get(key) for key in ("projectName", "userProjectId")
+            ):
+                failed += 1
+                details.append("项目结构无效")
+                self.log.error(f"项目响应缺少必要字段：{task}")
+                continue
+            project_prefix = str(task["projectName"])
             # 项目未开始（未到开课时间等）：官方 H5 弹 message 并禁止进入，同样提示后跳过
             startable, notice = self._project_startable(task)
             if not startable:
                 self.log.warning(
                     f"{project_prefix}：{notice or '项目尚未开放，暂不可学习'}，跳过"
                 )
+                skipped += 1
+                failed += 1
+                details.append(f"{project_prefix}: 项目尚不可学习")
                 continue
             self.log.info(f"开始处理任务：{project_prefix}")
             # 对齐官方 H5：进入学习项目页即发 initIndex（项目详情初始化），
             # 不依赖课程是否加载 apicenext.js
             try:
-                self.api.init_index(task["userProjectId"])
+                init_response = self.api.init_index(task["userProjectId"])
             except PermissionError:
                 raise  # Token 失效，立即终止该账号
-            except OSError as e:  # 网络异常不阻断学习
-                self.log.warning(f"初始化学习索引失败（网络异常）：{e}")
+            except (OSError, APIResponseError) as exc:
+                self.log.error(f"初始化学习索引失败：{exc}")
+                failed += 1
+                details.append(f"{project_prefix}: 初始化失败")
+                continue
+            if not _check_code_ok(init_response):
+                self.log.error(f"初始化学习索引失败：{init_response}")
+                failed += 1
+                details.append(f"{project_prefix}: 初始化响应失败")
+                continue
             progress = self.get_progress(task["userProjectId"], project_prefix)
-            progress_data = (
-                progress.get("data", {}) if _check_code_ok(progress) else {}
-            )
+            if not _check_code_ok(progress):
+                failed += 1
+                details.append(f"{project_prefix}: 进度响应失败")
+                continue
+            progress_data = progress["data"]
 
             choose_types = [
                 (3, "必修课", "requiredNum", "requiredFinishedNum"),
                 (1, "推送课", "pushNum", "pushFinishedNum"),
                 (2, "自选课", "optionalNum", "optionalFinishedNum"),
             ]
+            project_ok = True
             for choose_type in choose_types:
                 # 只跳过"项目无该类型需求"（需求数=0）的类型：
                 # - need > 0（如项目确实要完成 5 门自选课）→ 正常学习该类型；
@@ -808,25 +1254,39 @@ class WeBanClient:
                     continue
                 # 官方 H5 课程主页按项目 projectMode 分流课程列表：
                 # mode==1 折叠分类（listCategory+listCourse）；mode≠1 扁平分页
-                # （listFlatCourse.do）。取不到 mode 时按折叠路径（原行为）兜底。
+                # （listFlatCourse.do）。结构不明时不猜测分流。
                 try:
                     simple = self.api.get_project_simple(task["userProjectId"])
-                    project_mode = int(
-                        simple.get("data", {}).get("projectMode", 1) or 1
-                    )
                 except PermissionError:
                     raise  # Token 失效，立即终止该账号
-                except OSError as e:
-                    self.log.debug(f"获取项目模式失败（网络异常）：{e}")
-                    project_mode = 1
+                except (OSError, APIResponseError) as exc:
+                    self.log.error(f"获取项目模式失败：{exc}")
+                    project_ok = False
+                    break
+                simple_data = simple.get("data") if _check_code_ok(simple) else None
+                if (
+                    not isinstance(simple_data, dict)
+                    or "projectMode" not in simple_data
+                ):
+                    self.log.error(f"获取项目模式响应无效：{simple}")
+                    project_ok = False
+                    break
+                try:
+                    project_mode = int(simple_data["projectMode"])
+                except (TypeError, ValueError):
+                    self.log.error(f"项目模式值无效：{simple_data['projectMode']}")
+                    project_ok = False
+                    break
                 if project_mode != 1:
-                    self._study_flat_courses(
+                    if not self._study_flat_courses(
                         task,
                         choose_type,
                         project_prefix,
                         answers_json,
                         force_restudy,
-                    )
+                    ):
+                        project_ok = False
+                        break
                     continue
 
                 try:
@@ -835,28 +1295,71 @@ class WeBanClient:
                     )
                 except PermissionError:
                     raise  # Token 失效，立即终止该账号
-                except OSError as e:  # 网络异常（DNS/连接/SSL）跳过本分类，不中断整个账号
-                    self.log.error(f"获取 {choose_type[1]} 分类失败（网络异常）：{e}")
-                    continue
+                except (OSError, APIResponseError) as exc:
+                    self.log.error(f"获取 {choose_type[1]} 分类失败：{exc}")
+                    project_ok = False
+                    break
                 if not _check_code_ok(categories):
                     self.log.error(f"获取 {choose_type[1]} 分类失败：{categories}")
-                    continue
+                    project_ok = False
+                    break
+                category_list = categories.get("data")
+                if not isinstance(category_list, list) or not all(
+                    isinstance(category, dict) for category in category_list
+                ):
+                    self.log.error(f"获取 {choose_type[1]} 分类结构无效")
+                    project_ok = False
+                    break
 
-                for category in categories.get("data", []):
+                for category in category_list:
+                    if not all(
+                        key in category
+                        for key in (
+                            "categoryName",
+                            "categoryCode",
+                            "finishedNum",
+                            "totalNum",
+                        )
+                    ):
+                        self.log.error(f"课程分类缺少必要字段：{category}")
+                        project_ok = False
+                        break
                     category_prefix = (
                         f"{choose_type[1]} {project_prefix}/{category['categoryName']}"
                     )
-                    if (
-                        not force_restudy
-                        and category["finishedNum"] >= category["totalNum"]
-                    ):
+                    try:
+                        category_finished = int(category["finishedNum"])
+                        category_total = int(category["totalNum"])
+                    except (TypeError, ValueError):
+                        self.log.error(f"课程分类计数无效：{category}")
+                        project_ok = False
+                        break
+                    if not force_restudy and category_finished >= category_total:
                         continue
 
-                    courses = self.api.list_course(
-                        task["userProjectId"], category["categoryCode"], choose_type[0]
+                    try:
+                        courses = self.api.list_course(
+                            task["userProjectId"],
+                            category["categoryCode"],
+                            choose_type[0],
+                        )
+                    except PermissionError:
+                        raise
+                    except (OSError, APIResponseError) as exc:
+                        self.log.error(f"获取课程列表失败：{exc}")
+                        project_ok = False
+                        break
+                    course_list = (
+                        courses.get("data") if _check_code_ok(courses) else None
                     )
-                    for course in courses.get("data", []):
-                        if not force_restudy and int(course.get("finished", 0)) == 1:
+                    if not isinstance(course_list, list) or not all(
+                        isinstance(course, dict) for course in course_list
+                    ):
+                        self.log.error(f"获取课程列表失败或结构无效：{courses}")
+                        project_ok = False
+                        break
+                    for course in course_list:
+                        if not force_restudy and _course_finished(course):
                             continue
                         if not self._learn_course(
                             course,
@@ -866,42 +1369,74 @@ class WeBanClient:
                             answers_json,
                             force_restudy,
                         ):
-                            return
+                            project_ok = False
+                            break
+                    if not project_ok:
+                        break
+                if not project_ok:
+                    break
 
-            self.log.success(f"{project_prefix} 课程学习完成")
-            self._check_project_course_done(task, project_prefix)
+            if project_ok and self._check_project_course_done(task, project_prefix):
+                self.log.success(f"{project_prefix} 课程学习已完整确认")
+                completed += 1
+            else:
+                self.log.error(f"{project_prefix} 课程学习未完整确认")
+                failed += 1
+                details.append(f"{project_prefix}: 学习未完整确认")
 
-    def _check_project_course_done(
-        self, task: dict, project_prefix: str
-    ) -> None:
+        if failed:
+            return WorkflowResult.incomplete(
+                "部分学习项目未完成",
+                completed=completed,
+                failed=failed,
+                skipped=skipped,
+                details=tuple(details),
+            )
+        return WorkflowResult.success(
+            "学习阶段完成",
+            completed=completed,
+            skipped=skipped,
+        )
+
+    def _check_project_course_done(self, task: dict, project_prefix: str) -> bool:
         """校验项目各类型课程完成数是否达到需求数，不足时告警。
 
-        服务端进度更新可能有延迟，因此只告警不重试；覆盖折叠/扁平两种
-        列表路径学完后的盲区（如扁平分页提前结束导致漏学）。
+        服务端进度更新可能有延迟，因此在有界退避窗口内重读；覆盖折叠/扁平
+        两种列表路径学完后的盲区（如扁平分页提前结束导致漏学）。
         """
         try:
-            progress = self.get_progress(
-                task["userProjectId"], project_prefix, output=False
-            )
-            if not _check_code_ok(progress):
-                return
-            data = progress.get("data", {})
-            for _, label, need_key, finished_key in [
-                (3, "必修课", "requiredNum", "requiredFinishedNum"),
-                (1, "推送课", "pushNum", "pushFinishedNum"),
-                (2, "自选课", "optionalNum", "optionalFinishedNum"),
-            ]:
-                need = int(data.get(need_key, 0) or 0)
-                finished = int(data.get(finished_key, 0) or 0)
-                if need > 0 and finished < need:
-                    self.log.warning(
-                        f"{project_prefix} {label}完成 {finished}/{need}，"
-                        f"未达到需求数，请检查是否漏学"
-                    )
-        except PermissionError:
+            for attempt in range(len(PROGRESS_POLL_DELAYS) + 1):
+                progress = self.get_progress(
+                    task["userProjectId"], project_prefix, output=False
+                )
+                if not _check_code_ok(progress):
+                    return False
+                data = progress.get("data", {})
+                completed = True
+                for _, label, need_key, finished_key in [
+                    (3, "必修课", "requiredNum", "requiredFinishedNum"),
+                    (1, "推送课", "pushNum", "pushFinishedNum"),
+                    (2, "自选课", "optionalNum", "optionalFinishedNum"),
+                ]:
+                    need = int(data.get(need_key, 0) or 0)
+                    finished = int(data.get(finished_key, 0) or 0)
+                    if need > 0 and finished < need:
+                        completed = False
+                        if attempt == len(PROGRESS_POLL_DELAYS):
+                            self.log.warning(
+                                f"{project_prefix} {label}完成 {finished}/{need}，"
+                                f"未达到需求数，请检查是否漏学"
+                            )
+                if completed:
+                    return True
+                if attempt < len(PROGRESS_POLL_DELAYS):
+                    self._sleep(PROGRESS_POLL_DELAYS[attempt])
+            return False
+        except (InterruptedError, PermissionError):
             raise  # Token 失效，立即终止该账号
-        except OSError as e:
-            self.log.debug(f"校验学习完成进度失败（网络异常）：{e}")
+        except (OSError, APIResponseError, ResponseValidationError) as e:
+            self.log.debug(f"校验学习完成进度失败：{e}")
+            return False
 
     def _learn_course(
         self,
@@ -914,21 +1449,25 @@ class WeBanClient:
     ) -> bool:
         """学习单门课程并校验进度是否更新（折叠/扁平两条列表路径共用）。
 
-        :return: True 可继续下一门；False 表示账号异常/锁定，应停止本账号
+        :return: True 表示本门已确认完成；False 表示本门不完整
         """
+        if not all(course.get(key) for key in ("resourceName", "resourceId")):
+            self.log.error(f"{category_prefix}：课程响应缺少必要字段：{course}")
+            return False
         course_prefix = f"{category_prefix}/{course['resourceName']}"
         try:
             progress_before = self.get_progress(
                 task["userProjectId"], project_prefix, output=False
             )
-            finished_before = 0
-            if progress_before.get("code", -1) == "0":
-                d = progress_before["data"]
-                finished_before = (
-                    d["requiredFinishedNum"]
-                    + d["pushFinishedNum"]
-                    + d["optionalFinishedNum"]
-                )
+            if not _check_code_ok(progress_before):
+                self.log.error(f"{course_prefix}：学习前进度响应无效")
+                return False
+            d = progress_before["data"]
+            finished_before = (
+                d["requiredFinishedNum"]
+                + d["pushFinishedNum"]
+                + d["optionalFinishedNum"]
+            )
             ok = self._study_one_course(
                 course,
                 task,
@@ -938,27 +1477,42 @@ class WeBanClient:
                 force_restudy,
             )
             if not ok:
-                self.log.error("检测到行为异常或账号锁定，已停止本账号后续学习")
                 return False
-            progress_after = self.get_progress(task["userProjectId"], project_prefix)
-            if progress_after.get("code", -1) == "0":
+            progress_after = None
+            finished_after = finished_before
+            for attempt in range(len(PROGRESS_POLL_DELAYS) + 1):
+                progress_after = self.get_progress(
+                    task["userProjectId"], project_prefix
+                )
+                if not _check_code_ok(progress_after):
+                    self.log.error(f"{course_prefix}：学习后进度响应无效")
+                    return False
                 d = progress_after["data"]
                 finished_after = (
                     d["requiredFinishedNum"]
                     + d["pushFinishedNum"]
                     + d["optionalFinishedNum"]
                 )
-                if finished_after <= finished_before:
-                    self.log.warning(
-                        f"{course_prefix}：完课成功但进度未更新，请手动检查"
+                if force_restudy or finished_after > finished_before:
+                    break
+                if attempt < len(PROGRESS_POLL_DELAYS):
+                    self.log.debug(
+                        f"{course_prefix}：完课接口成功但进度尚未更新，"
+                        f"{PROGRESS_POLL_DELAYS[attempt]:g}s 后重试"
                     )
-        except PermissionError:
+                    self._sleep(PROGRESS_POLL_DELAYS[attempt])
+            if not force_restudy and finished_after <= finished_before:
+                self.log.warning(
+                    f"{course_prefix}：完课接口成功但进度未更新，标记为不完整"
+                )
+                return False
+            self.log.success(f"{course_prefix} 完成")
+            return True
+        except (InterruptedError, PermissionError):
             raise  # Token 失效，立即终止该账号
-        except OSError as e:
-            # 网络异常（DNS/连接/SSL）跳过本门课程，不中断整个账号；
-            # 未完成的课程下次运行会自动重学
-            self.log.warning(f"{course_prefix}：网络异常，跳过本门课程（{e}）")
-        return True
+        except (OSError, APIResponseError, ResponseValidationError) as e:
+            self.log.warning(f"{course_prefix}：学习未完成（{e}）")
+            return False
 
     def _study_flat_courses(
         self,
@@ -967,7 +1521,7 @@ class WeBanClient:
         project_prefix: str,
         answers_json: dict,
         force_restudy: bool,
-    ) -> None:
+    ) -> bool:
         """官方 projectMode≠1 的扁平分页课程列表路径（listFlatCourse.do）
 
         官方 H5 课程主页按 project/getSimple.do 的 projectMode 分流：
@@ -996,22 +1550,38 @@ class WeBanClient:
                 )
             except PermissionError:
                 raise  # Token 失效，立即终止该账号
-            except OSError as e:  # 网络异常跳过本类型，不中断整个账号
-                self.log.error(f"获取 {label} 课程失败（网络异常）：{e}")
-                return
+            except (OSError, APIResponseError) as e:
+                self.log.error(f"获取 {label} 课程失败：{e}")
+                return False
             if not _check_code_ok(res):
                 self.log.error(f"获取 {label} 课程失败：{res}")
-                return
-            data = res.get("data") or {}
-            courses_all.extend(data.get("paginateData") or [])
-            total_pages = int(data.get("totalPages", 1) or 1)
+                return False
+            data = res.get("data")
+            if not isinstance(data, dict):
+                self.log.error(f"获取 {label} 课程响应 data 无效")
+                return False
+            page_courses = data.get("paginateData")
+            if not isinstance(page_courses, list) or not all(
+                isinstance(course, dict) for course in page_courses
+            ):
+                self.log.error(f"获取 {label} 课程分页列表结构无效")
+                return False
+            courses_all.extend(page_courses)
+            try:
+                total_pages = int(data["totalPages"])
+            except (KeyError, TypeError, ValueError):
+                self.log.error(f"获取 {label} 课程总页数无效")
+                return False
+            if total_pages < 1:
+                self.log.error(f"获取 {label} 课程总页数无效：{total_pages}")
+                return False
             # 官方结束条件：totalPages <= pageNo
             if total_pages <= page_no:
                 break
             page_no += 1
 
         for course in courses_all:
-            if not force_restudy and int(course.get("finished", 0)) == 1:
+            if not force_restudy and _course_finished(course):
                 continue
             category_name = course.get("categoryName") or label
             category_prefix = f"{label} {project_prefix}/{category_name}"
@@ -1023,7 +1593,8 @@ class WeBanClient:
                 answers_json,
                 force_restudy,
             ):
-                return
+                return False
+        return True
 
     @staticmethod
     def _is_account_blocked(res: dict) -> bool:
@@ -1035,7 +1606,9 @@ class WeBanClient:
         raw = str(res.get("raw", ""))
         if detail in {"10018", "701"}:
             return True
-        return ("行为存在异常" in msg or "Account locked" in raw or "Account locked" in msg)
+        return (
+            "行为存在异常" in msg or "Account locked" in raw or "Account locked" in msg
+        )
 
     def _study_one_course(
         self,
@@ -1047,14 +1620,14 @@ class WeBanClient:
         force_restudy: bool,
     ) -> bool:
         """处理单门课程：加载 apicenext.js 的走 jupiter 翻页轨迹；
-无 apicenext 的默认只答题+完课（对齐官方页面行为），配置
-jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
+        无 apicenext 的默认只答题+完课（对齐官方页面行为），配置
+        jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
 
-        :return: True 可继续下一门；False 表示账号异常/锁定，应停止本账号
+                :return: True 表示完课接口成功；False 表示流程不完整
         """
         course_prefix = f"{category_prefix}/{course['resourceName']}"
 
-        if not force_restudy and int(course.get("finished", 0)) == 1:
+        if not force_restudy and _course_finished(course):
             return True
 
         self.log.info(f"学习： {course_prefix}")
@@ -1064,7 +1637,7 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
         if not _check_code_ok(study_res):
             msg = study_res.get("message") or study_res.get("msg") or "课程暂时无法学习"
             self.log.warning(f"{course_prefix}：{msg}，跳过")
-            return True
+            return False
         study_start = time.time()
 
         # 官方 H5 完课不依赖列表对象的 userCourseId：课程页 URL 由
@@ -1083,8 +1656,10 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
             if uid and uid[0]:
                 course["userCourseId"] = uid[0]
             else:
-                self.log.warning(f"{course_prefix}：未获取到学习记录（userCourseId 为空），跳过")
-                return True
+                self.log.warning(
+                    f"{course_prefix}：未获取到学习记录（userCourseId 为空），跳过"
+                )
+                return False
 
         course_code = ""
         url_path = urlparse(course_url).path
@@ -1108,16 +1683,15 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
         nonstr_map = item_info.get("nonstr_map", {})
         total_step = item_info.get("total_step", 0)
         uses_apinext = item_info.get("uses_apinext", False)
-        # jupiter 学习轨迹上报始终带本次会话 uuid（浏览器每次学习都上报）
-        apinext_no = str(uuid4())
-        # sdk.js 仅在 apicenext.js 定义了全局 uuid 时才带 uniqueNo；
-        # 无 apinext 的课传 uniqueNo 会被判行为异常 (10018)
-        unique_no = str(uuid4()) if uses_apinext else None
 
         # 1. jupiter finish=2 翻页轨迹：官方仅在加载 apicenext.js 的课程里上报
         # （页面 item.js 调 callApinext）；非 apicnext 课程默认不发，除非配置
         # jupiter_fallback=true（个别学校要求全部微课都有轨迹）
         trace_enabled = uses_apinext or self.jupiter_fallback
+        # 同一次 apicenext 学习只创建一个 UUID，翻页、完成轨迹和 JSONP 完课
+        # 全程复用。普通课程仍不向完课接口发送 uniqueNo。
+        trace_unique_no = str(uuid4()) if trace_enabled else ""
+        finish_unique_no = trace_unique_no if uses_apinext else None
         if total_step and trace_enabled:
             self.log.info(
                 f"total_step={total_step} ({item_info.get('total_step_source', '')})"
@@ -1130,45 +1704,60 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                 task["userProjectId"],
                 nonstr_map,
                 total_step,
-                unique_no=apinext_no,
+                unique_no=trace_unique_no,
                 finish=2,
             )
 
         # 2. 获取并回答题目（翻页后题目才可用）
         question_data = self.api.list_question(course["resourceId"])
-        if question_data and question_data.get("code") == "0":
-            data = question_data.get("data", {})
-            for qlist, label, save_func in [
-                (
-                    data.get("viewpointQuestionList", []),
-                    "观点题",
-                    self.api.save_question,
-                ),
-                (
-                    data.get("examQuestionList", []),
-                    "课后习题",
-                    self.api.save_exam_question,
-                ),
-            ]:
-                if qlist:
-                    self.log.info(f"  {label} {len(qlist)} 道")
-                    for i, q in enumerate(qlist):
-                        # 无论题库命中还是 fallback 都已提交答案，
-                        # 对用户而言课程题目作答流程已完成
-                        self._answer_question(
-                            q,
-                            answers_json,
-                            course["resourceId"],
-                            save_func,
-                            source_str,
-                        )
-                        self.log.info(f"    {i + 1}/{len(qlist)} 已完成")
-                        time.sleep(0.5)
-        elif question_data:
-            self.log.info(f"  list_question: code={question_data.get('code')}")
-        if item_info.get("has_exam") and not question_data.get("data", {}).get(
-            "examQuestionList"
-        ):
+        if not _check_code_ok(question_data):
+            self.log.error(f"{course_prefix} 获取课程题目失败：{question_data}")
+            return False
+        question_payload = question_data.get("data")
+        if not isinstance(question_payload, dict):
+            self.log.error(f"{course_prefix} 课程题目响应结构无效")
+            return False
+        for key, label, save_func in [
+            (
+                "viewpointQuestionList",
+                "观点题",
+                self.api.save_question,
+            ),
+            (
+                "examQuestionList",
+                "课后习题",
+                self.api.save_exam_question,
+            ),
+        ]:
+            qlist = question_payload.get(key, [])
+            if not isinstance(qlist, list):
+                self.log.error(f"{course_prefix} {label}列表结构无效")
+                return False
+            if qlist:
+                self.log.info(f"  {label} {len(qlist)} 道")
+            for i, question in enumerate(qlist):
+                if (
+                    not isinstance(question, dict)
+                    or not question.get("id")
+                    or not isinstance(question.get("optionList"), list)
+                    or not question["optionList"]
+                ):
+                    self.log.error(f"{course_prefix} {label}题目结构无效")
+                    return False
+                try:
+                    self._answer_question(
+                        question,
+                        answers_json,
+                        course["resourceId"],
+                        save_func,
+                        source_str,
+                    )
+                except ResponseValidationError as exc:
+                    self.log.error(f"{course_prefix} {label}作答失败：{exc}")
+                    return False
+                self.log.info(f"    {i + 1}/{len(qlist)} 已完成")
+                self._sleep(0.5)
+        if item_info.get("has_exam") and not question_payload.get("examQuestionList"):
             self.log.info("  检测到题目标记但 list_question 无课后习题，可能为内联题目")
 
         # 3. 确保满足最低学习时长（服务端要求 study 后至少学习 study_time 秒才接受完课）
@@ -1196,12 +1785,12 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
             if self.video_speed > 0 and video_duration > 0:
                 deadline = time.monotonic() + remaining
                 while remaining > 0:
-                    time.sleep(min(30, remaining))
+                    self._sleep(min(30, remaining))
                     remaining = max(0, deadline - time.monotonic())
                     if remaining > 0:
                         self.log.info(f"视频剩余 {self._format_duration(remaining)}")
             else:
-                time.sleep(remaining)
+                self._sleep(remaining)
 
         # 4. jupiter finish=1 完成标记（提交前上报学习完成，与翻页轨迹同条件）
         if total_step and trace_enabled:
@@ -1211,19 +1800,28 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                 task["userProjectId"],
                 nonstr_map,
                 total_step,
-                unique_no=apinext_no,
+                unique_no=trace_unique_no,
                 finish=1,
             )
-            time.sleep(2)
+            self._sleep(2)
 
         # 5. 完课
-        res = self._finish_course(course, task, query, course_url, unique_no)
+        res = self._finish_course(
+            course,
+            task,
+            query,
+            course_url,
+            finish_unique_no,
+        )
         # 完课走 JSONP（sdk.js finishWxCourse）：checkCode 只认 code∈{0,1}
         if not _check_code_ok(res, allow_200=False):
             self.log.error(f"{course_prefix} 完成失败：{res}")
-            return not self._is_account_blocked(res)
-
-        self.log.success(f"{course_prefix} 完成")
+            if self._is_account_blocked(res):
+                raise AccountBlockedError(
+                    str(res.get("msg") or "系统检测到行为异常或账号已锁定"),
+                    detail_code=str(res.get("detailCode", "")),
+                )
+            return False
         return True
 
     def _finish_course(
@@ -1277,6 +1875,8 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                     return check_res
                 self.log.success("课程验证码校验通过")
                 finish_kwargs["token"] = check_res.get("data", "")
+            except InterruptedError:
+                raise
             except PermissionError:
                 raise  # Token 失效，立即终止该账号
             except Exception as e:  # noqa: BLE001 -- 浏览器自动化可能抛任意异常，降级为完成失败
@@ -1293,7 +1893,7 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
         exam_question_time: str = "3,3",
         exam_submit_match_rate: int = 90,
         only_project: dict | None = None,
-    ):
+    ) -> WorkflowResult:
         """考试主入口
 
         流程：加载题库 → 遍历项目/计划 → 无感验证码 → 获取试卷 →
@@ -1321,21 +1921,42 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
         self.exam_mode = exam_mode
 
         answers_json = self._load_answers_json()
+        completed = 0
+        failed = 0
+        skipped = 0
+        details: list[str] = []
+
+        def mark_failed(message: str) -> None:
+            nonlocal failed
+            failed += 1
+            details.append(message)
 
         if only_project is not None:
             projects = [only_project]
         else:
             projects = self._get_project_list()
+        if projects is None:
+            return WorkflowResult.failed_result("考试项目列表加载失败")
         if not projects:
             self.log.warning("当前没有进行中的项目可考试。")
+            return WorkflowResult.success("当前没有考试项目", skipped=1)
 
         for project in projects:
+            self._raise_if_stopped()
+            if not isinstance(project, dict) or not all(
+                project.get(key) for key in ("projectName", "userProjectId")
+            ):
+                self.log.error(f"考试项目结构无效：{project}")
+                mark_failed("考试项目结构无效")
+                continue
             # 项目未开始（未到开课时间等）：官方 H5 弹 message 并禁止进入，同样提示后跳过
             startable, notice = self._project_startable(project)
             if not startable:
                 self.log.warning(
                     f"{project['projectName']}：{notice or '项目尚未开放，暂不可考试'}，跳过"
                 )
+                skipped += 1
+                mark_failed(f"{project['projectName']}: 项目尚不可考试")
                 continue
             self.log.info(f"开始考试项目 {project['projectName']}")
             user_project_id = project["userProjectId"]
@@ -1343,38 +1964,79 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
             exam_plans = self.api.exam_list_plan(user_project_id)
             if not _check_code_ok(exam_plans):
                 self.log.error(f"获取考试计划失败：{exam_plans}")
-                return
-            exam_plans = exam_plans["data"]
+                mark_failed(f"{project['projectName']}: 考试计划响应失败")
+                continue
+            exam_plans = exam_plans.get("data")
+            if not isinstance(exam_plans, list) or not all(
+                isinstance(plan, dict) for plan in exam_plans
+            ):
+                self.log.error(f"考试计划列表结构无效：{exam_plans}")
+                mark_failed(f"{project['projectName']}: 考试计划结构无效")
+                continue
 
             for plan in exam_plans:
+                self._raise_if_stopped()
+                required_plan_keys = {
+                    "id",
+                    "examPlanId",
+                    "examPlanName",
+                    "examOddNum",
+                    "examFinishNum",
+                    "examScore",
+                    "passScore",
+                }
+                if not required_plan_keys.issubset(plan):
+                    self.log.error(f"考试计划缺少必要字段：{plan}")
+                    mark_failed(f"{project['projectName']}: 考试计划字段缺失")
+                    continue
                 plan_name = f"{project['projectName']}/{plan['examPlanName']}"
-                exam_odd_num = plan.get("examOddNum", 0)
-                exam_finish_num = plan.get("examFinishNum", 0)
-                exam_score = plan.get("examScore", 0)
-                pass_score = plan.get("passScore", 0)
+                try:
+                    exam_odd_num = int(plan["examOddNum"])
+                    exam_finish_num = int(plan["examFinishNum"])
+                except (TypeError, ValueError, OverflowError):
+                    self.log.error(f"{plan_name} 考试计划计数字段无效")
+                    mark_failed(f"{plan_name}: 考试计划计数无效")
+                    continue
+                exam_score = _finite_score(plan["examScore"])
+                pass_score = _finite_score(plan["passScore"])
+                if exam_score is None or pass_score is None:
+                    # 非有限分数会让 >= 判定失真（如 -inf 被当成"已及格"），
+                    # 宁可跳过该计划也不能基于它决定是否交卷。
+                    self.log.error(f"{plan_name} 考试计划分数字段无效")
+                    mark_failed(f"{plan_name}: 考试计划分数无效")
+                    continue
 
                 # ── 已考过的考试，显示历史成绩 ──
-                full_score = 100
+                # 满分仅用于日志和 perfect 模式的跳过判断；preparePaper 在此
+                # 处失败或结构异常时按默认 100 分继续，不能拖垮整个账号。
+                full_score = 100.0
                 if exam_finish_num > 0:
                     try:
                         pp = self.api.exam_prepare_paper(plan["id"])
-                        full_score = pp.get("data", {}).get("paperScore", 100)
                     except PermissionError:
                         raise  # Token 失效，立即终止该账号
-                    except OSError:
-                        pass
+                    except (OSError, APIResponseError) as exc:
+                        self.log.debug(f"{plan_name} 读取试卷总分失败：{exc}")
+                    else:
+                        pp_data = pp.get("data") if _check_code_ok(pp) else None
+                        if isinstance(pp_data, dict):
+                            parsed_full = _finite_score(pp_data.get("paperScore"))
+                            # 0 分满分同样不可信，保持默认 100
+                            if parsed_full:
+                                full_score = parsed_full
                     self.log.info(
                         f"{plan_name} 已考过 {exam_finish_num}/{exam_odd_num} 次，"
-                        f"最高 {exam_score}/{full_score}（及格线 {pass_score}）"
+                        f"最高 {exam_score:g}/{full_score:g}（及格线 {pass_score:g}）"
                     )
                 elif exam_odd_num > 0:
-                    self.log.info(
-                        f"{plan_name} 未考试，可考 {exam_odd_num} 次"
-                    )
+                    self.log.info(f"{plan_name} 未考试，可考 {exam_odd_num} 次")
 
                 # ── 根据 exam_mode 判断是否跳过 ──
                 if exam_odd_num <= 0:
                     self.log.info(f"{plan_name} 无剩余考试机会，跳过")
+                    skipped += 1
+                    if exam_finish_num <= 0 or exam_score < pass_score:
+                        mark_failed(f"{plan_name}: 未完成且无剩余机会")
                     continue
 
                 if (
@@ -1382,7 +2044,10 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                     and exam_finish_num > 0
                     and exam_score >= pass_score
                 ):
-                    self.log.info(f"{plan_name} 已及格 ({exam_score}分 >= {pass_score}分)，跳过")
+                    self.log.info(
+                        f"{plan_name} 已及格 ({exam_score}分 >= {pass_score}分)，跳过"
+                    )
+                    skipped += 1
                     continue
 
                 if (
@@ -1391,6 +2056,7 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                     and exam_score >= full_score
                 ):
                     self.log.info(f"{plan_name} 已满分 ({exam_score}分)，跳过")
+                    skipped += 1
                     continue
 
                 # perfect 模式：只剩 1 次机会时，检查题库是否能全覆盖
@@ -1403,7 +2069,9 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                     self.log.warning(warning_msg)
 
                 if exam_mode == "true" and exam_finish_num > 0:
-                    self.log.info(f"{plan_name} 已完成 {exam_finish_num} 次，{plan_name} 继续考试以争取更好成绩")
+                    self.log.info(
+                        f"{plan_name} 已完成 {exam_finish_num} 次，{plan_name} 继续考试以争取更好成绩"
+                    )
 
                 user_exam_plan_id = plan["id"]
                 exam_plan_id = plan["examPlanId"]
@@ -1413,6 +2081,18 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                     self.log.error(
                         f"考试项目 {plan_name} 获取考试记录失败：{before_paper}"
                     )
+                    mark_failed(f"{plan_name}: beforePaper 失败")
+                    continue
+                before_data = before_paper.get("data")
+                if (
+                    not isinstance(before_data, dict)
+                    or "isExistedNotSubmit" not in before_data
+                ):
+                    self.log.error(
+                        f"考试项目 {plan_name} 获取考试记录结构无效：{before_paper}"
+                    )
+                    mark_failed(f"{plan_name}: beforePaper 结构无效")
+                    continue
 
                 prepare_paper = self.api.exam_prepare_paper(user_exam_plan_id)
                 if not _check_code_ok(prepare_paper):
@@ -1423,9 +2103,30 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                         )
                     else:
                         self.log.error(f"获取考试信息失败：{prepare_paper}")
+                    mark_failed(f"{plan_name}: preparePaper 失败")
                     continue
-                prepare_paper = prepare_paper["data"]
-                question_num = prepare_paper["questionNum"]
+                prepare_paper = prepare_paper.get("data")
+                prepare_keys = {
+                    "questionNum",
+                    "paperScore",
+                    "answerTime",
+                    "realName",
+                    "userIDLabel",
+                }
+                if not isinstance(prepare_paper, dict) or not prepare_keys.issubset(
+                    prepare_paper
+                ):
+                    self.log.error(f"获取考试信息结构无效：{prepare_paper}")
+                    mark_failed(f"{plan_name}: preparePaper 结构无效")
+                    continue
+                try:
+                    question_num = int(prepare_paper["questionNum"])
+                except (TypeError, ValueError):
+                    question_num = 0
+                if question_num <= 0:
+                    self.log.error(f"{plan_name} 题目数无效，禁止开始考试")
+                    mark_failed(f"{plan_name}: 题目数无效")
+                    continue
                 self.log.info(
                     f"考试信息：用户：{prepare_paper['realName']}，ID：{prepare_paper['userIDLabel']}，"
                     f"题目数：{question_num}，试卷总分：{prepare_paper['paperScore']}，"
@@ -1445,34 +2146,78 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                     )
                     if not _check_code_ok(check_res):
                         self.log.error(f"无感验证码校验失败：{check_res}")
+                        mark_failed(f"{plan_name}: 验证码校验失败")
                         continue
                     self.log.success("无感验证码校验通过")
+                except InterruptedError:
+                    raise
                 except PermissionError:
                     raise  # Token 失效，立即终止该账号
                 except Exception as e:  # noqa: BLE001 -- 浏览器自动化可能抛任意异常
                     self.log.error(f"无感验证码处理异常: {e}")
+                    mark_failed(f"{plan_name}: 验证码处理异常")
                     continue
 
                 exam_paper = self.api.exam_start_paper(user_exam_plan_id)
                 if not _check_code_ok(exam_paper):
                     self.log.error(f"获取考试题目失败：{exam_paper}")
-                    if exam_paper.get("detailCode") == "10018":
-                        self.log.warning(
-                            f"考试项目 {plan_name} 需要手动处理，"
-                            f"请在网站上开启一次考试后重试"
-                        )
+                    mark_failed(f"{plan_name}: startPaper 失败")
                     continue
 
-                exam_paper = exam_paper.get("data", {})
-                question_list = exam_paper.get("questionList", [])
-                have_answer, no_answer = [], []
-                for question in question_list:
-                    target = (
-                        have_answer
-                        if clean_text(question["title"]) in answers_json
-                        else no_answer
+                exam_paper = exam_paper.get("data")
+                if not isinstance(exam_paper, dict):
+                    self.log.error(f"{plan_name} 试卷响应 data 无效，禁止交卷")
+                    mark_failed(f"{plan_name}: 试卷 data 无效")
+                    continue
+                question_list = exam_paper.get("questionList")
+                if not isinstance(question_list, list) or not question_list:
+                    self.log.error(f"{plan_name} 空试卷或题目列表无效，禁止交卷")
+                    mark_failed(f"{plan_name}: 空试卷")
+                    continue
+                if len(question_list) != question_num:
+                    self.log.error(
+                        f"{plan_name} 试卷题数 {len(question_list)} 与声明题数 "
+                        f"{question_num} 不符，禁止交卷"
                     )
-                    target.append(question)
+                    mark_failed(f"{plan_name}: 题数不符")
+                    continue
+                paper_valid = True
+                for question in question_list:
+                    if not isinstance(question, dict) or not all(
+                        key in question for key in ("id", "title", "type", "optionList")
+                    ):
+                        paper_valid = False
+                        break
+                    options = question["optionList"]
+                    if not isinstance(options, list) or not options:
+                        paper_valid = False
+                        break
+                    option_ids = [
+                        str(option.get("id", ""))
+                        for option in options
+                        if isinstance(option, dict) and option.get("id")
+                    ]
+                    if len(option_ids) != len(options) or len(set(option_ids)) != len(
+                        option_ids
+                    ):
+                        paper_valid = False
+                        break
+                if not paper_valid:
+                    self.log.error(f"{plan_name} 试卷题目/选项结构无效，禁止交卷")
+                    mark_failed(f"{plan_name}: 试卷结构无效")
+                    continue
+
+                have_answer: list[tuple[dict, list[str]]] = []
+                no_answer: list[dict] = []
+                for question in question_list:
+                    mapped_ids = self._answer_ids_for_question(
+                        answers_json,
+                        question,
+                    )
+                    if mapped_ids:
+                        have_answer.append((question, mapped_ids))
+                    else:
+                        no_answer.append(question)
 
                 match_rate = (
                     len(have_answer) / len(question_list) * 100 if question_list else 0
@@ -1482,22 +2227,26 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                     f"无答案的题目数：{len(no_answer)}，题库匹配率：{match_rate:.1f}%"
                 )
 
-                # perfect 模式：匹配率不足且 random_answer=False 时警告
-                if exam_mode == "perfect" and match_rate < 100 and not random_answer:
-                    self.log.warning(
-                        f"题库匹配率 {match_rate:.1f}% 不足 100%，"
-                        f"perfect 模式下手动作答可能存在风险"
-                    )
-
-                # 检查提交匹配率
-                if match_rate < exam_submit_match_rate and not random_answer:
+                # 安全门按“已映射到当前试卷合法选项 ID”的题数计算，
+                # 与是否启用随机答案无关。
+                if match_rate < exam_submit_match_rate:
                     self.log.error(
                         f"题库匹配率 {match_rate:.1f}% 低于阈值 {exam_submit_match_rate}%，"
-                        f"且 random_answer=false，放弃交卷"
+                        "禁止记录答案和交卷"
                     )
+                    mark_failed(f"{plan_name}: 匹配率未达安全阈值")
+                    continue
+                if exam_odd_num <= 1 and match_rate < 100:
+                    self.log.error(
+                        f"{plan_name} 只剩最后一次机会且题库未 100% 合法映射，"
+                        "禁止记录答案和交卷"
+                    )
+                    mark_failed(f"{plan_name}: 最后一次机会安全门")
                     continue
 
                 # ── 处理无答案题目 ──
+                recorded_count = 0
+                answer_failed = False
                 for i, question in enumerate(no_answer):
                     type_label = question.get("typeLabel", "未知")
 
@@ -1516,8 +2265,8 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                             f"({type_label})，等待 {self._format_duration(use_time)}: "
                             f"{question['title'][:40]}..."
                         )
-                        time.sleep(use_time)
-                    elif random_answer or is_non_interactive():
+                        self._sleep(use_time)
+                    elif random_answer or self.non_interactive:
                         # 自动随机作答：单选随机选一个，多选全选
                         # （无交互模式即使配置 random_answer=false 也走随机，
                         #   避免阻塞等待终端输入）
@@ -1530,15 +2279,17 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                             f"({type_label})，等待 {self._format_duration(use_time)}: "
                             f"{question['title'][:40]}..."
                         )
-                        time.sleep(use_time)
+                        self._sleep(use_time)
                     else:
                         # 手动输入
                         self.log.info(
                             f"[{i + 1}/{len(no_answer)}] 题目不在题库中，请手动选择答案"
                         )
-                        print(f"题目类型：{type_label}，题目标题：{question['title']}")
+                        self.log.info(
+                            f"题目类型：{type_label}，题目标题：{question['title']}"
+                        )
                         for j, opt in enumerate(question["optionList"]):
-                            print(f"{j + 1}. {opt['content']}")
+                            self.log.info(f"{j + 1}. {opt['content']}")
 
                         opt_count = len(question["optionList"])
                         start_time = time.time()
@@ -1576,6 +2327,30 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
 
                         use_time = round(time.time() - start_time)
 
+                    valid_option_ids = {
+                        str(option["id"]) for option in question["optionList"]
+                    }
+                    selected_ids = [str(answer_id) for answer_id in answers_ids]
+                    try:
+                        question_type = int(question.get("type", 1))
+                    except (TypeError, ValueError):
+                        question_type = 0
+                    cardinality_ok = (
+                        bool(selected_ids)
+                        if question_type == 2
+                        else len(selected_ids) == 1
+                    )
+                    if (
+                        not cardinality_ok
+                        or len(set(selected_ids)) != len(selected_ids)
+                        or not set(selected_ids).issubset(valid_option_ids)
+                    ):
+                        self.log.error(
+                            f"{plan_name} 题目 {question['id']} 产生空答案、"
+                            "重复答案或非法答案 ID，禁止交卷"
+                        )
+                        answer_failed = True
+                        break
                     self.log.info("正在提交当前答案")
                     if not self.record_answer(
                         user_exam_plan_id,
@@ -1584,30 +2359,30 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                         answers_ids,
                         exam_plan_id,
                     ):
-                        raise RuntimeError(f"答题失败，请重新考试：{question}")
+                        answer_failed = True
+                        break
+                    recorded_count += 1
+
+                if answer_failed:
+                    mark_failed(f"{plan_name}: 答案记录失败")
+                    continue
 
                 # ── 题库作答 ──
                 if have_answer:
                     self.log.info(f"开始答题库中的题目，共 {len(have_answer)} 道题目")
-                for i, question in enumerate(have_answer):
+                for i, (question, answers_ids) in enumerate(have_answer):
                     self.log.info(
                         f"[{i + 1}/{len(have_answer)}] 题目在题库中，开始答题"
                     )
                     self.log.info(
-                        f"题目类型：{question['typeLabel']}，"
+                        f"题目类型：{question.get('typeLabel', '未知')}，"
                         f"题目标题：{question['title']}"
                     )
-                    answers = answers_json[clean_text(question["title"])]
-                    answers_ids = [
-                        opt["id"]
-                        for opt in question["optionList"]
-                        if clean_text(opt["content"]) in answers
-                    ]
                     use_time = question_base_time + randint(0, question_random_upper)
                     self.log.info(
                         f"等待 {self._format_duration(use_time)}，模拟答题中..."
                     )
-                    time.sleep(use_time)
+                    self._sleep(use_time)
                     if not self.record_answer(
                         user_exam_plan_id,
                         question["id"],
@@ -1615,16 +2390,51 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                         answers_ids,
                         exam_plan_id,
                     ):
-                        raise RuntimeError(f"答题失败，请重新考试：{question}")
+                        answer_failed = True
+                        break
+                    recorded_count += 1
+
+                if answer_failed:
+                    mark_failed(f"{plan_name}: 题库答案记录失败")
+                    continue
+                if recorded_count != len(question_list):
+                    self.log.error(
+                        f"{plan_name} 仅成功记录 {recorded_count}/{len(question_list)} "
+                        "道题，禁止交卷"
+                    )
+                    mark_failed(f"{plan_name}: 答案记录数不完整")
+                    continue
 
                 self.log.info("完成考试，正在提交试卷...")
                 submit_res = self.api.exam_submit_paper(user_exam_plan_id)
                 if not _check_code_ok(submit_res):
-                    raise RuntimeError(f"提交试卷失败，请重新考试：{submit_res}")
+                    self.log.error(f"提交试卷失败：{submit_res}")
+                    mark_failed(f"{plan_name}: 提交试卷失败")
+                    continue
+                submit_data = submit_res.get("data")
+                if not isinstance(submit_data, dict) or "score" not in submit_data:
+                    self.log.error(f"提交试卷响应结构无效：{submit_res}")
+                    mark_failed(f"{plan_name}: 交卷响应结构无效")
+                    continue
                 self.log.success(
-                    f"试卷提交成功，考试完成，成绩：{submit_res['data']['score']} 分"
+                    f"试卷提交成功，考试完成，成绩：{submit_data['score']} 分"
                 )
                 self._update_exam_eta(time.time() - plan_start_ts)
+                completed += 1
+
+        if failed:
+            return WorkflowResult.incomplete(
+                "部分考试计划未完成",
+                completed=completed,
+                failed=failed,
+                skipped=skipped,
+                details=tuple(details),
+            )
+        return WorkflowResult.success(
+            "考试阶段完成",
+            completed=completed,
+            skipped=skipped,
+        )
 
     def _update_exam_eta(self, elapsed: float) -> None:
         """用实测考试耗时更新每场考试的自适应估计（EMA）"""
@@ -1678,16 +2488,12 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
             video_block = re.search(r"<video\b[^>]*>(.*?)</video>", html, re.DOTALL)
             if video_block:
                 # 去掉注释（被注释掉的备选 m3u8 源不算数），再找 <source>
-                clean = re.sub(
-                    r"<!--.*?-->", "", video_block.group(1), flags=re.DOTALL
-                )
+                clean = re.sub(r"<!--.*?-->", "", video_block.group(1), flags=re.DOTALL)
                 video_match = re.search(
                     r"<source\b[^>]*\bsrc=[\"']([^\"']+)[\"']", clean
                 )
             if not video_match:
-                video_match = re.search(
-                    r"<video\b[^>]*\bsrc=[\"']([^\"']+)[\"']", html
-                )
+                video_match = re.search(r"<video\b[^>]*\bsrc=[\"']([^\"']+)[\"']", html)
             if video_match:
                 video_url = urljoin(html_url, video_match.group(1))
                 result["has_video"] = True
@@ -1751,9 +2557,7 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                         for buf in buffers:
                             pos = 0
                             while pos + 8 <= len(buf) and not video_duration:
-                                size = int.from_bytes(
-                                    buf[pos : pos + 4], "big"
-                                )
+                                size = int.from_bytes(buf[pos : pos + 4], "big")
                                 box_type = buf[pos + 4 : pos + 8]
                                 if size == 1:  # largesize（64 位）
                                     if pos + 16 > len(buf):
@@ -1780,10 +2584,7 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                                             break
                                         if buf[q + 4 : q + 8] == b"mvhd":
                                             version = buf[q + 8]
-                                            if (
-                                                version == 0
-                                                and q + 28 <= len(buf)
-                                            ):
+                                            if version == 0 and q + 28 <= len(buf):
                                                 timescale = int.from_bytes(
                                                     buf[q + 20 : q + 24],
                                                     "big",
@@ -1805,9 +2606,7 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                                                 timescale = 0
                                                 duration = 0
                                             if timescale:
-                                                video_duration = (
-                                                    duration / timescale
-                                                )
+                                                video_duration = duration / timescale
                                             break
                                         q += inner_size
                                     break
@@ -1854,10 +2653,10 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                 content = _fetch_text(self.api.session, item_url, referer=html_url)
                 if not content:
                     continue
-                result["nonstr_map"] = _extract_map(content)
+                extracted = _extract_map(content)
+                if extracted:
+                    result["nonstr_map"].update(extracted)
                 result["has_exam"] = result["has_exam"] or _check_exam(content)
-                if result["nonstr_map"] or result["has_exam"]:
-                    break
 
             # 推导 total_step（finish=2 的调用次数 = finish=1 的 step - 1）
             # 每个题目页会产生 2 次额外 apinext 调用（提交 → 结果页 → 继续）
@@ -1915,53 +2714,33 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
             return unique_no
 
         def _send_step(step: int, finish: int, nonstr: str, label: str) -> None:
-            """单步发送，网络异常最多重试 3 次（含首次）。
+            """Jupiter 是状态写入；单步只发送一次并严格校验响应。"""
 
-            WeBanAPI 的 session 层已有 HTTPAdapter 全局重试（连接类错误/429/5xx
-            自动退避），这里对重试耗尽后剩余的网络异常再兜底 2 次，避免偶发
-            抖动导致翻页轨迹断步。
-            """
-            for attempt in range(1, 4):
-                try:
-                    resp = self.api.apinext(
-                        user_course_id,
-                        course_id,
-                        user_project_id,
-                        step=step,
-                        finish=finish,
-                        nonstr=nonstr,
-                        unique_no=unique_no,
-                    )
-                    if not resp.get("success"):
-                        self.log.warning(f"apinext [{label}] 返回异常：{resp}")
-                    else:
-                        self.log.info(f"apinext [{label}] finish={finish} 已发送")
-                    return
-                except PermissionError:
-                    raise  # Token 失效，立即终止该账号
-                except OSError as e:
-                    if attempt < 3:
-                        self.log.warning(
-                            f"apinext [{label}] 网络异常，重试 {attempt}/2：{e}"
-                        )
-                        time.sleep(attempt)
-                    else:
-                        self.log.warning(f"apinext [{label}] 失败：{e}")
+            resp = self.api.apinext(
+                user_course_id,
+                course_id,
+                user_project_id,
+                step=step,
+                finish=finish,
+                nonstr=nonstr,
+                unique_no=unique_no,
+            )
+            if not _check_code_ok(resp) or resp.get("success") is not True:
+                raise ResponseValidationError(f"apinext [{label}] 返回异常：{resp}")
+            self.log.info(f"apinext [{label}] finish={finish} 已发送")
 
         if finish == 2:
             self.log.info(f"apinext 发送中间步骤，共 {total_step} 步")
             for step in range(1, total_step + 1):
                 if step_delay:
-                    time.sleep(step_delay)
+                    self._sleep(step_delay)
                 # nonstr_map 的 key 对应 finish=2 的 step，完成步 (finish=1) 不在 map 中
                 _send_step(step, 2, nonstr_map.get(step, ""), f"{step}/{total_step}")
         else:
             if step_delay:
-                time.sleep(step_delay)
+                self._sleep(step_delay)
             # finish=1 的 step 需要偏移 total_step + 1（nonstr_map 不含此步）
-            _send_step(
-                total_step + 1, 1, "", f"完成标记 step={total_step + 1}"
-            )
+            _send_step(total_step + 1, 1, "", f"完成标记 step={total_step + 1}")
         return unique_no
 
     @staticmethod
@@ -2001,21 +2780,22 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
         :param source: sourceStr 值
         :return: 题库命中返回 True，fallback/失败返回 False
         """
-        title = clean_text(question.get("title", ""))
         option_list = question.get("optionList", [])
         if not option_list:
             return False
 
         # 题库命中，直接提交正确答案
-        if title in answers_json:
-            answer_ids = [
-                opt["id"]
-                for opt in option_list
-                if clean_text(opt["content"]) in answers_json[title]
-            ]
-            if answer_ids:
-                save_func(course_id, question["id"], json.dumps(answer_ids), source)
-                return True
+        answer_ids = self._answer_ids_for_question(answers_json, question)
+        if answer_ids:
+            result = save_func(
+                course_id,
+                question["id"],
+                json.dumps(answer_ids),
+                source,
+            )
+            if not _check_code_ok(result):
+                raise ResponseValidationError(f"课程答题响应失败：{result}")
+            return True
 
         # 题库未命中：先提交第一个选项，从响应中提取正确 answerLabel
         res = save_func(
@@ -2024,6 +2804,8 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
             json.dumps([option_list[0]["id"]]),
             source,
         )
+        if not _check_code_ok(res):
+            raise ResponseValidationError(f"课程试探答题响应失败：{res}")
         data = res.get("data", {})
         # 观点题返回投票统计列表，无 answerLabel
         if isinstance(data, list):
@@ -2042,7 +2824,14 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
             letter_to_opt[ch]["id"] for ch in correct_letters if ch in letter_to_opt
         ]
         if answer_ids:
-            save_func(course_id, question["id"], json.dumps(answer_ids), source)
+            result = save_func(
+                course_id,
+                question["id"],
+                json.dumps(answer_ids),
+                source,
+            )
+            if not _check_code_ok(result):
+                raise ResponseValidationError(f"课程纠正答题响应失败：{result}")
         return False
 
     def record_answer(
@@ -2061,6 +2850,16 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
         :param exam_plan_id: 考试计划 ID
         :return: 成功返回 True，失败返回 False
         """
+        if (
+            not answers_ids
+            or any(
+                not isinstance(answer_id, str) or not answer_id
+                for answer_id in answers_ids
+            )
+            or len(set(answers_ids)) != len(answers_ids)
+        ):
+            self.log.error("拒绝记录空答案、重复答案或无效答案 ID")
+            return False
         res = self.api.exam_record_question(
             user_exam_plan_id,
             question_id,
@@ -2161,7 +2960,7 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                     self.log.warning(
                         f"AI 搜题第 {attempt} 次请求失败，{wait}s 后重试：{e}"
                     )
-                    time.sleep(wait)
+                    self._sleep(wait)
                 else:
                     self.log.error(f"AI 搜题请求失败（已重试 {max_retries} 次）：{e}")
                     return []
@@ -2232,213 +3031,330 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
 
     @staticmethod
     def _is_valid_answers(answers_json: Any) -> bool:
-        """校验题库是否为有效字典且非空"""
-        return isinstance(answers_json, dict) and bool(answers_json)
+        """至少包含一道能在规范化后保留的题目。"""
+
+        if not isinstance(answers_json, dict):
+            return False
+        for title, question in answers_json.items():
+            if (
+                not isinstance(title, str)
+                or not title
+                or not isinstance(question, dict)
+            ):
+                continue
+            raw_options = question.get("optionList")
+            if not isinstance(raw_options, list):
+                continue
+            if any(
+                isinstance(option, dict)
+                and isinstance(option.get("content"), str)
+                and bool(_exact_text(option["content"]))
+                for option in raw_options
+            ):
+                return True
+        return False
 
     @staticmethod
     def _normalize_answers(answers_json: dict) -> dict:
-        """合并 clean_text 后相同的题目与选项条目，保留原始标点。
+        """清理字段但不再按模糊键合并题目或并集单选答案。"""
 
-        标题与选项文本取各组内最长（标点最完整）的原文，选项标记取并集
-        （任一变体标 1 则保留 1），合并前后经 clean_text 匹配的运行时
-        行为不变。
-        """
-        merged: dict = {}
+        normalized: dict[str, dict[str, Any]] = {}
         for title, question in answers_json.items():
-            clean_title = clean_text(title)
-            entry = merged.get(clean_title)
-            if entry is None:
-                entry = merged[clean_title] = {
-                    "title": title,
-                    "type": question.get("type"),
-                    "options": {},
+            if (
+                not isinstance(title, str)
+                or not title
+                or not isinstance(question, dict)
+            ):
+                continue
+            raw_options = question.get("optionList")
+            if not isinstance(raw_options, list):
+                continue
+            options: dict[str, dict[str, Any]] = {}
+            for option in raw_options:
+                if not isinstance(option, dict):
+                    continue
+                content = option.get("content")
+                if not isinstance(content, str) or not content:
+                    continue
+                option_key = _exact_text(content)
+                if not option_key:
+                    continue
+                # 同一精确选项由后一次完整记录替换，不对 isCorrect 取并集。
+                options[option_key] = {
+                    "content": content,
+                    "isCorrect": 1 if option.get("isCorrect") == 1 else 2,
                 }
-            elif len(title) > len(entry["title"]):
-                entry["title"] = title
-            for option in question.get("optionList", []):
-                content = clean_text(option["content"])
-                old = entry["options"].get(content)
-                if old is None:
-                    entry["options"][content] = {
-                        "content": option["content"],
-                        "isCorrect": option["isCorrect"],
-                    }
-                else:
-                    if len(option["content"]) > len(old["content"]):
-                        old["content"] = option["content"]
-                    if option["isCorrect"] == 1:
-                        old["isCorrect"] = 1
-        return {
-            entry["title"]: {
-                "type": entry["type"],
-                "optionList": list(entry["options"].values()),
+            if not options:
+                continue
+            normalized[title] = {
+                "type": question.get("type"),
+                "optionList": list(options.values()),
             }
-            for entry in merged.values()
-        }
+        return normalized
 
-    def sync_answers(self) -> None:
-        """同步答案
-        :return: 无返回值
-        """
-        os.makedirs(answer_dir, exist_ok=True)
-        # 按优先级查找已有题库: 根目录 > answer/ > 打包内置
-        existing_path: str | None = None
-        for p in [root_answer_path, answer_path, bundle_answer_path]:
-            if os.path.exists(p):
-                existing_path = p
-                break
-        need_download = existing_path is None
+    @staticmethod
+    def _extract_history_list(response: dict) -> list[dict] | None:
+        """兼容 data 为列表和 data.examHistoryList 两种历史响应。"""
 
-        answers_json: dict | None = None
-        if not need_download:
-            assert existing_path is not None
-            try:
-                with open(existing_path, encoding="utf-8") as f:
-                    answers_json = json.load(f)
-                if not self._is_valid_answers(answers_json):
-                    need_download = True
-            except (json.JSONDecodeError, OSError):
-                need_download = True
+        if not _check_code_ok(response):
+            return None
+        data = response.get("data")
+        if isinstance(data, list):
+            histories = data
+        elif isinstance(data, dict):
+            histories = data.get("examHistoryList")
+        else:
+            return None
+        if not isinstance(histories, list) or not all(
+            isinstance(history, dict) for history in histories
+        ):
+            return None
+        return histories
 
-        if need_download:
-            # 与模板下载同构：远程 jsDelivr 失败后回退打包内置/本地文件兜底
+    @classmethod
+    def _merge_reviewed_answer(
+        cls,
+        answers: dict,
+        reviewed: dict,
+    ) -> bool:
+        """以完整复盘结果替换唯一兼容项，不合并正确答案集合。"""
+
+        title = reviewed.get("title")
+        if not isinstance(title, str) or not title:
+            return False
+        normalized = cls._normalize_answers({title: reviewed})
+        incoming = normalized.get(title)
+        if incoming is None:
+            return False
+
+        target_key: str | None = title if title in answers else None
+        incoming_signature = _option_signature(incoming)
+        if target_key is None:
+            exact_candidates = [
+                key
+                for key, value in answers.items()
+                if isinstance(value, dict)
+                and _exact_text(key) == _exact_text(title)
+                and _option_signature(value) == incoming_signature
+            ]
+            if len(exact_candidates) == 1:
+                target_key = exact_candidates[0]
+        if target_key is None:
+            fuzzy_candidates = [
+                key
+                for key, value in answers.items()
+                if isinstance(value, dict)
+                and clean_text(key) == clean_text(title)
+                and _option_signature(value) == incoming_signature
+            ]
+            if len(fuzzy_candidates) == 1:
+                target_key = fuzzy_candidates[0]
+
+        if target_key is not None and target_key != title:
+            del answers[target_key]
+        answers[title] = incoming
+        return True
+
+    def sync_answers(self) -> WorkflowResult:
+        """从考试复盘增量同步题库，并通过 AnswerStore 原子提交。"""
+
+        store = self._answer_store()
+        remote_baseline: dict[str, Any] = {}
+        try:
+            answers_json = self._normalize_answers(store.load())
+        except AnswerStoreError:
             self.log.info("题库不存在或格式错误，正在下载...")
             try:
                 remote = self.api.download_answer()
-                self.log.success("题库已从远程下载")
-            except Exception as e:  # noqa: BLE001 -- 网络失败不应中断整个账号流程
-                self.log.warning(f"题库下载失败：{e}，回退本地内置题库")
-                remote = read_first_existing(
-                    [bundle_answer_path, answer_path, root_answer_path]
-                )
-                if remote is None:
-                    self.log.warning("本地无可用题库，本次跳过题库同步")
-                    return
-            with open(answer_path, "w", encoding="utf-8") as f:
-                f.write(remote)
-            try:
-                with open(answer_path, encoding="utf-8") as f:
-                    answers_json = json.load(f)
-            except (json.JSONDecodeError, OSError) as e:
-                self.log.error(f"读取题库失败：{e}")
-                return
-            if not self._is_valid_answers(answers_json):
+                downloaded = json.loads(remote)
+            except (OSError, TypeError, ValueError, APIResponseError) as exc:
+                self.log.error(f"题库下载或解析失败：{exc}")
+                return WorkflowResult.failed_result("没有可用题库")
+            if not self._is_valid_answers(downloaded):
                 self.log.error("下载的题库格式无效，应为非空 JSON 对象")
-                return
+                return WorkflowResult.failed_result("下载题库格式无效")
+            answers_json = self._normalize_answers(downloaded)
+            if not self._is_valid_answers(answers_json):
+                self.log.error("下载的题库格式无效，应包含至少一道有效题目")
+                return WorkflowResult.failed_result("下载题库格式无效")
+            remote_baseline = answers_json
+            self.log.info("题库已从远程下载，待同步事务中合并保存")
 
-        if answers_json is None:
-            self.log.error("题库加载失败")
-            return
+        failures = 0
+        reviewed_questions: list[dict] = []
+        user_project_ids: list[str] = []
 
-        # 合并变体：clean_text 相同的题目/选项仅保留一条，保留原始标点
-        answers_json = self._normalize_answers(answers_json)
-        # clean 标题 → 原始标题索引，服务器标题按 clean 语义匹配
-        key_by_clean = {clean_text(k): k for k in answers_json}
+        # 题库同步是辅助阶段：项目/模块列表的网络或协议错误只计入 failures
+        # 并降级为 incomplete，不能让整个账号在学习开始前就失败。
+        for ended in (2, 1):
+            self._raise_if_stopped()
+            try:
+                response = self.api.list_my_project(ended=ended)
+            except PermissionError:
+                raise
+            except (OSError, APIResponseError) as exc:
+                self.log.warning(f"获取项目列表失败（ended={ended}）：{exc}")
+                failures += 1
+                continue
+            projects = response.get("data") if _check_code_ok(response) else None
+            if not isinstance(projects, list):
+                self.log.error(f"获取项目列表失败：{response}")
+                failures += 1
+                continue
+            for project in projects:
+                if isinstance(project, dict) and project.get("userProjectId"):
+                    user_project_ids.append(str(project["userProjectId"]))
+                else:
+                    self.log.warning(f"跳过结构无效的项目：{project}")
+                    failures += 1
 
-        user_project_ids = [
-            p["userProjectId"] for p in self.api.list_my_project().get("data", [])
-        ]
-        user_project_ids.extend(
-            p["userProjectId"]
-            for p in self.api.list_my_project(ended=1).get("data", [])
-        )
-        completion = self.api.list_completion()
-        if not _check_code_ok(completion):
-            self.log.error(f"获取模块完成情况失败：{completion}")
-
-        showable_modules = [
-            d["module"] for d in completion.get("data", []) if d["showable"] == 1
-        ]
-        if "labProject" in showable_modules:
-            self.log.info("加载实验室课程")
-            lab_project = self.api.lab_index()
-            if not _check_code_ok(lab_project):
-                self.log.error(f"获取实验室课程失败：{lab_project}")
-            user_project_ids.append(
-                lab_project.get("data", {}).get("current", {}).get("userProjectId")
+        completion_failed = False
+        try:
+            completion = self.api.list_completion()
+        except PermissionError:
+            raise
+        except (OSError, APIResponseError) as exc:
+            self.log.warning(f"获取模块完成情况失败：{exc}")
+            failures += 1
+            completion_failed = True
+            completion = {}
+        modules = completion.get("data") if _check_code_ok(completion) else None
+        if isinstance(modules, list):
+            show_lab = any(
+                isinstance(item, dict)
+                and item.get("module") == "labProject"
+                and item.get("showable") == 1
+                for item in modules
             )
+            if show_lab:
+                lab_failed = False
+                try:
+                    lab_project = self.api.lab_index()
+                except PermissionError:
+                    raise
+                except (OSError, APIResponseError) as exc:
+                    self.log.warning(f"获取实验室项目失败：{exc}")
+                    failures += 1
+                    lab_failed = True
+                    lab_project = {}
+                lab_data = (
+                    lab_project.get("data") if _check_code_ok(lab_project) else None
+                )
+                current = (
+                    lab_data.get("current") if isinstance(lab_data, dict) else None
+                )
+                if isinstance(current, dict) and current.get("userProjectId"):
+                    user_project_ids.append(str(current["userProjectId"]))
+                elif not lab_failed:
+                    self.log.warning(f"跳过无效实验室项目：{lab_project}")
+                    failures += 1
+        elif not completion_failed:
+            self.log.warning(f"获取模块完成情况失败：{completion}")
+            failures += 1
+
+        # 去重但保留服务端顺序。
+        user_project_ids = list(dict.fromkeys(user_project_ids))
         for user_project_id in user_project_ids:
-            for plan in self.api.exam_list_plan(user_project_id).get("data", []):
-                for history in self.api.exam_list_history(
-                    plan["examPlanId"], plan["examType"]
-                ).get("data", []):
-                    questions = self.api.exam_review_paper(
-                        history["id"], history["isRetake"]
-                    )["data"].get("questions", [])
-                    for answer in questions:
-                        server_title = answer["title"]
-                        clean_title = clean_text(server_title)
-                        old_key = key_by_clean.get(clean_title)
-                        if old_key is None:
-                            # 新题：直接以服务器原文入库，并提醒用户
-                            answers_json[server_title] = {
-                                "type": answer["type"],
-                                "optionList": [
-                                    {
-                                        "content": o["content"],
-                                        "isCorrect": o["isCorrect"],
-                                    }
-                                    for o in answer.get("optionList", [])
-                                ],
-                            }
-                            key_by_clean[clean_title] = server_title
-                            self.log.info(f"发现新题：{server_title}")
-                            for option in answer.get("optionList", []):
-                                self.log.info(
-                                    f"发现题目：{server_title} 新选项：{option['content']}"
-                                )
-                            continue
-                        entry = answers_json[old_key]
-                        # 标题有变化则以服务器原文更新
-                        if old_key != server_title:
-                            del answers_json[old_key]
-                            answers_json[server_title] = entry
-                            key_by_clean[clean_title] = server_title
-                        # 选项追加合并：新选项追加；已有选项标记取并集
-                        # （任一变体标 1 则保留 1），文本保留较长原文，同题
-                        # 不同答案的变体互不覆盖（与 _normalize_answers 一致）
-                        options = {
-                            clean_text(o["content"]): o for o in entry["optionList"]
-                        }
-                        for option in answer.get("optionList", []):
-                            content = clean_text(option["content"])
-                            old = options.get(content)
-                            if old is None:
-                                options[content] = {
-                                    "content": option["content"],
-                                    "isCorrect": option["isCorrect"],
-                                }
-                                self.log.info(
-                                    f"发现题目：{server_title} 新选项：{option['content']}"
-                                )
-                                continue
-                            merged = False
-                            if option["isCorrect"] == 1 and old["isCorrect"] != 1:
-                                old["isCorrect"] = 1
-                                merged = True
-                            if len(option["content"]) > len(old["content"]):
-                                old["content"] = option["content"]
-                                merged = True
-                            if merged:
-                                self.log.info(
-                                    f"发现题目：{server_title} 答案合并：{old['content']}"
-                                )
-                        entry["optionList"] = list(options.values())
-                        entry["type"] = answer["type"]
+            self._raise_if_stopped()
+            try:
+                plan_response = self.api.exam_list_plan(user_project_id)
+            except PermissionError:
+                raise
+            except (OSError, APIResponseError) as exc:
+                self.log.warning(f"项目 {user_project_id} 考试计划同步失败：{exc}")
+                failures += 1
+                continue
+            plans = plan_response.get("data") if _check_code_ok(plan_response) else None
+            if not isinstance(plans, list):
+                self.log.warning(f"项目考试计划响应无效：{plan_response}")
+                failures += 1
+                continue
+            for plan in plans:
+                if not isinstance(plan, dict) or not all(
+                    key in plan for key in ("examPlanId", "examType")
+                ):
+                    self.log.warning(f"跳过无效考试计划：{plan}")
+                    failures += 1
+                    continue
+                try:
+                    history_response = self.api.exam_list_history(
+                        plan["examPlanId"],
+                        plan["examType"],
+                    )
+                except PermissionError:
+                    raise
+                except (OSError, APIResponseError) as exc:
+                    self.log.warning(f"考试历史同步失败：{exc}")
+                    failures += 1
+                    continue
+                histories = self._extract_history_list(history_response)
+                if histories is None:
+                    self.log.warning(f"考试历史响应无效：{history_response}")
+                    failures += 1
+                    continue
+                for history in histories:
+                    history_id = history.get("examId") or history.get("id")
+                    if not history_id:
+                        self.log.warning(f"跳过缺少 examId/id 的历史记录：{history}")
+                        failures += 1
+                        continue
+                    try:
+                        review = self.api.exam_review_paper(
+                            str(history_id),
+                            int(history.get("isRetake", 2)),
+                        )
+                    except PermissionError:
+                        raise
+                    except (OSError, ValueError, APIResponseError) as exc:
+                        self.log.warning(f"考试复盘同步失败：{exc}")
+                        failures += 1
+                        continue
+                    review_data = review.get("data") if _check_code_ok(review) else None
+                    questions = (
+                        review_data.get("questions")
+                        if isinstance(review_data, dict)
+                        else None
+                    )
+                    if not isinstance(questions, list):
+                        self.log.warning(f"考试复盘响应无效：{review}")
+                        failures += 1
+                        continue
+                    for question in questions:
+                        if isinstance(question, dict) and self._normalize_answers(
+                            {str(question.get("title", "")): question}
+                        ):
+                            reviewed_questions.append(question)
+                        else:
+                            self.log.warning(f"跳过无效复盘题目：{question}")
+                            failures += 1
 
-        # 所有入库路径统一走规范化，确保只保留 content/isCorrect
-        answers_json = self._normalize_answers(answers_json)
+        def merge_latest(current: dict[str, Any]) -> dict[str, Any]:
+            merged = self._normalize_answers(current)
+            # 远程题库只是缺失本地题库时的基线。将它放入最终 update
+            # 事务内合并，避免锁外的独立 write 覆盖其他进程刚写入的答案。
+            for title, question in self._normalize_answers(remote_baseline).items():
+                merged.setdefault(title, question)
+            for reviewed in reviewed_questions:
+                if not self._merge_reviewed_answer(merged, reviewed):
+                    self.log.warning(f"跳过无效复盘题目：{reviewed}")
+            return self._normalize_answers(merged)
 
-        # 写回读取来源（打包内置路径只读，退回可写的 answer/ 目录），
-        # 与 _load_answers_json 的加载优先级保持一致，避免同步结果不被加载
-        write_path = (
-            existing_path
-            if existing_path is not None and existing_path != bundle_answer_path
-            else answer_path
+        try:
+            merged = store.update(merge_latest, default=answers_json)
+        except (OSError, AnswerStoreError) as exc:
+            self.log.error(f"题库原子写入失败：{exc}")
+            return WorkflowResult.failed_result("题库写入失败")
+
+        self.log.success(
+            f"题库同步完成：复盘 {len(reviewed_questions)} 题，现有 {len(merged)} 题"
         )
-        os.makedirs(os.path.dirname(write_path), exist_ok=True)
-        with open(write_path, "w", encoding="utf-8") as f:
-            f.write(
-                json.dumps(answers_json, indent=2, ensure_ascii=False, sort_keys=True)
+        if failures:
+            return WorkflowResult.incomplete(
+                "题库已保存，但部分项目同步失败",
+                completed=len(reviewed_questions),
+                failed=failures,
             )
-            f.write("\n")
+        return WorkflowResult.success(
+            "题库同步完成",
+            completed=len(reviewed_questions),
+        )
