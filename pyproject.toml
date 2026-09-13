@@ -20,6 +20,13 @@ dependencies = [
     "requests>=2.34.2",
 ]
 
+[project.optional-dependencies]
+webui = [
+    "fastapi>=0.110.0",
+    "tomli-w>=1.0.0",
+    "uvicorn[standard]>=0.27.0",
+]
+
 [dependency-groups]
 dev = [
     "pyinstaller>=6.20.0",
