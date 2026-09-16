@@ -452,7 +452,7 @@ def prompt_account_interactive() -> dict | None:
     """交互式提示输入学校/用户名/密码，返回账号 dict；输入被中断或未填完整返回 None"""
     print("\n请输入账号信息：")
     try:
-        tenant_name = input("  学校全称（如：北京交通大学-本科生）: ").strip()
+        tenant_name = input("  学校全称（如：北京交通大学）: ").strip()
         username = input("  用户名（学号）: ").strip()
         password = input("  密码（默认同用户名）: ").strip()
     except (EOFError, KeyboardInterrupt):
