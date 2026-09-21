@@ -17,6 +17,7 @@ dependencies = [
     "numpy>=1.26.4,<2",
     "opencv-python-headless==4.10.0.84",
     "pyaes>=1.6.1",
+    "PySocks>=1.7.1",
     "requests>=2.34.2",
 ]
 

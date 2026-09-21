@@ -1,4 +1,5 @@
 import argparse
+import ipaddress
 import os
 import re
 import subprocess
@@ -8,6 +9,64 @@ import time
 import tomllib
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+_LOCAL_HOSTNAMES = frozenset({"localhost", "host.docker.internal"})
+_LOCAL_NETWORKS = (
+    ipaddress.ip_network("127.0.0.0/8"),
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("169.254.0.0/16"),
+    ipaddress.ip_network("::1/128"),
+    ipaddress.ip_network("fc00::/7"),
+    ipaddress.ip_network("fe80::/10"),
+)
+
+
+def _strip_port(host: str) -> str:
+    h = host.strip().lower()
+    if h.startswith("["):
+        return h[1:].split("]", 1)[0]
+    if h.count(":") == 1:
+        return h.split(":", 1)[0]
+    if h.count(":") > 2 and h.rsplit(":", 1)[1].isdigit():
+        return h.rsplit(":", 1)[0]
+    return h
+
+
+def _is_local_host(host: str) -> bool:
+    h = _strip_port(host)
+    if not h:
+        return False
+    if h in _LOCAL_HOSTNAMES:
+        return True
+    try:
+        addr = ipaddress.ip_address(h)
+    except ValueError:
+        return False
+    return any(addr in net for net in _LOCAL_NETWORKS)
+
+
+def _bypass_proxy_for_local_hosts() -> None:
+    def _wrap(orig):
+        def _bypass(host: str) -> bool:
+            return _is_local_host(host) or orig(host)
+
+        return _bypass
+
+    import urllib.request
+
+    urllib.request.proxy_bypass = _wrap(urllib.request.proxy_bypass)
+
+    try:
+        import requests.utils
+
+        requests.utils.proxy_bypass = _wrap(requests.utils.proxy_bypass)
+    except (ImportError, AttributeError):
+        pass
+
+
+_bypass_proxy_for_local_hosts()
 
 import requests
 from loguru import logger
