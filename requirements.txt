@@ -24,6 +24,8 @@ opencv-python-headless==4.10.0.84
     # via weban
 pyaes==1.6.1
     # via weban
+pysocks==1.7.1
+    # via weban
 requests==2.34.2
     # via weban
 urllib3==2.7.0
