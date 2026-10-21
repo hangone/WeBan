@@ -7,7 +7,7 @@ import time
 import webbrowser
 from random import randint
 from typing import Any
-from urllib.parse import parse_qs, urljoin, urlparse
+from urllib.parse import parse_qs, urlencode, urljoin, urlparse, urlunparse
 from uuid import uuid4
 
 from loguru import logger
@@ -124,6 +124,131 @@ def _extract_map(content: str) -> dict:
         if entries:
             return {int(step): val for step, val in entries}
     return {}
+
+
+def _strip_js_comments(content: str) -> str:
+    """删除 JS 注释，保留字符串。"""
+    return re.sub(
+        r'''("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`)|/\*[\s\S]*?\*/|//[^\n]*''',
+        lambda match: match.group(1) or "",
+        content,
+    )
+
+
+def _js_block_end(script: str, start: int) -> int:
+    """查找代码块结尾，忽略字符串中的花括号。"""
+    depth = 1
+    for token in re.finditer(
+        r'''"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|[{}]''', script[start:]
+    ):
+        if token.group() == "{":
+            depth += 1
+        elif token.group() == "}":
+            depth -= 1
+        if depth == 0:
+            return start + token.start()
+    return len(script)
+
+
+def _dynamic_course_steps(html: str, script: str, has_questions: bool) -> tuple[int, int] | None:
+    """返回动态题目分支的中间步数和完成 step。"""
+    if not re.search(r"getQuestions\s*\(", script):
+        return None
+    question_branch = re.search(
+        r"\bif\s*\([^{};]*\bexamQuestionList\.length\s*>\s*0\s*\)\s*\{", script
+    )
+    if question_branch:
+        block_end = _js_block_end(script, question_branch.end())
+        selected = script[question_branch.end():block_end] if has_questions else ""
+        chain_end = block_end + 1
+        other = re.match(r"\s*else\s*\{", script[chain_end:])
+        if other:
+            begin = chain_end + other.end()
+            block_end = _js_block_end(script, begin)
+            if not has_questions:
+                selected = script[begin:block_end]
+            chain_end = block_end + 1
+        script = script[:question_branch.start()] + selected + script[chain_end:]
+    start = re.search(
+        r'''BtnFn\(["']\.btn-start["']\s*,\s*["']\.page-start["']\s*,\s*["']\.page-(\d+)["']''', script
+    )
+    end = re.search(
+        r'''BtnFn\(["']\.btn-ce["']\s*,\s*["']\.page-(\d+)["']\s*,\s*["']\.page-aq''', script
+    )
+    empty_end = re.search(
+        r'''\$\(["']\.page-(\d+)["']\)\.addClass\(["']page-reciprocal["']\)''', script
+    )
+    endpoint = end if has_questions else empty_end
+    btnfn = re.search(r"function\s+BtnFn\([^)]*\)\s*\{", script)
+    if not start or not endpoint or not btnfn:
+        return None
+    body = script[btnfn.end():_js_block_end(script, btnfn.end())]
+    next_pattern = r'''callApinext\(["']next["']\s*,\s*2'''
+    prev_pattern = r'''callApinext\(["']prev["']\s*,\s*2'''
+    branch_pattern = r'''if\s*\(\s*Btn\s*==+\s*["']([^"']+)["']\s*\)\s*\{'''
+    deltas = {}
+    for selector in (".btn-start", ".btn-ce"):
+        selected_body = body
+        while branch := re.search(branch_pattern, selected_body):
+            begin = branch.end()
+            block_end = _js_block_end(selected_body, begin)
+            selected = selected_body[begin:block_end] if branch.group(1) == selector else None
+            chain_end = block_end + 1
+            while other := re.match(r"\s*else\s*(?:" + branch_pattern[:-2] + r")?\s*\{", selected_body[chain_end:]):
+                begin = chain_end + other.end()
+                block_end = _js_block_end(selected_body, begin)
+                if selected is None and (other.group(1) is None or other.group(1) == selector):
+                    selected = selected_body[begin:block_end]
+                chain_end = block_end + 1
+            selected_body = selected_body[:branch.start()] + (selected or "") + selected_body[chain_end:]
+        deltas[selector] = len(re.findall(next_pattern, selected_body)) - len(re.findall(prev_pattern, selected_body))
+    sections = list(re.finditer(
+        r'''<section\b[^>]*class=["']([^"']*\bpage-item\b[^"']*)["'][^>]*>([\s\S]*?)(?=<section\b[^>]*class=["'][^"']*\bpage-item\b|$)''', html
+    ))
+    names = [next((c for c in section.group(1).split() if re.fullmatch(r"page-\d+", c)), "") for section in sections]
+    start_page = f"page-{start.group(1)}"
+    last_page = f"page-{endpoint.group(1)}"
+    if start_page not in names or last_page not in names:
+        return None
+    first, last = names.index(start_page), names.index(last_page)
+    if first > last:
+        return None
+    middle = deltas[".btn-start"]
+    for section in sections[first:last + 1]:
+        if not has_questions and last_page in section.group(1).split():
+            continue  # 无题分支在此完成，不再发送中间步骤。
+        middle += sum("btn-next" in classes.split() for classes in re.findall(
+            r'''\bclass=["']([^"']+)["']''', section.group(2)
+        ))
+    # 情景按钮也会在动画回调中上报。
+    reached = set(names[first:last + 1])
+    handlers = list(re.finditer(
+        r'''\$\(["']([^"']+)["']\)\.(?:click|on)\(\s*(?:["'][^"']+["']\s*,\s*)?function\s*\([^)]*\)\s*\{''', script
+    ))
+    for handler in handlers:
+        if handler.group(1) in {".btn-next", ".btn-prev", ".btn-af"}:
+            continue
+        callback = script[handler.end():_js_block_end(script, handler.end())]
+        for call in re.finditer(next_pattern, callback):
+            targets = re.findall(
+                r'''\$\(["']\.(page-\d+)["']\)\.addClass\(["']page-active["']\)''',
+                callback[:call.start()],
+            )
+            if targets and targets[-1] in reached:
+                repeats = 1
+                for animation in re.finditer(
+                    r'''\$\(["']\.([\w-]+)["']\)\.animate\(\s*\{[^}]*\}\s*,\s*[^,]+,\s*function\s*\([^)]*\)\s*\{''',
+                    callback,
+                ):
+                    if animation.end() <= call.start() < _js_block_end(callback, animation.end()):
+                        # complete 会对每个匹配元素执行一次。
+                        repeats *= sum(animation.group(1) in classes.split() for classes in re.findall(
+                            r'''\bclass=["']([^"']+)["']''', html
+                        ))
+                middle += repeats
+    delta = deltas[".btn-ce"] if has_questions else 0
+    middle += max(delta, 0)
+    return middle, middle + min(delta, 0) + 1
 
 
 def _check_exam(content: str) -> bool:
@@ -302,15 +427,16 @@ class WeBanClient:
         return f"{sec}s"
 
     def simulate_home_page(self) -> None:
-        """模拟打开官方 H5 首页：对齐登录后页面初始化请求面
+        """执行首页初始化请求。"""
+        guide = self.api.get_user_guide()
+        if not _check_code_ok(guide):
+            raise RuntimeError("获取新手引导失败，已停止当前账号，请前往官网检查")
+        guide_data = guide.get("data") or {}
+        if not isinstance(guide_data, dict):
+            raise RuntimeError("新手引导响应格式异常，已停止当前账号")  # noqa: TRY004
+        if guide_data.get("url"):
+            raise RuntimeError("请先按原登录方式进入官网完成新手引导，再运行程序")
 
-        官方浏览器（weiban.mycourse.cn）登录成功后，首页组件 created 依次发起：
-        协议/电子书(getEbook+ebook 记录) → 轮播图 → 用户信息 → 必读公告
-        (listMust 弹窗逐条展示，阅读后逐条 viewMust 确认) → 问卷列表 →
-        学习任务列表(index/listStudyTask.do，"开始学习"入口) → 项目统计/
-        公告红点/功能开关/租户配置/帮助文件等。
-        逐个模拟发送（尽力而为），任一失败只记日志不中断主流程。
-        """
         batch_code = self.api.user.get("batchCode", "") or ""
         steps: list[tuple[str, Any]] = [
             ("协议内容", self.api.get_ebook),
@@ -458,28 +584,27 @@ class WeBanClient:
         return False, message
 
     def _build_course_url(self, course: dict, task: dict) -> str:
-        """根据课程和任务信息构建完整的课程 URL
-
-        硬编码的 query 参数（projectType=special 等）为 Web 播放器前端所需，
-        缺失会导致页面白屏或功能异常。
-        :param course: 课程数据（含 resourceId）
-        :param task: 任务数据（含 userProjectId）
-        :return: 完整的课程播放 URL
-        """
+        """补充播放参数，保留服务端 URL 中已有的值。"""
         url = self.api.get_course_url(course["resourceId"], task["userProjectId"])[
             "data"
         ]
-        url += f"&userProjectId={task['userProjectId']}"
-        url += f"&userId={self.api.user['userId']}"
-        url += f"&courseId={course['resourceId']}"
-        url += f"&userName={self.api.user.get('userName', self.api.user.get('realName', ''))}"
-        link = course.get("praiseNum", "")
-        url += (
-            f"&projectType=special&projectId=undefined&protocol=true&link={link}"
-            "&weiban=weiban&certificateId=undefined&userActivityState=undefined"
-            "&step=undefined&index=undefined&viewStep=undefined"
-        )
-        return url
+        parts = urlparse(url)
+        params = {
+            "userProjectId": task["userProjectId"],
+            "userId": self.api.user["userId"],
+            "courseId": course["resourceId"],
+            "userName": self.api.user.get("userName", self.api.user.get("realName", "")),
+            "projectType": "special", "projectId": "undefined", "protocol": "true",
+            "link": course.get("praiseNum", ""), "weiban": "weiban",
+            "certificateId": "undefined", "userActivityState": "undefined",
+            "step": "undefined", "index": "undefined", "viewStep": "undefined",
+        }
+        existing = parse_qs(parts.query, keep_blank_values=True)
+        if existing.get("lyra", [None])[0] == "lyra":
+            params.pop("weiban")
+        extra = urlencode({key: value for key, value in params.items() if key not in existing})
+        query = "&".join(value for value in (parts.query, extra) if value)
+        return urlunparse(parts._replace(query=query))
 
     # ---- tenant / progress --------------------------------------------------
 
@@ -524,10 +649,14 @@ class WeBanClient:
         """
         progress = self.api.show_progress(user_project_id)
         if not _check_code_ok(progress):
-            if output:
-                self.log.warning(f"{project_prefix} 获取进度失败：{progress}")
-            return progress
-        data = progress.get("data", {})
+            raise RuntimeError(f"{project_prefix} 获取进度失败，已停止当前账号")
+        data = progress.get("data")
+        required_fields = {
+            "requiredNum", "requiredFinishedNum", "optionalNum", "optionalFinishedNum",
+            "pushNum", "pushFinishedNum", "examNum", "examFinishedNum",
+        }
+        if not isinstance(data, dict) or not required_fields.issubset(data):
+            raise RuntimeError(f"{project_prefix} 进度响应缺少必要字段，已停止当前账号")
         if self.study_force:
             # force 模式会重新学习所有课程，剩余量按总数计算
             required = data["requiredNum"]
@@ -938,8 +1067,7 @@ class WeBanClient:
                 force_restudy,
             )
             if not ok:
-                self.log.error("检测到行为异常或账号锁定，已停止本账号后续学习")
-                return False
+                raise PermissionError("检测到行为异常或账号锁定，已停止当前账号")
             progress_after = self.get_progress(task["userProjectId"], project_prefix)
             if progress_after.get("code", -1) == "0":
                 d = progress_after["data"]
@@ -1078,7 +1206,8 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
         self.log.info(f"{course_prefix}：{course_url.split('?')[0]}")
         query = parse_qs(urlparse(course_url).query)
         source_str = get_source_str(query)
-        if "userCourseId" not in course:
+        is_lyra = query.get("weiban", [None])[0] != "weiban" and query.get("lyra", [None])[0] == "lyra"
+        if "userCourseId" not in course and not is_lyra:
             uid = query.get("userCourseId")
             if uid and uid[0]:
                 course["userCourseId"] = uid[0]
@@ -1108,16 +1237,27 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
         nonstr_map = item_info.get("nonstr_map", {})
         total_step = item_info.get("total_step", 0)
         uses_apinext = item_info.get("uses_apinext", False)
-        # jupiter 学习轨迹上报始终带本次会话 uuid（浏览器每次学习都上报）
+        # 翻页和完课共用 UUID。
         apinext_no = str(uuid4())
-        # sdk.js 仅在 apicenext.js 定义了全局 uuid 时才带 uniqueNo；
-        # 无 apinext 的课传 uniqueNo 会被判行为异常 (10018)
-        unique_no = str(uuid4()) if uses_apinext else None
+        unique_no = apinext_no if uses_apinext else None
 
-        # 1. jupiter finish=2 翻页轨迹：官方仅在加载 apicenext.js 的课程里上报
-        # （页面 item.js 调 callApinext）；非 apicnext 课程默认不发，除非配置
-        # jupiter_fallback=true（个别学校要求全部微课都有轨迹）
-        trace_enabled = uses_apinext or self.jupiter_fallback
+        # 题目响应决定后续翻页路径。
+        question_data = self.api.list_question(course["resourceId"])
+        if item_info.get("has_exam") and not _check_code_ok(question_data):
+            raise RuntimeError("获取课程题目失败，无法确定学习路径")
+        questions = (question_data.get("data") or {}) if _check_code_ok(question_data) else {}
+        dynamic_steps = item_info.get("dynamic_steps") or {}
+        branch = "with_questions" if questions.get("examQuestionList") else "without_questions"
+        steps = dynamic_steps.get(branch)
+        finish_step = None
+        if steps:
+            total_step, finish_step = steps
+            self.log.info(f"按题目响应选择翻页路径：中间步骤 {total_step}，完成 step={finish_step}")
+
+        trace_enabled = (
+            (uses_apinext or self.jupiter_fallback)
+            and query.get("weiban", [None])[0] == "weiban"
+        )
         if total_step and trace_enabled:
             self.log.info(
                 f"total_step={total_step} ({item_info.get('total_step_source', '')})"
@@ -1134,10 +1274,8 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                 finish=2,
             )
 
-        # 2. 获取并回答题目（翻页后题目才可用）
-        question_data = self.api.list_question(course["resourceId"])
-        if question_data and question_data.get("code") == "0":
-            data = question_data.get("data", {})
+        if _check_code_ok(question_data):
+            data = questions
             for qlist, label, save_func in [
                 (
                     data.get("viewpointQuestionList", []),
@@ -1166,9 +1304,7 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                         time.sleep(0.5)
         elif question_data:
             self.log.info(f"  list_question: code={question_data.get('code')}")
-        if item_info.get("has_exam") and not question_data.get("data", {}).get(
-            "examQuestionList"
-        ):
+        if item_info.get("has_exam") and not questions.get("examQuestionList"):
             self.log.info("  检测到题目标记但 list_question 无课后习题，可能为内联题目")
 
         # 3. 确保满足最低学习时长（服务端要求 study 后至少学习 study_time 秒才接受完课）
@@ -1177,9 +1313,6 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
         # 视频课程按配置倍速播放对齐（video_speed=0 表示不按视频时长等待）
         video_duration = item_info.get("video_duration", 0)
         if self.video_speed > 0 and video_duration > 0:
-            if video_duration > 3600:
-                self.log.warning("视频超过60分钟，按60分钟处理")
-                video_duration = 3600
             video_need = video_duration / self.video_speed
             if video_need > study_time:
                 self.log.info(
@@ -1213,6 +1346,7 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                 total_step,
                 unique_no=apinext_no,
                 finish=1,
+                finish_step=finish_step,
             )
             time.sleep(2)
 
@@ -1248,40 +1382,43 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
         :param unique_no: 仅 apinext 课程传入；None 表示不传 uniqueNo
         :return: 完课 API 响应
         """
-        if query.get("lyra", [None])[0] == "lyra":
-            return self.api.finish_lyra(query.get("userActivityId", [None])[0])
-        if query.get("weiban", [None])[0] != "weiban":
-            return self.api.finish_by_token(course["userCourseId"], course_type="open")
-        if query.get("source", [None])[0] == "moon":
-            return self.api.finish_by_token(course["userCourseId"], course_type="moon")
-
-        finish_kwargs: dict = {
-            "referer": "https://mcwk.mycourse.cn/",
-        }
+        finish_kwargs: dict = {"referer": "https://mcwk.mycourse.cn/"}
         if unique_no:
             finish_kwargs["unique_no"] = unique_no
+        if query.get("weiban", [None])[0] != "weiban":
+            if query.get("lyra", [None])[0] == "lyra":
+                return self.api.finish_lyra(
+                    query.get("userActivityId", [None])[0], unique_no=unique_no
+                )
+            return self.api.finish_by_token(
+                course["userCourseId"], course_type="open", **finish_kwargs
+            )
+        if query.get("source", [None])[0] == "moon":
+            finish_kwargs["course_type"] = "moon"
+
         if query.get("csCapt", [None])[0] == "true":
             try:
                 captcha_result = self.captcha_handler.handle_course_captcha(
                     course_url=course_url
                 )
-                check_res = self.api.course_check(
-                    course["userCourseId"],
-                    task["userProjectId"],
-                    course["resourceId"],
-                    captcha_result["randstr"],
-                    captcha_result["ticket"],
-                )
-                if not _check_code_ok(check_res):
-                    self.log.error(f"课程验证码校验失败：{check_res}")
-                    return check_res
-                self.log.success("课程验证码校验通过")
-                finish_kwargs["token"] = check_res.get("data", "")
             except PermissionError:
-                raise  # Token 失效，立即终止该账号
-            except Exception as e:  # noqa: BLE001 -- 浏览器自动化可能抛任意异常，降级为完成失败
+                raise
+            except Exception as e:  # noqa: BLE001 -- 浏览器异常类型不固定
                 self.log.error(f"课程验证码处理异常: {e}")
                 return {"code": "-1"}
+            check_res = self.api.course_check(
+                course["userCourseId"],
+                task["userProjectId"],
+                course["resourceId"],
+                captcha_result["randstr"],
+                captcha_result["ticket"],
+            )
+            if not _check_code_ok(check_res):
+                self.log.error(f"课程验证码校验失败：{check_res}")
+                return check_res
+            self.log.success("课程验证码校验通过")
+            finish_kwargs["token"] = check_res.get("data", "")
+            finish_kwargs.pop("course_type", None)  # 验证后改用 weiban token URL。
         return self.api.finish_by_token(course["userCourseId"], **finish_kwargs)
 
     # ---- exam ---------------------------------------------------------------
@@ -1294,10 +1431,7 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
         exam_submit_match_rate: int = 90,
         only_project: dict | None = None,
     ):
-        """考试主入口
-
-        流程：加载题库 → 遍历项目/计划 → 无感验证码 → 获取试卷 →
-        作答（根据 random_answer 决定手动/自动）→ 提交试卷。
+        """执行项目考试。
 
         :param exam_mode: 考试模式
             - "false": 跳过所有考试
@@ -1432,27 +1566,7 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                     f"限时 {prepare_paper['answerTime']} 分钟"
                 )
 
-                # 无感验证码
                 plan_start_ts = time.time()
-                try:
-                    captcha_result = self.captcha_handler.handle_exam_captcha(
-                        user_exam_plan_id
-                    )
-                    check_res = self.api.exam_check(
-                        user_exam_plan_id,
-                        captcha_result["randstr"],
-                        captcha_result["ticket"],
-                    )
-                    if not _check_code_ok(check_res):
-                        self.log.error(f"无感验证码校验失败：{check_res}")
-                        continue
-                    self.log.success("无感验证码校验通过")
-                except PermissionError:
-                    raise  # Token 失效，立即终止该账号
-                except Exception as e:  # noqa: BLE001 -- 浏览器自动化可能抛任意异常
-                    self.log.error(f"无感验证码处理异常: {e}")
-                    continue
-
                 exam_paper = self.api.exam_start_paper(user_exam_plan_id)
                 if not _check_code_ok(exam_paper):
                     self.log.error(f"获取考试题目失败：{exam_paper}")
@@ -1640,16 +1754,7 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
     def parse_item_js(
         self, course_code: str, course_url: str | None = None
     ) -> dict[str, Any]:
-        """解析课程 JS，检测是否使用 apinext 并提取 nonstrMap/total_step。
-
-        关键判断：HTML 是否加载 apicenext.js。
-        不加载 → 不需要任何 apinext 调用，直接返回 uses_apinext=False。
-        加载 → 从 item.js 注释/HTML btn-next 推导 total_step。
-
-        :param course_code: 课程代码（用于拼接 mcwk 资源 URL）
-        :param course_url: 课程播放页 URL，作为抓 mcwk HTML 的 Referer。
-            缺失时 mcwk 资源服务器可能 403。
-        """
+        """从课程页面和引用脚本中提取轨迹、题目分支和视频源。"""
         result = {
             "uses_apinext": False,
             "nonstr_map": {},
@@ -1665,15 +1770,33 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
             # （/course/A25005/A25005.html 与 /course/DAGJAQ/DAGJAQ001/DAGJAQ001.html）
             url_path = urlparse(course_url).path if course_url else ""
             html_url = (
-                f"https://mcwk.mycourse.cn{url_path}"
-                if "/course/" in url_path
+                course_url.split("#", 1)[0]
+                if course_url and "/course/" in url_path
                 else f"https://mcwk.mycourse.cn/course/{course_code}/{course_code}.html"
             )
             html = _fetch_text(self.api.session, html_url, referer=course_url)
             if not html:
                 return result
+            html = re.sub(r"<!--.*?-->", "", html, flags=re.DOTALL)
+            script_urls = list(dict.fromkeys(
+                urljoin(html_url, src)
+                for src in re.findall(r'''<script\b[^>]*\bsrc=["']([^"']+)["']''', html)
+            ))
+            inline_scripts = "\n".join(re.findall(r"<script\b[^>]*>([\s\S]*?)</script>", html))
+            scripts = [inline_scripts]
+            course_path = urlparse(html_url).path.rsplit("/", 1)[0] + "/"
+            for script_url in script_urls:
+                if urlparse(script_url).path.startswith(course_path):
+                    scripts.append(_fetch_text(self.api.session, script_url, referer=html_url))
+            script = _strip_js_comments("\n".join(scripts))
+            result["has_exam"] = _check_exam(script)
+            result["nonstr_map"] = _extract_map(script)
+            result["dynamic_steps"] = {
+                "with_questions": _dynamic_course_steps(html, script, True),
+                "without_questions": _dynamic_course_steps(html, script, False),
+            }
 
-            # 视频课程：提取 <video>/<source> 源，解析实际时长供完课前按 2 倍速等待
+            # 播放器可能在脚本中设置视频地址。
             video_match = None
             video_block = re.search(r"<video\b[^>]*>(.*?)</video>", html, re.DOTALL)
             if video_block:
@@ -1688,12 +1811,25 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                 video_match = re.search(
                     r"<video\b[^>]*\bsrc=[\"']([^\"']+)[\"']", html
                 )
+            video_urls = [urljoin(html_url, src) for src in re.findall(
+                r'''<(?:video|source)\b[^>]*\bsrc=["']([^"']+\.(?:mp4|m3u8)(?:\?[^"']*)?)["']''', html
+            )]
             if video_match:
-                video_url = urljoin(html_url, video_match.group(1))
+                video_urls.append(urljoin(html_url, video_match.group(1)))
+            video_urls.extend(urljoin(html_url, src) for src in re.findall(
+                r'''["']([^"'\s<>]+\.(?:mp4|m3u8)(?:\?[^"'\s<>]*)?)["']''', script
+            ))
+            # 备用 CDN 不重复计时，多段视频累计时长。
+            video_sources = {}
+            for video_url in video_urls:
+                name = urlparse(video_url).path.rsplit("/", 1)[-1].rsplit(".", 1)[0]
+                video_sources.setdefault(name, video_url)
+            durations = []
+            for video_url in video_sources.values():
                 result["has_video"] = True
                 video_duration = 0.0
                 try:
-                    if video_url.endswith(".m3u8") or "/m3u8/" in video_url:
+                    if urlparse(video_url).path.endswith(".m3u8"):
                         # m3u8：累加 EXTINF 时长
                         playlist = self.api.session.get(video_url, timeout=10)
                         if playlist.status_code == 200:
@@ -1718,114 +1854,67 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                                         )
                             video_duration = sum(float(s) for s in segments)
                     else:
-                        # mp4：Range 抓文件头/尾各 512KB，解析 moov 内 mvhd
-                        head_size = 512 * 1024
-                        head = self.api.session.get(
-                            video_url,
-                            headers={"Range": f"bytes=0-{head_size - 1}"},
-                            timeout=10,
-                        )
-                        buffers: list[bytes] = []
-                        if head.status_code in (200, 206):
-                            buffers.append(head.content[:head_size])
-                            if head.status_code == 206:
-                                match = re.search(
-                                    r"/(\d+)\s*$",
-                                    head.headers.get("Content-Range", ""),
+                        # moov 可能在 mdat 后，按 box 长度跳转定位。
+                        offset = 0
+                        movie_end = None
+                        full_content = None
+                        for _ in range(128):
+                            if full_content is None:
+                                metadata = self.api.session.get(
+                                    video_url,
+                                    headers={"Range": f"bytes={offset}-{offset + 63}"},
+                                    timeout=10,
                                 )
-                                if match:
-                                    total = int(match.group(1))
-                                    if total > head_size:
-                                        tail = self.api.session.get(
-                                            video_url,
-                                            headers={
-                                                "Range": (
-                                                    f"bytes={total - head_size}-"
-                                                    f"{total - 1}"
-                                                )
-                                            },
-                                            timeout=10,
-                                        )
-                                        if tail.status_code == 206:
-                                            buffers.append(tail.content)
-                        for buf in buffers:
-                            pos = 0
-                            while pos + 8 <= len(buf) and not video_duration:
-                                size = int.from_bytes(
-                                    buf[pos : pos + 4], "big"
-                                )
-                                box_type = buf[pos + 4 : pos + 8]
-                                if size == 1:  # largesize（64 位）
-                                    if pos + 16 > len(buf):
-                                        break
-                                    size = int.from_bytes(
-                                        buf[pos + 8 : pos + 16], "big"
-                                    )
-                                    header = 16
-                                elif size == 0:  # 延伸到文件尾
-                                    size = len(buf) - pos
-                                    header = 8
-                                else:
-                                    header = 8
-                                if size < header:
+                                if metadata.status_code not in (200, 206):
                                     break
-                                if box_type == b"moov":
-                                    q = pos + header
-                                    end = min(pos + size, len(buf))
-                                    while q + 8 <= end:
-                                        inner_size = int.from_bytes(
-                                            buf[q : q + 4], "big"
-                                        )
-                                        if inner_size < 8:
-                                            break
-                                        if buf[q + 4 : q + 8] == b"mvhd":
-                                            version = buf[q + 8]
-                                            if (
-                                                version == 0
-                                                and q + 28 <= len(buf)
-                                            ):
-                                                timescale = int.from_bytes(
-                                                    buf[q + 20 : q + 24],
-                                                    "big",
-                                                )
-                                                duration = int.from_bytes(
-                                                    buf[q + 24 : q + 28],
-                                                    "big",
-                                                )
-                                            elif q + 40 <= len(buf):
-                                                timescale = int.from_bytes(
-                                                    buf[q + 28 : q + 32],
-                                                    "big",
-                                                )
-                                                duration = int.from_bytes(
-                                                    buf[q + 32 : q + 40],
-                                                    "big",
-                                                )
-                                            else:
-                                                timescale = 0
-                                                duration = 0
-                                            if timescale:
-                                                video_duration = (
-                                                    duration / timescale
-                                                )
-                                            break
-                                        q += inner_size
+                                if metadata.status_code == 200:
+                                    full_content = metadata.content
+                                buf = metadata.content if full_content is None else full_content[offset:offset + 64]
+                            else:
+                                buf = full_content[offset:offset + 64]
+                            if len(buf) < 8:
+                                break
+                            size = int.from_bytes(buf[:4], "big")
+                            kind = buf[4:8]
+                            header = 16 if size == 1 else 8
+                            if size == 1:
+                                size = int.from_bytes(buf[8:16], "big")
+                            if size < header:
+                                break
+                            if kind == b"moov":
+                                movie_end = offset + size
+                                offset += header
+                                continue
+                            if kind == b"mvhd" and movie_end is not None:
+                                version = buf[header]
+                                scale_pos = header + (20 if version == 1 else 12)
+                                duration_pos = scale_pos + 4
+                                duration_size = 8 if version == 1 else 4
+                                if version not in (0, 1) or len(buf) < duration_pos + duration_size:
                                     break
-                                pos += size
+                                timescale = int.from_bytes(buf[scale_pos:duration_pos], "big")
+                                duration = int.from_bytes(buf[duration_pos:duration_pos + duration_size], "big")
+                                if timescale:
+                                    video_duration = duration / timescale
+                                break
+                            offset += size
+                            if movie_end is not None and offset >= movie_end:
+                                break
                 except OSError:
-                    pass  # 视频元数据获取失败按普通课程处理
-                result["video_duration"] = video_duration
+                    pass
+                durations.append(video_duration)
+            if durations:
+                if not all(durations) and self.video_speed > 0:
+                    raise RuntimeError("视频时长获取失败")
+                result["video_duration"] = sum(durations) if all(durations) else 0.0
                 self.log.info(
-                    f"视频课程，视频时长 "
-                    f"{self._format_duration(video_duration) if video_duration else '未知'}"
+                    "视频课程，视频时长 "
+                    f"{self._format_duration(sum(durations)) if all(durations) else '未知'}"
                 )
 
             # 不加载 apicenext.js 的课程：JS 无 nonstrMap。仍解析 nav 步数供
             # jupiter_fallback=true 时使用（默认关闭，完全对齐官方不发轨迹）
-            if "apicenext.js" not in html:
-                result["has_exam"] = (
-                    "saveExamQuestion" in html or "listQuestions" in html
-                )
+            if not any("apicenext.js" in urlparse(url).path for url in script_urls):
                 nav_pages, _ = _count_nav_pages(html)
                 if nav_pages:
                     result["total_step"] = nav_pages
@@ -1833,31 +1922,6 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                 return result
 
             result["uses_apinext"] = True
-            script_urls = [
-                urljoin(html_url, src)
-                for src in re.findall(r'<script\b[^>]*\bsrc=["\']([^"\']+)["\']', html)
-                if "item.js" in src or f"{course_code}.js" in src
-            ]
-            script_urls.extend(
-                [
-                    f"{html_url.rsplit('/', 1)[0]}/js/item.js",
-                    f"{html_url.rsplit('/', 1)[0]}/build/js/{course_code}.js",
-                ]
-            )
-
-            seen_urls: set[str] = set()
-            for item_url in script_urls:
-                if item_url in seen_urls:
-                    continue
-                seen_urls.add(item_url)
-                # JS 由 HTML 加载，Referer 是 HTML 自身的 URL
-                content = _fetch_text(self.api.session, item_url, referer=html_url)
-                if not content:
-                    continue
-                result["nonstr_map"] = _extract_map(content)
-                result["has_exam"] = result["has_exam"] or _check_exam(content)
-                if result["nonstr_map"] or result["has_exam"]:
-                    break
 
             # 推导 total_step（finish=2 的调用次数 = finish=1 的 step - 1）
             # 每个题目页会产生 2 次额外 apinext 调用（提交 → 结果页 → 继续）
@@ -1876,6 +1940,8 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                     parts.append(f"+{extra_steps}题")
                 result["total_step_source"] = " ".join(parts)
 
+        except RuntimeError:
+            raise
         except Exception as e:  # noqa: BLE001 -- 解析边界，尽力而为，失败返回默认结构
             self.log.warning(f"解析课程 JS 失败：{e}")
         return result
@@ -1892,21 +1958,19 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
         unique_no: str = "",
         finish: int = 2,
         step_delay: float = 1,
+        finish_step: int | None = None,
     ) -> str:
-        """调用 apinext 接口模拟翻页学习过程
-
-        finish=2：逐页发送 step=1..total_step 模拟中间翻页（nonstr 来自 nonstr_map）。
-        finish=1：发送 step=total_step+1 标记学习完成（nonstr 为空，因为 nonstr_map
-        中不包含完成步，所以需要偏移 +1）。
+        """上报翻页和完课步骤。
 
         :param user_course_id: 用户课程 ID
         :param course_id: 课程 ID
         :param user_project_id: 用户项目 ID
-        :param nonstr_map: nonstr 值映射（step → nonstr 值）
+        :param nonstr_map: step 对应的 nonstr 值
         :param total_step: finish=2 的调用次数
         :param unique_no: 本次学习的唯一标识
         :param finish: 2=中间步骤, 1=完成标记
         :param step_delay: 每步之间的延迟（秒）
+        :param finish_step: 完成步骤，默认 total_step+1
         :return: unique_no
         """
         if unique_no == "":
@@ -1956,12 +2020,13 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                 # nonstr_map 的 key 对应 finish=2 的 step，完成步 (finish=1) 不在 map 中
                 _send_step(step, 2, nonstr_map.get(step, ""), f"{step}/{total_step}")
         else:
+            step = finish_step if finish_step is not None else total_step + 1
+            # nextnummax 会过滤回退后重复的步骤。
+            if step <= total_step:
+                return unique_no
             if step_delay:
                 time.sleep(step_delay)
-            # finish=1 的 step 需要偏移 total_step + 1（nonstr_map 不含此步）
-            _send_step(
-                total_step + 1, 1, "", f"完成标记 step={total_step + 1}"
-            )
+            _send_step(step, 1, nonstr_map.get(step, ""), f"完成标记 step={step}")
         return unique_no
 
     @staticmethod

@@ -18,20 +18,52 @@ def pkcs7_pad(data: bytes, block_size: int = 16) -> bytes:
     return data + bytes([pad_len] * pad_len)
 
 
-def handle_response(response: requests.Response) -> dict[str, Any]:
-    """处理接口响应"""
+def _check_http_status(response: requests.Response) -> None:
+    """检查 HTTP 错误和账号锁定。"""
+    if response.status_code == 701 or (
+        response.text.lstrip().startswith("<") and "Account locked" in response.text
+    ):
+        message = f"HTTP {response.status_code}"
+        if "Account locked" in response.text:
+            message += ": Account locked"
+        raise PermissionError(message)
+    if response.status_code == 403:
+        raise PermissionError("Token 无效，不允许同时登录，请重新登录")
+    if response.status_code in (401, 463):
+        raise PermissionError("登录已失效，请按原方式重新登录")
     if response.status_code != 200:
-        if response.status_code == 403:
-            raise PermissionError("Token 无效，不允许同时登录，请重试")
-        if response.status_code == 401:
-            raise PermissionError("Token 无效，请检查账号信息")
-        print(f"请求失败：{response.status_code} {response.text}")
-        return {}
+        raise RuntimeError(f"接口请求失败（HTTP {response.status_code}），已停止当前账号")
+
+
+def _check_account_response(result: Any) -> dict[str, Any]:
+    """检查账号限制并展开 result。"""
+    if not isinstance(result, dict):
+        raise RuntimeError("接口响应格式异常：预期为 JSON 对象，已停止当前账号")  # noqa: TRY004
+    wrapped = result.get("result")
+    payloads = [result, wrapped] if isinstance(wrapped, dict) else [result]
+    for payload in payloads:
+        detail = str(payload.get("detailCode", ""))
+        messages = (str(payload.get("msg", "")), str(payload.get("message", "")))
+        if detail == "-105":
+            raise PermissionError("登录已失效，请按原方式重新登录")
+        if detail in {"701", "10018"} or any(
+            text in message
+            for message in messages
+            for text in ("Account locked", "行为存在异常", "学习行为异常")
+        ):
+            message = payload.get("msg") or payload.get("message") or f"detailCode={detail}"
+            raise PermissionError(message)
+    return wrapped if isinstance(wrapped, dict) else result
+
+
+def handle_response(response: requests.Response) -> dict[str, Any]:
+    """解析 JSON 响应，失败时抛出异常。"""
+    _check_http_status(response)
     try:
-        return response.json()
+        result = response.json()
     except json.JSONDecodeError:
-        print(f"响应内容不是有效的 JSON：{response.text}")
-        return {}
+        raise RuntimeError("接口响应不是有效的 JSON，已停止当前账号") from None
+    return _check_account_response(result)
 
 
 class LoggingSession:
@@ -400,6 +432,10 @@ class WeBanAPI:
     # ========================================================================
     # 首页 / 项目
     # ========================================================================
+
+    def get_user_guide(self) -> dict[str, Any]:
+        """查询待完成的新手引导。"""
+        return self._post("/pharos/userguide/get.do")
 
     def list_completion(self) -> dict[str, Any]:
         """
@@ -882,17 +918,10 @@ class WeBanAPI:
         unique_no: str | None = None,
         referer: str | None = None,
     ) -> dict[str, Any]:
-        """
-        通过 userCourseId 或验证码 token 完成课程。
-        :param user_course_id: 用户课程 ID
-        :param token: 验证码获取的 token，weiban 模式会替代 URL 中的 id
-        :param course_type: 决定接口——"weiban"（JSONP GET，需绕过跨域）、"open"（POST）、"moon"（POST）
-        :param unique_no: 仅 apicenext 课程传入；与翻页共用同一 uuid。普通课不传
-          （sdk.js: `if (typeof uuid !== 'undefined') opts.uniqueNo = uuid`）
-        :param referer: JSONP 完课 Referer，默认 mcwk 根路径（与浏览器 script 请求一致）
-        :return: 完成结果 dict
-        JSONP 模式是因为 weiban 服务端返回 callback 包裹而非 JSON，前端通过 <script> 标签跨域拉取。
-        detailCode=10018 表示「系统检测到您的行为存在异常」，不是进度未落库，禁止重试。
+        """通过 JSONP GET 完课。
+
+        token 替代 weiban URL 中的课程 ID。
+        unique_no 复用翻页 UUID，未加载 apicenext.js 时不传。
         """
         data = {"userCourseId": user_course_id, "tenantCode": self.tenant_code}
         if unique_no:
@@ -905,32 +934,21 @@ class WeBanAPI:
         else:
             url = f"{self.baseurl}/pharos/usercourse/v2/{token or user_course_id}.do"
 
-        is_jsonp = course_type not in ("open", "moon")
-        if is_jsonp:
-            ts = int(self.get_timestamp(13, 0))
-            cb = f"jQuery3410{randint(10**15, 10**16 - 1)}_{ts}"
-            headers = {
-                "Accept": "*/*",
-                "Referer": referer or "https://mcwk.mycourse.cn/",
-                "X-Token": None,
-            }
-            response = self.session.get(
-                url,
-                params={**data, "callback": cb, "_": ts + 1},
-                headers=headers,
-                timeout=self.timeout,
-            )
-        else:
-            response = self.session.post(url, data=data, timeout=self.timeout)
+        ts = int(self.get_timestamp(13, 0))
+        cb = f"jQuery3410{randint(10**15, 10**16 - 1)}_{ts}"
+        headers = {
+            "Accept": "*/*",
+            "Referer": referer or "https://mcwk.mycourse.cn/",
+            "X-Token": None,
+        }
+        response = self.session.get(
+            url,
+            params={**data, "callback": cb, "_": ts + 1},
+            headers=headers,
+            timeout=self.timeout,
+        )
 
-        if response.status_code == 701 or "Account locked" in response.text:
-            return {
-                "code": "-1",
-                "detailCode": "701",
-                "msg": "Account locked",
-                "raw": response.text,
-            }
-
+        _check_http_status(response)
         try:
             result = response.json()
         except json.JSONDecodeError:
@@ -941,18 +959,20 @@ class WeBanAPI:
             try:
                 result = json.loads(text)
             except json.JSONDecodeError:
-                return {"raw": response.text}
-        return result
+                raise RuntimeError("完课接口响应不是有效的 JSON/JSONP，已停止当前账号") from None
+        return _check_account_response(result)
 
-    def finish_lyra(self, user_activity_id: str) -> dict[str, Any]:
-        """完成安全实训（Lyra 独立微服务，不走 _post 统一入口）
-        :param user_activity_id: 用户活动 ID
-        :return: 完成结果 dict
-        {"msg":"ok","code":"0","detailCode":"0"}
-        """
+    def finish_lyra(
+        self, user_activity_id: str, unique_no: str | None = None
+    ) -> dict[str, Any]:
+        """提交 Lyra 实训完课记录。"""
+        data = {"userActivityId": user_activity_id}
+        if unique_no:
+            data["uniqueNo"] = unique_no
         response = self.session.post(
             "https://lyra.mycourse.cn/lyraapi/study/course/finish.api",
-            data={"userActivityId": user_activity_id},
+            data=data,
+            headers={"X-Token": None, "Referer": "https://mcwk.mycourse.cn/", "Origin": "https://mcwk.mycourse.cn"},
             timeout=self.timeout,
         )
         return handle_response(response)
@@ -1268,7 +1288,7 @@ class WeBanAPI:
         }
         """
         return self._post(
-            "/pharos/exam/freshPaper.do", {"userExamPlanId": user_exam_plan_id}
+            "/pharos/exam/refreshPaper.do", {"userExamPlanId": user_exam_plan_id}
         )
 
     def exam_review_paper(

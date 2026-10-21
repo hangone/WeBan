@@ -303,3 +303,5 @@ answer/*
 .claude
 src/
 logs/
+docs/
+tests/
