@@ -126,27 +126,46 @@ def _extract_map(content: str) -> dict:
     return {}
 
 
-def _strip_js_comments(content: str) -> str:
-    """删除 JS 注释，保留字符串。"""
-    return re.sub(
-        r'''("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`)|/\*[\s\S]*?\*/|//[^\n]*''',
-        lambda match: match.group(1) or "",
-        content,
+def _js_tokens(script: str):
+    """按词法区分字符串、正则与注释，避免压缩代码里的 / 被误判。"""
+    pattern = re.compile(
+        r'''\s+|//[^\n]*|/\*[\s\S]*?\*/|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|[\w$]+|=>|\+\+|--|.''',
+        re.DOTALL,
     )
+    regex_literal = re.compile(r"/(?:\\.|\[(?:\\.|[^\]\\])*\]|[^/\\\n])+/[a-z]*")
+    position, allow_regex = 0, True
+    prefixes = {"return", "throw", "case", "typeof", "void", "delete", "yield", "await", "in", "of", "new"}
+    while position < len(script):
+        token = regex_literal.match(script, position) if allow_regex and script[position] == "/" and not script.startswith(("//", "/*"), position) else None
+        is_regex = token is not None
+        token = token or pattern.match(script, position)
+        if token is None:
+            break
+        value = token.group()
+        yield position, value, value.startswith(("//", "/*")) and not is_regex
+        position = token.end()
+        if value.isspace() or value.startswith(("//", "/*")) and not is_regex:
+            continue
+        allow_regex = not is_regex and (value in prefixes or value in {"(", "[", "{", "=", ",", ":", ";", "!", "?", "&", "|", "+", "-", "*", "%", "~", "^", "<", ">", "=>"})
+
+
+def _strip_js_comments(content: str) -> str:
+    """删除 JS 注释，保留字符串和正则表达式。"""
+    return "".join(" " if comment else value for _, value, comment in _js_tokens(content))
 
 
 def _js_block_end(script: str, start: int) -> int:
-    """查找代码块结尾，忽略字符串中的花括号。"""
+    """查找代码块结尾，不计字符串、正则和注释里的花括号。"""
     depth = 1
-    for token in re.finditer(
-        r'''"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|[{}]''', script[start:]
-    ):
-        if token.group() == "{":
+    for position, value, comment in _js_tokens(script[start:]):
+        if comment:
+            continue
+        if value == "{":
             depth += 1
-        elif token.group() == "}":
+        elif value == "}":
             depth -= 1
         if depth == 0:
-            return start + token.start()
+            return start + position
     return len(script)
 
 
@@ -256,11 +275,49 @@ def _video_course_jumps(script: str) -> dict[str, str]:
     return jumps
 
 
+def _direct_course_steps(html: str, script: str) -> tuple[int, int] | None:
+    """识别直接绑定按钮的课程，不按课程编号选择规则。"""
+    handlers = list(re.finditer(
+        r'''(?:\$\(["']\.([^"']+)["']\)\.(?:on|click)\(\s*(?:["']click["']\s*,\s*)?|document\.querySelector\(["']\.([^"']+)["']\)\.addEventListener\(["']click["']\s*,\s*)function\s*\([^)]*\)\s*\{''', script
+    ))
+    actions = {}
+    for handler in handlers:
+        selector = handler.group(1) or handler.group(2)
+        body = script[handler.end():_js_block_end(script, handler.end())]
+        count = len(re.findall(r'''callApinext\(["']next["']\s*,\s*2''', body))
+        if count and selector not in {"btn-prev", "btn-next"}:
+            actions[selector] = count
+    has_end = bool(re.search(r'''callApinext\(["']next["']\s*,\s*1''', script))
+    if not has_end or not actions:
+        return None
+    if "btn-next-prev" in html:
+        return None
+    if re.search(r'''\$\(["']\.btn-next["']\)\.each''', script):
+        sections = re.findall(r'''<section\b[^>]*class=["']([^"']*\bpage-item\b[^"']*)["'][^>]*>([\s\S]*?)(?=<section\b[^>]*class=["'][^"']*\bpage-item\b|$)''', html)
+        ordinary = sum(any("btn-next" in c.split() for c in re.findall(r'''class=["']([^"']+)["']''', body)) for classes, body in sections if "page-reciprocal" not in classes.split())
+        middle = ordinary + sum(actions.values())
+    else:
+        # 编译模板把开始按钮保存到局部变量后注册事件。
+        start = re.search(r'''([\w$]+)=["']\.page-start-btn["']''', script)
+        if start:
+            binding = re.search(r"document\.querySelector\(" + re.escape(start.group(1)) + r'''\)\.addEventListener\(["']click["']\s*,\s*function\([^)]*\)\s*\{''', script[start.end():])
+            if binding:
+                offset = start.end() + binding.end()
+                body = script[offset:_js_block_end(script, offset)]
+                for nested in reversed(list(re.finditer(r"function\s*\([^)]*\)\s*\{", body))):
+                    end = _js_block_end(body, nested.end())
+                    body = body[:nested.start()] + body[end + 1:]
+                actions["page-start-btn"] = len(re.findall(r'''callApinext\(["']next["']\s*,\s*2''', body))
+        middle = sum(actions.values())
+    return middle, middle + 1
+
+
 def _dynamic_course_steps(html: str, script: str, has_questions: bool, question_count: int = 2) -> tuple[int, int] | None:
     """返回动态题目分支的中间步数和完成 step。"""
     question_branch = re.search(
         r"\bif\s*\([^{};]*\bexamQuestionList\.length\s*>\s*0\s*\)\s*\{", script
     )
+    selected = ""
     if question_branch:
         block_end = _js_block_end(script, question_branch.end())
         selected = script[question_branch.end():block_end] if has_questions else ""
@@ -273,13 +330,56 @@ def _dynamic_course_steps(html: str, script: str, has_questions: bool, question_
                 selected = script[begin:block_end]
             chain_end = block_end + 1
         script = script[:question_branch.start()] + selected + script[chain_end:]
+        # 空题分支会改掉下一页按钮的类名，委托事件随后不再匹配原按钮。
+        for mutation in re.finditer(
+            r'''\$\(["']\.(page-[\w-]+)\s+\.([\w-]+)["']\)\.addClass\(["']([\w -]+)["']\)\.removeClass\(["']([\w -]+)["']\)''', selected
+        ):
+            # 改名后若页面显式解绑旧事件，原按钮不再上报；否则旧监听仍有效。
+            unbound = re.search(
+                r'''\$\([^)]*\)\.off\(["']click["']\)''', script
+            ) or re.search(r'''\$\(document\)\.on\(["']click["']\s*,\s*["']\.'''
+                           + re.escape(mutation.group(2)) + r'''["']''', script)
+            if not unbound:
+                continue
+            for section in re.finditer(r'''<section\b[^>]*class=["']([^"']+)["'][^>]*>[\s\S]*?</section>''', html):
+                if mutation.group(1) not in section.group(1).split():
+                    continue
+                def update_class(match, mutation=mutation):
+                    classes = match.group(1).split()
+                    if mutation.group(2) in classes:
+                        classes = [name for name in classes if name not in mutation.group(4).split()] + mutation.group(3).split()
+                    return 'class="' + " ".join(classes) + '"'
+                updated = re.sub(r'''class=["']([^"']+)["']''', update_class, section.group())
+                html = html[:section.start()] + updated + html[section.end():]
+                break
+    # 空题分支会用选择器列表摘掉具体按钮的 btn-next，这些按钮不再上报。
+    for selector_list, classes in re.findall(
+        r'''\$\(["']([^"']+)["']\)\.removeClass\(["']([\w -]+)["']\)''', selected
+    ) if question_branch else []:
+        if "btn-next" not in classes.split():
+            continue
+        for selector in selector_list.split(","):
+            name = selector.strip().lstrip(".")
+            if not name or name.startswith("page-"):
+                continue
+            for section in re.finditer(r'''<section\b[^>]*class=["']([^"']+)["'][^>]*>[\s\S]*?</section>''', html):
+                if f'"{name}' not in section.group(0) and f' {name} ' not in section.group(0):
+                    continue
+                def strip_class(match, name=name):
+                    items = match.group(1).split()
+                    if name not in items:
+                        return match.group()
+                    return 'class="' + " ".join(item for item in items if item != "btn-next") + '"'
+                updated = re.sub(r'''class=["']([^"']+)["']''', strip_class, section.group())
+                html = html[:section.start()] + updated + html[section.end():]
+                break
     sections = list(re.finditer(
         r'''<section\b[^>]*class=["']([^"']*\bpage-item\b[^"']*)["'][^>]*>([\s\S]*?)(?=<section\b[^>]*class=["'][^"']*\bpage-item\b|$)''', html
     ))
     names = [next((c for c in section.group(1).split() if re.fullmatch(r"page-(?:\d+|aq\d+|at\d+|af\d+)", c)), "") for section in sections]
     if not re.search(r"function\s+BtnFn\s*\(", script):
         if not ("btn-next-prev" in html and re.search(r'''\$\(["']\.page-active["']\)\.next\(\)\.addClass\(["']page-active''', script)):
-            return None
+            return _direct_course_steps(html, script)
         numeric = [name for name in names if re.fullmatch(r"page-\d+", name)]
         endpoint = None
         if has_questions:
@@ -295,12 +395,18 @@ def _dynamic_course_steps(html: str, script: str, has_questions: bool, question_
             unconditional_next = "page-reciprocal" not in next_body and bool(re.search(r'''callApinext\(["']next["']\s*,\s*2''', next_body))
         if endpoint in numeric and not (unconditional_next and not has_questions):
             numeric = numeric[:numeric.index(endpoint) + 1]
-        elif has_questions and endpoint not in numeric:
+        elif has_questions and endpoint not in numeric and re.search(r"getQuestions\s*\(", script):
             return None
         middle = len(numeric) + int(has_questions or unconditional_next)
         return (middle, middle + 1) if numeric else None
     start = re.search(
-        r'''BtnFn\(["']\.btn-start["']\s*,\s*["']\.page-start["']\s*,\s*["']\.page-(\d+)["']''', script
+        r'''BtnFn\(["']\.btn-start["']\s*,\s*["']\.page-start["']\s*,\s*["']\.page-((?:aq)?\d+)["']''', script
+    )
+    # 题目前可能是内容页内的最后一个 box（例如 .e7），先还原所属 page。
+    script = re.sub(
+        r'''(BtnFn\(["']\.btn-ce["']\s*,\s*["']\.)([\w-]+)(["']\s*,\s*["']\.page-aq)''',
+        lambda match: match.group(1) + next((name for name, section in zip(names, sections, strict=True)
+            if any(match.group(2) in classes.split() for classes in re.findall(r'''class=["']([^"']+)["']''', section.group(2)))), match.group(2)) + match.group(3), script,
     )
     ends = list(re.finditer(
         r'''BtnFn\(["']\.btn-ce["']\s*,\s*["']\.page-(\d+)["']\s*,\s*["']\.page-aq''', script
@@ -333,7 +439,8 @@ def _dynamic_course_steps(html: str, script: str, has_questions: bool, question_
     body = script[btnfn.end():_js_block_end(script, btnfn.end())]
     next_pattern = r'''callApinext\(["']next["']\s*,\s*2'''
     prev_pattern = r'''callApinext\(["']prev["']\s*,\s*2'''
-    branch_pattern = r'''if\s*\(\s*Btn\s*==+\s*["']([^"']+)["']\s*\)\s*\{'''
+    button_test = r'''Btn\s*==+\s*["']([^"']+)["']'''
+    branch_pattern = r'''if\s*\(\s*((?:Btn\s*==+\s*["'][^"']+["']\s*)(?:\|\|\s*Btn\s*==+\s*["'][^"']+["']\s*)*)\)\s*\{'''
     deltas = {}
     selectors = {".btn-start", ".btn-ce"}
     selectors.update(re.findall(r'''BtnFn\(["']([^"']+)["']\s*,''', script))
@@ -342,12 +449,12 @@ def _dynamic_course_steps(html: str, script: str, has_questions: bool, question_
         while branch := re.search(branch_pattern, selected_body):
             begin = branch.end()
             block_end = _js_block_end(selected_body, begin)
-            selected = selected_body[begin:block_end] if branch.group(1) == selector else None
+            selected = selected_body[begin:block_end] if selector in re.findall(button_test, branch.group(1)) else None
             chain_end = block_end + 1
             while other := re.match(r"\s*else\s*(?:" + branch_pattern[:-2] + r")?\s*\{", selected_body[chain_end:]):
                 begin = chain_end + other.end()
                 block_end = _js_block_end(selected_body, begin)
-                if selected is None and (other.group(1) is None or other.group(1) == selector):
+                if selected is None and (other.group(1) is None or selector in re.findall(button_test, other.group(1))):
                     selected = selected_body[begin:block_end]
                 chain_end = block_end + 1
             selected_body = selected_body[:branch.start()] + (selected or "") + selected_body[chain_end:]
@@ -382,15 +489,27 @@ def _dynamic_course_steps(html: str, script: str, has_questions: bool, question_
         sources = list(dict.fromkeys(sources))
         if len(sources) > 1 and all(not re.search(r'''\bclass=["'][^"']*\bbtn-next\b''', sections[names.index(source)].group(2)) for source in sources):
             skipped.update(sources[1:])
+    nested_selectors = set()
+    for helper in re.finditer(r"function\s+([\w$]+)\s*\(\s*([\w$]+)\s*\)\s*\{", script):
+        helper_body = script[helper.end():_js_block_end(script, helper.end())]
+        if re.search(r'''\.parents\(["']\.box["']\)\.next\(''', helper_body) and re.search(next_pattern, helper_body):
+            nested_selectors.update(re.findall(re.escape(helper.group(1)) + r'''\(["']\.([^"']+)["']\)''', script))
     nav_selectors = {"btn-next"}
     for nav in re.finditer(
         r'''\$\(["']\.([\w-]+)["']\)\.(?:each|click|on)\(\s*(?:["'][^"']+["']\s*,\s*)?function\s*\([^)]*\)\s*\{''', script
     ):
         nav_body = script[nav.end():_js_block_end(script, nav.end())]
-        if nav.group(1).startswith("btn-next") and re.search(next_pattern, nav_body):
+        if nav.group(1) not in {"btn-at", "btn-at01", "btn-af"} and re.search(next_pattern, nav_body) and (
+            nav.group(1).startswith("btn-next")
+            or re.search(r'''\.parents\(["']\.page-item["']\)\.next\(\)\.addClass\(["']page-active''', nav_body)
+        ):
             nav_selectors.add(nav.group(1))
     for section in sections[first:last + 1]:
         if (not (has_questions and dynamic_questions) or continuation) and last_page in section.group(1).split():
+            if nested_selectors:
+                middle += sum(bool(nested_selectors.intersection(classes.split())) for classes in re.findall(
+                    r'''class=["']([^"']+)["']''', section.group(2)
+                )) - 1
             continue  # 完成页按钮不再发送中间步骤。
         section_name = next((name for name in section.group(1).split() if name in names), "")
         if section_name in skipped:
@@ -402,10 +521,15 @@ def _dynamic_course_steps(html: str, script: str, has_questions: bool, question_
             if player:
                 player_body = script[player.end():_js_block_end(script, player.end())]
                 auto_video = bool(re.search(r'''\$\(["']\.page-\d+["']\)\.addClass\(["']page-active["']\)''', player_body))
-        if not auto_video:
+        if not auto_video and not re.search(
+            r'''\bclass=["'][^"']*\bbtn-next-end\b''', section.group(2)
+        ):
             middle += int(any(nav_selectors.intersection(classes.split()) for classes in re.findall(
                 r'''\bclass=["']([^"']+)["']''', section.group(2)
             )))
+        middle += sum(bool(nested_selectors.intersection(classes.split())) for classes in re.findall(
+            r'''class=["']([^"']+)["']''', section.group(2)
+        ))
         page = next((name for name in section.group(1).split() if re.fullmatch(r"page-\d+", name)), "")
         for binding in re.finditer(
             r'''BtnFn\(["']([^"']+)["']\s*,\s*["']\.([^"']+)["']\s*,\s*["']\.([^"']+)["']''', script
@@ -415,21 +539,36 @@ def _dynamic_course_steps(html: str, script: str, has_questions: bool, question_
                 middle += deltas.get(binding.group(1), 0)
     # 情景按钮也会在动画回调中上报。
     reached = set(names[first:last + 1]) - skipped
-    for helper in re.finditer(r"function\s+([\w$]+)\(\s*([\w$]+)\s*,\s*([\w$]+)\s*\)\s*\{", script):
+    for helper in re.finditer(r"function\s+([\w$]+)\s*\(([^)]*)\)\s*\{", script):
+        params = [value.strip() for value in helper.group(2).split(",")]
+        if len(params) < 2:
+            continue
         callback = script[helper.end():_js_block_end(script, helper.end())]
-        if not (re.search(r"\$\(\s*" + re.escape(helper.group(2)) + r"\s*\)\.click", callback)
-                and re.search(r"\$\(\s*" + re.escape(helper.group(3)) + r'''\s*\)\.addClass\(["']page-active''', callback)):
+        targets = [param for param in params[1:] if re.search(
+            r"\$\(\s*" + re.escape(param) + r'''\s*\)\.addClass\(["']page-active''', callback
+        )]
+        if not targets or not re.search(r"\$\(\s*" + re.escape(params[0]) + r"\s*\)\.click", callback):
             continue
         count = len(re.findall(next_pattern, callback))
         sources = set()
-        for call in re.finditer(re.escape(helper.group(1)) + r'''\(["']\.([^"']+)["']\s*,\s*["']\.([^"']+)["']''', script):
-            if call.group(2) not in reached:
+        for call in re.finditer(re.escape(helper.group(1)) + r"\(([^()]*)\)", script):
+            args = [value.strip().strip("\"'") for value in call.group(1).split(",")]
+            if len(args) != len(params):
+                continue
+            selector = args[0].lstrip(".")
+            if selector in nav_selectors:
+                continue
+            destinations = [args[params.index(target)] for target in targets]
+            if not all(re.fullmatch(r"\.page-\d+", value) for value in destinations):
+                continue  # 情景按钮只在跳转到具体内容页时上报，题目页另有规则。
+            if not any(value.lstrip(".") in reached for value in destinations):
                 continue
             for name, section in zip(names, sections, strict=True):
-                if name in reached and any(call.group(1) in classes.split() for classes in re.findall(
+                if name in reached and any(selector in classes.split() for classes in re.findall(
                     r'''\bclass=["']([^"']+)["']''', section.group(2)
                 )):
-                    sources.add(name)
+                    # 同一页上不同按钮各自跳不同目标页，各算一次上报。
+                    sources.add((name, tuple(destinations)))
         middle += len(sources) * count
     handlers = list(re.finditer(
         r'''\$\(["']([^"']+)["']\)\.(?:click|on)\(\s*(?:["'][^"']+["']\s*,\s*)?function\s*\([^)]*\)\s*\{''', script
@@ -440,9 +579,14 @@ def _dynamic_course_steps(html: str, script: str, has_questions: bool, question_
         callback = script[handler.end():_js_block_end(script, handler.end())]
         if not re.search(r"\bcallApinext\s*\(", callback) and handler.group(1).startswith("."):
             # 有些情景按钮直接转到下一内容页，不触发原来的 btn-next。
+            # 逗号选择器（如 ".p1602,.p1603"）同样属于该页的情景按钮。
+            selectors = {
+                part.strip()[1:] for part in handler.group(1).split(",")
+                if part.strip().startswith(".")
+            }
             source_pages = [
                 name for name, section in zip(names, sections, strict=True)
-                if any(handler.group(1)[1:] in classes.split() for classes in re.findall(
+                if selectors and any(selectors.intersection(classes.split()) for classes in re.findall(
                     r'''\bclass=["']([^"']+)["']''', section.group(2)
                 ))
             ]
@@ -474,15 +618,24 @@ def _dynamic_course_steps(html: str, script: str, has_questions: bool, question_
     if continuation and save_callback:
         callback = script[save_callback.end():_js_block_end(script, save_callback.end())]
         middle += question_count * len(re.findall(next_pattern, callback))
-    if not dynamic_questions:
+    if re.search(r'''\bslFn\(["']''', script):
         inline_questions = len(re.findall(r'''\bslFn\(["']''', script))
         slfn = re.search(r"function\s+slFn\([^)]*\)\s*\{", script)
         if slfn:
-            middle += inline_questions * len(re.findall(next_pattern, script[slfn.end():_js_block_end(script, slfn.end())]))
-        at_handler = re.search(r'''\$\(["']\.btn-at["']\)\.each\(function\s*\([^)]*\)\s*\{''', script)
+            sl_body = script[slfn.end():_js_block_end(script, slfn.end())]
+            correct = re.search(r"if\s*\(\s*arr\.uniq\(\)\.sort\(\)\.toString\(\)\s*==+\s*arrItem\.sort\(\)\.toString\(\)\s*\)\s*\{", sl_body)
+            if correct:
+                stop = _js_block_end(sl_body, correct.end())
+                other = re.match(r"\s*else\s*\{", sl_body[stop + 1:])
+                if other:
+                    end = stop + 1 + other.end()
+                    sl_body = sl_body[:correct.start()] + sl_body[correct.end():stop] + sl_body[_js_block_end(sl_body, end) + 1:]
+            middle += inline_questions * len(re.findall(next_pattern, sl_body))
+        at_handler = re.search(r'''\$\(["']\.btn-at(?:01)?["']\)\.each\(function\s*\([^)]*\)\s*\{''', script)
         if at_handler:
             callback = script[at_handler.end():_js_block_end(script, at_handler.end())]
-            middle += max(inline_questions - 1, 0) * len(re.findall(next_pattern, callback))
+            count = inline_questions if '.btn-at01' in at_handler.group() else max(inline_questions - 1, 0)
+            middle += count * len(re.findall(next_pattern, callback))
     middle += max(delta, 0)
     return middle, middle + min(delta, 0) + 1
 
@@ -1687,6 +1840,18 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                 finish_step=finish_step,
                 step_delay=0,
             )
+        if item_info.get("trace_after_finish") and total_step and trace_enabled:
+            # 完成步（total_step+1）之后仍会补发一次翻页上报。
+            self.handle_apinext(
+                course["userCourseId"],
+                course["resourceId"],
+                task["userProjectId"],
+                nonstr_map,
+                total_step + 2,
+                unique_no=apinext_no,
+                start_step=total_step + 2,
+                step_delay=0,
+            )
         if not finish_first:
             if finish_delay:
                 time.sleep(finish_delay)
@@ -2144,6 +2309,11 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
             }
             result["nonstr_map"] = _extract_map(script)
             result["question_trace_flow"] = _question_trace_flow(html, script)
+            # 尾页点击先完成、随后无条件再发一次翻页上报。
+            result["trace_after_finish"] = bool(re.search(
+                r'''\$\(["']\.page-end["']\)\.hasClass\(["']page-active["']\)\?[\s\S]{0,220}?callApinext\(["']next["']\s*,\s*2''',
+                script,
+            ))
             result["dynamic_steps"] = {
                 "with_questions": _dynamic_course_steps(html, script, True),
                 "without_questions": _dynamic_course_steps(html, script, False),
