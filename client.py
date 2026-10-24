@@ -2376,71 +2376,57 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
         save_func,
         source: str,
     ) -> bool:
-        """答题通用逻辑，返回是否通过题库命中
+        """答题通用逻辑，返回是否通过题库命中。
 
-        题库未命中时使用 fallback 策略：先提交第一个错误选项，
-        从响应中提取 answerLabel（如 "A-B-D"），再据此提交正确答案。
-        观点题返回列表（无 answerLabel），无法使用此策略。
+        题库未命中时先提交第一个选项，从响应中提取 answerLabel，
+        再据此提交正确答案；观点题返回投票统计列表，无需修正。
         :param question: 题目数据（含 title、optionList）
         :param answers_json: 题库映射
         :param course_id: 课程 ID
         :param save_func: 提交函数（save_question 或 save_exam_question）
         :param source: sourceStr 值
-        :return: 题库命中返回 True，fallback/失败返回 False
+        :return: 首次题库答案通过返回 True，其余成功路径返回 False
         """
         title = clean_text(question.get("title", ""))
         option_list = question.get("optionList", [])
         if not option_list:
             raise RuntimeError("课程题目缺少选项，已停止学习")
 
-        # 题库命中，直接提交正确答案
+        answer_ids = []
         if title in answers_json:
             answer_ids = [
                 opt["id"]
                 for opt in option_list
                 if clean_text(opt["content"]) in answers_json[title]
             ]
-            if answer_ids:
-                result = save_func(course_id, question["id"], json.dumps(answer_ids), source)
-                if not _check_code_ok(result):
-                    raise RuntimeError("课程答案保存失败，已停止学习")
-                saved = result.get("data")
-                if isinstance(saved, list) or isinstance(saved, dict) and saved.get("isRight") in (1, "1"):
-                    return True
-                if isinstance(saved, dict) and saved.get("isRight") in (0, "0", 2, "2"):
-                    raise RuntimeError("题库答案未通过课后题校验，已停止学习")
-                raise RuntimeError("课程答案响应缺少通过状态，已停止学习")
+        matched = bool(answer_ids)
+        if not answer_ids:
+            answer_ids = [option_list[0]["id"]]
 
-        # 题库未命中：先提交第一个选项，从响应中提取正确 answerLabel
-        res = save_func(
-            course_id,
-            question["id"],
-            json.dumps([option_list[0]["id"]]),
-            source,
-        )
+        res = save_func(course_id, question["id"], json.dumps(answer_ids), source)
         if not _check_code_ok(res):
             raise RuntimeError("课程答案保存失败，已停止学习")
-        data = res.get("data", {})
-        if isinstance(data, dict) and data.get("isRight") in (1, "1"):
-            return False  # 首次已答对，无需重复提交。
-        # 观点题返回投票统计列表，无 answerLabel
+        data = res.get("data")
         if isinstance(data, list):
-            return False
+            return matched
+        if not isinstance(data, dict):
+            raise TypeError("课程答案响应格式异常，已停止学习")
+        if data.get("isRight") in (1, "1"):
+            return matched
 
+        # 题库错答也复用本次反馈，不再额外试答或遍历选项。
         answer_label = data.get("answerLabel", "")
         if not answer_label:
             raise RuntimeError("课后题未通过且缺少反馈答案，已停止学习")
-
+        if not isinstance(answer_label, str):
+            raise TypeError("课后题反馈答案格式异常，已停止学习")
         correct_letters = {ch for ch in answer_label.replace("-", "") if ch.isalpha()}
         if not correct_letters:
             raise RuntimeError("课后题反馈答案格式异常，已停止学习")
-
         letter_to_opt = {chr(65 + idx): opt for idx, opt in enumerate(option_list)}
-        answer_ids = [
-            letter_to_opt[ch]["id"] for ch in correct_letters if ch in letter_to_opt
-        ]
-        if not answer_ids:
+        if not correct_letters.issubset(letter_to_opt):
             raise RuntimeError("课后题反馈无法匹配选项，已停止学习")
+        answer_ids = [opt["id"] for letter, opt in letter_to_opt.items() if letter in correct_letters]
         corrected = save_func(course_id, question["id"], json.dumps(answer_ids), source)
         corrected_data = corrected.get("data")
         if not _check_code_ok(corrected) or not isinstance(corrected_data, dict) or corrected_data.get("isRight") not in (1, "1"):
