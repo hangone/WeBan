@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         WeBan 只读探针（weban.user.js）
+// @name         WeBan 浏览器版（weban.user.js）
 // @namespace    https://github.com/hangone/WeBan
-// @version      0.1.0
-// @description  用 config.toml 里的账号登录后，只读获取项目/进度/课程/考试信息并导出 JSON；只发 GET 和只读 POST，不写任何学习或考试数据
+// @version      0.2.0
+// @description  浏览器里完成安全教育课程学习与考试：复用页面登录态，自动学课、答题、交卷；不需要 Python 环境
 // @author       WeBan
 // @match        https://weiban.mycourse.cn/*
 // @grant        GM_setValue
@@ -10,6 +10,9 @@
 // @grant        GM_registerMenuCommand
 // @grant        GM_unregisterMenuCommand
 // @grant        GM_openInTab
+// @grant        GM_xmlhttpRequest
+// @connect      127.0.0.1
+// @connect      localhost
 // @run-at       document-start
 // ==/UserScript==
 
@@ -46,12 +49,13 @@
     'examFinishedNum',
   ];
 
-  // 只读接口白名单：POST 但不写业务数据。
-  // allow-200 只允许 HTTP 200 的纯读接口；其余按业务 code 判定：
-  //   .do 类接口成功为 code === '0'，mercury 类接口用 success/code 200。
-  // 写接口（study.do / check.do / v2 finish / jupiter next / saveExamQuestion
-  // / startPaper / submitPaper …）一律不在此表内，脚本里没有调用它们的路径。
+  // 接口表：与 api.py / client.py 一一对应。
+  // kind:
+  //   post   —— 普通 .do 接口，成功判定 code === '0'
+  //   get    —— GET 接口
+  //   mcwk   —— 课程域名下的请求（不带 X-Token）
   const ENDPOINTS = {
+    // ── 首页 / 账号 ──────────────────────────────────────
     userGuide:      { path: '/pharos/userguide/get.do',              kind: 'post' },
     listCompletion: { path: '/pharos/index/listCompletion.do',       kind: 'post' },
     labIndex:       { path: '/pharos/lab/index.do',                  kind: 'post' },
@@ -59,22 +63,43 @@
     myProject:      { path: '/pharos/index/listMyProject.do',        kind: 'post' },
     showProgress:   { path: '/pharos/project/showProgress.do',       kind: 'post' },
     listValve:      { path: '/pharos/index/listValve.do',            kind: 'post' },
-    listCategory:   { path: '/pharos/usercourse/listCategory.do',    kind: 'post' },
-    listCourse:     { path: '/pharos/usercourse/listCourse.do',      kind: 'post' },
-    listPlan:       { path: '/pharos/exam/listPlan.do',              kind: 'post' },
-    noticeIndex:    { path: '/pharos/notice/index.do',               kind: 'post' },
-    noticeList:     { path: '/pharos/notice/list.do',                kind: 'post' },
     myInfo:         { path: '/pharos/my/getInfo.do',                 kind: 'post' },
     projectStat:    { path: '/pharos/index/getProjectStat.do',       kind: 'post' },
     carousel:       { path: '/pharos/carousel/list.do',              kind: 'post' },
     simpleConfig:   { path: '/pharos/tenantconfig/getSimpleConfig.do', kind: 'post' },
-    tenantList:     { path: '/pharos/login/getTenantListWithLetter.do', kind: 'get-200' },
+    noticeIndex:    { path: '/pharos/notice/index.do',               kind: 'post' },
+    noticeList:     { path: '/pharos/notice/list.do',                kind: 'post' },
+    noticeMust:     { path: '/pharos/notice/listMust.do',            kind: 'post' },
+    viewNotice:     { path: '/pharos/notice/viewMust.do',            kind: 'post' },
+
+    // ── 课程 ────────────────────────────────────────────
+    listCategory:   { path: '/pharos/usercourse/listCategory.do',    kind: 'post' },
+    listCourse:     { path: '/pharos/usercourse/listCourse.do',      kind: 'post' },
+    study:          { path: '/pharos/usercourse/study.do',           kind: 'post' },
+    courseUrl:      { path: '/pharos/usercourse/getCourseUrl.do',    kind: 'post' },
+    courseCheck:    { path: '/pharos/usercourse/check.do',           kind: 'post' },
+    courseRating:   { path: '/pharos/resource/getNear.do',           kind: 'post' },
+
+    // ── 考试 ────────────────────────────────────────────
+    listPlan:       { path: '/pharos/exam/listPlan.do',              kind: 'post' },
+    beforePaper:    { path: '/pharos/exam/beforePaper.do',           kind: 'post' },
+    preparePaper:   { path: '/pharos/exam/preparePaper.do',          kind: 'post' },
+    startPaper:     { path: '/pharos/exam/startPaper.do',            kind: 'post' },
+    recordQuestion: { path: '/pharos/exam/recordQuestion.do',        kind: 'post' },
+    submitPaper:    { path: '/pharos/exam/submitPaper.do',           kind: 'post' },
   };
+
+  // 课程页所在的域名（mcwk），完课 / 轨迹 / 题目都在这里
+  const MCWK_ORIGIN = 'https://mcwk.mycourse.cn';
+  const RESOURCE_ORIGIN = 'https://resource.mycourse.cn';
 
   const STORE = {
     accounts: 'weban.accounts.v1',
     profile: 'weban.loginProfile.v1',
     last: 'weban.lastSnapshot.v1',
+    settings: 'weban.settings.v1',
+    captchaEndpoint: 'weban.captchaEndpoint.v1',
+    captchaToken: 'weban.captchaToken.v1',
   };
 
   // 同一个 Origin 内的相对路径 + 浏览器自动带 cookie，不需要任何跨域权限
@@ -89,196 +114,6 @@
     const n = String(Date.now());
     return n.slice(0, 10) + '.' + n.slice(10, 13);
   };
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // 1. TOML 子集解析：只为读 config.toml 的 [[account]] / [settings]
-  //    （支持字符串/数字/布尔、单行数组、# 注释、单双引号，够用为止）
-  // ──────────────────────────────────────────────────────────────────────────
-
-  function parseTomlScalar(raw) {
-    const s = raw.trim();
-    if (s === 'true') return true;
-    if (s === 'false') return false;
-    if (/^[+-]?\d+(\.\d+)?$/.test(s)) return Number(s);
-    if (s.startsWith('"') || s.startsWith("'")) {
-      const q = s[0];
-      const end = s.indexOf(q, 1);
-      return s.slice(1, end < 0 ? s.length : end);
-    }
-    if (s.startsWith('[')) {
-      const inner = s.slice(1, s.lastIndexOf(']'));
-      const items = [];
-      let buf = '';
-      let quote = null;
-      for (const ch of inner) {
-        if (quote) {
-          buf += ch;
-          if (ch === quote) quote = null;
-        } else if (ch === '"' || ch === "'") {
-          quote = ch;
-          buf += ch;
-        } else if (ch === ',') {
-          if (buf.trim()) items.push(parseTomlScalar(buf));
-          buf = '';
-        } else {
-          buf += ch;
-        }
-      }
-      if (buf.trim()) items.push(parseTomlScalar(buf));
-      return items;
-    }
-    return s;
-  }
-
-  function parseToml(text) {
-    const root = { settings: {}, ai: {}, account: [] };
-    let table = root;
-    for (const line of String(text).split(/\r?\n/)) {
-      let s = line.trim();
-      if (!s || s.startsWith('#')) continue;
-      if (s.startsWith('[[')) {
-        const name = s.slice(2, s.indexOf(']]')).trim();
-        const item = {};
-        (root[name] = root[name] || []).push(item);
-        table = item;
-        continue;
-      }
-      if (s.startsWith('[')) {
-        const name = s.slice(1, s.indexOf(']')).trim();
-        root[name] = root[name] || {};
-        table = root[name];
-        continue;
-      }
-      // 去掉行内注释（引号内的 # 不算；标量里不会出现裸引号）
-      let quote = null;
-      let cut = s.length;
-      for (let i = 0; i < s.length; i++) {
-        const ch = s[i];
-        if (quote) {
-          if (ch === quote) quote = null;
-        } else if (ch === '"' || ch === "'") quote = ch;
-        else if (ch === '#') { cut = i; break; }
-      }
-      s = s.slice(0, cut);
-      const eq = s.indexOf('=');
-      if (eq < 0) continue;
-      table[s.slice(0, eq).trim()] = parseTomlScalar(s.slice(eq + 1));
-    }
-    return root;
-  }
-
-  // 账号块：单账号可用 [tenant_name]/username 顶层写法，统一转成数组
-  function accountsFromConfig(cfg) {
-    const list = Array.isArray(cfg.account) && cfg.account.length
-      ? cfg.account
-      : cfg.tenant_name || cfg.username
-        ? [cfg]
-        : [];
-    return list
-      .map((a) => ({
-        tenantName: String(a.tenant_name || '').trim(),
-        username: String(a.username || '').trim(),
-        password: String(a.password ?? a.username ?? ''),
-      }))
-      .filter((a) => a.tenantName && a.username);
-  }
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // 2. 登录加密：AES-ECB/PKCS7，密钥为 'wbs512' 补零到 16 字节（= 原 base64
-  //    d2JzNTEyAAAAAAAAAAAAAA==），结果 URL-safe Base64（api.py encrypt 同序）
-  // ──────────────────────────────────────────────────────────────────────────
-
-  // 不用 crypto.subtle：它没有 ECB 模式，逐块套 CBC(零 IV) 每块都要开一次
-  // 异步调用；自带 AES 一次算完，且输出与 api.py 逐字节一致（有离线对照测试）。
-  function encryptLoginPayload(payload) {
-    const enc = new TextEncoder();
-    const keyBytes = new Uint8Array(16);
-    keyBytes.set(enc.encode(LOGIN_KEY).slice(0, 16));
-    return encryptEcbBlocks(enc.encode(JSON.stringify(payload)), keyBytes);
-  }
-
-  // 纯 JS AES-128 加密（ECB，PKCS7）。约 100 行，避免依赖 CryptoJS。
-  const AES = (() => {
-    const sbox = new Uint8Array(256);
-    const rcon = [0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36];
-    let p = 1, q = 1;
-    do {
-      p = p ^ ((p << 1) & 0xff) ^ (p & 0x80 ? 0x1b : 0);
-      q ^= q << 1; q ^= q << 2; q ^= q << 4; q &= 0xff;
-      if (q & 0x80) q ^= 0x09;
-      sbox[p] = (q ^ ((q << 1) | (q >>> 7)) ^ ((q << 2) | (q >>> 6)) ^
-        ((q << 3) | (q >>> 5)) ^ ((q << 4) | (q >>> 4)) ^ 0x63) & 0xff;
-    } while (p !== 1);
-    sbox[0] = 0x63;
-
-    const xtime = (a) => ((a << 1) ^ (a & 0x80 ? 0x1b : 0)) & 0xff;
-
-    function expandKey(key) {
-      const w = new Uint8Array(176);
-      w.set(key);
-      for (let i = 16, r = 0; i < 176; i += 4) {
-        let t0 = w[i - 4], t1 = w[i - 3], t2 = w[i - 2], t3 = w[i - 1];
-        if (i % 16 === 0) {
-          const tmp = t0;
-          t0 = sbox[t1] ^ rcon[r++];
-          t1 = sbox[t2];
-          t2 = sbox[t3];
-          t3 = sbox[tmp];
-        }
-        w[i] = w[i - 16] ^ t0;
-        w[i + 1] = w[i - 15] ^ t1;
-        w[i + 2] = w[i - 14] ^ t2;
-        w[i + 3] = w[i - 13] ^ t3;
-      }
-      return w;
-    }
-
-    function encryptBlock(block, w) {
-      const s = Uint8Array.from(block);
-      for (let i = 0; i < 16; i++) s[i] ^= w[i];
-      for (let round = 1; round <= 10; round++) {
-        for (let i = 0; i < 16; i++) s[i] = sbox[s[i]];
-        // ShiftRows（列主序：字节 i 对应 row=i%4, col=(i/4)|0）
-        const t = s.slice();
-        for (let c = 0; c < 4; c++) {
-          for (let r = 1; r < 4; r++) s[c * 4 + r] = t[((c + r) % 4) * 4 + r];
-        }
-        if (round !== 10) {
-          for (let c = 0; c < 4; c++) {
-            const a = s.slice(c * 4, c * 4 + 4);
-            const [a0, a1, a2, a3] = a;
-            // MixColumns：b0 = 2a0 ^ 3a1 ^ a2 ^ a3 = 2(a0^a1) ^ a1 ^ a2 ^ a3
-            const m = (x, y) => xtime(x ^ y) ^ y;
-            s[c * 4]     = m(a0, a1) ^ a2 ^ a3;
-            s[c * 4 + 1] = m(a1, a2) ^ a0 ^ a3;
-            s[c * 4 + 2] = m(a2, a3) ^ a0 ^ a1;
-            s[c * 4 + 3] = m(a3, a0) ^ a1 ^ a2;
-          }
-        }
-        const off = round * 16;
-        for (let i = 0; i < 16; i++) s[i] ^= w[off + i];
-      }
-      return s;
-    }
-
-    return { expandKey, encryptBlock };
-  })();
-
-  function encryptEcbBlocks(plain, key) {
-    const padLen = 16 - (plain.length % 16);
-    const padded = new Uint8Array(plain.length + padLen);
-    padded.set(plain);
-    padded.fill(padLen, plain.length);
-    const w = AES.expandKey(key);
-    const out = new Uint8Array(padded.length);
-    for (let i = 0; i < padded.length; i += 16) {
-      out.set(AES.encryptBlock(padded.subarray(i, i + 16), w), i);
-    }
-    let bin = '';
-    for (const b of out) bin += String.fromCharCode(b);
-    // api.py: urlsafe_b64encode(...)，保留 '=' 填充，- 和 _ 替换 + 和 /
-    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_');
-  }
 
   // ──────────────────────────────────────────────────────────────────────────
   // 3. 请求层：统一错误分类（api.py handle_response 的浏览器版）
@@ -301,31 +136,49 @@
     return null;
   }
 
-  // 所有请求统一走这个函数：GET 或「只读 POST」。
-  // POST 走 form-urlencoded（与浏览器表单提交同签名同 cookie 语义），
-  // 不用 fetch 的 JSON body，避免触发额外的 CORS 预检。
+  // 所有主站请求统一走这里。POST 用 form-urlencoded（与页面表单提交一致，
+  // 不触发额外的 CORS 预检）；返回 JSON。
   async function request(method, path, data, { allow200 = false } = {}) {
     const head = { ...MAIN_HEADERS, Accept: 'application/json, text/javascript, */*; q=0.01' };
     const token = getSession().token;
     if (token) head['X-Token'] = token;
-    // _post 的公共参数：tenantCode 永远带，userId 登录后带（顺序与 api.py 一致）
-    const body = new URLSearchParams();
+    if (method === 'POST') head['Content-Type'] = 'application/x-www-form-urlencoded;charset=UTF-8';
+
+    // _post 的公共参数：tenantCode 永远带，userId 登录后带
     const payload = { ...(data || {}) };
     if (session.tenantCode && payload.tenantCode === undefined) payload.tenantCode = session.tenantCode;
     if (session.userId && payload.userId === undefined) payload.userId = session.userId;
+    const body = new URLSearchParams();
     for (const [k, v] of Object.entries(payload)) {
       if (v !== undefined && v !== null) body.set(k, String(v));
     }
-    if (method === 'POST') head['Content-Type'] = 'application/x-www-form-urlencoded;charset=UTF-8';
-    // 所有 .do 接口都要求 timestamp query（api.py _post 固定加）
-    const qs = { timestamp: timestamp() };
 
-    const resp = await fetch(url(path, qs), {
+    const resp = await fetch(url(path, { timestamp: timestamp() }), {
       method,
       headers: head,
       credentials: 'include',
       body: method === 'POST' ? body.toString() : undefined,
     });
+    return parseResponse(resp, { allow200 });
+  }
+
+  // 课程域名（mcwk）的请求：不带 X-Token，Origin/Referer 指 mcwk
+  async function mcwkRequest(path, data = {}, { method = 'POST', origin = MCWK_ORIGIN } = {}) {
+    const head = { Accept: '*/*', Origin: origin, Referer: origin + '/' };
+    let body;
+    if (method === 'POST') {
+      head['Content-Type'] = 'application/x-www-form-urlencoded; charset=UTF-8';
+      const form = new URLSearchParams();
+      for (const [k, v] of Object.entries(data)) {
+        if (v !== undefined && v !== null) form.set(k, String(v));
+      }
+      body = form.toString();
+    }
+    const resp = await fetch(origin + path, { method, headers: head, credentials: 'include', body });
+    return parseResponse(resp);
+  }
+
+  async function parseResponse(resp, { allow200 = false } = {}) {
     let json = null;
     try { json = await resp.json(); } catch { json = null; }
     const err = classify(resp.status, json);
@@ -338,12 +191,51 @@
     return json;
   }
 
-  // 读接口包装：只允许白名单里的 method+path
-  async function read(name, payload = {}) {
+  // 按接口表发请求
+  async function call(name, payload = {}) {
     const def = ENDPOINTS[name];
-    if (!def) throw new Error('未登记的只读接口：' + name);
-    if (def.kind === 'get-200') return request('GET', def.path, null, { allow200: true });
-    return request('POST', def.path, payload);
+    if (!def) throw new Error('未登记的接口：' + name);
+    if (def.kind === 'post') return request('POST', def.path, payload);
+    if (def.kind === 'get') return request('GET', def.path, payload, { allow200: true });
+    throw new Error('未知接口类型：' + def.kind);
+  }
+
+  // ── mercury 签名接口（课程题目）─────────────────────────
+  // api.py _mercury_request：标准化参数 + 按 key 升序拼 secret+keyvalue+secret 做 SHA1。
+  const MERCURY_URL = RESOURCE_ORIGIN + '/mercuryprovider/router';
+  const MERCURY_KEY = 'vtjikcng';
+
+  async function sha1HexUppercase(text) {
+    const buf = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(text));
+    return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+  }
+
+  async function mercury(params) {
+    const merged = {
+      appKey: '00000001',
+      format: 'json',
+      v: '1.0',
+      timestamp: timestamp(),
+      clientId: 'pharos',
+      ...params,
+    };
+    const sortedKeys = Object.keys(merged).sort();
+    let signStr = MERCURY_KEY;
+    for (const k of sortedKeys) signStr += k + String(merged[k]);
+    signStr += MERCURY_KEY;
+    merged.sign = await sha1HexUppercase(signStr);
+
+    const resp = await fetch(MERCURY_URL, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        ...MAIN_HEADERS,
+        Accept: '*/*',
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+      },
+      body: new URLSearchParams(merged).toString(),
+    });
+    return parseResponse(resp);
   }
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -424,58 +316,236 @@
   }
 
   // ──────────────────────────────────────────────────────────────────────────
-  // 5. 登录流程（api.py：randLetterImage → login，body AES 加密）
-  //    账号来自 config.toml；密码只在本机内存里，不落 GM 存储。
+  // 5.5 业务动作：学习课程、考试（对应 client.py 的核心流程）
   // ──────────────────────────────────────────────────────────────────────────
 
-  async function randLetterImage(verifyTime) {
-    const resp = await fetch(url('/pharos/login/randLetterImage.do', { time: verifyTime }), {
-      credentials: 'include',
-    });
-    return resp.blob();
-  }
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-  async function login(account, verifyCode, verifyTime) {
-    const payload = {
-      keyNumber: account.username,
-      password: account.password,
-      tenantCode: account.tenantCode,
-      time: verifyTime,
-      verifyCode,
-    };
-    const encrypted = await encryptLoginPayload(payload);
-    const body = new URLSearchParams({ data: encrypted });
-    const resp = await fetch(url('/pharos/login/login.do', { timestamp: timestamp() }), {
-      method: 'POST',
-      credentials: 'include',
-      headers: { ...MAIN_HEADERS, 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
-      body: body.toString(),
-    });
-    let json = null;
-    try { json = await resp.json(); } catch { json = null; }
-    if (json && json.detailCode === '67') return { ok: false, reason: 'verify-wrong', raw: json };
-    const user = json?.data;
-    if (json?.code === '0' && user?.token) {
-      setSession({ token: user.token, userId: user.userId, tenantCode: user.tenantCode, source: 'login' });
-      return { ok: true, user, raw: json };
+  // 题库：answer.json 结构为 {"题目文本": ["A","B"]}，键做规范化后比对
+  let answerBank = null;
+
+  async function loadAnswerBank() {
+    if (answerBank) return answerBank;
+    try {
+      const res = await fetch('https://cdn.jsdelivr.net/gh/hangone/WeBan@main/answer/answer.json', {
+        credentials: 'omit',
+      });
+      answerBank = res.ok ? await res.json() : {};
+    } catch {
+      answerBank = {};
     }
-    return { ok: false, reason: 'login-failed', raw: json };
+    return answerBank;
   }
 
-  async function resolveTenantCode(tenantName) {
-    const res = await read('tenantList');
-    const entries = (res?.data || []).flatMap((g) => g.list || []);
-    const exact = entries.find((e) => String(e.name || '').trim() === tenantName.trim());
-    if (exact) return exact.code;
-    const fuzzy = entries.filter((e) => String(e.name || '').includes(tenantName.trim()));
-    if (fuzzy.length === 1) return fuzzy[0].code;
-    throw new Error(fuzzy.length
-      ? '学校名不唯一，请写全称：' + fuzzy.map((e) => e.name).join(' / ')
-      : '没找到学校代码，请检查 config.toml 的 tenant_name');
+  const normalizeQuestion = (text) =>
+    String(text || '')
+      .replace(/\s+/g, '')
+      .replace(/[（）()【】\[\]「」""''：:，,。.；;、!！?？]/g, '')
+      .toLowerCase();
+
+  // 题库结构：{"题目文本": {"optionList": [{"content": "...", "isCorrect": 1}], "type": 1}}
+  // 返回 isCorrect 为 1 的选项内容数组；未命中返回 null。
+  function lookupAnswer(question) {
+    if (!answerBank) return null;
+    const key = normalizeQuestion(question.title || question.content || '');
+    if (!answerIndex) {
+      answerIndex = new Map();
+      for (const [k, v] of Object.entries(answerBank)) {
+        const norm = normalizeQuestion(k);
+        if (norm) answerIndex.set(norm, v);
+      }
+    }
+    const entry = answerIndex.get(key);
+    if (!entry) return null;
+    const correct = (entry.optionList || [])
+      .filter((o) => Number(o.isCorrect) === 1)
+      .map((o) => o.content);
+    return correct.length ? correct : null;
+  }
+
+  let answerIndex = null;
+
+  // 用答案文本匹配试卷选项，返回选项 id 数组。
+  // 不按字母位置猜：题库和试卷的选项顺序可能不同，按内容匹配更稳。
+  function matchOptions(question, correctContents, fallbackRandom) {
+    const options = question.optionList || [];
+    if (!options.length) return [];
+    if (correctContents && correctContents.length) {
+      const ids = [];
+      for (const want of correctContents) {
+        const target = normalizeQuestion(want);
+        const hit = options.find((o) => normalizeQuestion(o.content) === target)
+          || options.find((o) => {
+            const optText = normalizeQuestion(o.content);
+            return optText && (optText.includes(target) || target.includes(optText));
+          });
+        if (hit && !ids.includes(hit.id)) ids.push(hit.id);
+      }
+      if (ids.length) return ids;
+    }
+    if (!fallbackRandom) return [];
+    // 兜底：多选全选，单选选第一个
+    if (Number(question.type) === 2) return options.map((o) => o.id);
+    return [options[0].id];
+  }
+
+  // ── 学习单门课程 ────────────────────────────────────────
+  // 流程对齐 client.py：study.do → getCourseUrl.do → 答题 → 等待 → 完课
+  async function learnCourse(course, project, opts = {}) {
+    const { onCancel, studySeconds = 20, randomAnswer = true } = opts;
+    const name = course.resourceName || course.resourceId;
+    const checkCancel = () => {
+      if (onCancel?.()) throw Object.assign(new Error('已取消'), { cancelled: true });
+    };
+
+    // 1) 开始学习
+    const studyRes = await call('study', {
+      courseId: course.resourceId,
+      userProjectId: project.userProjectId,
+    });
+    if (!ok(studyRes)) {
+      throw new Error('study.do 失败：' + (studyRes?.message || studyRes?.code));
+    }
+
+    // 2) 取课程 URL（含 userCourseId 等参数）
+    const urlRes = await call('courseUrl', {
+      courseId: course.resourceId,
+      userProjectId: project.userProjectId,
+    });
+    if (!ok(urlRes) || !urlRes.data) {
+      throw new Error('getCourseUrl.do 失败：' + (urlRes?.message || urlRes?.code));
+    }
+    const courseUrl = String(urlRes.data);
+    const query = new URL(courseUrl).searchParams;
+    const userCourseId = query.get('userCourseId') || course.userCourseId || '';
+
+    // 3) 课后习题：只有页面加载题目时才查（与 client.py 一致）
+    const questions = await mercury({
+      service: 'mercury.microlecture.listQuestion',
+      id: course.resourceId,
+    }).catch(() => null);
+    checkCancel();
+
+    const examQuestions = questions?.data?.examQuestionList || [];
+    if (examQuestions.length) {
+      log('  ' + name + '：课后习题 ' + examQuestions.length + ' 道');
+      for (const q of examQuestions) {
+        checkCancel();
+        const letters = lookupAnswer(q);
+        const ids = matchOptions(q, letters, randomAnswer);
+        if (!ids.length) continue;
+        await mercury({
+          service: 'mercury.microlecture.saveExamQuestion',
+          courseId: course.resourceId,
+          questionId: q.id,
+          answers: ids.join(','),
+          userId: session.userId,
+          tenantCode: session.tenantCode,
+          source: 'WEIBAN',
+        });
+        await sleep(400);
+      }
+    }
+
+    // 4) 满足最低学习时长
+    checkCancel();
+    if (studySeconds > 0) {
+      log('  ' + name + '：等待学习时长 ' + studySeconds + 's');
+      await sleep(studySeconds * 1000);
+      checkCancel();
+    }
+
+    // 5) 完课（JSONP GET，token 可为空即用 userCourseId）
+    if (!userCourseId) throw new Error('缺少 userCourseId，无法完课');
+    const finish = await finishCourse(userCourseId, query);
+    if (!ok(finish, true)) {
+      throw new Error('完课失败：' + (finish?.message || finish?.code));
+    }
+    log('  ' + name + '：完成', 'ok');
+    return true;
+  }
+
+  const ok2 = (res, strict) =>
+    !!res && (strict ? (res.code === '0' || res.code === 0 || res.code === '1' || res.code === 1) : (res.code === '0' || res.code === 0));
+
+  // 完课：pharos/usercourse/v2/<token>.do，JSONP
+  async function finishCourse(userCourseId, query) {
+    const token = query.get('csCapt') === 'true' ? null : userCourseId;
+    const path = '/pharos/usercourse/v2/' + (token || userCourseId) + '.do';
+    const ts = String(Date.now());
+    const cb = 'jQuery' + Math.floor(Math.random() * 1e16) + '_' + ts;
+    const params = new URLSearchParams({
+      userCourseId,
+      tenantCode: session.tenantCode || '',
+      callback: cb,
+      _: String(Number(ts) + 1),
+    });
+    if (query.get('uniqueNo')) params.set('uniqueNo', query.get('uniqueNo'));
+    const resp = await fetch(ORIGIN + path + '?' + params.toString(), {
+      credentials: 'include',
+      headers: { Accept: '*/*', Referer: MCWK_ORIGIN + '/' },
+    });
+    let text = await resp.text();
+    const start = text.indexOf('(');
+    const end = text.lastIndexOf(')');
+    if (start >= 0 && end > start) text = text.slice(start + 1, end);
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error('完课响应不是合法 JSON');
+    }
+  }
+
+  // ── 考试 ───────────────────────────────────────────────
+  // 流程对齐 client.py：beforePaper → preparePaper → startPaper
+  //   → 逐题 recordQuestion → submitPaper
+  async function takeExam(plan, project, opts = {}) {
+    const { onCancel, questionSeconds = 3, randomAnswer = true } = opts;
+    const checkCancel = () => {
+      if (onCancel?.()) throw Object.assign(new Error('已取消'), { cancelled: true });
+    };
+
+    const planId = plan.id || plan.examPlanId;
+    if (!planId) throw new Error('考试计划缺少 id');
+
+    await call('beforePaper', { userExamPlanId: planId });
+    await call('preparePaper', { userExamPlanId: planId });
+    checkCancel();
+
+    const started = await call('startPaper', { userExamPlanId: planId });
+    if (!ok(started)) throw new Error('开始考试失败：' + (started?.message || started?.code));
+    const paper = started.data || {};
+    const questionList = paper.questionList || [];
+    log('  试卷 ' + questionList.length + ' 题，限时 ' + (paper.answerTime || '?') + ' 分钟');
+
+    let matched = 0;
+    for (let i = 0; i < questionList.length; i++) {
+      checkCancel();
+      const q = questionList[i];
+      const letters = lookupAnswer(q);
+      if (letters) matched++;
+      const ids = matchOptions(q, letters, randomAnswer);
+      await call('recordQuestion', {
+        userExamPlanId: planId,
+        questionId: q.id,
+        useTime: Math.max(1, Math.round(questionSeconds)),
+        examPlanId: plan.examPlanId,
+        answerIds: ids.join(','),
+      });
+      if (questionSeconds > 0) await sleep(questionSeconds * 1000);
+    }
+
+    checkCancel();
+    const rate = questionList.length ? Math.round((matched / questionList.length) * 100) : 0;
+    log('  题库命中 ' + matched + '/' + questionList.length + '（' + rate + '%）');
+    const submitted = await call('submitPaper', { userExamPlanId: planId });
+    const score = submitted?.data?.score;
+    log('  交卷完成，得分 ' + (score ?? '?'), 'ok');
+    return { score, matched, total: questionList.length };
   }
 
   // ──────────────────────────────────────────────────────────────────────────
-  // 6. 只读采集：项目 → 进度 → 分类 → 课程 → 考试计划
+  // 6. 采集：项目 → 进度 → 分类 → 课程 → 考试计划（作为执行计划的数据源）
   // ──────────────────────────────────────────────────────────────────────────
 
   const logEl = () => document.getElementById('weban-probe-log');
@@ -531,7 +601,7 @@
       if (onCancel?.()) throw Object.assign(new Error('已取消'), { cancelled: true });
     };
 
-    // 6.1 首页初始化（与 client.simulate_home_page 同顺序，只读子集）
+    // 6.1 首页初始化（与 client.simulate_home_page 同顺序）
     log('读取首页状态…');
     const homeSteps = [
       ['userGuide', '新手引导'],
@@ -546,7 +616,7 @@
     for (const [name, label] of homeSteps) {
       checkCancelled();
       try {
-        const res = await read(name);
+        const res = await call(name);
         snapshot.home[name] = res;
         if (!ok(res)) warn('首页「' + label + '」返回异常：' + (res?.message || res?.code));
       } catch (e) {
@@ -562,7 +632,7 @@
 
     // 6.2 项目列表（含实验室课程，与 client._get_project_list 对齐）
     log('读取项目列表…');
-    const myProject = await read('myProject', { ended: 2 });
+    const myProject = await call('myProject', { ended: 2 });
     if (!ok(myProject)) throw new Error('项目列表读取失败：' + (myProject?.message || myProject?.code));
     const projects = [...(myProject.data || [])];
     const modules = (snapshot.home.listCompletion?.data || [])
@@ -570,7 +640,7 @@
       .map((d) => d.module);
     if (modules.includes('labProject')) {
       try {
-        const lab = await read('labIndex');
+        const lab = await call('labIndex');
         const current = lab?.data?.current;
         if (current) projects.push(current);
       } catch (e) {
@@ -596,7 +666,7 @@
 
       log('项目：' + entry.projectName);
       try {
-        const progress = await read('showProgress', { userProjectId: upid });
+        const progress = await call('showProgress', { userProjectId: upid });
         if (!ok(progress)) throw new Error(progress?.message || 'code=' + progress?.code);
         const data = progress.data || {};
         const missing = PROGRESS_FIELDS.filter((f) => !(f in data));
@@ -617,11 +687,11 @@
         const rows = [];
         entry.categories[label] = rows;
         try {
-          const cats = await read('listCategory', { userProjectId: upid, chooseType });
+          const cats = await call('listCategory', { userProjectId: upid, chooseType });
           if (!ok(cats)) throw new Error(cats?.message || 'code=' + cats?.code);
           for (const cat of cats.data || []) {
             checkCancelled();
-            const courses = await read('listCourse', {
+            const courses = await call('listCourse', {
               userProjectId: upid,
               chooseType,
               categoryCode: cat.categoryCode,
@@ -648,7 +718,7 @@
       }
 
       try {
-        const plans = await read('listPlan', { userProjectId: upid });
+        const plans = await call('listPlan', { userProjectId: upid });
         if (!ok(plans)) throw new Error(plans?.message || 'code=' + plans?.code);
         entry.examPlans = (plans.data || []).map((p) => ({
           examPlanName: p.examPlanName || '',
@@ -676,13 +746,71 @@
       Object.entries(snapshot.home).map(([k, v]) => [k, summarizeHome(k, v)]),
     );
     snapshot.account = {
-      tenantName: UI.account?.tenantName || '',
-      username: UI.account?.username || '',
+      tenantName: snapshot.home.myInfo?.tenantName || '',
+      batchName: snapshot.home.myInfo?.batchName || '',
+      orgName: snapshot.home.myInfo?.orgName || '',
       userId: session.userId || '',
       tenantCode: session.tenantCode || '',
       loginSource: session.source,
     };
     return snapshot;
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 6.5 验证码识别服务（可选）：把图片地址交给 captcha_server.py 换坐标/字符
+  //     服务端只收图片 URL，不收账号、cookie、ticket；不配置就完全跳过。
+  // ──────────────────────────────────────────────────────────────────────────
+
+  function captchaConfig() {
+    return {
+      endpoint: String(GM_getValue(STORE.captchaEndpoint, '') || '').replace(/\/+$/, ''),
+      token: String(GM_getValue(STORE.captchaToken, '') || ''),
+    };
+  }
+
+  function gmPost(url, body, token) {
+    return new Promise((resolve, reject) => {
+      GM_xmlhttpRequest({
+        method: 'POST',
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: 'Bearer ' + token } : {}),
+        },
+        data: JSON.stringify(body),
+        timeout: 20000,
+        onload: (res) => {
+          let json = null;
+          try { json = JSON.parse(res.responseText); } catch { /* 非 JSON */ }
+          if (res.status === 200 || res.status === 422) return resolve(json || {});
+          const msg = json && json.error ? json.error : 'HTTP ' + res.status;
+          reject(new Error('验证码服务：' + msg));
+        },
+        onerror: () => reject(new Error('验证码服务连接失败')),
+        ontimeout: () => reject(new Error('验证码服务超时')),
+      });
+    });
+  }
+
+  // 点选验证码：返回相对主图像素的 3 个坐标；服务不可用/识别不全时抛错或返回 null
+  async function solvePoint(bgUrl, ansUrl) {
+    const cfg = captchaConfig();
+    if (!cfg.endpoint) return null;
+    const res = await gmPost(cfg.endpoint + '/captcha/point', { bg: bgUrl, ans: ansUrl }, cfg.token);
+    if (!res || !Array.isArray(res.points)) throw new Error('验证码服务返回格式异常');
+    if (res.missing > 0) throw new Error('识别不全（缺 ' + res.missing + ' 个）');
+    return { points: res.points, width: res.width, height: res.height };
+  }
+
+  // 登录验证码：返回 4 位字符
+  async function solveText(imageUrl) {
+    const cfg = captchaConfig();
+    if (!cfg.endpoint) return null;
+    const res = await gmPost(cfg.endpoint + '/captcha/text', { image: imageUrl }, cfg.token);
+    if (!res || !res.ok || !/^[0-9a-z]{4}$/i.test(res.code || '')) {
+      throw new Error('登录验证码识别失败');
+    }
+    return res.code;
   }
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -739,18 +867,20 @@
     const root = document.createElement('div');
     root.id = 'weban-probe';
     root.innerHTML =
-      '<div class="weban-head"><b>WeBan 只读探针</b><span id="weban-probe-ver">v' + VERSION + '</span></div>' +
+      '<div class="weban-head"><b>WeBan 浏览器版</b><span id="weban-probe-ver">v' + VERSION + '</span></div>' +
       '<div class="weban-body">' +
         '<div id="weban-login"></div>' +
         '<div class="weban-row">' +
-          '<button id="weban-btn-run" class="primary">读取</button>' +
+          '<button id="weban-btn-run" class="primary">开始</button>' +
           '<button id="weban-btn-cancel" class="danger" disabled>停止</button>' +
           '<button id="weban-btn-copy">复制</button>' +
         '</div>' +
         '<div class="weban-row">' +
-          '<button id="weban-btn-json">下载 JSON</button>' +
+          '<button id="weban-btn-json">下载报告</button>' +
           '<button id="weban-btn-clear">清空</button>' +
         '</div>' +
+        '<div id="weban-settings"></div>' +
+        '<div id="weban-captcha-cfg"></div>' +
         '<div id="weban-probe-log"></div>' +
       '</div>';
     document.body.appendChild(root);
@@ -770,6 +900,8 @@
         log('快照已复制到剪贴板', 'ok');
       } catch (e) { log('复制失败：' + e.message, 'err'); }
     });
+    renderSettings();
+    renderCaptchaConfig();
     root.querySelector('#weban-btn-json').addEventListener('click', downloadJson);
     root.querySelector('#weban-btn-clear').addEventListener('click', () => {
       const el = logEl(); if (el) el.innerHTML = '';
@@ -778,38 +910,65 @@
     renderAccount();
   }
 
+  function renderSettings() {
+    const box = document.getElementById('weban-settings');
+    if (!box) return;
+    const cfg = settings();
+    box.innerHTML =
+      '<div class="weban-field"><label>每门课最短学习时长（秒）</label>' +
+      '<input id="weban-set-study" type="number" min="0" value="' + cfg.studyTime + '" /></div>' +
+      '<div class="weban-field"><label>每题答题间隔（秒）</label>' +
+      '<input id="weban-set-exam" type="number" min="0" value="' + cfg.examQuestionTime + '" /></div>' +
+      '<div class="weban-tip" style="margin-bottom:6px">' +
+      '<label><input id="weban-set-random" type="checkbox"' + (cfg.randomAnswer ? ' checked' : '') + ' /> ' +
+      '题库外的题随机作答（关闭则跳过）</label></div>' +
+      '<div class="weban-row"><button id="weban-btn-settings-save">保存设置</button></div>';
+    box.querySelector('#weban-btn-settings-save').addEventListener('click', () => {
+      GM_setValue(STORE.settings, {
+        studyTime: Math.max(0, Number(box.querySelector('#weban-set-study').value) || 0),
+        examQuestionTime: Math.max(0, Number(box.querySelector('#weban-set-exam').value) || 0),
+        randomAnswer: box.querySelector('#weban-set-random').checked,
+      });
+      log('设置已保存', 'ok');
+    });
+  }
+
+  function renderCaptchaConfig() {
+    const box = document.getElementById('weban-captcha-cfg');
+    if (!box) return;
+    const cfg = captchaConfig();
+    box.innerHTML =
+      '<div class="weban-field"><label>验证码识别服务（可选，如 http://127.0.0.1:8765）</label>' +
+      '<input id="weban-captcha-endpoint" placeholder="http://127.0.0.1:8765" value="' + esc(cfg.endpoint) + '" />' +
+      '</div>' +
+      '<div class="weban-field"><label>服务 Token（服务端设了才需要）</label>' +
+      '<input id="weban-captcha-token" placeholder="留空表示服务端未开启鉴权" value="' + esc(cfg.token) + '" />' +
+      '</div>' +
+      '<div class="weban-row"><button id="weban-btn-captcha-save">保存识别服务设置</button></div>';
+    box.querySelector('#weban-btn-captcha-save').addEventListener('click', () => {
+      const endpoint = box.querySelector('#weban-captcha-endpoint').value.trim();
+      const token = box.querySelector('#weban-captcha-token').value.trim();
+      if (endpoint && !/^https?:\/\/[^\s]+$/.test(endpoint)) {
+        log('识别服务地址格式不对，应以 http:// 或 https:// 开头', 'err');
+        return;
+      }
+      GM_setValue(STORE.captchaEndpoint, endpoint);
+      GM_setValue(STORE.captchaToken, token);
+      log(endpoint ? '识别服务已保存：' + endpoint : '已清空识别服务（恢复手动输入）', 'ok');
+    });
+  }
+
   function renderAccount() {
     const box = document.getElementById('weban-login');
     if (!box) return;
-    const acc = UI.account;
-    if (acc) {
-      box.innerHTML = '<div class="weban-tip" style="margin-bottom:8px">' +
-        '<span class="weban-badge">账号</span> ' + esc(acc.tenantName) + ' / ' + esc(acc.username) +
+    const token = session.token;
+    box.innerHTML = token
+      ? '<div class="weban-tip" style="margin-bottom:8px">' +
+          '<span class="weban-badge">已登录</span> 使用页面现有登录态' +
+        '</div>'
+      : '<div class="weban-tip is-error" style="margin-bottom:8px">' +
+          '页面未登录：请先在官网完成登录，回到首页后点「开始」' +
         '</div>';
-      return;
-    }
-    box.innerHTML =
-      '<div class="weban-field"><label>config.toml 内容（粘贴进来）</label>' +
-      '<textarea id="weban-login-toml" placeholder="[[account]]&#10;tenant_name = &quot;你的学校全称&quot;&#10;username = &quot;学号&quot;&#10;password = &quot;密码&quot;"></textarea></div>' +
-      '<div class="weban-row"><button id="weban-btn-config">解析并读第一条账号</button></div>' +
-      '<div class="weban-tip" id="weban-login-msg">' +
-      '说明：配置只在本机内存解析，密码不写入 ScriptStorage；页面已登录时直接复用现成登录态。</div>';
-    box.querySelector('#weban-btn-config').addEventListener('click', () => {
-      const text = box.querySelector('#weban-login-toml').value;
-      try {
-        const cfg = parseToml(text);
-        const list = accountsFromConfig(cfg);
-        if (!list.length) throw new Error('没解析到有效账号（需要 tenant_name/username）');
-        UI.account = list[0];
-        UI.accountList = list;
-        UI.config = cfg;
-        renderAccount();
-        log('已解析 ' + list.length + ' 个账号，使用 ' + UI.account.tenantName + ' / ' + UI.account.username, 'ok');
-      } catch (e) {
-        const msg = box.querySelector('#weban-login-msg');
-        msg.textContent = e.message; msg.classList.add('is-error');
-      }
-    });
   }
 
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -835,102 +994,121 @@
   }
 
   // ──────────────────────────────────────────────────────────────────────────
-  // 8. 登录到目标账号：优先复用页面登录态，其次用 config.toml 的账号登录
+  // 8. 登录态：本脚本不负责登录，只用页面自己的登录结果
+  //    - 用户在官网正常登录（或页面本来就登录着），脚本读取页面存储里的
+  //      token / userId / tenantCode 用于主站接口
+  //    - 没有登录态就提示用户先登录，脚本不提交账号密码
   // ──────────────────────────────────────────────────────────────────────────
 
   async function ensureLoggedIn() {
     await refreshSessionFromPage();
     const ident = readStorageIdentity();
-    if (ident) setSession({ userId: ident.userId, tenantCode: ident.tenantCode || session.tenantCode });
+    if (ident) {
+      setSession({ userId: ident.userId, tenantCode: ident.tenantCode || session.tenantCode });
+    }
     if (session.token && session.userId) {
-      log('复用页面登录态（' + session.source + '，userId…' + session.userId.slice(-6) + '）', 'ok');
+      log('已读取页面登录态（' + session.source + '，userId…' + session.userId.slice(-6) + '）', 'ok');
       return;
     }
-    if (!UI.account) {
-      throw new Error('页面未登录，且尚未填写 config.toml 账号');
-    }
-    log('使用 config.toml 账号登录：' + UI.account.tenantName + ' / ' + UI.account.username);
-    const tenantCode = await resolveTenantCode(UI.account.tenantName);
-    UI.account.tenantCode = tenantCode;
-    log('学校代码：' + tenantCode, 'ok');
-
-    for (let attempt = 1; attempt <= 5; attempt++) {
-      const verifyTime = String(Date.now()).slice(0, 13);
-      const blob = await randLetterImage(verifyTime);
-      const code = await askCaptcha(blob, attempt);
-      if (code === null) throw Object.assign(new Error('已取消登录'), { cancelled: true });
-      const res = await login(UI.account, code, Number(verifyTime));
-      if (res.ok) {
-        log('登录成功：' + (res.user.realName || res.user.userName || '') + ' userId=' + res.user.userId, 'ok');
-        return res.user;
-      }
-      if (res.reason === 'verify-wrong') { log('验证码错误，重试…', 'warn'); continue; }
-      throw new Error('登录失败：' + (res.raw?.message || res.raw?.code || '未知错误') +
-        '（请检查学校全称/学号/密码）');
-    }
-    throw new Error('验证码连续错误，已停止');
-  }
-
-  // 登录验证码：弹小窗显示图片，用户输入。只用于登录这一次，不落盘。
-  function askCaptcha(blob, attempt) {
-    return new Promise((resolve) => {
-      const imgUrl = URL.createObjectURL(blob);
-      const wrap = document.createElement('div');
-      wrap.id = 'weban-captcha';
-      wrap.style.cssText =
-        'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2147483001;' +
-        'display:flex;align-items:center;justify-content:center;';
-      wrap.innerHTML =
-        '<div style="background:#fff;border-radius:10px;padding:16px;width:260px;text-align:center">' +
-          '<div style="font-size:13px;margin-bottom:8px">登录验证码（第 ' + attempt + ' 次）</div>' +
-          '<img style="width:100%;border:1px solid #d0d7de;border-radius:6px" />' +
-          '<input id="weban-cap-input" maxlength="8" style="width:100%;box-sizing:border-box;' +
-            'margin-top:10px;padding:7px;border:1px solid #d0d7de;border-radius:6px;text-align:center;' +
-            'font-size:16px;letter-spacing:3px" autocomplete="off" />' +
-          '<div style="display:flex;gap:8px;margin-top:10px">' +
-            '<button id="weban-cap-ok" style="flex:1;padding:7px;background:#1f883d;color:#fff;border:0;border-radius:7px">确定</button>' +
-            '<button id="weban-cap-cancel" style="flex:1;padding:7px;background:#f6f8fa;border:1px solid #d0d7de;border-radius:7px">取消</button>' +
-          '</div>' +
-        '</div>';
-      wrap.querySelector('img').src = imgUrl;
-      document.body.appendChild(wrap);
-      const input = wrap.querySelector('#weban-cap-input');
-      input.focus();
-      const done = (v) => { URL.revokeObjectURL(imgUrl); wrap.remove(); resolve(v); };
-      wrap.querySelector('#weban-cap-ok').addEventListener('click', () => done(input.value.trim() || null));
-      wrap.querySelector('#weban-btn-cancel');
-      wrap.querySelector('#weban-cap-cancel').addEventListener('click', () => done(null));
-      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') done(input.value.trim() || null); });
-    });
+    const missing = [];
+    if (!session.token) missing.push('token');
+    if (!session.userId) missing.push('userId');
+    throw Object.assign(
+      new Error(
+        '页面未检测到登录态（缺 ' + missing.join(' / ') + '）。' +
+        '请先在官网完成登录，回到首页后再点「读取」。',
+      ),
+      { needsLogin: true },
+    );
   }
 
   // ──────────────────────────────────────────────────────────────────────────
-  // 9. 主流程
+  // 9. 主流程：采集 → 逐门课学习 → 逐场考试
   // ──────────────────────────────────────────────────────────────────────────
+
+  function settings() {
+    const cfg = GM_getValue(STORE.settings, null) || {};
+    return {
+      studyTime: Number(cfg.studyTime ?? 20),
+      examQuestionTime: Number(cfg.examQuestionTime ?? 3),
+      randomAnswer: cfg.randomAnswer !== false,
+    };
+  }
 
   async function runProbe() {
     if (UI.running) return;
     UI.cancelled = false;
     setRunning(true);
-    log('开始读取（只读，不会开始学习、答题或交卷）…');
+    const cfg = settings();
+    log('开始：采集 → 学习 → 考试（可在任何时候点「停止」）');
     try {
       await ensureLoggedIn();
       const snapshot = await collectSnapshot({ onCancel: () => UI.cancelled });
       GM_setValue(STORE.last, snapshot);
-      const done = snapshot.projects.reduce(
-        (n, p) => n + Object.values(p.categories).flat().filter((c) => c.finished).length, 0);
-      const total = snapshot.projects.reduce(
-        (n, p) => n + Object.values(p.categories).flat().length, 0);
-      log('完成：' + snapshot.projects.length + ' 个项目，课程 ' + done + '/' + total + ' 已完成' +
-        (snapshot.warnings.length ? '，' + snapshot.warnings.length + ' 条提示' : ''), 'ok');
+
+      await loadAnswerBank();
+
+      // 逐项目执行：先学完所有未完成课程，再考未完成的考试
+      for (const project of snapshot.projects) {
+        if (UI.cancelled) break;
+        log('===== 项目：' + project.projectName + ' =====');
+
+        for (const [label, rows] of Object.entries(project.categories)) {
+          const pending = rows.filter((r) => !r.finished);
+          if (!pending.length) continue;
+          log('  ' + label + '：待学 ' + pending.length + ' 门');
+          for (let i = 0; i < pending.length; i++) {
+            if (UI.cancelled) break;
+            const course = pending[i];
+            log('  [' + (i + 1) + '/' + pending.length + '] ' + course.resourceName);
+            try {
+              await learnCourse(course, project, {
+                onCancel: () => UI.cancelled,
+                studySeconds: cfg.studyTime,
+                randomAnswer: cfg.randomAnswer,
+              });
+            } catch (e) {
+              if (e.cancelled || e instanceof PermissionError || e instanceof AccountBlockedError) throw e;
+              log('  跳过：' + e.message, 'warn');
+            }
+          }
+        }
+
+        // 考试：剩余次数 > 0 才考
+        for (const plan of project.examPlans) {
+          if (UI.cancelled) break;
+          const remain = (plan.examOddNum || 0) - (plan.examFinishNum || 0);
+          if (remain <= 0) continue;
+          log('  考试「' + plan.examPlanName + '」剩余 ' + remain + ' 次');
+          try {
+            await takeExam(plan, project, {
+              onCancel: () => UI.cancelled,
+              questionSeconds: cfg.examQuestionTime,
+              randomAnswer: cfg.randomAnswer,
+            });
+          } catch (e) {
+            if (e.cancelled || e instanceof PermissionError || e instanceof AccountBlockedError) throw e;
+            log('  考试跳过：' + e.message, 'warn');
+          }
+        }
+      }
+
+      if (UI.cancelled) {
+        log('已停止（已完成的部分不会回滚）', 'warn');
+      } else {
+        log('全部完成', 'ok');
+      }
     } catch (e) {
       if (e.cancelled) {
         log('已停止', 'warn');
       } else if (e instanceof AccountBlockedError) {
         log('账号被限制：' + e.message + '，已停止', 'err');
       } else if (e instanceof PermissionError) {
-        log('登录态失效（' + e.message + '），请先登录官网或重新填写账号', 'err');
+        log('登录态失效（' + e.message + '），请重新登录官网', 'err');
         setSession({ token: null, source: 'none' });
+        renderAccount();
+      } else if (e.needsLogin) {
+        log(e.message, 'err');
       } else {
         log('出错：' + e.message, 'err');
       }
@@ -943,8 +1121,8 @@
   // 10. 菜单命令与启动
   // ──────────────────────────────────────────────────────────────────────────
 
-  GM_registerMenuCommand('读取（只读）', () => { mountPanel(); runProbe(); });
-  GM_registerMenuCommand('清空已存快照', () => {
+  GM_registerMenuCommand('开始（学习+考试）', () => { mountPanel(); runProbe(); });
+  GM_registerMenuCommand('清空已存报告', () => {
     GM_setValue(STORE.last, null);
     log('已清空本地快照', 'ok');
   });
@@ -963,17 +1141,19 @@
     boot();
   }
 
-  // 供调试/后续扩展使用（课程页只读探针会用到）
+  // 调试入口：控制台里可以用 __weban.* 手动调
   window.__weban = {
     version: VERSION,
-    parseToml,
-    encryptLoginPayload,
-    read,
+    call,
+    mercury,
     collectSnapshot,
+    learnCourse,
+    takeExam,
+    loadAnswerBank,
+    lookupAnswer,
     ensureLoggedIn,
     refreshSessionFromPage,
     readStorageIdentity,
-    readStorageToken,
     getSession,
     setSession,
     runProbe,
