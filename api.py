@@ -9,8 +9,6 @@ from uuid import uuid4
 import pyaes
 import requests
 from loguru import logger
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 
 
 def pkcs7_pad(data: bytes, block_size: int = 16) -> bytes:
@@ -67,10 +65,9 @@ def handle_response(response: requests.Response) -> dict[str, Any]:
 
 
 class LoggingSession:
-    """统一的网络请求：自动重试、debug 日志、基本浏览器头。
+    """统一的网络请求、debug 日志和基本浏览器头。
 
-    内部构造带 HTTPAdapter Retry 的 requests.Session（429/5xx 自动重试，
-    backoff_factor=1），外层捕获 RequestException 记日志后抛回。
+    与官网 ajax 一样不自动重发；学习、答题、完课请求不能在响应不确定时重复写入。
     """
 
     DEFAULT_HEADERS: ClassVar[dict[str, str]] = {
@@ -84,13 +81,6 @@ class LoggingSession:
 
     def __init__(self, log=logger, debug: bool = False):
         session = requests.Session()
-        retry = Retry(
-            total=5,
-            backoff_factor=1,
-            status_forcelist=[429, 500, 502, 503, 504],
-            allowed_methods=["GET", "POST"],
-        )
-        session.mount("https://", HTTPAdapter(max_retries=retry))
         session.headers.update(self.DEFAULT_HEADERS)
         self._session = session
         self.log = log
@@ -140,6 +130,20 @@ class LoggingSession:
 
 
 class WeBanAPI:
+    MAIN_HEADERS: ClassVar[dict[str, str]] = {
+        "Origin": "https://weiban.mycourse.cn",
+        "Referer": "https://weiban.mycourse.cn/",
+        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+    }
+
+    # 课程页（mcwk）内发起的请求：不带主站 X-Token。
+    MCWK_ORIGIN: ClassVar[str] = "https://mcwk.mycourse.cn"
+    MCWK_HEADERS: ClassVar[dict[str, str | None]] = {
+        "X-Token": None,
+        "Origin": MCWK_ORIGIN,
+        "Referer": MCWK_ORIGIN + "/",
+    }
+
     # 题库下载地址（jsDelivr CDN 稳定；gh-proxy 免费公共代理会限流 403，
     # github 官方 raw 域名在国内不稳定，均不用）
     ANSWER_URL = (
@@ -228,7 +232,7 @@ class WeBanAPI:
         if self.user.get("userId"):
             data.setdefault("userId", self.user["userId"])
         response = self.session.post(
-            url, params=params, data=data, timeout=self.timeout
+            url, params=params, data=data, headers=self.MAIN_HEADERS, timeout=self.timeout
         )
         return handle_response(response)
 
@@ -257,6 +261,10 @@ class WeBanAPI:
         response = self.session.post(
             "https://resource.mycourse.cn/mercuryprovider/router",
             data=merged,
+            headers={
+                **self.MCWK_HEADERS,
+                "Accept": "*/*", "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+            },
             timeout=self.timeout,
         )
         return handle_response(response)
@@ -292,7 +300,7 @@ class WeBanAPI:
         """
         url = f"{self.baseurl}/pharos/login/getTenantListWithLetter.do"
         response = self.session.post(
-            url, params={"timestamp": self.get_timestamp()}, timeout=self.timeout
+            url, params={"timestamp": self.get_timestamp()}, headers=self.MAIN_HEADERS, timeout=self.timeout
         )
         return handle_response(response)
 
@@ -323,7 +331,7 @@ class WeBanAPI:
         params = {"timestamp": self.get_timestamp()}
         data = {"tenantCode": tenant_code or self.tenant_code}
         response = self.session.post(
-            url, params=params, data=data, timeout=self.timeout
+            url, params=params, data=data, headers=self.MAIN_HEADERS, timeout=self.timeout
         )
         return handle_response(response)
 
@@ -420,6 +428,7 @@ class WeBanAPI:
             f"{self.baseurl}/pharos/login/login.do",
             params={"timestamp": self.get_timestamp()},
             data={"data": encrypted},
+            headers=self.MAIN_HEADERS,
             timeout=self.timeout,
         )
         result = handle_response(response)
@@ -632,6 +641,31 @@ class WeBanAPI:
             "/pharos/index/listValve.do",
             {"tenantCode": self.tenant_code, "userId": self.user.get("userId", "")},
         )
+
+    def get_course_neighbors(self, user_course_id: str) -> dict[str, Any]:
+        """读取完课评价页的相邻课程，不点赞或发布评价。"""
+        return self._post("/pharos/resource/getNear.do", {"userCourseId": user_course_id})
+
+    def get_course_rating(self, course_id: str) -> dict[str, Any]:
+        """按官网 BRAIN 请求封装读取课程评分汇总。"""
+        data = {
+            "tenantCode": self.tenant_code,
+            "userId": self.user["userId"],
+            "currentUserId": self.user["userId"],
+            "targetId": course_id,
+            "service": "/comment/comment/getDetail.api",
+            "clientId": "operation",
+        }
+        secret = "52c203760cf28798a44f6ac4"
+        sign = secret + "".join(key + str(data[key]) for key in sorted(data)) + secret
+        data["sign"] = hashlib.sha1(sign.encode()).hexdigest().upper()
+        response = self.session.post(
+            "https://safety.mycourse.cn/brainprovider/router",
+            data=data,
+            headers={**self.MAIN_HEADERS, "Token": self.user["token"], "X-Token": None},
+            timeout=self.timeout,
+        )
+        return handle_response(response)
 
     def get_next_task(self, user_project_id: str) -> dict[str, Any]:
         """获取项目下一步状态
@@ -938,8 +972,8 @@ class WeBanAPI:
         cb = f"jQuery3410{randint(10**15, 10**16 - 1)}_{ts}"
         headers = {
             "Accept": "*/*",
-            "Referer": referer or "https://mcwk.mycourse.cn/",
-            "X-Token": None,
+            "Referer": referer or self.MCWK_HEADERS["Referer"],
+            "X-Token": None, "Origin": None, "Content-Type": None,
         }
         response = self.session.get(
             url,
@@ -972,7 +1006,7 @@ class WeBanAPI:
         response = self.session.post(
             "https://lyra.mycourse.cn/lyraapi/study/course/finish.api",
             data=data,
-            headers={"X-Token": None, "Referer": "https://mcwk.mycourse.cn/", "Origin": "https://mcwk.mycourse.cn"},
+            headers=self.MCWK_HEADERS,
             timeout=self.timeout,
         )
         return handle_response(response)
@@ -1099,9 +1133,7 @@ class WeBanAPI:
         headers = {
             "Accept": "*/*",
             "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-            "Origin": "https://mcwk.mycourse.cn",
-            "Referer": "https://mcwk.mycourse.cn/",
-            "X-Token": None,
+            **self.MCWK_HEADERS,
         }
         response = self.session.post(
             url, data=data, headers=headers, timeout=self.timeout
@@ -1444,6 +1476,10 @@ class WeBanAPI:
         response = self.session.post(
             f"{self.baseurl}/jupiterapi/api/statusercourse/v1/next",
             json={"data": encrypted_b64},
+            headers={
+                **self.MCWK_HEADERS,
+                "Accept": "application/json, text/javascript, */*; q=0.01", "Content-Type": "application/json",
+            },
             timeout=self.timeout,
         )
         return handle_response(response)
