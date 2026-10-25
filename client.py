@@ -126,6 +126,49 @@ def _extract_map(content: str) -> dict:
     return {}
 
 
+# 课程分类：chooseType、显示名、需求数字段、已完成数字段
+COURSE_CATEGORIES = (
+    (3, "必修课", "requiredNum", "requiredFinishedNum"),
+    (1, "推送课", "pushNum", "pushFinishedNum"),
+    (2, "自选课", "optionalNum", "optionalFinishedNum"),
+)
+PROGRESS_FIELDS = {
+    *(field for _, _, need, done in COURSE_CATEGORIES for field in (need, done)),
+    "examNum", "examFinishedNum",
+}
+
+# 课程脚本里的轨迹上报调用
+TRACE_NEXT = r'''callApinext\(["']next["']\s*,\s*2'''
+TRACE_PREV = r'''callApinext\(["']prev["']\s*,\s*2'''
+TRACE_FINISH = r'''callApinext\(["']next["']\s*,\s*1'''
+
+CLASS_ATTR = r'''class=["']([^"']+)["']'''
+PAGE_ITEM_SECTION = (
+    r'''<section\b[^>]*class=["']([^"']*\bpage-item\b[^"']*)["'][^>]*>'''
+    r'''([\s\S]*?)(?=<section\b[^>]*class=["'][^"']*\bpage-item\b|$)'''
+)
+PAGE_NAME = re.compile(r"page-(?:\d+|aq\d+|at\d+|af\d+)")
+
+
+def _class_lists(fragment: str) -> list[list[str]]:
+    """取片段里所有 class 属性的词列表。"""
+    return [value.split() for value in re.findall(CLASS_ATTR, fragment)]
+
+
+def _has_class(fragment: str, name: str) -> bool:
+    return any(name in classes for classes in _class_lists(fragment))
+
+
+def _page_sections(html: str) -> list[re.Match]:
+    """按 page-item 切分课程页面区块。"""
+    return list(re.finditer(PAGE_ITEM_SECTION, html))
+
+
+def _page_names(sections: list[re.Match]) -> list[str]:
+    """取每个区块的页码类名，没有则返回空串。"""
+    return [next((name for name in section.group(1).split() if PAGE_NAME.fullmatch(name)), "") for section in sections]
+
+
 def _js_tokens(script: str):
     """按词法区分字符串、正则与注释，避免压缩代码里的 / 被误判。"""
     pattern = re.compile(
@@ -284,17 +327,20 @@ def _direct_course_steps(html: str, script: str) -> tuple[int, int] | None:
     for handler in handlers:
         selector = handler.group(1) or handler.group(2)
         body = script[handler.end():_js_block_end(script, handler.end())]
-        count = len(re.findall(r'''callApinext\(["']next["']\s*,\s*2''', body))
+        count = len(re.findall(TRACE_NEXT, body))
         if count and selector not in {"btn-prev", "btn-next"}:
             actions[selector] = count
-    has_end = bool(re.search(r'''callApinext\(["']next["']\s*,\s*1''', script))
+    has_end = bool(re.search(TRACE_FINISH, script))
     if not has_end or not actions:
         return None
     if "btn-next-prev" in html:
         return None
     if re.search(r'''\$\(["']\.btn-next["']\)\.each''', script):
-        sections = re.findall(r'''<section\b[^>]*class=["']([^"']*\bpage-item\b[^"']*)["'][^>]*>([\s\S]*?)(?=<section\b[^>]*class=["'][^"']*\bpage-item\b|$)''', html)
-        ordinary = sum(any("btn-next" in c.split() for c in re.findall(r'''class=["']([^"']+)["']''', body)) for classes, body in sections if "page-reciprocal" not in classes.split())
+        ordinary = sum(
+            any("btn-next" in classes for classes in _class_lists(section.group(2)))
+            for section in _page_sections(html)
+            if "page-reciprocal" not in section.group(1).split()
+        )
         middle = ordinary + sum(actions.values())
     else:
         # 编译模板把开始按钮保存到局部变量后注册事件。
@@ -307,7 +353,7 @@ def _direct_course_steps(html: str, script: str) -> tuple[int, int] | None:
                 for nested in reversed(list(re.finditer(r"function\s*\([^)]*\)\s*\{", body))):
                     end = _js_block_end(body, nested.end())
                     body = body[:nested.start()] + body[end + 1:]
-                actions["page-start-btn"] = len(re.findall(r'''callApinext\(["']next["']\s*,\s*2''', body))
+                actions["page-start-btn"] = len(re.findall(TRACE_NEXT, body))
         middle = sum(actions.values())
     return middle, middle + 1
 
@@ -373,10 +419,8 @@ def _dynamic_course_steps(html: str, script: str, has_questions: bool, question_
                 updated = re.sub(r'''class=["']([^"']+)["']''', strip_class, section.group())
                 html = html[:section.start()] + updated + html[section.end():]
                 break
-    sections = list(re.finditer(
-        r'''<section\b[^>]*class=["']([^"']*\bpage-item\b[^"']*)["'][^>]*>([\s\S]*?)(?=<section\b[^>]*class=["'][^"']*\bpage-item\b|$)''', html
-    ))
-    names = [next((c for c in section.group(1).split() if re.fullmatch(r"page-(?:\d+|aq\d+|at\d+|af\d+)", c)), "") for section in sections]
+    sections = _page_sections(html)
+    names = _page_names(sections)
     if not re.search(r"function\s+BtnFn\s*\(", script):
         if not ("btn-next-prev" in html and re.search(r'''\$\(["']\.page-active["']\)\.next\(\)\.addClass\(["']page-active''', script)):
             return _direct_course_steps(html, script)
@@ -392,7 +436,7 @@ def _dynamic_course_steps(html: str, script: str, has_questions: bool, question_
         unconditional_next = False
         if next_method:
             next_body = script[next_method.end():_js_block_end(script, next_method.end())]
-            unconditional_next = "page-reciprocal" not in next_body and bool(re.search(r'''callApinext\(["']next["']\s*,\s*2''', next_body))
+            unconditional_next = "page-reciprocal" not in next_body and bool(re.search(TRACE_NEXT, next_body))
         if endpoint in numeric and not (unconditional_next and not has_questions):
             numeric = numeric[:numeric.index(endpoint) + 1]
         elif has_questions and endpoint not in numeric and re.search(r"getQuestions\s*\(", script):
@@ -406,7 +450,7 @@ def _dynamic_course_steps(html: str, script: str, has_questions: bool, question_
     script = re.sub(
         r'''(BtnFn\(["']\.btn-ce["']\s*,\s*["']\.)([\w-]+)(["']\s*,\s*["']\.page-aq)''',
         lambda match: match.group(1) + next((name for name, section in zip(names, sections, strict=True)
-            if any(match.group(2) in classes.split() for classes in re.findall(r'''class=["']([^"']+)["']''', section.group(2)))), match.group(2)) + match.group(3), script,
+            if any(match.group(2) in classes for classes in _class_lists(section.group(2)))), match.group(2)) + match.group(3), script,
     )
     ends = list(re.finditer(
         r'''BtnFn\(["']\.btn-ce["']\s*,\s*["']\.page-(\d+)["']\s*,\s*["']\.page-aq''', script
@@ -437,8 +481,8 @@ def _dynamic_course_steps(html: str, script: str, has_questions: bool, question_
     if not start or not (endpoint or static_end) or not btnfn:
         return None
     body = script[btnfn.end():_js_block_end(script, btnfn.end())]
-    next_pattern = r'''callApinext\(["']next["']\s*,\s*2'''
-    prev_pattern = r'''callApinext\(["']prev["']\s*,\s*2'''
+    next_pattern = TRACE_NEXT
+    prev_pattern = TRACE_PREV
     button_test = r'''Btn\s*==+\s*["']([^"']+)["']'''
     branch_pattern = r'''if\s*\(\s*((?:Btn\s*==+\s*["'][^"']+["']\s*)(?:\|\|\s*Btn\s*==+\s*["'][^"']+["']\s*)*)\)\s*\{'''
     deltas = {}
@@ -487,7 +531,7 @@ def _dynamic_course_steps(html: str, script: str, has_questions: bool, question_
             merge_targets.setdefault(target, []).append(source)
     for sources in merge_targets.values():
         sources = list(dict.fromkeys(sources))
-        if len(sources) > 1 and all(not re.search(r'''\bclass=["'][^"']*\bbtn-next\b''', sections[names.index(source)].group(2)) for source in sources):
+        if len(sources) > 1 and all(not _has_class(sections[names.index(source)].group(2), "btn-next") for source in sources):
             skipped.update(sources[1:])
     nested_selectors = set()
     for helper in re.finditer(r"function\s+([\w$]+)\s*\(\s*([\w$]+)\s*\)\s*\{", script):
@@ -507,9 +551,7 @@ def _dynamic_course_steps(html: str, script: str, has_questions: bool, question_
     for section in sections[first:last + 1]:
         if (not (has_questions and dynamic_questions) or continuation) and last_page in section.group(1).split():
             if nested_selectors:
-                middle += sum(bool(nested_selectors.intersection(classes.split())) for classes in re.findall(
-                    r'''class=["']([^"']+)["']''', section.group(2)
-                )) - 1
+                middle += sum(bool(nested_selectors.intersection(classes)) for classes in _class_lists(section.group(2))) - 1
             continue  # 完成页按钮不再发送中间步骤。
         section_name = next((name for name in section.group(1).split() if name in names), "")
         if section_name in skipped:
@@ -521,15 +563,9 @@ def _dynamic_course_steps(html: str, script: str, has_questions: bool, question_
             if player:
                 player_body = script[player.end():_js_block_end(script, player.end())]
                 auto_video = bool(re.search(r'''\$\(["']\.page-\d+["']\)\.addClass\(["']page-active["']\)''', player_body))
-        if not auto_video and not re.search(
-            r'''\bclass=["'][^"']*\bbtn-next-end\b''', section.group(2)
-        ):
-            middle += int(any(nav_selectors.intersection(classes.split()) for classes in re.findall(
-                r'''\bclass=["']([^"']+)["']''', section.group(2)
-            )))
-        middle += sum(bool(nested_selectors.intersection(classes.split())) for classes in re.findall(
-            r'''class=["']([^"']+)["']''', section.group(2)
-        ))
+        if not auto_video and not _has_class(section.group(2), "btn-next-end"):
+            middle += int(any(nav_selectors.intersection(classes) for classes in _class_lists(section.group(2))))
+        middle += sum(bool(nested_selectors.intersection(classes)) for classes in _class_lists(section.group(2)))
         page = next((name for name in section.group(1).split() if re.fullmatch(r"page-\d+", name)), "")
         for binding in re.finditer(
             r'''BtnFn\(["']([^"']+)["']\s*,\s*["']\.([^"']+)["']\s*,\s*["']\.([^"']+)["']''', script
@@ -564,9 +600,7 @@ def _dynamic_course_steps(html: str, script: str, has_questions: bool, question_
             if not any(value.lstrip(".") in reached for value in destinations):
                 continue
             for name, section in zip(names, sections, strict=True):
-                if name in reached and any(selector in classes.split() for classes in re.findall(
-                    r'''\bclass=["']([^"']+)["']''', section.group(2)
-                )):
+                if name in reached and any(selector in classes for classes in _class_lists(section.group(2))):
                     # 同一页上不同按钮各自跳不同目标页，各算一次上报。
                     sources.add((name, tuple(destinations)))
         middle += len(sources) * count
@@ -586,16 +620,14 @@ def _dynamic_course_steps(html: str, script: str, has_questions: bool, question_
             }
             source_pages = [
                 name for name, section in zip(names, sections, strict=True)
-                if selectors and any(selectors.intersection(classes.split()) for classes in re.findall(
-                    r'''\bclass=["']([^"']+)["']''', section.group(2)
-                ))
+                if selectors and any(selectors.intersection(classes) for classes in _class_lists(section.group(2)))
             ]
             targets = re.findall(r'''\$\(["']\.(page-\d+)["']\)\.addClass\(["']page-active["']\)''', callback)
             if len(source_pages) == 1 and targets:
                 source = source_pages[0]
                 if source in reached and source != last_page and all(target in names and names.index(target) == names.index(source) + 1 for target in targets):
                     section = sections[names.index(source)]
-                    if any("btn-next" in classes.split() for classes in re.findall(r'''\bclass=["']([^"']+)["']''', section.group(2))):
+                    if any("btn-next" in classes for classes in _class_lists(section.group(2))):
                         middle -= 1
         for call in re.finditer(next_pattern, callback):
             targets = re.findall(
@@ -610,9 +642,7 @@ def _dynamic_course_steps(html: str, script: str, has_questions: bool, question_
                 ):
                     if animation.end() <= call.start() < _js_block_end(callback, animation.end()):
                         # complete 会对每个匹配元素执行一次。
-                        repeats *= sum(animation.group(1) in classes.split() for classes in re.findall(
-                            r'''\bclass=["']([^"']+)["']''', html
-                        ))
+                        repeats *= sum(animation.group(1) in classes for classes in _class_lists(html))
                 middle += repeats
     delta = deltas[".btn-ce"] * len(ends) if has_questions and dynamic_questions else 0
     if continuation and save_callback:
@@ -646,7 +676,7 @@ def _question_trace_flow(html: str, script: str) -> tuple[int, int]:
     if not save:
         return 0, 0
     callback = script[save.end():_js_block_end(script, save.end())]
-    per_question = len(re.findall(r'''callApinext\(["']next["']\s*,\s*2''', callback))
+    per_question = len(re.findall(TRACE_NEXT, callback))
     terminal = re.search(r"if\s*\(\s*atsum\s*>=\s*Examnum\s*\)\s*\{", callback)
     if not terminal:
         return per_question, 0
@@ -656,15 +686,13 @@ def _question_trace_flow(html: str, script: str) -> tuple[int, int]:
         return per_question, 0
     after = 0
     reached = False
-    for section in re.finditer(
-        r'''<section\b[^>]*class=["']([^"']*\bpage-item\b[^"']*)["'][^>]*>([\s\S]*?)(?=<section\b[^>]*class=["'][^"']*\bpage-item\b|$)''', html
-    ):
+    for section in _page_sections(html):
         classes = section.group(1).split()
         reached = reached or target.group(1) in classes
         if reached and ("page-reciprocal" in classes or "page-end" in classes):
             return per_question, after
         if reached:
-            after += int(any("btn-next" in c.split() for c in re.findall(r'''class=["']([^"']+)["']''', section.group(2))))
+            after += int(any("btn-next" in item for item in _class_lists(section.group(2))))
     raise RuntimeError("题目返回正文后的轨迹路径无法完整解析，已停止学习")
 
 
@@ -702,9 +730,9 @@ def _course_completion_timing(script: str, has_questions: bool | None = None) ->
             continue
         following = script[finish.end():finish.end() + 250]
         preceding = script[max(0, finish.start() - 250):finish.start()]
-        if re.search(r'''callApinext\(["']next["']\s*,\s*1''', following):
+        if re.search(TRACE_FINISH, following):
             timings.add((True, 0.0))
-        elif re.search(r'''callApinext\(["']next["']\s*,\s*1''', preceding) or not re.search(r"\bcallApinext\s*\(", script):
+        elif re.search(TRACE_FINISH, preceding) or not re.search(r"\bcallApinext\s*\(", script):
             timings.add((False, 0.0))
         else:
             return None
@@ -1110,11 +1138,7 @@ class WeBanClient:
         if not _check_code_ok(progress):
             raise RuntimeError(f"{project_prefix} 获取进度失败，已停止当前账号")
         data = progress.get("data")
-        required_fields = {
-            "requiredNum", "requiredFinishedNum", "optionalNum", "optionalFinishedNum",
-            "pushNum", "pushFinishedNum", "examNum", "examFinishedNum",
-        }
-        if not isinstance(data, dict) or not required_fields.issubset(data):
+        if not isinstance(data, dict) or not PROGRESS_FIELDS.issubset(data):
             raise RuntimeError(f"{project_prefix} 进度响应缺少必要字段，已停止当前账号")
         if self.study_force:
             # force 模式会重新学习所有课程，剩余量按总数计算
@@ -1129,11 +1153,7 @@ class WeBanClient:
 
         # 每门课耗时：项目内累计实测均值，样本少时与理论值渐进混合，
         # 避免首门课带验证码或单次网络波动让 ETA 大幅跳变。
-        finished = (
-            data["requiredFinishedNum"]
-            + data["pushFinishedNum"]
-            + data["optionalFinishedNum"]
-        )
+        finished = sum(data[done] for _, _, _, done in COURSE_CATEGORIES)
         now = time.time()
         state = self._eta_course_state.setdefault(
             user_project_id, {"started_at": now, "start_finished": finished}
@@ -1376,12 +1396,7 @@ class WeBanClient:
                 progress.get("data", {}) if _check_code_ok(progress) else {}
             )
 
-            choose_types = [
-                (3, "必修课", "requiredNum", "requiredFinishedNum"),
-                (1, "推送课", "pushNum", "pushFinishedNum"),
-                (2, "自选课", "optionalNum", "optionalFinishedNum"),
-            ]
-            for choose_type in choose_types:
+            for choose_type in COURSE_CATEGORIES:
                 # 只跳过"项目无该类型需求"（需求数=0）的类型：
                 # - need > 0（如项目确实要完成 5 门自选课）→ 正常学习该类型；
                 # - need == 0（未配置该类型，如本例自选课 optionalNum=0）→
@@ -1474,11 +1489,7 @@ class WeBanClient:
             if not _check_code_ok(progress):
                 return
             data = progress.get("data", {})
-            for _, label, need_key, finished_key in [
-                (3, "必修课", "requiredNum", "requiredFinishedNum"),
-                (1, "推送课", "pushNum", "pushFinishedNum"),
-                (2, "自选课", "optionalNum", "optionalFinishedNum"),
-            ]:
+            for _, label, need_key, finished_key in COURSE_CATEGORIES:
                 need = int(data.get(need_key, 0) or 0)
                 finished = int(data.get(finished_key, 0) or 0)
                 if need > 0 and finished < need:
@@ -1512,11 +1523,7 @@ class WeBanClient:
             finished_before = 0
             if progress_before.get("code", -1) == "0":
                 d = progress_before["data"]
-                finished_before = (
-                    d["requiredFinishedNum"]
-                    + d["pushFinishedNum"]
-                    + d["optionalFinishedNum"]
-                )
+                finished_before = sum(d[done] for _, _, _, done in COURSE_CATEGORIES)
             ok = self._study_one_course(
                 course,
                 task,
@@ -1727,6 +1734,21 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
             (uses_apinext or self.jupiter_fallback)
             and query.get("weiban", [None])[0] == "weiban"
         )
+        def send_trace(total: int, finish: int = 2, start: int = 1) -> None:
+            """按本次课程上下文上报一段轨迹。"""
+            self.handle_apinext(
+                course["userCourseId"],
+                course["resourceId"],
+                task["userProjectId"],
+                nonstr_map,
+                total,
+                unique_no=apinext_no,
+                finish=finish,
+                start_step=start,
+                step_delay=0,
+                **({"finish_step": finish_step} if finish == 1 else {}),
+            )
+
         completion_timing = (item_info.get("completion_timings") or {}).get(branch) or item_info.get("completion_timing")
         if trace_enabled and "completion_timing" in item_info and completion_timing is None:
             raise RuntimeError("课程完课顺序未能完整解析，已停止学习")
@@ -1738,15 +1760,7 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
             )
             if not uses_apinext:
                 self.log.info("  课程未加载 apicenext.js，补充翻页轨迹上报")
-            self.handle_apinext(
-                course["userCourseId"],
-                course["resourceId"],
-                task["userProjectId"],
-                nonstr_map,
-                total_step - deferred_steps,
-                unique_no=apinext_no,
-                finish=2,
-            )
+            send_trace(total_step - deferred_steps)
 
         if _check_code_ok(question_data):
             data = questions
@@ -1777,20 +1791,14 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                         self.log.info(f"    {i + 1}/{len(qlist)} 已完成")
                         if label == "课后习题" and question_trace and trace_enabled:
                             begin = total_step - deferred_steps + i * question_trace + 1
-                            self.handle_apinext(
-                                course["userCourseId"], course["resourceId"], task["userProjectId"], nonstr_map,
-                                begin + question_trace - 1, unique_no=apinext_no, start_step=begin,
-                            )
+                            send_trace(begin + question_trace - 1, start=begin)
                         time.sleep(0.5)
         elif question_data:
             self.log.info(f"  list_question: code={question_data.get('code')}")
         if item_info.get("has_exam") and not questions.get("examQuestionList"):
             self.log.info("  检测到题目标记但 list_question 无课后习题，可能为内联题目")
         if exam_questions and after_question_trace and trace_enabled:
-            self.handle_apinext(
-                course["userCourseId"], course["resourceId"], task["userProjectId"], nonstr_map,
-                total_step, unique_no=apinext_no, start_step=total_step - after_question_trace + 1,
-            )
+            send_trace(total_step, start=total_step - after_question_trace + 1)
 
         # 3. 确保满足最低学习时长（服务端要求 study 后至少学习 study_time 秒才接受完课）
         elapsed = time.time() - study_start
@@ -1829,29 +1837,10 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
             if not _check_code_ok(res, allow_200=False):
                 raise RuntimeError(f"{course_prefix} 完成失败，已停止学习：{res}")
         if total_step and trace_enabled:
-            self.handle_apinext(
-                course["userCourseId"],
-                course["resourceId"],
-                task["userProjectId"],
-                nonstr_map,
-                total_step,
-                unique_no=apinext_no,
-                finish=1,
-                finish_step=finish_step,
-                step_delay=0,
-            )
+            send_trace(total_step, finish=1)
         if item_info.get("trace_after_finish") and total_step and trace_enabled:
             # 完成步（total_step+1）之后仍会补发一次翻页上报。
-            self.handle_apinext(
-                course["userCourseId"],
-                course["resourceId"],
-                task["userProjectId"],
-                nonstr_map,
-                total_step + 2,
-                unique_no=apinext_no,
-                start_step=total_step + 2,
-                step_delay=0,
-            )
+            send_trace(total_step + 2, start=total_step + 2)
         if not finish_first:
             if finish_delay:
                 time.sleep(finish_delay)
@@ -2311,7 +2300,7 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
             result["question_trace_flow"] = _question_trace_flow(html, script)
             # 尾页点击先完成、随后无条件再发一次翻页上报。
             result["trace_after_finish"] = bool(re.search(
-                r'''\$\(["']\.page-end["']\)\.hasClass\(["']page-active["']\)\?[\s\S]{0,220}?callApinext\(["']next["']\s*,\s*2''',
+                r'''\$\(["']\.page-end["']\)\.hasClass\(["']page-active["']\)\?[\s\S]{0,220}?''' + TRACE_NEXT,
                 script,
             ))
             result["dynamic_steps"] = {

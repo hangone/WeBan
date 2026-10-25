@@ -136,6 +136,14 @@ class WeBanAPI:
         "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
     }
 
+    # 课程页（mcwk）内发起的请求：不带主站 X-Token。
+    MCWK_ORIGIN: ClassVar[str] = "https://mcwk.mycourse.cn"
+    MCWK_HEADERS: ClassVar[dict[str, str | None]] = {
+        "X-Token": None,
+        "Origin": MCWK_ORIGIN,
+        "Referer": MCWK_ORIGIN + "/",
+    }
+
     # 题库下载地址（jsDelivr CDN 稳定；gh-proxy 免费公共代理会限流 403，
     # github 官方 raw 域名在国内不稳定，均不用）
     ANSWER_URL = (
@@ -254,7 +262,7 @@ class WeBanAPI:
             "https://resource.mycourse.cn/mercuryprovider/router",
             data=merged,
             headers={
-                "X-Token": None, "Origin": "https://mcwk.mycourse.cn", "Referer": "https://mcwk.mycourse.cn/",
+                **self.MCWK_HEADERS,
                 "Accept": "*/*", "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
             },
             timeout=self.timeout,
@@ -964,7 +972,7 @@ class WeBanAPI:
         cb = f"jQuery3410{randint(10**15, 10**16 - 1)}_{ts}"
         headers = {
             "Accept": "*/*",
-            "Referer": referer or "https://mcwk.mycourse.cn/",
+            "Referer": referer or self.MCWK_HEADERS["Referer"],
             "X-Token": None, "Origin": None, "Content-Type": None,
         }
         response = self.session.get(
@@ -998,7 +1006,7 @@ class WeBanAPI:
         response = self.session.post(
             "https://lyra.mycourse.cn/lyraapi/study/course/finish.api",
             data=data,
-            headers={"X-Token": None, "Referer": "https://mcwk.mycourse.cn/", "Origin": "https://mcwk.mycourse.cn"},
+            headers=self.MCWK_HEADERS,
             timeout=self.timeout,
         )
         return handle_response(response)
@@ -1125,9 +1133,7 @@ class WeBanAPI:
         headers = {
             "Accept": "*/*",
             "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-            "Origin": "https://mcwk.mycourse.cn",
-            "Referer": "https://mcwk.mycourse.cn/",
-            "X-Token": None,
+            **self.MCWK_HEADERS,
         }
         response = self.session.post(
             url, data=data, headers=headers, timeout=self.timeout
@@ -1471,7 +1477,7 @@ class WeBanAPI:
             f"{self.baseurl}/jupiterapi/api/statusercourse/v1/next",
             json={"data": encrypted_b64},
             headers={
-                "X-Token": None, "Origin": "https://mcwk.mycourse.cn", "Referer": "https://mcwk.mycourse.cn/",
+                **self.MCWK_HEADERS,
                 "Accept": "application/json, text/javascript, */*; q=0.01", "Content-Type": "application/json",
             },
             timeout=self.timeout,
