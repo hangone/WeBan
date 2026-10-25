@@ -341,11 +341,20 @@
 
   // 前进按钮候选选择器（按优先级）。全部是站点实际用到的类名。
   const FORWARD_SELECTORS = [
-    // 起始页专用（实测 A11036/.btn-start）
+    // 起始页专用（实测 A11036/.btn-start、A32006/.page-start-btn）
     '.page-active .btn-start',
     '.page-active .page-start-btn',
     '.page-active .btn-ce',
     '.page-active .btn-at',
+    // 特殊功能按钮必须优先于全局导航条：
+    // 实测 A32006 的 page-16 导航条被永久隐藏，只能点 page-test-btn 前进
+    '.page-active .page-test-btn',
+    '.page-active [class*="test-btn"]',
+    '.page-active [class*="success-button"]',
+    '.page-active [class*="-btn"]:not([class*="prev"])',
+    // 全局底部导航条（实测 A32006：<section class="btn-next-prev"> 里的 .btn-next）
+    '.btn-next-prev .btn-next',
+    '.btn-next-prev .page-content-common.btn-next',
     '.page-active .btn-next',
     '.page-active .page-next-btn',
     '.page-active .answer-btn-next',
@@ -360,29 +369,48 @@
     '.p0_next, .p1_next, .p2_next, .p3_next, .p4_next',
   ];
 
-  function findForwardButton(win) {
+  // 返回所有「可见的、候选的前进控件」，按优先级排序。
+  // 不只看第一个：实测 A32006 里靠前选择器会命中隐藏元素，
+  // 所以由调用方「点一个 → 看是否前进 → 不行再点下一个」。
+  function collectForwardButtons(win) {
     const doc = win.document;
     const isVisible = (n) => {
       if (!n) return false;
-      const r = n.getBoundingClientRect();
-      return r.width > 0 && r.height > 0;
+      try {
+        const r = n.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+      } catch { return false; }
     };
+    const skip = (n) => n.classList.contains('btn-next-end')
+      || n.classList.contains('btn-prev')
+      || n.classList.contains('btn-next-prev');
+
+    const out = [];
+    const seen = new Set();
+    const push = (n, sel) => {
+      if (!n || seen.has(n) || skip(n) || !isVisible(n)) return;
+      seen.add(n);
+      out.push({ el: n, sel });
+    };
+
     for (const sel of FORWARD_SELECTORS) {
       let nodes;
       try { nodes = [...doc.querySelectorAll(sel)]; } catch { continue; }
-      const hit = nodes.find((n) => isVisible(n) && !n.classList.contains('btn-next-end')
-        && !n.classList.contains('btn-prev'));
-      if (hit) return hit;
+      for (const n of nodes) push(n, sel);
     }
-    // 兜底：任何可见的「前进」语义元素
-    const any = [...doc.querySelectorAll('a, button, img, div')].filter((n) => {
-      if (!isVisible(n)) return false;
+    // 兜底：语义匹配
+    for (const n of doc.querySelectorAll('a, button, img, div, span')) {
       const cls = String(n.className || '');
-      if (/prev|back-list|icon-back/.test(cls)) return false;
-      if (n.classList.contains('btn-next-end')) return false;
-      return /next|btn-start|start-btn|btn-ce|btn-at\b|btn-ti|success-button/.test(cls);
-    });
-    return any[0] || null;
+      if (!/next|btn-start|start-btn|btn-ce|btn-at\b|btn-ti|success-button/.test(cls)) continue;
+      if (/prev|back-list|icon-back/.test(cls)) continue;
+      push(n, '(fallback)');
+    }
+    return out;
+  }
+
+  function findForwardButton(win) {
+    const list = collectForwardButtons(win);
+    return list.length ? list[0] : null;
   }
 
   // 页面是否已经到了结束页（多门课共用的结束标志）
@@ -521,7 +549,7 @@
   }
 
   async function waitVideoEnd(win, opts = {}) {
-    const { videoRate = 1, maxWaitMin = 90 } = opts;
+    const { videoRate = 2, maxWaitMin = 90 } = opts;
     const deadline = Date.now() + maxWaitMin * 60000;
     let applied = false;
 
@@ -764,6 +792,54 @@
     return true;
   }
 
+  // ── 自定义单选（实测 A32006 page-17/18）──────────────────
+  // 页面用 span.page-radio 当选项：点击 toggleClass("page-radio-active")，
+  // 提交按钮 .page-N-btn 判断 .page-N-radio1 是否 active —— radio1 就是正确答案。
+  // 所以：点 radio1 → 点对应按钮 → 出现 page-success 就继续。
+  function hasCustomRadio(win) {
+    try {
+      const d = win.document;
+      return [...d.querySelectorAll('.page-radio')].some((n) => {
+        const r = n.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+      });
+    } catch {
+      return false;
+    }
+  }
+
+  async function answerCustomRadio(win, opts = {}) {
+    const { onCancel } = opts;
+    const isVisible = (n) => {
+      if (!n) return false;
+      try {
+        const r = n.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+      } catch { return false; }
+    };
+    const d = win.document;
+
+    // 当前页的 radio 组（可见的那些）
+    const radios = [...d.querySelectorAll('.page-radio')].filter(isVisible);
+    if (!radios.length) return false;
+
+    // radio1 是正确答案：优先点它，没有再按顺序
+    const first = radios.find((n) => /radio1\b|-radio1$/.test(n.className)) || radios[0];
+    try { first.click(); await sleep(250); } catch { return false; }
+
+    // 对应页面的提交按钮：.page-N-btn
+    const page = first.closest('.page-item');
+    const pageCls = page ? page.className : '';
+    const m = /\bpage-(\d+)\b/.exec(pageCls);
+    let submit = m ? d.querySelector('.page-' + m[1] + '-btn') : null;
+    if (!submit) submit = [...d.querySelectorAll('[class*="-btn"]')].find(isVisible);
+    if (!submit) return false;
+
+    try { submit.click(); await sleep(900); } catch { return false; }
+    log('  单选题：选择第一个选项并提交');
+    return true;
+  }
+
   // ── 兜底完课 ────────────────────────────────────────────  // ── 兜底完课 ────────────────────────────────────────────  // ── 兜底完课 ────────────────────────────────────────────
   function callFinishFn(win) {
     try {
@@ -827,6 +903,21 @@
       //   - 起始页没有按钮，要用下一页的按钮前进
       //   - 交互题页必须先答完才放出下一页
       //   - 最后一页是 page-N，没有按钮；完课按钮藏在最后一个隐藏页里
+      // ── 最小学习时长（对齐 client.py 的 study_time 逻辑）──────────
+      // 服务端要求 study.do 之后至少停留一段时间才接受完课；
+      // Python 版默认 20 秒 + 0~5 秒随机。这里翻页前先补足。
+      const minStudy = Number(opts.studyTime ?? 20);
+      if (minStudy > 0) {
+        const jitter = Math.floor(Math.random() * 5);
+        const need = minStudy + jitter;
+        const started = Date.now();
+        log('  最小学习时长：等待 ' + need + ' 秒');
+        while (Date.now() - started < need * 1000) {
+          if (checkCancel()) break;
+          await sleep(1000);
+        }
+      }
+
       // ── 学习主状态机 ──────────────────────────────────────────────
       // 每轮做一件事，然后重新观察页面（不假设固定的页数或按钮结构）：
       //   1) 是视频页 → 等播放到结尾（页面自己会完课）
@@ -863,6 +954,11 @@
           await sleep(400);
           continue;
         }
+        if (hasCustomRadio(win)) {
+          await answerCustomRadio(win, opts);
+          await sleep(400);
+          continue;
+        }
 
         // 3) 结束页
         if (reachedEnd(win)) {
@@ -870,24 +966,34 @@
           break;
         }
 
-        // 4) 前进
-        const sig = pageSignature(win);
-        const moved = await clickForward(win);
-        if (moved.found) {
-          await sleep(opts.pageInterval ?? 600);
-          const after = pageSignature(win);
-          if (after === lastSig) {
-            if (++idle >= 4) break;
-          } else {
-            idle = 0;
+        // 4) 前进：依次尝试候选按钮，直到页面真的变化
+        const before = pageSignature(win);
+        const candidates = collectForwardButtons(win);
+        let advanced = false;
+        for (const cand of candidates) {
+          if (checkCancel()) break;
+          try { cand.el.click(); } catch { continue; }
+          await sleep(400);
+          if (pageSignature(win) !== before || reachedEnd(win)) {
+            advanced = true;
+            break;
           }
-          lastSig = after;
+        }
+        if (advanced) {
+          await sleep(opts.pageInterval ?? 400);
+          idle = 0;
+          lastSig = pageSignature(win);
           continue;
         }
 
-        // 5) 没有可点控件
-        if (++idle >= 3) break;
-        await sleep(700);
+        // 所有候选都点不动：可能导航条被页面故意隐藏了一段时间
+        // （实测 A32006 在 page-4/6 隐藏 9 秒，page-21 隐藏 3.8 秒）
+        // 实测最长隐藏 9 秒，这里最多等 3 轮 × 4.5 秒 ≈ 13.5 秒
+        if (idle === 0) log('  本页导航条被隐藏，等待页面放出继续按钮…');
+        await sleep(opts.hiddenNavWait ?? 5000);
+        if (++idle >= 4) break;
+        continue;
+
       }
 
       checkCancel();
@@ -1132,7 +1238,8 @@
       speedup: cfg.speedup !== false,
       animSpeed: Number(cfg.animSpeed ?? 0.05),
       mute: cfg.mute !== false,
-      stopWhenDone: cfg.stopWhenDone !== false,
+      videoRate: Number(cfg.videoRate ?? 2),
+      studyTime: Number(cfg.studyTime ?? 20),
     };
   }
 
@@ -1367,6 +1474,8 @@
                 speedup: cfg.speedup,
                 animSpeed: cfg.animSpeed,
                 mute: cfg.mute,
+                videoRate: cfg.videoRate,
+                studyTime: cfg.studyTime,
               });
               summary.studied++;
             } catch (e) {
