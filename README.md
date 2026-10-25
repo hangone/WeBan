@@ -245,6 +245,27 @@ docker run --rm \
 3. **Playwright 浏览器**：自动查找 `~/.cache/ms-playwright` 下的 Chromium
 4. **系统浏览器**：自动查找已安装的 Chrome / Chromium / Edge
 
+## 油猴脚本（只读探针）
+
+[`weban.user.js`](weban.user.js) 是在浏览器里跑的**只读**版本：用账号登录后读取项目、进度、课程和考试信息，不开始学习、不答题、不交卷。适合先确认账号状态，或在没有 Python 环境的电脑上核对数据。
+
+**安装**：装好 Tampermonkey 后，新建脚本、粘贴 `weban.user.js` 全文保存，打开 <https://weiban.mycourse.cn/> 右下角会出现面板。
+
+**用法**：
+- 页面已登录：直接点「读取」，脚本复用页面登录态
+- 页面未登录：把 `config.toml` 全文粘进面板，点「解析并读第一条账号」，再点「读取」（验证码在小窗里手输一次）
+- 结果可「复制」或「下载 JSON」
+
+**与 Python 版的关系**：主站接口路径、登录加密（AES-ECB + URL-safe Base64）、请求体公共字段（`tenantCode` / `userId`）和 `timestamp` query 都与 `api.py` 对齐；快照里的 `projects[].progress`、`categories`、`examPlans` 字段与 `client.py` 读取的接口一一对应。
+
+## 约定：如何保持“只读”
+
+`weban.user.js` 的 `ENDPOINTS` 是**只读白名单**，当前 17 个接口全部只读。新增功能前请注意：
+
+- 写接口（`usercourse/study.do`、`usercourse/check.do`、`v2/<id>.do` 完课、`jupiterapi/.../next`、`saveExamQuestion`、`startPaper`、`submitPaper`、`recordQuestion`、`notice/viewMust.do`）**不在表内**，脚本没有任何调用它们的路径
+- 快照会进剪贴板和 GM 存储，所以 `home` 只存摘要（见 `summarizeHome`），不保留身份证、手机号等个人信息
+- 修改加密或请求层后，用 `api.py` 的 `WeBanAPI.encrypt()` 对照同一 payload 的密文，必须逐字节一致
+
 ## 演示
 
 ![study](images/study.png)
