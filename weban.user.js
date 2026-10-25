@@ -225,6 +225,48 @@
   }
 
   // ────────────────────────────────────────────────────────────────────────
+  // 2.6 静音：课程页点击时用 <audio id="click-base"> 播提示音
+  //     （item.js: clickbase.play()），视频课也有声音。
+  //     默认全部静音：改 muted + volume=0，并拦截 HTMLMediaElement.play()，
+  //     防止页面之后重新调起有声播放。
+  // ────────────────────────────────────────────────────────────────────────
+
+  function installMute(win) {
+    try {
+      const w = win;
+      if (!w || w.__webanMuteHook) return;
+      const proto = w.HTMLMediaElement && w.HTMLMediaElement.prototype;
+      if (!proto) return;
+
+      const nativePlay = proto.play;
+      proto.play = function () {
+        try {
+          this.muted = true;
+          this.volume = 0;
+        } catch { /* 某些元素不允许改属性 */ }
+        return nativePlay.apply(this, arguments);
+      };
+
+      // 已有的 audio/video 也立刻静音
+      const muteAll = () => {
+        try {
+          for (const el of w.document.querySelectorAll('audio, video')) {
+            el.muted = true;
+            el.volume = 0;
+            if (!el.paused) el.pause();
+          }
+        } catch { /* ignore */ }
+      };
+      muteAll();
+      // 页面后续动态插入的媒体元素也覆盖
+      const mo = new w.MutationObserver(muteAll);
+      mo.observe(w.document.documentElement, { childList: true, subtree: true });
+      w.__webanMuteHook = true;
+      w.__webanMuteObserver = mo;
+    } catch { /* 跨域等忽略 */ }
+  }
+
+  // ────────────────────────────────────────────────────────────────────────
   // 3. 课程学习：真实打开课程页，驱动页面 DOM
   //    依据 src/online-*/mcwk/course-A11078/item.js：
   //      .btn-next      翻页（点击后 pageNums++）
@@ -263,18 +305,33 @@
     throw new Error('课程页加载超时');
   }
 
-  // 驱动一次翻页：点 .btn-next，等页面切换
+  // 驱动一次翻页。返回 true 表示确实有按钮可以点。
+  // 关键：起始页等没有按钮的页面，用「下一个页面」里的按钮前进。
   async function clickNext(win) {
     const doc = win.document;
-    const buttons = [...doc.querySelectorAll('.btn-next')];
-    if (!buttons.length) throw new Error('课程页没有可点击的下一页按钮');
+    const pages = [...doc.querySelectorAll('.page-item')];
+    const idx = pages.findIndex((p) => p.classList.contains('page-active'));
+    if (idx < 0) return false;
 
-    // 找到当前可见页里的按钮
-    const bar = doc.querySelector('.page-active');
-    const target = (bar && [...bar.querySelectorAll('.btn-next')][0]) || buttons[0];
+    // 当前页自己的按钮优先，否则用下一个页面的
+    let target = pages[idx].querySelector('.btn-next');
+    if (!target && pages[idx + 1]) target = pages[idx + 1].querySelector('.btn-next');
+    if (!target) return false;
+
+    // 完课按钮由上层单独处理，这里不点
+    if (target.classList.contains('btn-next-end')) return false;
+
     target.click();
-    await sleep(1200);
-    return buttons.length;
+    return true;
+  }
+
+  function currentPageNums(win) {
+    try {
+      const v = win.pageNums;
+      return typeof v === 'number' ? v : null;
+    } catch {
+      return null;
+    }
   }
 
   function getPageNumber(win) {
@@ -294,36 +351,71 @@
   //   - 提交按钮 .p0511 点击后把选项标记为 over，并 setTimeout 2600ms 后复位
   //   - 集满 5 个不同选项才显示 .btn-base（下一页按钮）
   // 所以自动答题要做的是：把页面上所有可点选项依次点一遍，再点提交。
+  // 交互题真实流程（实测 A11078 page-5）：
+  //   1. 初始 5 个选项都可见、提交按钮(.p0511)不可见
+  //   2. 点一个选项 → 该选项加 p050Nactive、提交按钮出现
+  //   3. 点提交 → 选项标记 over，2600ms 后复位
+  //   4. 必须依次把所有选项都走完这一步，页面才放出下一页
+  // 关键：一次只点一个，不能连点（连点会把页面状态搞乱、卡死）。
+  // 交互题真实流程（在 A11078 第 6 页实测确认）：
+  //   - 页面元素：img.p0502 ~ img.p0506 五个选项，img.p0511 是提交
+  //   - 点选项后：该选项加 p050Nactive 类，提交按钮变可见
+  //   - 点提交后：选项短暂变 over 再复位；提交按钮隐藏
+  //   - 每点完一个选项都要提交一次，页面才继续放行
+  // 判断「还没点过」不能只看类名含 active：必须精确比对该选项自己的
+  // active 类（p0502active 只对应 p0502），否则会反复点同一个。
+  const INTERACTIVE_IDS = ['p0502', 'p0503', 'p0504', 'p0505', 'p0506'];
+
+  // 判断选项「是否还没点过」。
+  // 实测：点过的选项有两个标志——
+  //   1) 类名变成 p050Nover（并隐藏）
+  //   2) src 从 p050N.png 变成 p050N-1.png
+  // 只看类名不够（点了但还没提交时类名仍是 p050N），所以两个都看。
+  function optionUntouched(el, base) {
+    if (!el) return false;
+    const parts = (el.className || '').split(/\s+/);
+    if (parts.includes(base + 'over')) return false;
+    const src = String(el.getAttribute('src') || '');
+    if (/-(\d+)\.(png|jpg|jpeg|gif|svg|webp)$/i.test(src)) return false;
+    return true;
+  }
+
   async function autoAnswerInteractive(win, opts = {}) {
-    const { maxRounds = 3 } = opts;
-    const answered = new Set();
-    for (let round = 0; round < maxRounds; round++) {
-      let doc;
-      try { doc = win.document; } catch { return; }
-      const optionBtns = [
-        ...doc.querySelectorAll(
-          '.p0502, .p0503, .p0504, .p0505, .p0506',
-        ),
-      ].filter((el) => el.offsetParent !== null || el.style.display !== 'none');
-      let clicked = 0;
-      for (const btn of optionBtns) {
-        const key = btn.className || String(optionBtns.indexOf(btn));
-        if (answered.has(key + round)) continue;
-        try {
-          btn.click();
-          clicked++;
-          answered.add(key + round);
-          await sleep(120);
-        } catch { /* 单个按钮失败不影响其他 */ }
-      }
-      // 点提交（第一轮把所有选项都点一遍后再提交）
-      const submit = doc.querySelector('.p0511');
-      if (submit && (submit.offsetParent !== null || submit.style.display !== 'none')) {
+    const { maxSteps = 20, waitAfterSubmit = 3200 } = opts;
+    const pause = opts.sleep || sleep;
+    const isVisible = (node) => {
+      if (!node) return false;
+      const r = node.getBoundingClientRect();
+      return r.width > 0 && r.height > 0;
+    };
+
+    for (let step = 0; step < maxSteps; step++) {
+      let d;
+      try { d = win.document; } catch { return false; }
+
+      // 1) 有未提交的选择就先提交，等复位
+      const submit = d.querySelector('.p0511');
+      if (isVisible(submit)) {
         try { submit.click(); } catch { /* ignore */ }
-        await sleep(400);
+        await pause(waitAfterSubmit);
+        continue;
       }
-      if (!clicked) break;
+
+      // 2) 找一个还没点过的选项（可见 且 未 over 且 src 没有 -N 后缀）
+      let target = null;
+      for (const base of INTERACTIVE_IDS) {
+        const node = d.querySelector('.' + base);
+        if (node && isVisible(node) && optionUntouched(node, base)) {
+          target = node;
+          break;
+        }
+      }
+      if (!target) return true;   // 全都点过了，本页交互结束
+
+      try { target.click(); } catch { return false; }
+      await pause(600);
     }
+    return true;
   }
 
   // 判断当前页是不是交互题页（有选项按钮）
@@ -362,46 +454,56 @@
       if (opts.speedup !== false) {
         installSpeedup(win, opts.animSpeed ?? 0.05);
         installTimerBoost(win, opts.timerScale ?? 0.05);
-        log('  已启用动画加速');
+        if (opts.mute !== false) installMute(win);
+        log('  已启用动画加速' + (opts.mute !== false ? '，页面已静音' : ''));
       }
 
       const info = getPageNumber(win);
       log('  ' + name + '：共 ' + (info ? info.total : '?') + ' 页，开始翻页');
 
+      // 翻页主循环。实测结论：
+      //   - 内容页在 .page-item 里，按钮就在各自页面内
+      //   - 起始页没有按钮，要用下一页的按钮前进
+      //   - 交互题页必须先答完才放出下一页
+      //   - 最后一页是 page-N，没有按钮；完课按钮藏在最后一个隐藏页里
       let guard = 0;
       let stuck = 0;
       let lastSig = '';
       while (!checkCancel()) {
-        if (++guard > 300) throw new Error('翻页次数异常，已停止');
+        if (++guard > 400) throw new Error('翻页次数异常，已停止');
 
-        // 交互题页：先把选项都点一遍再翻页
+        // 1) 交互题：先答完
         if (hasInteractive(win)) {
           log('  发现交互题，自动作答');
           await autoAnswerInteractive(win);
-          await sleep(300);
+          await sleep(400);
         }
 
-        // 到最后一页就停
-        const cur = getPageNumber(win);
-        if (cur && cur.total && cur.current >= cur.total) break;
+        // 2) 下一页
+        const moved = await clickNext(win);
+        if (!moved) {
+          // 没有可点的下一页：可能已到最后一页
+          if (++stuck >= 2) break;
+          await sleep(600);
+          continue;
+        }
+        await sleep(opts.pageInterval ?? 600);
 
-        const before = pageSignature(win);
-        await clickNext(win);
-        await sleep(opts.pageInterval ?? 800);
-
-        // 页面没变化超过 3 次，认为到底了
+        // 3) 页面完全没变化，连续几次就认为到底
         const after = pageSignature(win);
-        if (after === before) {
+        if (after === lastSig) {
           if (++stuck >= 3) break;
         } else {
           stuck = 0;
         }
-        if (after === lastSig) stuck++;
         lastSig = after;
       }
 
       checkCancel();
-      // 点完课：页面校验 pageNums >= 7 后调用 finishWxCourse()
+
+      // 完课：btn-next-end 在最后一个隐藏页里，pageNums >= 7 时点击即完课
+      const nums = currentPageNums(win);
+      log('  ' + name + '：已翻到第 ' + nums + ' 页，提交完课');
       const endBtn = win.document.querySelector('.btn-next-end');
       if (!endBtn) throw new Error('找不到完课按钮');
       endBtn.click();
@@ -602,7 +704,7 @@
   // 6. UI
   // ────────────────────────────────────────────────────────────────────────
 
-  const UI = { root: null, running: false, cancelled: false };
+  const UI = { root: null, running: false, cancelled: false, logs: [], progress: '' };
 
   function settings() {
     const cfg = GM_getValue(STORE.settings, null) || {};
@@ -612,6 +714,8 @@
       randomAnswer: cfg.randomAnswer !== false,
       speedup: cfg.speedup !== false,
       animSpeed: Number(cfg.animSpeed ?? 0.05),
+      mute: cfg.mute !== false,
+      stopWhenDone: cfg.stopWhenDone !== false,
     };
   }
 
@@ -628,14 +732,30 @@
     const box = el('weban-log');
     const t = new Date().toLocaleTimeString('zh-CN', { hour12: false });
     const line = '[' + t + '] ' + msg;
+    UI.logs = UI.logs || [];
+    UI.logs.push(line);
+    if (UI.logs.length > 2000) UI.logs.shift();
     if (box) {
       const div = document.createElement('div');
       div.className = 'weban-line weban-' + level;
       div.textContent = line;
       box.appendChild(div);
+      while (box.childElementCount > 500) box.removeChild(box.firstChild);
       box.scrollTop = box.scrollHeight;
     }
     console.log('[WeBan] ' + msg);
+  }
+
+  // 进度条：显示当前项目 / 第几门 / 总数
+  function setProgress(text, ratio) {
+    const box = el('weban-progress');
+    if (!box) return;
+    const pct = Math.max(0, Math.min(100, Math.round((ratio || 0) * 100)));
+    box.innerHTML = text
+      ? '<div class="weban-prog"><div class="weban-prog-text">' + esc(text) + '</div>' +
+        '<div class="weban-prog-bar"><i style="width:' + pct + '%"></i></div></div>'
+      : '';
+    UI.progress = text;
   }
 
   function styles() {
@@ -665,6 +785,14 @@
         border: 1px solid #d0d7de; border-radius: 6px; font-size: 12px; }
       .weban-tip { font-size: 11.5px; color: #656d76; margin-bottom: 6px; }
       .weban-tip.bad { color: #cf222e; }
+      .weban-sec { font-size: 11px; color: #8c959f; margin: 8px 0 4px; font-weight: 600;
+        border-top: 1px solid #eaeef2; padding-top: 6px; }
+      .weban-sec:first-child { border-top: 0; margin-top: 0; padding-top: 0; }
+      .weban-prog { margin-bottom: 8px; }
+      .weban-prog-text { font-size: 11.5px; color: #656d76; margin-bottom: 3px;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .weban-prog-bar { height: 5px; background: #eaeef2; border-radius: 99px; overflow: hidden; }
+      .weban-prog-bar i { display: block; height: 100%; background: #1f883d; transition: width .3s; }
     `;
   }
 
@@ -680,9 +808,14 @@
       '<div class="weban-head"><b>安全教育助手</b><span id="weban-ver"></span></div>' +
       '<div class="weban-body">' +
         '<div id="weban-status"></div>' +
+        '<div id="weban-progress"></div>' +
         '<div class="weban-row">' +
           '<button id="btn-start" class="on">开始</button>' +
           '<button id="btn-stop" class="stop" disabled>停止</button>' +
+        '</div>' +
+        '<div class="weban-row">' +
+          '<button id="btn-clear">清空日志</button>' +
+          '<button id="btn-copy">复制日志</button>' +
         '</div>' +
         '<div id="weban-settings"></div>' +
         '<div id="weban-log"></div>' +
@@ -700,6 +833,20 @@
     on('#btn-stop', () => {
       UI.cancelled = true;
       log('已请求停止…', 'warn');
+    });
+    on('#btn-clear', () => {
+      const box = el('weban-log');
+      if (box) box.innerHTML = '';
+      UI.logs = [];
+    });
+    on('#btn-copy', async () => {
+      const text = (UI.logs || []).join('\n');
+      try {
+        await navigator.clipboard.writeText(text);
+        log('日志已复制', 'ok');
+      } catch (e) {
+        log('复制失败：' + e.message, 'err');
+      }
     });
 
     renderSettings();
@@ -719,32 +866,38 @@
     const box = el('weban-settings');
     if (!box) return;
     const cfg = settings();
+    const srv = serverConfig();
+    const row = (id, label, type, value, extra) =>
+      '<div class="weban-f"><label>' + label + '</label>' +
+      '<input id="' + id + '" type="' + type + '"' + (extra || '') + ' value="' + esc(String(value)) + '"></div>';
+    const check = (id, label, checked) =>
+      '<div class="weban-tip"><label><input id="' + id + '" type="checkbox"' +
+      (checked ? ' checked' : '') + '> ' + label + '</label></div>';
+
     box.innerHTML =
-      '<div class="weban-f"><label>翻页间隔（秒）</label>' +
-      '<input id="set-page" type="number" min="0.5" step="0.5" value="' + cfg.pageInterval + '"></div>' +
-      '<div class="weban-f"><label>考试答题间隔（秒）</label>' +
-      '<input id="set-exam" type="number" min="0" value="' + cfg.examQuestionTime + '"></div>' +
-      '<div class="weban-tip"><label><input id="set-speedup" type="checkbox"' +
-      (cfg.speedup ? ' checked' : '') + '> 动画加速（大幅缩短课程页等待）</label></div>' +
-      '<div class="weban-tip"><label><input id="set-random" type="checkbox"' +
-      (cfg.randomAnswer ? ' checked' : '') + '> 题库外随机作答</label></div>' +
-      '<div class="weban-f"><label>辅助服务地址（可选，如 http://127.0.0.1:8765）</label>' +
-      '<input id="set-endpoint" placeholder="不填则不用题库/验证码识别" value="' +
-      esc(serverConfig().endpoint) + '"></div>' +
-      '<div class="weban-f"><label>服务 Token</label>' +
-      '<input id="set-token" placeholder="服务端未开鉴权则留空" value="' +
-      esc(serverConfig().token) + '"></div>';
+      '<div class="weban-sec">学习</div>' +
+      row('set-page', '翻页间隔（秒）', 'number', cfg.pageInterval, ' min="0.2" step="0.1"') +
+      check('set-speedup', '动画加速（大幅缩短课程页等待）', cfg.speedup) +
+      check('set-mute', '静音（关闭点击音效）', cfg.mute) +
+      '<div class="weban-sec">考试</div>' +
+      row('set-exam', '答题间隔（秒）', 'number', cfg.examQuestionTime, ' min="0" step="0.5"') +
+      check('set-random', '题库外的题随机作答', cfg.randomAnswer) +
+      '<div class="weban-sec">辅助服务（题库/验证码）</div>' +
+      row('set-endpoint', '服务地址', 'text', srv.endpoint) +
+      row('set-token', '服务 Token', 'text', srv.token);
+
     const save = () => {
       GM_setValue(STORE.settings, {
         pageInterval: Math.max(0.2, Number(box.querySelector('#set-page').value) || 0.8),
         examQuestionTime: Math.max(0, Number(box.querySelector('#set-exam').value) || 0),
         randomAnswer: box.querySelector('#set-random').checked,
         speedup: box.querySelector('#set-speedup').checked,
+        mute: box.querySelector('#set-mute').checked,
       });
       GM_setValue(STORE.captchaEndpoint, box.querySelector('#set-endpoint').value.trim());
       GM_setValue(STORE.captchaToken, box.querySelector('#set-token').value.trim());
     };
-    for (const id of ['set-page', 'set-exam', 'set-random', 'set-speedup', 'set-endpoint', 'set-token']) {
+    for (const id of ['set-page', 'set-exam', 'set-random', 'set-speedup', 'set-mute', 'set-endpoint', 'set-token']) {
       const node = box.querySelector('#' + id);
       if (node) node.addEventListener('change', save);
     }
@@ -787,6 +940,8 @@
           for (let i = 0; i < pending.length; i++) {
             if (UI.cancelled) break;
             const course = pending[i];
+            setProgress('学习中 ' + (i + 1) + '/' + pending.length + '：' + course.resourceName,
+              (i + 1) / pending.length);
             log('(' + (i + 1) + '/' + pending.length + ') ' + course.resourceName);
             try {
               await studyCourse(course, project, {
@@ -794,6 +949,7 @@
                 pageInterval: cfg.pageInterval * 1000,
                 speedup: cfg.speedup,
                 animSpeed: cfg.animSpeed,
+                mute: cfg.mute,
               });
               summary.studied++;
             } catch (e) {
@@ -828,6 +984,7 @@
         : '全部完成：学习 ' + summary.studied + ' 门，失败 ' + summary.failed + ' 门，用时 ' + mins + ' 分钟',
         UI.cancelled ? 'warn' : 'ok');
       GM_setValue(STORE.lastRun, { at: new Date().toISOString(), summary });
+      setProgress('', 0);
     } catch (e) {
       if (e.cancelled) log('已停止', 'warn');
       else if (e.needsLogin) log(e.message, 'err');
@@ -886,6 +1043,7 @@
       pickOptionIds,
       installSpeedup,
       installTimerBoost,
+      installMute,
       autoAnswerInteractive,
       run,
     };
