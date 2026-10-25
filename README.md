@@ -247,35 +247,46 @@ docker run --rm \
 
 ## 油猴脚本（浏览器版）
 
-[`weban.user.js`](weban.user.js) 是在浏览器里跑的完整版本：**不需要 Python 环境**，登录后自动学完所有未完成课程、考完剩余考试。
+[`weban.user.js`](weban.user.js) 在浏览器里完成整套流程，**不需要 Python 环境**：自动学完未完成课程、自动处理课程里的交互题、自动答题、自动交卷。
 
-**安装**：装好 Tampermonkey → 新建脚本 → 粘贴 `weban.user.js` 全文保存 → 打开 <https://weiban.mycourse.cn/>，右下角出现面板。
+**解决的问题**：
 
-**用法**：
-
-1. 在官网正常登录（脚本不碰账号密码）
-2. 点面板上的「开始」
-3. 脚本自动采集项目/进度 → 逐门课学习并答题完课 → 考剩余考试
-
-**面板设置**：
-
-| 设置 | 说明 |
+| 痛点 | 做法 |
 | --- | --- |
-| 每门课最短学习时长 | 服务端要求的最少停留时间，默认 20 秒 |
-| 每题答题间隔 | 考试答题节奏，默认 3 秒 |
-| 题库外随机作答 | 关闭则题库未命中的题不作答 |
-| 验证码识别服务 | 可选，见下一节 |
+| 课程动画太慢 | 注入样式把 CSS `animation`/`transition` 压到 0.05s，并把页面里 2600ms 之类的长等待压缩（详见下方原理） |
+| 需要手动点翻页 | 自动点 `.btn-next` 翻到底，再点 `.btn-next-end` 完课 |
+| 交互题要手点 | 自动把选项按钮依次点一遍，再点提交（页面用 Set 计数，集满才放行） |
+| 考试要手答 | 从 `server.py` 查题库，按答案文本匹配选项；题库外的题可配置随机作答 |
 
-**与 Python 版的关系**：接口路径、请求体字段（`tenantCode`/`userId`）、`timestamp` query、mercury 签名都与 `api.py` 对齐；学习流程（`study.do` → `getCourseUrl.do` → 答题 → 完课）和考试流程（`beforePaper` → `preparePaper` → `startPaper` → `recordQuestion` → `submitPaper`）与 `client.py` 一一对应。
+**安装**：Tampermonkey → 新建脚本 → 粘贴 `weban.user.js` → 打开 <https://weiban.mycourse.cn/> → 右下角面板点「开始」。
 
-**已知差异**（相对 Python 版）：
+**原理（为什么不自己发请求）**：主站是 Vue + Vuex 应用，所有接口都封装在 store 的 actions 里。脚本通过 `#app.__vue__` 拿根实例后直接 `dispatch` 官方 action，签名、加密、token 全由页面代码处理。课程页则由脚本真实点击页面按钮驱动，完课请求由页面自己的 `finishWxCourse()` 发出。源码见 `src/online-*/ `（用 sourcemap 还原）。
 
-- 不处理 `jupiterapi` 翻页轨迹：部分课程需要逐页上报才算学习，这类课程目前可能完课失败，脚本会跳过并提示
-- 不自动处理课程完成时的点选验证码（需配识别服务，或手动点）
-- 题库按题目文本匹配，命中率取决于题库覆盖率
+## 辅助服务 server.py（可选）
+
+[`server.py`](server.py) 提供**题库查询**和**验证码识别**，脚本不配也能跑（只是题库外的题随机、验证码要手点）。
+
+```bash
+python server.py                          # 127.0.0.1:8765，无鉴权
+WB_TOKEN=随机串 python server.py            # 开鉴权
+python server.py --host 0.0.0.0 --token 随机串   # 对外，必须带 token
+```
+
+| 接口 | 作用 |
+| --- | --- |
+| `POST /answer/query` | 传 `{title, options}`，返回 `{hit, indexes, answers, matchedBy}` |
+| `POST /answer/match` | 一次传多题，返回每题结果 |
+| `POST /captcha/point` | 点选验证码 → 3 个坐标 |
+| `POST /captcha/text` | 登录验证码 → 4 位字符 |
+| `GET /answer/stats` / `GET /health` | 题库统计 / 健康检查 |
+
+题库来自 `answer/answer.json`（3700+ 题），文件改动后自动重载。题目文本会做规范化（去空格标点、全角转半角、小写），所以「带空格或标点不同」的同一道题也能命中。
+
+在脚本面板「辅助服务地址」里填 `http://127.0.0.1:8765` 即可。
+
+安全约束：默认只监听回环地址；对外必须带 token；图片地址限制 https + 域名白名单 + DNS 内网校验（防 SSRF）；请求体与图片都有大小上限；按 IP 限流。
 
 ## 演示
-
 ![study](images/study.png)
 ![exam](images/exam.png)
 ![old](images/old.png)

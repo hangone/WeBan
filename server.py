@@ -1,24 +1,27 @@
-"""验证码识别 HTTP 服务（给油猴脚本 / 其他客户端共用）。
+"""WeBan 辅助服务：验证码识别 + 题库查询（给油猴脚本 / 其他客户端共用）。
 
-只做「看图返回坐标」，不接触任何账号、cookie、ticket 或业务接口：
+服务端只做「看图」和「查题」，不接触账号、cookie、ticket 或任何业务接口：
 
 - POST /captcha/point   点选验证码：传主图/提示图 URL，返回 3 个点击坐标
-- POST /captcha/text    登录验证码：传图片 URL，返回 4 位字符
+- POST /captcha/text    登录验证码：传图片 URL 或 dataUrl，返回 4 位字符
+- POST /answer/query    题库查询：传题目文本与选项，返回应选选项下标
+- POST /answer/match    批量匹配：一次传多题，返回每题命中的答案
+- GET  /answer/stats    题库统计
 - GET  /health          健康检查
 
-识别算法直接复用 captcha.py 的 detect_points / LoginCaptchaSolver，
-本文件只负责 HTTP 外壳、鉴权和限流，不复制算法。
+识别算法复用 captcha.py 的 detect_points / LoginCaptchaSolver，题库复用
+answer/answer.json，本文件只负责 HTTP 外壳、鉴权和限流。
 
 启动::
 
-    python captcha_server.py                 # 默认 127.0.0.1:8765
-    WB_CAPTCHA_TOKEN=xxx python captcha_server.py
-    python captcha_server.py --host 0.0.0.0 --port 8765 --token xxx
+    python server.py                        # 默认 127.0.0.1:8765
+    WB_TOKEN=xxx python server.py
+    python server.py --host 0.0.0.0 --port 8765 --token xxx
 
 安全约定：
-- 默认只监听回环地址；要对外提供服务必须显式 --host，并设置 --token
-- 只接受 HTTPS 图片 URL，并解析 DNS 后拒绝内网/回环地址（防 SSRF）
-- 不落盘、不记录图片内容，日志只记耗时和识别结果
+- 默认只监听回环地址；对外监听必须显式 --host 并设置 --token
+- 只接受 HTTPS 图片 URL，解析 DNS 后拒绝内网/回环地址（防 SSRF）
+- 不落盘、不记录图片内容，日志只记耗时和结果
 """
 
 from __future__ import annotations
@@ -30,17 +33,21 @@ import ipaddress
 import json
 import logging
 import os
+import re
 import socket
 import threading
 import time
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
 import numpy as np
 
 from captcha import LoginCaptchaSolver, detect_points
+
+ANSWER_FILE = Path(__file__).parent / "answer" / "answer.json"
 
 # ── 配置 ────────────────────────────────────────────────
 
@@ -57,7 +64,7 @@ ALLOWED_IMAGE_HOSTS = (
     "captcha.qcloud.com",
 )
 
-log = logging.getLogger("captcha_server")
+log = logging.getLogger("weban-server")
 
 
 class CaptchaError(Exception):
@@ -66,6 +73,134 @@ class CaptchaError(Exception):
     def __init__(self, message: str, status: int = 400) -> None:
         super().__init__(message)
         self.status = status
+
+
+# ── 题库 ────────────────────────────────────────────────
+
+# 题库结构：{"题目文本": {"optionList": [{"content": "...", "isCorrect": 1}], "type": 1}}
+# 用户给的题目文本常带空格/标点差异，匹配前统一规范化。
+
+_PUNCT_RE = re.compile(
+    r"[\s（）()【】\[\]「」『』《》〈〉｛｝{}＜＞<>"
+    r"：:，,。.；;、!！?？\-—－_~～·…\"'“”‘’]+"
+)
+
+
+def normalize(text: str) -> str:
+    """规范化题目/选项文本：去空白标点、全角转半角、转小写。"""
+    if not text:
+        return ""
+    # 全角字母数字转半角
+    out = []
+    for ch in str(text):
+        code = ord(ch)
+        if 0xFF01 <= code <= 0xFF5E:
+            ch = chr(code - 0xFEE0)
+        elif code == 0x3000:
+            ch = " "
+        out.append(ch)
+    text = "".join(out).lower()
+    return _PUNCT_RE.sub("", text)
+
+
+class AnswerBank:
+    """题库索引：规范化文本 → 题目条目。进程内单例，线程安全。"""
+
+    def __init__(self, path: Path = ANSWER_FILE) -> None:
+        self.path = path
+        self._index: dict[str, dict[str, Any]] = {}
+        self._lock = threading.Lock()
+        self._loaded_at: float = 0.0
+        self._mtime: float = 0.0
+        self.error: str = ""
+
+    def load(self, force: bool = False) -> int:
+        """加载题库；文件 mtime 变化时自动重载。返回题目数。"""
+        with self._lock:
+            if not self.path.exists():
+                self.error = f"题库文件不存在: {self.path}"
+                log.warning(self.error)
+                return len(self._index)
+            mtime = self.path.stat().st_mtime
+            if not force and self._index and mtime == self._mtime:
+                return len(self._index)
+            try:
+                raw = json.loads(self.path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                self.error = f"题库读取失败: {exc}"
+                log.warning(self.error)
+                return len(self._index)
+
+            index: dict[str, dict[str, Any]] = {}
+            for title, entry in raw.items():
+                key = normalize(title)
+                if not key or not isinstance(entry, dict):
+                    continue
+                index[key] = entry
+            self._index = index
+            self._mtime = mtime
+            self._loaded_at = time.time()
+            self.error = ""
+            log.info("题库已加载：%d 题", len(index))
+            return len(index)
+
+    @property
+    def size(self) -> int:
+        return len(self._index)
+
+    def lookup(self, title: str) -> dict[str, Any] | None:
+        """按题目文本查答案条目。"""
+        if not self._index:
+            self.load()
+        return self._index.get(normalize(title))
+
+    def pick(self, title: str, options: list[str] | None = None) -> dict[str, Any]:
+        """查题并给出「该选第几个选项」的结论。
+
+        优先按答案文本匹配客户端传来的选项；匹配不上时退化为按题库顺序，
+        并在返回里标注 matched 方式，让调用方知道可信度。
+        """
+        entry = self.lookup(title)
+        if entry is None:
+            return {"hit": False}
+
+        correct_texts = [
+            str(o.get("content", ""))
+            for o in entry.get("optionList", [])
+            if int(o.get("isCorrect", 0) or 0) == 1
+        ]
+        result: dict[str, Any] = {
+            "hit": True,
+            "type": entry.get("type"),
+            "answers": correct_texts,
+            "indexes": [],
+            "matchedBy": "text",
+        }
+        if not options:
+            return result
+
+        norm_opts = [normalize(o) for o in options]
+        indexes: list[int] = []
+        for want in correct_texts:
+            target = normalize(want)
+            if not target:
+                continue
+            for i, opt in enumerate(norm_opts):
+                if not opt:
+                    continue
+                if opt == target or (
+                    len(target) >= 4 and (target in opt or opt in target)
+                ):
+                    if i not in indexes:
+                        indexes.append(i)
+                    break
+        result["indexes"] = sorted(indexes)
+        if not indexes:
+            result["matchedBy"] = "none"
+        return result
+
+
+BANK = AnswerBank()
 
 
 # ── SSRF 防护 ───────────────────────────────────────────
@@ -222,7 +357,7 @@ def solve_text(image_url: str, data_url: str | None = None) -> dict[str, Any]:
         try:
             resp = requests.get(
                 image_url,
-                headers={"User-Agent": "Mozilla/5.0 (WeBan captcha_server)"},
+                headers={"User-Agent": "Mozilla/5.0 (WeBan server)"},
                 timeout=10,
             )
             resp.raise_for_status()
@@ -328,14 +463,42 @@ class Handler(BaseHTTPRequestHandler):
     # ── 路由 ────────────────────────────────────────────
 
     def do_GET(self) -> None:
-        if self.path.split("?")[0] == "/health":
-            self._send(200, {"ok": True, "service": "weban-captcha"})
+        path = self.path.split("?")[0]
+        if path == "/health":
+            self._send(
+                200,
+                {
+                    "ok": True,
+                    "service": "weban-server",
+                    "answerBank": BANK.size,
+                    "answerFile": str(ANSWER_FILE.name),
+                },
+            )
+            return
+        if path == "/answer/stats":
+            BANK.load()
+            self._send(
+                200,
+                {
+                    "ok": True,
+                    "count": BANK.size,
+                    "file": str(ANSWER_FILE),
+                    "error": BANK.error,
+                },
+            )
             return
         self._error(404, "not found")
 
+    ROUTES = (
+        "/captcha/point",
+        "/captcha/text",
+        "/answer/query",
+        "/answer/match",
+    )
+
     def do_POST(self) -> None:
         path = self.path.split("?")[0]
-        if path not in ("/captcha/point", "/captcha/text"):
+        if path not in self.ROUTES:
             self._error(404, "not found")
             return
         if not self._check_access():
@@ -344,8 +507,12 @@ class Handler(BaseHTTPRequestHandler):
             body = self._json_body()
             if path == "/captcha/point":
                 self._handle_point(body)
-            else:
+            elif path == "/captcha/text":
                 self._handle_text(body)
+            elif path == "/answer/query":
+                self._handle_answer_query(body)
+            else:
+                self._handle_answer_match(body)
         except CaptchaError as exc:
             self._error(exc.status, str(exc))
         except Exception as exc:
@@ -390,6 +557,44 @@ class Handler(BaseHTTPRequestHandler):
         )
         self._send(200 if result["ok"] else 422, result)
 
+    def _handle_answer_query(self, body: dict[str, Any]) -> None:
+        title = body.get("title") or body.get("question") or ""
+        if not title:
+            raise CaptchaError("需要提供 title（题目文本）")
+        options = body.get("options")
+        if options is not None and not isinstance(options, list):
+            raise CaptchaError("options 必须是字符串数组")
+        result = BANK.pick(str(title), [str(o) for o in options] if options else None)
+        log.info(
+            "answer hit=%s matchedBy=%s", result.get("hit"), result.get("matchedBy")
+        )
+        self._send(200 if result.get("hit") else 404, result)
+
+    def _handle_answer_match(self, body: dict[str, Any]) -> None:
+        items = body.get("items")
+        if not isinstance(items, list) or not items:
+            raise CaptchaError("需要提供 items 数组")
+        if len(items) > 200:
+            raise CaptchaError("单次最多 200 题", 413)
+        results = []
+        for item in items:
+            if not isinstance(item, dict):
+                results.append({"hit": False})
+                continue
+            title = item.get("title") or item.get("question") or ""
+            options = item.get("options")
+            r = BANK.pick(
+                str(title),
+                [str(o) for o in options] if isinstance(options, list) else None,
+            )
+            r["id"] = item.get("id")
+            results.append(r)
+        hits = sum(1 for r in results if r.get("hit"))
+        log.info("answer match %d/%d", hits, len(results))
+        self._send(
+            200, {"ok": True, "total": len(results), "hits": hits, "results": results}
+        )
+
     def log_message(self, format: str, *args: Any) -> None:
         """不打印默认的逐请求访问日志，避免刷屏。"""
         log.debug("%s - %s", self._client_key(), format % args)
@@ -414,21 +619,19 @@ def build_server(config: ServerConfig) -> CaptchaServer:
 
 def parse_args(argv: list[str] | None = None) -> ServerConfig:
     parser = argparse.ArgumentParser(description="WeBan 验证码识别服务")
+    parser.add_argument("--host", default=os.environ.get("WB_HOST", DEFAULT_HOST))
     parser.add_argument(
-        "--host", default=os.environ.get("WB_CAPTCHA_HOST", DEFAULT_HOST)
-    )
-    parser.add_argument(
-        "--port", type=int, default=int(os.environ.get("WB_CAPTCHA_PORT", DEFAULT_PORT))
+        "--port", type=int, default=int(os.environ.get("WB_PORT", DEFAULT_PORT))
     )
     parser.add_argument(
         "--token",
-        default=os.environ.get("WB_CAPTCHA_TOKEN", ""),
-        help="Bearer token；对外监听时必填（也可用 WB_CAPTCHA_TOKEN）",
+        default=os.environ.get("WB_TOKEN", ""),
+        help="Bearer token；对外监听时必填（也可用 WB_TOKEN）",
     )
     parser.add_argument(
         "--rate-limit",
         type=int,
-        default=int(os.environ.get("WB_CAPTCHA_RATE_LIMIT", "60")),
+        default=int(os.environ.get("WB_RATE_LIMIT", "60")),
         help="每个 IP 每分钟最大请求数，0 表示不限",
     )
     args = parser.parse_args(argv)
@@ -446,6 +649,7 @@ def main(argv: list[str] | None = None) -> int:
         format="%(asctime)s %(levelname)s %(message)s",
     )
     config = parse_args(argv)
+    BANK.load(force=True)
     server = build_server(config)
     host, port = server.server_address[:2]
     log.info(

@@ -113,91 +113,116 @@
   }
 
   // ────────────────────────────────────────────────────────────────────────
-  // 2. 题库（唯一需要外部网络的资源）
+  // 2. 题库：交给 server.py，本地不再维护匹配逻辑
+  //     服务端返回 { hit, indexes: [选项下标], answers: [正确文本], matchedBy }
+  //     未配置服务时退化为随机/全选，不影响学习流程。
   // ────────────────────────────────────────────────────────────────────────
 
-  let answerBank = null;
-  let answerIndex = null;
-
-  async function loadAnswerBank() {
-    if (answerBank) return answerBank;
-    const urls = [
-      'https://cdn.jsdelivr.net/gh/hangone/WeBan@main/answer/answer.json',
-      'https://raw.githubusercontent.com/hangone/WeBan/main/answer/answer.json',
-    ];
-    for (const u of urls) {
-      try {
-        const data = await gmGetJson(u);
-        if (data && typeof data === 'object') {
-          answerBank = data;
-          answerIndex = new Map();
-          for (const [k, v] of Object.entries(data)) {
-            const nk = normalizeQuestion(k);
-            if (nk) answerIndex.set(nk, v);
-          }
-          log('题库已加载：' + answerIndex.size + ' 题', 'ok');
-          return answerBank;
-        }
-      } catch (e) {
-        log('题库源不可用（' + u.split('/')[2] + '）：' + e.message, 'warn');
-      }
-    }
-    answerBank = {};
-    answerIndex = new Map();
-    log('题库加载失败，将按随机策略作答', 'warn');
-    return answerBank;
+  function serverConfig() {
+    return {
+      endpoint: String(GM_getValue(STORE.captchaEndpoint, '') || '').replace(/\/+$/, ''),
+      token: String(GM_getValue(STORE.captchaToken, '') || ''),
+    };
   }
 
-  function gmGetJson(url) {
+  function gmPost(url, body, token) {
     return new Promise((resolve, reject) => {
       GM_xmlhttpRequest({
-        method: 'GET',
+        method: 'POST',
         url,
-        timeout: 20000,
-        onload: (res) => {
-          if (res.status !== 200) return reject(new Error('HTTP ' + res.status));
-          try { resolve(JSON.parse(res.responseText)); } catch (e) { reject(e); }
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: 'Bearer ' + token } : {}),
         },
-        onerror: () => reject(new Error('网络错误')),
-        ontimeout: () => reject(new Error('超时')),
+        data: JSON.stringify(body),
+        timeout: 15000,
+        onload: (res) => {
+          let json = null;
+          try { json = JSON.parse(res.responseText); } catch { /* 非 JSON */ }
+          if (res.status === 200 || res.status === 404 || res.status === 422) {
+            return resolve({ status: res.status, body: json || {} });
+          }
+          reject(new Error((json && json.error) || 'HTTP ' + res.status));
+        },
+        onerror: () => reject(new Error('服务连接失败')),
+        ontimeout: () => reject(new Error('服务超时')),
       });
     });
   }
 
-  const normalizeQuestion = (text) =>
-    String(text || '')
-      .replace(/\s+/g, '')
-      .replace(/[（）()【】\[\]「」""''：:，,。.；;、!！?？\-—_]/g, '')
-      .toLowerCase();
-
-  // 题库结构：{"题目": {"optionList": [{"content": "...", "isCorrect": 1}], "type": 1}}
-  function lookupAnswer(question) {
-    if (!answerIndex) return null;
-    const entry = answerIndex.get(normalizeQuestion(question.title || question.content));
-    if (!entry) return null;
-    const correct = (entry.optionList || []).filter((o) => Number(o.isCorrect) === 1).map((o) => o.content);
-    return correct.length ? correct : null;
+  async function askServerAnswer(question, options) {
+    const cfg = serverConfig();
+    if (!cfg.endpoint) return null;
+    try {
+      const res = await gmPost(
+        cfg.endpoint + '/answer/query',
+        { title: question.title || question.content || '', options },
+        cfg.token,
+      );
+      if (!res.body || !res.body.hit) return null;
+      return res.body;
+    } catch (e) {
+      log('题库服务不可用：' + e.message, 'warn');
+      return null;
+    }
   }
 
-  // 用答案文本匹配选项（题库和试卷选项顺序可能不同，按内容匹配更稳）
-  function matchOptions(question, correctContents, fallbackRandom) {
+  // 把服务端返回的 indexes 映射成选项 id；没命中时按策略兜底
+  function pickOptionIds(question, serverResult, fallbackRandom) {
     const options = question.optionList || [];
     if (!options.length) return [];
-    if (correctContents && correctContents.length) {
-      const ids = [];
-      for (const want of correctContents) {
-        const target = normalizeQuestion(want);
-        if (!target) continue;
-        const hit = options.find((o) => normalizeQuestion(o.content) === target);
-        if (hit && !ids.includes(hit.id)) ids.push(hit.id);
-      }
-      if (ids.length) return ids;
+    if (serverResult && Array.isArray(serverResult.indexes) && serverResult.indexes.length) {
+      return serverResult.indexes.map((i) => options[i]).filter(Boolean).map((o) => o.id);
     }
     if (!fallbackRandom) return [];
     if (Number(question.type) === 2) return options.map((o) => o.id);
     return [options[0].id];
   }
 
+  // ────────────────────────────────────────────────────────────────────────
+  // 2.5 动画加速：课程页的「慢」来自 CSS animation
+  //     实测 src/online-*/mcwk 的 CSS 里 animation 时长 2.4~6s，且带
+  //     animation-delay（单页最多等 4.8s）。翻一页要等动画播完，这是卡顿
+  //     的主因。这里注入一份覆盖样式把它们压缩到极短。
+  //     —— 只改「播放速度」，不跳过页面逻辑，页面该有的状态切换照常发生。
+  // ────────────────────────────────────────────────────────────────────────
+
+  const SPEED_STYLE_ID = 'weban-speedup';
+
+  function installSpeedup(win, speed = 0.05) {
+    try {
+      const doc = win.document;
+      if (!doc || doc.getElementById(SPEED_STYLE_ID)) return;
+      const style = doc.createElement('style');
+      style.id = SPEED_STYLE_ID;
+      // 用 !important 覆盖页面所有 animation/transition
+      style.textContent =
+        '*, *::before, *::after {' +
+        '  animation-duration: ' + speed + 's !important;' +
+        '  animation-delay: 0s !important;' +
+        '  transition-duration: ' + speed + 's !important;' +
+        '  transition-delay: 0s !important;' +
+        '}';
+      (doc.head || doc.documentElement).appendChild(style);
+    } catch { /* 跨域等情况忽略 */ }
+  }
+
+  // 加速 setTimeout：item.js 里用 setTimeout(fn, 2600) 等交互反馈，
+  // 这是纯等待，压缩它不会影响正确性（页面逻辑按顺序执行）。
+  function installTimerBoost(win, scale = 0.05) {
+    try {
+      const w = win;
+      if (!w || w.__webanTimerBoost) return;
+      const nativeSetTimeout = w.setTimeout.bind(w);
+      w.setTimeout = function (fn, delay, ...args) {
+        const d = Number(delay) || 0;
+        // 只压缩 100ms 以上的等待，短延时保持原样避免竞态
+        const next = d > 100 ? Math.max(20, Math.round(d * scale)) : d;
+        return nativeSetTimeout(fn, next, ...args);
+      };
+      w.__webanTimerBoost = true;
+    } catch { /* ignore */ }
+  }
 
   // ────────────────────────────────────────────────────────────────────────
   // 3. 课程学习：真实打开课程页，驱动页面 DOM
@@ -263,6 +288,53 @@
     return null;
   }
 
+  // 课程页「交互题」自动答题。
+  // 依据 src/online-*/mcwk/course-A11078/item.js：
+  //   - 每个选项按钮 .p0502/.p0503/... 绑定 p5btn()，点击后记录到 Set
+  //   - 提交按钮 .p0511 点击后把选项标记为 over，并 setTimeout 2600ms 后复位
+  //   - 集满 5 个不同选项才显示 .btn-base（下一页按钮）
+  // 所以自动答题要做的是：把页面上所有可点选项依次点一遍，再点提交。
+  async function autoAnswerInteractive(win, opts = {}) {
+    const { maxRounds = 3 } = opts;
+    const answered = new Set();
+    for (let round = 0; round < maxRounds; round++) {
+      let doc;
+      try { doc = win.document; } catch { return; }
+      const optionBtns = [
+        ...doc.querySelectorAll(
+          '.p0502, .p0503, .p0504, .p0505, .p0506',
+        ),
+      ].filter((el) => el.offsetParent !== null || el.style.display !== 'none');
+      let clicked = 0;
+      for (const btn of optionBtns) {
+        const key = btn.className || String(optionBtns.indexOf(btn));
+        if (answered.has(key + round)) continue;
+        try {
+          btn.click();
+          clicked++;
+          answered.add(key + round);
+          await sleep(120);
+        } catch { /* 单个按钮失败不影响其他 */ }
+      }
+      // 点提交（第一轮把所有选项都点一遍后再提交）
+      const submit = doc.querySelector('.p0511');
+      if (submit && (submit.offsetParent !== null || submit.style.display !== 'none')) {
+        try { submit.click(); } catch { /* ignore */ }
+        await sleep(400);
+      }
+      if (!clicked) break;
+    }
+  }
+
+  // 判断当前页是不是交互题页（有选项按钮）
+  function hasInteractive(win) {
+    try {
+      return !!win.document.querySelector('.p0502, .p0503, .p0504, .p0505, .p0506');
+    } catch {
+      return false;
+    }
+  }
+
   // 学一门课：打开 → 翻到底 → 点完课按钮
   async function studyCourse(course, project, opts = {}) {
     const { onCancel, pageInterval = 1500 } = opts;
@@ -286,42 +358,76 @@
       await waitCourseReady(win);
       checkCancel();
 
+      // 注入加速：CSS 动画 + 长 setTimeout
+      if (opts.speedup !== false) {
+        installSpeedup(win, opts.animSpeed ?? 0.05);
+        installTimerBoost(win, opts.timerScale ?? 0.05);
+        log('  已启用动画加速');
+      }
+
       const info = getPageNumber(win);
-      const totalPages = info ? info.total : null;
-      log('  ' + name + '：共 ' + (totalPages ?? '?') + ' 页，开始翻页');
+      log('  ' + name + '：共 ' + (info ? info.total : '?') + ' 页，开始翻页');
 
       let guard = 0;
-      let lastPage = info ? info.current : 0;
+      let stuck = 0;
+      let lastSig = '';
       while (!checkCancel()) {
+        if (++guard > 300) throw new Error('翻页次数异常，已停止');
+
+        // 交互题页：先把选项都点一遍再翻页
+        if (hasInteractive(win)) {
+          log('  发现交互题，自动作答');
+          await autoAnswerInteractive(win);
+          await sleep(300);
+        }
+
+        // 到最后一页就停
         const cur = getPageNumber(win);
         if (cur && cur.total && cur.current >= cur.total) break;
-        if (++guard > 200) throw new Error('翻页次数异常，已停止');
+
+        const before = pageSignature(win);
         await clickNext(win);
-        await sleep(pageInterval);
-        const now = getPageNumber(win);
-        if (now && cur && now.current === cur.current) {
-          // 页码没变，可能已到最后一页
-          break;
+        await sleep(opts.pageInterval ?? 800);
+
+        // 页面没变化超过 3 次，认为到底了
+        const after = pageSignature(win);
+        if (after === before) {
+          if (++stuck >= 3) break;
+        } else {
+          stuck = 0;
         }
-        if (cur) lastPage = cur.current;
+        if (after === lastSig) stuck++;
+        lastSig = after;
       }
 
       checkCancel();
-      // 点完课：页面会校验 pageNums >= 7 并调用 finishWxCourse()
+      // 点完课：页面校验 pageNums >= 7 后调用 finishWxCourse()
       const endBtn = win.document.querySelector('.btn-next-end');
       if (!endBtn) throw new Error('找不到完课按钮');
       endBtn.click();
-      await sleep(3000);
+      await sleep(2500);
 
-      // 校验：页面上出现完成提示，或者按钮区域切换
-      const finished = detectFinish(win);
-      if (!finished) {
+      if (!detectFinish(win)) {
         log('  ' + name + '：完课请求已发出，但未确认到成功提示', 'warn');
       }
       log('  ' + name + '：学习完成', 'ok');
       return true;
     } finally {
       closeCourseTab();
+    }
+  }
+
+  // 页面状态指纹：用于判断「翻页是否真的前进了」
+  function pageSignature(win) {
+    try {
+      const doc = win.document;
+      const active = doc.querySelector('.page-active');
+      if (!active) return '';
+      const cls = active.className || '';
+      const num = getPageNumber(win);
+      return cls + '|' + (num ? num.current + '/' + num.total : '');
+    } catch {
+      return '';
     }
   }
 
@@ -366,9 +472,10 @@
     for (let i = 0; i < questionList.length; i++) {
       checkCancel();
       const q = questionList[i];
-      const correct = lookupAnswer(q);
-      if (correct) matched++;
-      const ids = matchOptions(q, correct, randomAnswer);
+      const options = (q.optionList || []).map((o) => o.content || '');
+      const serverResult = await askServerAnswer(q, options);
+      if (serverResult) matched++;
+      const ids = pickOptionIds(q, serverResult, randomAnswer);
       await dispatch('recordQuestion', {
         userExamPlanId: planId,
         questionId: q.id,
@@ -500,9 +607,11 @@
   function settings() {
     const cfg = GM_getValue(STORE.settings, null) || {};
     return {
-      pageInterval: Number(cfg.pageInterval ?? 1.5),
-      examQuestionTime: Number(cfg.examQuestionTime ?? 3),
+      pageInterval: Number(cfg.pageInterval ?? 0.8),
+      examQuestionTime: Number(cfg.examQuestionTime ?? 2),
       randomAnswer: cfg.randomAnswer !== false,
+      speedup: cfg.speedup !== false,
+      animSpeed: Number(cfg.animSpeed ?? 0.05),
     };
   }
 
@@ -582,9 +691,13 @@
     const verEl = el('weban-ver');
     if (verEl) verEl.textContent = 'v' + VERSION;
 
-    panel.querySelector('.weban-head').addEventListener('click', () => panel.classList.toggle('min'));
-    el('btn-start').addEventListener('click', run);
-    el('btn-stop').addEventListener('click', () => {
+    const on = (sel, fn) => {
+      const node = panel.querySelector(sel);
+      if (node) node.addEventListener('click', fn);
+    };
+    on('.weban-head', () => panel.classList.toggle('min'));
+    on('#btn-start', run);
+    on('#btn-stop', () => {
       UI.cancelled = true;
       log('已请求停止…', 'warn');
     });
@@ -611,16 +724,29 @@
       '<input id="set-page" type="number" min="0.5" step="0.5" value="' + cfg.pageInterval + '"></div>' +
       '<div class="weban-f"><label>考试答题间隔（秒）</label>' +
       '<input id="set-exam" type="number" min="0" value="' + cfg.examQuestionTime + '"></div>' +
+      '<div class="weban-tip"><label><input id="set-speedup" type="checkbox"' +
+      (cfg.speedup ? ' checked' : '') + '> 动画加速（大幅缩短课程页等待）</label></div>' +
       '<div class="weban-tip"><label><input id="set-random" type="checkbox"' +
-      (cfg.randomAnswer ? ' checked' : '') + '> 题库外随机作答</label></div>';
-    for (const id of ['set-page', 'set-exam', 'set-random']) {
-      box.querySelector('#' + id).addEventListener('change', () => {
-        GM_setValue(STORE.settings, {
-          pageInterval: Math.max(0.5, Number(box.querySelector('#set-page').value) || 1.5),
-          examQuestionTime: Math.max(0, Number(box.querySelector('#set-exam').value) || 0),
-          randomAnswer: box.querySelector('#set-random').checked,
-        });
+      (cfg.randomAnswer ? ' checked' : '') + '> 题库外随机作答</label></div>' +
+      '<div class="weban-f"><label>辅助服务地址（可选，如 http://127.0.0.1:8765）</label>' +
+      '<input id="set-endpoint" placeholder="不填则不用题库/验证码识别" value="' +
+      esc(serverConfig().endpoint) + '"></div>' +
+      '<div class="weban-f"><label>服务 Token</label>' +
+      '<input id="set-token" placeholder="服务端未开鉴权则留空" value="' +
+      esc(serverConfig().token) + '"></div>';
+    const save = () => {
+      GM_setValue(STORE.settings, {
+        pageInterval: Math.max(0.2, Number(box.querySelector('#set-page').value) || 0.8),
+        examQuestionTime: Math.max(0, Number(box.querySelector('#set-exam').value) || 0),
+        randomAnswer: box.querySelector('#set-random').checked,
+        speedup: box.querySelector('#set-speedup').checked,
       });
+      GM_setValue(STORE.captchaEndpoint, box.querySelector('#set-endpoint').value.trim());
+      GM_setValue(STORE.captchaToken, box.querySelector('#set-token').value.trim());
+    };
+    for (const id of ['set-page', 'set-exam', 'set-random', 'set-speedup', 'set-endpoint', 'set-token']) {
+      const node = box.querySelector('#' + id);
+      if (node) node.addEventListener('change', save);
     }
   }
 
@@ -647,7 +773,8 @@
     try {
       const user = requireUser();
       log('使用页面登录态：' + (user.realName || user.userName || user.userId));
-      await loadAnswerBank();
+      const cfgSrv = serverConfig();
+      log(cfgSrv.endpoint ? '题库服务：' + cfgSrv.endpoint : '未配置题库服务，题库外的题按随机策略作答', cfgSrv.endpoint ? 'ok' : 'warn');
 
       const projects = await collectPlan(user, () => UI.cancelled);
 
@@ -665,6 +792,8 @@
               await studyCourse(course, project, {
                 onCancel: () => UI.cancelled,
                 pageInterval: cfg.pageInterval * 1000,
+                speedup: cfg.speedup,
+                animSpeed: cfg.animSpeed,
               });
               summary.studied++;
             } catch (e) {
@@ -753,8 +882,11 @@
       collectPlan,
       studyCourse,
       takeExam,
-      loadAnswerBank,
-      lookupAnswer,
+      askServerAnswer,
+      pickOptionIds,
+      installSpeedup,
+      installTimerBoost,
+      autoAnswerInteractive,
       run,
     };
   }
