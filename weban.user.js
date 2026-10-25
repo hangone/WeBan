@@ -359,6 +359,7 @@
     '.page-active .page-next-btn',
     '.page-active .answer-btn-next',
     '.page-active .btn-ti',
+    '.page-active [class*="btn-next"]',
     '.page-active [class*="_next"]',
     '.page-active .page-success-button2',
     '.page-active .page-success-button',
@@ -393,10 +394,28 @@
       out.push({ el: n, sel });
     };
 
+    // 可用的「所在页」：当前激活页 + 紧跟它的下一屏。
+    // 实测 A05037 page-7 是分支页，出口按钮在其下一屏 page-8 里。
+    const pages = [...doc.querySelectorAll('.page-item')];
+    const activeIdx = pages.findIndex((p) => p.classList.contains('page-active'));
+    const scope = [];
+    if (activeIdx >= 0) {
+      scope.push(pages[activeIdx]);
+      if (pages[activeIdx + 1]) scope.push(pages[activeIdx + 1]);
+    }
+
     for (const sel of FORWARD_SELECTORS) {
       let nodes;
       try { nodes = [...doc.querySelectorAll(sel)]; } catch { continue; }
-      for (const n of nodes) push(n, sel);
+      for (const n of nodes) {
+        // 按钮有多组同名（实测 A05037 三个 answer-btn-next 分属
+        // at00/at01/at02），只用当前页或下一屏里的那个，
+        // 否则会一直点第一个、原地打转。
+        if (scope.length && /btn|next|answer/i.test(sel)) {
+          if (!scope.some((p) => p.contains(n))) continue;
+        }
+        push(n, sel);
+      }
     }
     // 兜底：语义匹配
     for (const n of doc.querySelectorAll('a, button, img, div, span')) {
@@ -411,6 +430,26 @@
   function findForwardButton(win) {
     const list = collectForwardButtons(win);
     return list.length ? list[0] : null;
+  }
+
+  // 分支页：当前页没有可用的前进按钮，但有返回按钮。
+  // 实测 A05037 的 page-7/8/9 就是这样（点击收集点后弹出的内容页）。
+  function isBranchPage(win) {
+    try {
+      const d = win.document;
+      const act = d.querySelector('.page-item.page-active');
+      if (!act) return false;
+      const visible = (n) => {
+        const cs = win.getComputedStyle(n);
+        return cs.display !== 'none' && cs.visibility !== 'hidden';
+      };
+      const hasForward = [...act.querySelectorAll('[class*="next"], [class*="btn-start"], [class*="btn-ce"], [class*="btn-at"], [class*="success-button"]')]
+        .some((n) => visible(n) && !/prev/.test(n.className));
+      const hasBack = [...act.querySelectorAll('[class*="prev"]')].some(visible);
+      return !hasForward && hasBack;
+    } catch {
+      return false;
+    }
   }
 
   // 页面是否已经到了结束页（多门课共用的结束标志）
@@ -792,7 +831,184 @@
     return true;
   }
 
-  // ── 自定义单选（实测 A32006 page-17/18）──────────────────
+  // ── 多点收集型（实测 A05037 page-6）────────────────────
+  // 源码：$(".p0813, .p0814, .p0815").click(... clickedSet.size === 3
+  //        → $(".page-6 .btn-base").css("display","block"))
+  // 即必须把本页所有 pNNNN 图层都点一遍，页面才放出前进按钮。
+  // 注意：不能用 getBoundingClientRect 判断可见性——入场动画期间
+  // 尺寸为 0，但元素本身可点（实测坑）。
+  async function clickAllCollectibles(win, opts = {}) {
+    const { onCancel, limit = 15 } = opts;
+    const isClickable = (n) => {
+      if (!n) return false;
+      try {
+        const cs = win.getComputedStyle(n);
+        if (cs.display === 'none' || cs.visibility === 'hidden') return false;
+        return true;
+      } catch { return false; }
+    };
+    const d = win.document;
+    const page = d.querySelector('.page-item.page-active');
+    if (!page) return 0;
+
+    const nodes = [...page.querySelectorAll('*')].filter((n) => {
+      if (!isClickable(n)) return false;
+      const cls = String(n.className || '');
+      if (/btn-|prev|next|back-list|icon-back/i.test(cls)) return false;
+      return /\bp\d{4}\b/.test(cls);
+    });
+
+    let clicked = 0;
+    for (const n of nodes.slice(0, limit)) {
+      if (onCancel && onCancel()) break;
+      try {
+        n.click();
+        clicked++;
+        await sleep(250);
+      } catch { /* ignore */ }
+
+      // 点 pNNNN 可能跳到分支页（实测 A05037：page-6 的 p0813/p0814/p0815
+      // 分别跳到 page-7/8/9，而这些页只有 btn-prev6 能回来）。
+      // 一旦离开原页，先点返回按钮回到原页再继续点下一个。
+      const now = d.querySelector('.page-item.page-active');
+      if (now && now !== page) {
+        const back = [...now.querySelectorAll('[class*="prev"]')]
+          .find((b) => {
+            try {
+              const cs = win.getComputedStyle(b);
+              return cs.display !== 'none' && cs.visibility !== 'hidden';
+            } catch { return false; }
+          });
+        if (back) { try { back.click(); await sleep(400); } catch { /* ignore */ } }
+      }
+    }
+    return clicked;
+  }
+
+  // 当前激活页是不是「答题反馈页」（page-atNN / page-afNN）。
+  // 这类页面上仍残留选项元素，必须走前进逻辑而不是重新作答（实测坑）。
+  function onAnswerFeedbackPage(win) {
+    try {
+      const act = win.document.querySelector('.page-item.page-active');
+      const cls = act ? String(act.className) : '';
+      return /page-(at|af)\d/.test(cls);
+    } catch {
+      return false;
+    }
+  }
+
+  // ── 列表型单选（实测 A05037）──────────────────────────
+  // 结构：.ques-list-item 是选项（点击加 ques-list-active），
+  //       .btn-ti-01 / .btn-ti-02 是提交按钮。
+  // 源码里正确答案写死在 if (qsone == 0) / if (qstwo == 1) 判断中，
+  // 脚本按「第几个选项」逐次尝试，答错会进 page-af0N，再回来重试。
+  // 只有「题目页(page-qsNN)处于激活状态」并且选项可见时才算待答题。
+  // 答对页(page-atNN)里仍残留 .ques-list-item，不能当成未完成（实测坑）。
+  function hasQuestList(win) {
+    try {
+      const d = win.document;
+      const active = d.querySelector('.page-item.page-active');
+      const cls = active ? String(active.className) : '';
+      if (/page-(at|af)\d/.test(cls)) return false;
+      const box = active || d;
+      return [...box.querySelectorAll('.ques-list-item')].some((n) => {
+        try {
+          const cs = win.getComputedStyle(n);
+          return cs.display !== 'none' && cs.visibility !== 'hidden';
+        } catch { return false; }
+      });
+    } catch {
+      return false;
+    }
+  }
+
+  // 答案解析（实测 A05037 item.js）：
+  //   $(".btn-ti-01").click(() => { if (qsone == 0) → page-at00 else page-af00 })
+  //   $(".btn-ti-02").click(() => { if (qstwo == 1) → page-at01 else page-af01 })
+  //   $(".btn-ti-03").click(() => { if (three == 1) → page-at02 else page-af02 })
+  // 即「第 N 个按钮对应第 M 个选项正确」，可以直接从脚本里读出来。
+  function parseQuestAnswers(source) {
+    const map = {};
+    // 匹配 if (<var> == <n>) 附近的 btn-ti-NN 绑定
+    const re = /\$\("\.btn-ti-(\d+)"\)\.click\(function\(\)\s*\{[\s\S]*?if\s*\(\s*\w+\s*==\s*(\d+)\s*\)/g;
+    let m;
+    while ((m = re.exec(source))) {
+      map[m[1]] = Number(m[2]);
+    }
+    return map;
+  }
+
+  let cachedQuestAnswers = {};
+  async function getQuestAnswers(win) {
+    if (Object.keys(cachedQuestAnswers).length) return cachedQuestAnswers;
+    const merged = {};
+    for (const sc of collectPageScripts(win)) {
+      let text = '';
+      if (sc.inline) text = sc.text;
+      else if (sc.src) {
+        try {
+          const res = await win.fetch(sc.src, { credentials: 'include' });
+          if (res.ok) text = await res.text();
+        } catch { /* ignore */ }
+      }
+      Object.assign(merged, parseQuestAnswers(text));
+    }
+    cachedQuestAnswers = merged;
+    return merged;
+  }
+
+  async function answerQuestList(win, opts = {}) {
+    const { onCancel } = opts;
+    const isVisible = (n) => {
+      if (!n) return false;
+      try {
+        const cs = win.getComputedStyle(n);
+        return cs.display !== 'none' && cs.visibility !== 'hidden';
+      } catch { return false; }
+    };
+    const d = win.document;
+
+    // 必须锁定到「当前正在显示的题目页 page-qsNN」。
+    // 页面上三组题目同时存在，全局查 btn-ti 会拿到第一组（实测坑）。
+    const active = d.querySelector('.page-item.page-active');
+    if (!active) return false;
+    const qsMatch = /page-qs(\d+)/.exec(String(active.className));
+    if (!qsMatch) return false;
+
+    const items = [...active.querySelectorAll('.ques-list-item')].filter(isVisible);
+    if (!items.length) return false;
+
+    const btn = [...active.querySelectorAll('[class*="btn-ti"]')].find(isVisible);
+    if (!btn) return false;
+
+    const noMatch = /btn-ti-(\d+)/.exec(String(btn.className));
+    const no = noMatch ? noMatch[1] : String(Number(qsMatch[1]) + 1).padStart(2, '0');
+
+    const answers = await getQuestAnswers(win);
+    const idx = answers[no] !== undefined
+      ? Math.min(answers[no], items.length - 1)
+      : 0;
+
+    if (onCancel && onCancel()) return false;
+
+    try {
+      items[idx].click();
+      await sleep(250);
+      const again = [...active.querySelectorAll('[class*="btn-ti"]')].find(isVisible);
+      if (again) again.click();
+      await sleep(900);
+    } catch { return false; }
+
+    const activeCls = (d.querySelector('.page-item.page-active') || {}).className || '';
+    if (/page-at/.test(activeCls)) {
+      log('  列表题 ' + no + '：选第 ' + (idx + 1) + ' 项答对', 'ok');
+    } else if (/page-af/.test(activeCls)) {
+      log('  列表题 ' + no + '：第 ' + (idx + 1) + ' 项答错', 'warn');
+    }
+    return true;
+  }
+
+  // ── 自定义单选（实测 A32006 page-17/18）──────────────────  // ── 自定义单选（实测 A32006 page-17/18）──────────────────
   // 页面用 span.page-radio 当选项：点击 toggleClass("page-radio-active")，
   // 提交按钮 .page-N-btn 判断 .page-N-radio1 是否 active —— radio1 就是正确答案。
   // 所以：点 radio1 → 点对应按钮 → 出现 page-success 就继续。
@@ -948,7 +1164,8 @@
           await sleep(400);
           continue;
         }
-        if (hasQuiz(win)) {
+        const feedbackPage = onAnswerFeedbackPage(win);
+        if (!feedbackPage && hasQuiz(win)) {
           log('  发现选择题，自动作答');
           await autoAnswerQuiz(win, opts);
           await sleep(400);
@@ -959,11 +1176,35 @@
           await sleep(400);
           continue;
         }
+        if (!feedbackPage && hasQuestList(win)) {
+          log('  发现列表型选择题，自动作答');
+          await answerQuestList(win, opts);
+          await sleep(400);
+          continue;
+        }
 
         // 3) 结束页
         if (reachedEnd(win)) {
           log('  已到结束页');
           break;
+        }
+
+        // 3.5) 分支页：只有返回按钮、没有前进按钮（实测 A05037 的 page-7/8/9）
+        //      这类页是点击收集点后弹出的内容，点 prev 回到主链继续。
+        if (isBranchPage(win)) {
+          const back = [...win.document.querySelectorAll('.page-item.page-active [class*="prev"]')]
+            .find((b) => {
+              try {
+                const cs = win.getComputedStyle(b);
+                return cs.display !== 'none' && cs.visibility !== 'hidden';
+              } catch { return false; }
+            });
+          if (back) {
+            log('  分支页，返回主链');
+            try { back.click(); } catch { /* ignore */ }
+            await sleep(600);
+            continue;
+          }
         }
 
         // 4) 前进：依次尝试候选按钮，直到页面真的变化
@@ -989,7 +1230,17 @@
         // 所有候选都点不动：可能导航条被页面故意隐藏了一段时间
         // （实测 A32006 在 page-4/6 隐藏 9 秒，page-21 隐藏 3.8 秒）
         // 实测最长隐藏 9 秒，这里最多等 3 轮 × 4.5 秒 ≈ 13.5 秒
-        if (idle === 0) log('  本页导航条被隐藏，等待页面放出继续按钮…');
+        // 先尝试「点满本页收集点」：部分课程要求点齐若干元素才放行
+        if (idle === 0) {
+          const n = await clickAllCollectibles(win, opts);
+          if (n > 0) {
+            log('  本页需要点击 ' + n + ' 处元素，已全部点击');
+            await sleep(800);
+            continue;
+          }
+        }
+        // 导航条可能被页面故意隐藏一段时间（实测最长 9 秒）
+        if (idle === 0) log('  未找到可点元素，等待页面放出继续按钮…');
         await sleep(opts.hiddenNavWait ?? 5000);
         if (++idle >= 4) break;
         continue;
