@@ -129,7 +129,7 @@ debug = false
 [ai]
 # 是否启用 AI 搜题功能（当题库无匹配时，优先采用 AI 搜题解答，AI 答题失败将回退到随机答题的配置）
 enable = true
-# API 基础路径，例如 DeepSeek、硅基流动等 OpenAI 兼容接口路径（/chat/completions）
+# API 基础路径，例如 DeepSeek、硅基流动等 OpenAI 兼容接口路径（本软件会自动补上/chat/completions路径，填写时请注意）
 base_url = "https://opencode.ai/zen/v1"
 # AI 服务的 API Key
 api_key = ""
@@ -139,3 +139,6 @@ model = "nemotron-3-ultra-free"
 timeout = 60
 # 请求失败时的最大重试次数
 max_retries = 2
+# 在此新增自定义请求体，使用json格式，写进一行里。本功能可用于自定义模型思考深度、强制json输出等，具体可查询各厂商文档
+# 以智谱为例：custom_body = '{"reasoning_effort": "max", "response_format": {"type": "json_object"}}'
+custom_body = '{"response_format": {"type": "json_object"}}'
