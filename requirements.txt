@@ -28,7 +28,7 @@ pysocks==1.7.1
     # via weban
 requests==2.34.2
     # via weban
-urllib3==2.7.0
+urllib3==2.8.0
     # via requests
 websockets==17.0.1
     # via nodriver
