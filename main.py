@@ -71,8 +71,10 @@ _bypass_proxy_for_local_hosts()
 import requests
 from loguru import logger
 
+from ai_client import parse_bool
 from captcha import check_browser_health, is_non_interactive
 from client import WeBanClient, read_first_existing
+from knowledge import parse_knowledge_paths
 
 # ── 命令行参数与环境变量（优先级：CLI > 环境变量 > 配置文件）────────
 
@@ -245,6 +247,43 @@ def _parse_args() -> tuple[argparse.Namespace, list[str]]:
         metavar="N",
         help="AI 请求失败最大重试次数（覆盖配置文件 [ai].max_retries）",
     )
+    parser.add_argument(
+        "--ai-reasoning-effort",
+        metavar="LEVEL",
+        help="AI 思考强度，按 OpenAI 标准传给 reasoning_effort（如 none/low/medium/high/xhigh，覆盖配置文件 [ai].reasoning_effort）",
+    )
+    parser.add_argument(
+        "--ai-stream",
+        choices=["true", "false"],
+        help="是否启用 AI 流式传输（覆盖配置文件 [ai].stream）",
+    )
+    parser.add_argument(
+        "--ai-show-thinking",
+        choices=["true", "false"],
+        help="是否显示 AI 思考过程（覆盖配置文件 [ai].show_thinking）",
+    )
+    parser.add_argument(
+        "--ai-knowledge-enable",
+        choices=["true", "false"],
+        help="是否启用参考文档知识库（覆盖配置文件 [ai].knowledge_enable）",
+    )
+    parser.add_argument(
+        "--ai-knowledge-paths",
+        metavar="PATHS",
+        help="参考文档文件或目录路径，多个用分号或逗号分隔（覆盖配置文件 [ai].knowledge_paths）",
+    )
+    parser.add_argument(
+        "--ai-knowledge-max-chars",
+        type=int,
+        metavar="N",
+        help="参考知识库全文注入阈值及最大上下文字符数（覆盖配置文件 [ai].knowledge_max_chars）",
+    )
+    parser.add_argument(
+        "--ai-knowledge-top-k",
+        type=int,
+        metavar="N",
+        help="参考知识库超出阈值时 BM25 召回的最大片段数（覆盖配置文件 [ai].knowledge_top_k）",
+    )
     opts, unknown = parser.parse_known_args()
     return opts, unknown
 
@@ -255,6 +294,8 @@ def merge_ai_config(opts: argparse.Namespace, ai: dict) -> dict:
     未通过 CLI/env 指定的字段保留配置文件原值。
     """
     merged = dict(ai)
+    bool_keys = {"enable", "stream", "show_thinking", "knowledge_enable"}
+    int_keys = {"timeout", "max_retries", "knowledge_max_chars", "knowledge_top_k"}
     cli_map = {
         "enable": opts.ai_enable,
         "base_url": opts.ai_base_url,
@@ -262,21 +303,27 @@ def merge_ai_config(opts: argparse.Namespace, ai: dict) -> dict:
         "model": opts.ai_model,
         "timeout": opts.ai_timeout,
         "max_retries": opts.ai_max_retries,
+        "reasoning_effort": opts.ai_reasoning_effort,
+        "stream": opts.ai_stream,
+        "show_thinking": opts.ai_show_thinking,
+        "knowledge_enable": opts.ai_knowledge_enable,
+        "knowledge_paths": opts.ai_knowledge_paths,
+        "knowledge_max_chars": opts.ai_knowledge_max_chars,
+        "knowledge_top_k": opts.ai_knowledge_top_k,
     }
     for key, cli_val in cli_map.items():
         env_val = os.environ.get(f"WB_AI_{key.upper()}")
-        if cli_val is not None:
-            merged[key] = (
-                str(cli_val).strip().lower() in ("1", "true", "yes")
-                if key == "enable"
-                else cli_val
-            )
-        elif env_val is not None:
-            merged[key] = (
-                env_val.strip().lower() in ("1", "true", "yes")
-                if key == "enable"
-                else env_val
-            )
+        raw_val = cli_val if cli_val is not None else env_val
+        if raw_val is None:
+            continue
+        if key in bool_keys:
+            merged[key] = parse_bool(raw_val)
+        elif key in int_keys:
+            merged[key] = int(raw_val)
+        elif key == "knowledge_paths":
+            merged[key] = parse_knowledge_paths(raw_val)
+        else:
+            merged[key] = raw_val
     return merged
 
 
@@ -381,7 +428,7 @@ def _log_format_message(record) -> str:
 # 远程模板下载地址（jsDelivr CDN 稳定；gh-proxy 免费公共代理会限流 403，
 # github 官方 raw 域名在国内不稳定，均不用）
 CONFIG_EXAMPLE_URL = (
-    "https://cdn.jsdelivr.net/gh/hangone/WeBan@main/config.example.toml"
+    "https://cdn.jsdelivr.net/gh/NoobCock/WeBan@main/config.example.toml"
 )
 
 # ── 日志 ──
@@ -394,11 +441,12 @@ log_format = (
     "<cyan>{message}</cyan>"
 )
 # 终端输出转义为单行并截断超长消息（DEBUG 模式请求/响应详情可能刷屏）；
-# 日志文件使用完整格式，不转义、不截断
+# 标记 file_only=True 的日志（如已流式展示过的思考摘要）仅写入日志文件
 logger.add(
     sink=sys.stdout,
     colorize=True,
     format=_log_format_message,
+    filter=lambda record: not record["extra"].get("file_only"),
 )
 
 os.makedirs(logs_dir, exist_ok=True)
@@ -415,7 +463,7 @@ sync_lock = threading.Lock()
 
 # ── 更新检查 ──────────────────────────────────────────────
 
-GITHUB_REPO = "hangone/WeBan"
+GITHUB_REPO = "NoobCock/WeBan"
 # 网络异常时的请求超时（秒）：检查失败也不能让用户久等
 UPDATE_CHECK_TIMEOUT = 3
 
@@ -775,6 +823,7 @@ def run_account(
                 ai_config=ai_config,
                 video_speed=video_speed,
                 jupiter_fallback=jupiter_fallback,
+                data_dir=_data_dir,
             )
         elif tenant_name and username:
             # 密码登录 — password 默认为 username
@@ -791,6 +840,7 @@ def run_account(
                 ai_config=ai_config,
                 video_speed=video_speed,
                 jupiter_fallback=jupiter_fallback,
+                data_dir=_data_dir,
             )
         else:
             log.error(
@@ -852,7 +902,7 @@ if __name__ == "__main__":
     try:
         logger.info(f"程序启动，当前版本：{VERSION}")
         _check_update_async()  # 异步检查更新，失败/无新版不阻塞主流程
-        logger.info("程序更新地址：https://github.com/hangone/WeBan")
+        logger.info(f"程序更新地址：https://github.com/{GITHUB_REPO}")
 
         # 加载配置文件
         def load_all_config():
@@ -864,6 +914,7 @@ if __name__ == "__main__":
             )
 
         global_settings, ai_config, accounts = load_all_config()
+        ai_config = merge_ai_config(_OPTS, ai_config)
 
         # 命令行/环境变量直传单账号（免配置文件，如 Docker 单用户）：
         # --tenant-name + --username [--password] 或 WB_TENANT_NAME + WB_USERNAME [WB_PASSWORD]

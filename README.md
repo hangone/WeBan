@@ -11,7 +11,11 @@
 ## 功能特性
 
 - **课程学习**：自动遍历项目 → 分类 → 课程，模拟翻页、答题、等待学习时长后完课；按项目交替完成课程与考试
-- **自动考试**：基于题库自动答题，支持单选/多选，未匹配题目可随机作答或手动输入
+- **自动考试**：基于题库自动答题，支持单选/多选，未匹配题目优先调用 AI 搜题，失败再回退随机或手动输入
+- **AI 搜题增强**：
+  - **自定义思考强度**：支持配置 OpenAI 标准 `reasoning_effort` 参数（如 `none`/`low`/`medium`/`high`/`xhigh`）
+  - **流式思考过程展示**：支持 SSE 流式传输，交互终端下实时淡色显示 LLM 思考过程（自动兼容 `reasoning_content`、`reasoning`、`<think>` 标签），多账号并发防错乱，无交互环境自动缓冲输出，并将思考摘要写入账号日志
+  - **多格式参考文档知识库**：支持引入 `.pdf`、`.docx`、`.pptx`、`.xlsx`、`.md`、`.txt`、`.csv`、`.json`、`.html` 等格式资料扩充知识库；采用自适应策略（总长未超阈值时全文注入，超出时自动本地中英文 BM25 检索召回 Top-K 片段），并在 Prompt 中要求 LLM 优先依据参考知识库思考作答
 - **验证码识别**：登录验证码自动识别；课程点选验证码自动识别（OpenCV，2 轮 × 3 次），失败才转手动
 - **多账号并发**：支持配置多个账号，可多线程同时执行
 - **题库同步**：考试前后自动从服务器同步题库，支持多用户共享
@@ -115,8 +119,15 @@ WB_TENANT_NAME="你的学校全称" WB_USERNAME=你的学号 WB_PASSWORD=你的�
 | `[ai].base_url`          | `--ai-base-url URL`          | `WB_AI_BASE_URL`            | AI 服务 API 基础路径                                                               |
 | `[ai].api_key`           | `--ai-api-key KEY`           | `WB_AI_API_KEY`             | AI 服务 API Key                                                                    |
 | `[ai].model`             | `--ai-model NAME`            | `WB_AI_MODEL`               | AI 模型名称                                                                        |
-| `[ai].timeout`           | `--ai-timeout SEC`           | `WB_AI_TIMEOUT`             | AI 请求超时秒数                                                                    |
-| `[ai].max_retries`       | `--ai-max-retries N`         | `WB_AI_MAX_RETRIES`         | AI 请求失败最大重试次数                                                            |
+| `[ai].timeout`             | `--ai-timeout SEC`             | `WB_AI_TIMEOUT`             | AI 请求超时秒数                                                                    |
+| `[ai].max_retries`         | `--ai-max-retries N`           | `WB_AI_MAX_RETRIES`         | AI 请求失败最大重试次数                                                            |
+| `[ai].reasoning_effort`    | `--ai-reasoning-effort LEVEL`  | `WB_AI_REASONING_EFFORT`    | AI 思考强度（OpenAI 标准 `reasoning_effort`，如 `none`/`low`/`medium`/`high`/`xhigh`） |
+| `[ai].stream`              | `--ai-stream`                  | `WB_AI_STREAM`              | 是否启用 AI 流式传输（`true`/`false`，默认 `true`）                                |
+| `[ai].show_thinking`       | `--ai-show-thinking`           | `WB_AI_SHOW_THINKING`       | 是否展示 AI 思考过程（`true`/`false`，默认 `true`）                                |
+| `[ai].knowledge_enable`    | `--ai-knowledge-enable`        | `WB_AI_KNOWLEDGE_ENABLE`    | 是否启用参考文档知识库（`true`/`false`，默认 `true`）                              |
+| `[ai].knowledge_paths`     | `--ai-knowledge-paths PATHS`   | `WB_AI_KNOWLEDGE_PATHS`     | 额外参考文档文件或目录路径（CLI/env 用分号或逗号分隔）                             |
+| `[ai].knowledge_max_chars` | `--ai-knowledge-max-chars N`   | `WB_AI_KNOWLEDGE_MAX_CHARS` | 知识库全文注入阈值与最大上下文字符数（默认 `12000`）                               |
+| `[ai].knowledge_top_k`     | `--ai-knowledge-top-k N`       | `WB_AI_KNOWLEDGE_TOP_K`     | BM25 分块检索召回的最大片段数（默认 `5`）                                          |
 
 无交互自动判定：`ENVIRONMENT=docker`（或 container）、stdin 非 TTY（cron/后台/管道）、或显式 `--non-interactive`。
 
@@ -131,6 +142,17 @@ WB_STUDY_TIME="20,5" WB_VIDEO_SPEED=0 ./WeBan-macos-arm64
   --study-time "20,5" --video-speed 0
 ```
 
+### AI 搜题与参考文档知识库
+
+当题目未命中本地题库 `answer.json` 且 `[ai].enable = true` 时，程序会自动调用 OpenAI 兼容接口进行答题：
+
+1. **自定义思考强度**：在 `config.toml` 的 `[ai]` 段设置 `reasoning_effort = "high"`（或 `low`/`medium`/`xhigh`/`none`，留空则不传该参数），或通过 `--ai-reasoning-effort` / `WB_AI_REASONING_EFFORT` 覆盖。
+2. **流式思考过程显示**：默认开启 `stream = true` 与 `show_thinking = true`，交互式终端会实时以淡色打印模型思考过程，思考完成后输出解析出的推荐选项与理由；无交互环境（如 Docker/后台）会自动缓冲输出，且思考摘要会记录到账号日志。
+3. **参考文档知识库**：
+   - 将参考资料直接放入程序目录（或 `--data-dir`）下的 `knowledge/` 目录即可自动加载，也可在 `[ai].knowledge_paths` 中配置额外的单文件或目录路径。
+   - 支持格式：`.pdf`（文本型 PDF，扫描件将提示先 OCR）、`.docx`（含段落与表格）、`.pptx`（含幻灯片、表格与备注）、`.xlsx`/`.xlsm`、`.md`/`.txt`/`.csv`/`.tsv`/`.json`/`.html` 等。
+   - **自适应检索**：资料总字数 ≤ `knowledge_max_chars`（默认 12000）时直接全文注入上下文；超出时自动按段落切块，用本地中英文 BM25 算法综合题干与选项召回最相关的 Top-K 片段（默认 5 条），无需额外 Embedding API。Prompt 会明确要求模型优先依据参考知识库思考并注明来源。
+
 ### 源码运行
 
 不需要代码基础的用户**跳过本节**（直接下载二进制即可）。开发者/想改代码时用：
@@ -140,7 +162,7 @@ WB_STUDY_TIME="20,5" WB_VIDEO_SPEED=0 ./WeBan-macos-arm64
 2. 克隆本仓库
 
 ```bash
-git clone --depth 1 https://github.com/hangone/WeBan
+git clone --depth 1 https://github.com/NoobCock/WeBan
 ```
 
 3. 安装依赖
@@ -277,6 +299,7 @@ docker run --rm \
 
 ## 鸣谢
 
+- [hangone/WeBan](https://github.com/hangone/WeBan) 上游原项目
 - [Coaixy/weiban-tool](https://github.com/Coaixy/weiban-tool) 提供题库和一些代码思路
 - [pooneyy/WeibanQuestionsBank](https://github.com/pooneyy/WeibanQuestionsBank) 提供题库
 

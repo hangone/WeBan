@@ -106,6 +106,10 @@ jobs:
             --hidden-import loguru \
             --hidden-import numpy \
             --hidden-import cv2 \
+            --hidden-import pypdf \
+            --hidden-import docx \
+            --hidden-import pptx \
+            --hidden-import openpyxl \
             --collect-submodules nodriver \
             main.py
 

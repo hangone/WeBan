@@ -12,6 +12,7 @@ from uuid import uuid4
 
 from loguru import logger
 
+from ai_client import parse_ai_response, request_ai_answer
 from api import WeBanAPI
 from captcha import CaptchaHandler, LoginCaptchaSolver, is_non_interactive
 
@@ -832,6 +833,7 @@ class WeBanClient:
         ai_config: dict[str, Any] | None = None,
         video_speed: float = 1.0,
         jupiter_fallback: bool = False,
+        data_dir: str | None = None,
     ) -> None:
         """
         :param tenant_name: 学校全称
@@ -867,6 +869,7 @@ class WeBanClient:
         self.cdp_host = cdp_host
         self.cdp_port = cdp_port
         self.ai_config = ai_config
+        self.data_dir = data_dir or _data_dir or None
         self._ai_key_warned = False  # api_key 未配置提醒只打一次
         if user and all([user.get("userId"), user.get("token")]):
             self.api = WeBanAPI(user=user, debug=debug, log=log)
@@ -2622,125 +2625,25 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
         return True
 
     def _ai_search_question(self, question: dict) -> list:
-        """使用 AI 服务获取题目答案
+        """使用 AI 服务获取题目答案（支持思考强度、流式思考显示与参考文档知识库）
 
         :param question: 题目字典
         :return: 选中的选项 ID 列表
         """
-        if not self.ai_config or not self.ai_config.get("enable"):
+        if not self.ai_config:
             return []
-
-        api_key = self.ai_config.get("api_key", "").strip()
-        base_url = self.ai_config.get("base_url", "https://api.deepseek.com").strip()
-        model = self.ai_config.get("model", "deepseek-v4-pro").strip()
-        timeout = int(self.ai_config.get("timeout", 60))
-        max_retries = int(self.ai_config.get("max_retries", 2))
-
-        if not api_key and not self._ai_key_warned:
-            self.log.warning("AI 搜题已启用，但未配置 api_key")
-            self._ai_key_warned = True
-
-        title = question.get("title", "")
-        type_label = question.get("typeLabel", "未知")
-        options = question.get("optionList", [])
-        opt_count = len(options)
-
-        options_str = "\n".join(
-            [f"{i + 1}. {opt['content']}" for i, opt in enumerate(options)]
+        warned_state = [self._ai_key_warned]
+        result = request_ai_answer(
+            session=self.api.session,
+            ai_config=self.ai_config,
+            question=question,
+            base_path=base_path,
+            data_dir=self.data_dir,
+            log=self.log,
+            warned_key_state=warned_state,
         )
-
-        prompt = f"""你是一个在线教育考试答题助手。请根据题目和选项，给出正确答案。
-
-【题目类型】{type_label}
-
-【题目】{title}
-
-【选项】
-{options_str}
-
-【规则】
-1. 单选题/判断题：answers 只能包含 1 个选项序号
-2. 多选题：answers 包含所有正确选项的序号
-3. 选项序号为 1-based，有效范围：1~{opt_count}
-
-【输出格式】严格输出一个 JSON 对象，不要输出任何其他内容：
-{{"answers":[1],"reason":"理由"}}"""
-
-        self.log.info(f"AI 搜题：{title[:40]}...")
-
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        }
-
-        payload = {
-            "model": model,
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0,
-            "response_format": {"type": "json_object"},
-        }
-
-        url = f"{base_url.rstrip('/')}/chat/completions"
-        content = None
-
-        for attempt in range(1, max_retries + 1):
-            try:
-                resp = self.api.session.post(
-                    url, headers=headers, json=payload, timeout=timeout
-                )
-                resp.raise_for_status()
-                res_data = resp.json()
-
-                usage = res_data.get("usage", {})
-                if usage:
-                    self.log.debug(
-                        f"AI token 用量 — prompt: {usage.get('prompt_tokens', '?')}, "
-                        f"completion: {usage.get('completion_tokens', '?')}, "
-                        f"total: {usage.get('total_tokens', '?')}"
-                    )
-
-                content = res_data["choices"][0]["message"]["content"].strip()
-                break
-
-            except (OSError, ValueError, KeyError, IndexError, TypeError) as e:
-                if attempt < max_retries:
-                    wait = attempt * 2
-                    self.log.warning(
-                        f"AI 搜题第 {attempt} 次请求失败，{wait}s 后重试：{e}"
-                    )
-                    time.sleep(wait)
-                else:
-                    self.log.error(f"AI 搜题请求失败（已重试 {max_retries} 次）：{e}")
-                    return []
-
-        if not content:
-            return []
-
-        # 解析 AI 返回的 JSON
-        raw_indices = self._parse_ai_answer(content)
-        if raw_indices is None:
-            self.log.warning(f"AI 返回内容解析失败，原始内容：{content[:200]}")
-            return []
-
-        # 校验并映射为选项 ID
-        valid_ids = []
-        for idx in raw_indices:
-            try:
-                val = int(idx)
-            except (ValueError, TypeError):
-                continue
-            if 1 <= val <= opt_count:
-                valid_ids.append(options[val - 1]["id"])
-                self.log.info(f"AI 推荐：{val}. {options[val - 1]['content']}")
-            else:
-                self.log.warning(
-                    f"AI 返回的选项序号 {val} 超出范围 1~{opt_count}，忽略"
-                )
-
-        if not valid_ids:
-            self.log.warning("AI 返回的答案未能匹配任何有效选项")
-
-        return valid_ids
+        self._ai_key_warned = warned_state[0]
+        return result
 
     @staticmethod
     def _parse_ai_answer(content: str) -> list | None:
@@ -2749,31 +2652,8 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
         :param content: AI 返回的原始文本
         :return: 答案序号列表，解析失败返回 None
         """
-        # 去除 markdown 代码块包裹
-        json_str = content
-        if "```" in json_str:
-            match = re.search(r"```(?:json)?\s*(.*?)\s*```", json_str, re.DOTALL)
-            if match:
-                json_str = match.group(1).strip()
-
-        # 方式一：直接解析 JSON
-        try:
-            data = json.loads(json_str)
-            answers = data.get("answers", [])
-            if isinstance(answers, list) and answers:
-                return answers
-        except (json.JSONDecodeError, TypeError):
-            pass
-
-        # 方式二：用正则从文本中提取第一个 {"answers": [...]} 结构
-        match = re.search(r'"answers"\s*:\s*\[([\d\s,]+)\]', json_str)
-        if match:
-            try:
-                return [int(x) for x in match.group(1).split(",") if x.strip()]
-            except (ValueError, TypeError):
-                pass
-
-        return None
+        answers, _ = parse_ai_response(content)
+        return answers
 
     # ---- sync answers -------------------------------------------------------
 

@@ -304,4 +304,5 @@ answer/*
 src/
 logs/
 docs/
+knowledge/
 tests/
