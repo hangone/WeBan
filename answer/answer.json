@@ -1746,6 +1746,27 @@
     ],
     "type": 1
   },
+  "“国家秘密受法律保护，一切社会组织及公民都有保密义务”出自哪部法律？": {
+    "optionList": [
+      {
+        "content": "《中华人民共和国国家安全法》",
+        "isCorrect": 2
+      },
+      {
+        "content": "《中华人民共和国保守国家秘密法》",
+        "isCorrect": 1
+      },
+      {
+        "content": "《中华人民共和国反间谍法》",
+        "isCorrect": 2
+      },
+      {
+        "content": "《科学技术保密规定》",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "“国际禁毒日”是每年的（   ）。": {
     "optionList": [
       {
@@ -4552,6 +4573,27 @@
     ],
     "type": 2
   },
+  "下列做法中，能有效避免沦为电诈“工具人”的是：": {
+    "optionList": [
+      {
+        "content": "为了高额报酬出借自己的支付宝账户",
+        "isCorrect": 2
+      },
+      {
+        "content": "配合陌生兼职人员进行人脸识别认证",
+        "isCorrect": 2
+      },
+      {
+        "content": "不参与帮助他人转账、取现的可疑任务",
+        "isCorrect": 1
+      },
+      {
+        "content": "将银行卡借给朋友短期使用",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "下列做法正确的是？": {
     "optionList": [
       {
@@ -5909,6 +5951,27 @@
       }
     ],
     "type": 1
+  },
+  "下列属于“跑分”团伙常用幌子的有：": {
+    "optionList": [
+      {
+        "content": "游戏试玩、代练",
+        "isCorrect": 1
+      },
+      {
+        "content": "App 推广、充场拉新",
+        "isCorrect": 1
+      },
+      {
+        "content": "电话营销",
+        "isCorrect": 1
+      },
+      {
+        "content": "正规企业实习招聘",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
   },
   "下列属于危害国家安全保密的违规行为的是：": {
     "optionList": [
@@ -8069,7 +8132,7 @@
         "isCorrect": 2
       }
     ],
-    "type": 2
+    "type": 1
   },
   "下面躲避雾霾的方式中错误的是：": {
     "optionList": [
@@ -8462,6 +8525,27 @@
       {
         "content": "正确",
         "isCorrect": 1
+      }
+    ],
+    "type": 1
+  },
+  "不法分子利用他人银行卡、支付账户为电信网络诈骗、赌博等上游犯罪转移资金并赚取佣金的行为，被称为：": {
+    "optionList": [
+      {
+        "content": "刷单",
+        "isCorrect": 2
+      },
+      {
+        "content": "跑分",
+        "isCorrect": 1
+      },
+      {
+        "content": "充场",
+        "isCorrect": 2
+      },
+      {
+        "content": "引流",
+        "isCorrect": 2
       }
     ],
     "type": 1
@@ -21744,6 +21828,27 @@
     ],
     "type": 2
   },
+  "参与“跑分”等违法活动可能带来的后果有：": {
+    "optionList": [
+      {
+        "content": "承担相应法律责任，情节严重者追究刑事责任",
+        "isCorrect": 1
+      },
+      {
+        "content": "个人征信受损",
+        "isCorrect": 1
+      },
+      {
+        "content": "名下银行卡、支付账户被冻结",
+        "isCorrect": 1
+      },
+      {
+        "content": "长期稳定赚取高薪",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
   "参与刷单可能带来什么后果？": {
     "optionList": [
       {
@@ -21909,6 +22014,27 @@
       }
     ],
     "type": 2
+  },
+  "发现“跑分”“洗钱”违法犯罪线索，最恰当的做法是：": {
+    "optionList": [
+      {
+        "content": "假装没看见，避免惹麻烦",
+        "isCorrect": 2
+      },
+      {
+        "content": "直接上前质问嫌疑人",
+        "isCorrect": 2
+      },
+      {
+        "content": "及时拨打 110 报警",
+        "isCorrect": 1
+      },
+      {
+        "content": "拍照发朋友圈警示他人",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
   },
   "发现国家科学技术秘密正在泄露或可能泄露时，涉密研究生应当：": {
     "optionList": [
@@ -22342,6 +22468,27 @@
     "type": 1
   },
   "古代诈骗和现在诈骗方式虽有不同，但是本质未改变，你认为骗子们能成功的本质原因有什么？": {
+    "optionList": [
+      {
+        "content": "人性中的贪婪",
+        "isCorrect": 1
+      },
+      {
+        "content": "骗子智商高",
+        "isCorrect": 2
+      },
+      {
+        "content": "人性中的恐惧",
+        "isCorrect": 1
+      },
+      {
+        "content": "骗子们有耐心",
+        "isCorrect": 2
+      }
+    ],
+    "type": 2
+  },
+  "古代诈骗和现在诈骗方式虽有不同，但是本质未改变，骗子们能成功的本质原因有什么？": {
     "optionList": [
       {
         "content": "人性中的贪婪",
@@ -29672,7 +29819,7 @@
     ],
     "type": 2
   },
-  "如何预防政治性案件的发生？（）": {
+  "如何预防政治性案件的发生？": {
     "optionList": [
       {
         "content": "自觉执行保密规定",
@@ -32793,6 +32940,27 @@
     ],
     "type": 2
   },
+  "守护外卖时，与骑手的沟通方式中，最有效的是：": {
+    "optionList": [
+      {
+        "content": "要求骑手当面交接，或放置在外卖柜",
+        "isCorrect": 1
+      },
+      {
+        "content": "让骑手随意放置，无需沟通",
+        "isCorrect": 2
+      },
+      {
+        "content": "让骑手将外卖放在宿舍门口，方便自己取",
+        "isCorrect": 2
+      },
+      {
+        "content": "让骑手把外卖交给楼下陌生同学转交",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "安全型依恋的特征是？": {
     "optionList": [
       {
@@ -34596,6 +34764,27 @@
       },
       {
         "content": "现实式爱情",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "对抗校园暴力与欺凌的核心方式是：": {
+    "optionList": [
+      {
+        "content": "以牙还牙、以暴制暴，用武力威慑施暴者",
+        "isCorrect": 2
+      },
+      {
+        "content": "默默忍受，等待施暴者主动停止行为",
+        "isCorrect": 2
+      },
+      {
+        "content": "依靠法律、规则与理性，从根源遏制暴力滋生",
+        "isCorrect": 1
+      },
+      {
+        "content": "拉拢同学形成对立团体，和施暴者对抗",
         "isCorrect": 2
       }
     ],
@@ -44296,7 +44485,7 @@
     ],
     "type": 1
   },
-  "机场净空区包括以下哪些禁止项？（）": {
+  "机场净空区包括以下哪些禁止项？": {
     "optionList": [
       {
         "content": "禁止燃放烟花爆竹",
@@ -45511,6 +45700,27 @@
       },
       {
         "content": "12小时",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
+  "根据《中华人民共和国国家安全法》，维护国家安全的责任和义务主体是：": {
+    "optionList": [
+      {
+        "content": "仅国家机关工作人员",
+        "isCorrect": 2
+      },
+      {
+        "content": "仅军人和警察",
+        "isCorrect": 2
+      },
+      {
+        "content": "公民、一切国家机关和武装力量、各政党和各人民团体、企业事业组织和其他社会组织",
+        "isCorrect": 1
+      },
+      {
+        "content": "仅企业事业单位",
         "isCorrect": 2
       }
     ],
@@ -47228,6 +47438,31 @@
       },
       {
         "content": "生殖系统功能",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "毒品对人的危害有哪些？": {
+    "optionList": [
+      {
+        "content": "情绪抑郁",
+        "isCorrect": 1
+      },
+      {
+        "content": "行为失控",
+        "isCorrect": 1
+      },
+      {
+        "content": "产生幻觉",
+        "isCorrect": 1
+      },
+      {
+        "content": "心脏功能受损",
+        "isCorrect": 1
+      },
+      {
+        "content": "失去知觉",
         "isCorrect": 1
       }
     ],
@@ -59274,6 +59509,27 @@
       },
       {
         "content": "有警觉戒备意识，对诱惑提高警惕，采取坚决拒绝的态度。",
+        "isCorrect": 1
+      }
+    ],
+    "type": 2
+  },
+  "防范沦为电诈“工具人”的核心要点包括：": {
+    "optionList": [
+      {
+        "content": "绝不出租、出借、出售电话卡和银行卡",
+        "isCorrect": 1
+      },
+      {
+        "content": "对要求配合刷脸的兼职保持高度警惕",
+        "isCorrect": 1
+      },
+      {
+        "content": "不参与帮助他人转账、取现的可疑任务",
+        "isCorrect": 1
+      },
+      {
+        "content": "不相信“低门槛、高薪资”的兼职宣传",
         "isCorrect": 1
       }
     ],
