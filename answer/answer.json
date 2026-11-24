@@ -42158,6 +42158,27 @@
     ],
     "type": 2
   },
+  "政治安全的根本保障是？": {
+    "optionList": [
+      {
+        "content": "军事力量",
+        "isCorrect": 2
+      },
+      {
+        "content": "宪法权威",
+        "isCorrect": 1
+      },
+      {
+        "content": "经济实力",
+        "isCorrect": 2
+      },
+      {
+        "content": "国际支持",
+        "isCorrect": 2
+      }
+    ],
+    "type": 1
+  },
   "政治性案件的法律责任有（）。": {
     "optionList": [
       {
