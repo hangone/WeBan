@@ -17,11 +17,11 @@
 // @grant        GM_registerMenuCommand
 // @grant        GM_info
 // @grant        GM_xmlhttpRequest
-// @grant        unsafeWindow
-// @connect      cdn.jsdelivr.net
-// @connect      raw.githubusercontent.com
 // @connect      127.0.0.1
 // @connect      localhost
+// @connect      cdn.jsdelivr.net
+// @connect      raw.githubusercontent.com
+// @connect      api.deepseek.com
 // @updateURL    https://cdn.jsdelivr.net/gh/hangone/WeBan@main/weban.user.js
 // @downloadURL  https://cdn.jsdelivr.net/gh/hangone/WeBan@main/weban.user.js
 // @run-at       document-idle
@@ -30,26 +30,12 @@
 (function () {
   'use strict';
 
-  // ════════════════════════════════════════════════════════════════════════
-  // 设计原则
-  // ---------------------------------------------------------------------------
-  // 主站（weiban）是 Vue + Vuex 应用，所有接口调用都封装在 store 的 actions
-  // 里（源码见 src/online-*/main-site/src/store/services.js）。所以本脚本
-  // **不自己拼请求**：通过 #app.__vue__ 拿到根实例，直接 dispatch 官方
-  // action —— 签名、加密、token、公共参数全部由页面自己的代码处理，
-  // 平台改加密算法也不用改脚本。
-  //
-  // 课程页（mcwk）是纯 jQuery 页面，学习进度靠真实点击翻页产生（见
-  // src/online-*/mcwk/course-A11078/item.js）。所以课程学习采用**真实
-  // 打开课程页 + 驱动页面 DOM**：点击 .btn-next 翻页、点 .btn-next-end 完课，
-  // 完课请求由页面自己的 finishWxCourse() 发出。
-  // ════════════════════════════════════════════════════════════════════════
 
-  // 版本号唯一来源是头部 @version
   const VERSION = (typeof GM_info === 'object' && GM_info?.script?.version) || '1.0.0';
 
   const STORE = {
     settings: 'weban.settings.v1',
+    ai: 'weban.ai.v1',
     lastRun: 'weban.lastRun.v1',
     captchaEndpoint: 'weban.captchaEndpoint.v1',
     captchaToken: 'weban.captchaToken.v1',
@@ -59,16 +45,12 @@
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-  // ────────────────────────────────────────────────────────────────────────
-  // 1. 取页面能力：Vue 根实例 → $store
-  // ────────────────────────────────────────────────────────────────────────
 
   let appVm = null;
 
   function getApp() {
     if (appVm && appVm.$store) return appVm;
     const root = document.querySelector('#app');
-    // Vue 2 会把根实例挂在根元素上（__vue__），取到后沿着 $root 归一
     for (const el of [root, document.body, ...document.querySelectorAll('#app *')]) {
       const vm = el && el.__vue__;
       if (vm) {
@@ -79,14 +61,12 @@
     return null;
   }
 
-  // 调官方 store action：dispatch('getCourseUrl', payload)
   async function dispatch(type, payload) {
     const app = getApp();
     if (!app) throw new Error('未找到页面应用实例，请刷新页面后重试');
     return app.$store.dispatch(type, payload);
   }
 
-  // 读 store 里的登录信息（页面自己存的 user）
   function getPageUser() {
     const app = getApp();
     const fromStore = app?.$store?.state?.user;
@@ -112,11 +92,6 @@
     return user;
   }
 
-  // ────────────────────────────────────────────────────────────────────────
-  // 2. 题库：交给 server.py，本地不再维护匹配逻辑
-  //     服务端返回 { hit, indexes: [选项下标], answers: [正确文本], matchedBy }
-  //     未配置服务时退化为随机/全选，不影响学习流程。
-  // ────────────────────────────────────────────────────────────────────────
 
   function serverConfig() {
     return {
@@ -150,24 +125,154 @@
     });
   }
 
-  async function askServerAnswer(question, options) {
+  let bankIndex = null;
+  let bankLoading = null;
+
+  function normText(t) {
+    return String(t || '')
+      .replace(/[\s（）()【】\[\]「」『』《》〈〉｛｝{}＜＞<>：:，,。.；;、!！?？\-—－_~～·…"'“”‘’]+/g, '')
+      .toLowerCase();
+  }
+
+  async function loadBank() {
+    if (bankIndex) return bankIndex;
+    if (bankLoading) return bankLoading;
+    bankLoading = (async () => {
+      for (const url of ANSWER_URLS) {
+        try {
+          const data = await gmGetJson(url);
+          const idx = new Map();
+          for (const [title, entry] of Object.entries(data)) {
+            const k = normText(title);
+            if (k && entry && typeof entry === 'object') idx.set(k, entry);
+          }
+          if (idx.size) {
+            bankIndex = idx;
+            log('题库已加载：' + idx.size + ' 题', 'ok');
+            return idx;
+          }
+        } catch (e) {
+          log('题库源不可用（' + url.split('/')[2] + '）：' + e.message, 'warn');
+        }
+      }
+      bankIndex = new Map();
+      return bankIndex;
+    })();
+    return bankLoading;
+  }
+
+  function gmGetJson(url) {
+    return new Promise((resolve, reject) => {
+      GM_xmlhttpRequest({
+        method: 'GET',
+        url,
+        timeout: 30000,
+        onload: (res) => {
+          if (res.status !== 200) return reject(new Error('HTTP ' + res.status));
+          try { resolve(JSON.parse(res.responseText)); } catch (e) { reject(e); }
+        },
+        onerror: () => reject(new Error('网络错误')),
+        ontimeout: () => reject(new Error('超时')),
+      });
+    });
+  }
+
+  async function askServerBatch(questions) {
     const cfg = serverConfig();
-    if (!cfg.endpoint) return null;
+    if (!cfg.endpoint || !questions.length) return null;
     try {
-      const res = await gmPost(
-        cfg.endpoint + '/answer/query',
-        { title: question.title || question.content || '', options },
-        cfg.token,
-      );
-      if (!res.body || !res.body.hit) return null;
-      return res.body;
+      const map = new Map();
+      // 服务端单次上限 200 题，超过就分块
+      for (let i = 0; i < questions.length; i += 200) {
+        const chunk = questions.slice(i, i + 200);
+        const res = await gmPost(
+          cfg.endpoint + '/answer/match',
+          { items: chunk.map((q) => ({ id: q.id, title: q.title || q.content || '', optionList: q.optionList || [] })) },
+          cfg.token,
+        );
+        const body = res && res.body;
+        if (!body || !Array.isArray(body.results)) continue;
+        for (const r of body.results) {
+          if (r.hit && Array.isArray(r.indexes) && r.indexes.length) map.set(r.id, r);
+        }
+      }
+      return map.size ? map : null;
     } catch (e) {
-      log('题库服务不可用：' + e.message, 'warn');
+      log('  题库服务不可用：' + e.message, 'warn');
       return null;
     }
   }
 
-  // 把服务端返回的 indexes 映射成选项 id；没命中时按策略兜底
+  async function askBank(question, options) {
+    const idx = await loadBank();
+    if (!idx.size) return null;
+    const entry = idx.get(normText(question.title || question.content));
+    if (!entry) return null;
+    const correct = (entry.optionList || [])
+      .filter((o) => Number(o.isCorrect) === 1)
+      .map((o) => String(o.content || ''));
+    if (!correct.length) return null;
+    const normOpts = options.map(normText);
+    const indexes = [];
+    for (const want of correct) {
+      const target = normText(want);
+      if (!target) continue;
+      for (let i = 0; i < normOpts.length; i++) {
+        const opt = normOpts[i];
+        if (!opt) continue;
+        if (opt === target || (target.length >= 4 && (opt.includes(target) || target.includes(opt)))) {
+          if (!indexes.includes(i)) indexes.push(i);
+          break;
+        }
+      }
+    }
+    return indexes.length ? { hit: true, indexes, matchedBy: 'bank' } : null;
+  }
+
+  async function askAI(question, options) {
+    const cfg = settings();
+    if (!cfg.aiEnable || !cfg.aiApiKey) return null;
+    const prompt = '题目：' + (question.title || question.content || '') +
+      '\n选项：' + options.map((o, i) => String.fromCharCode(65 + i) + '. ' + o).join('\n') +
+      '\n只回复正确选项字母，多选用逗号分隔。';
+    try {
+      const res = await gmPostJson(
+        cfg.aiBaseUrl.replace(/\/+$/, '') + '/chat/completions',
+        { model: cfg.aiModel, messages: [{ role: 'user', content: prompt }], temperature: 0 },
+        { Authorization: 'Bearer ' + cfg.aiApiKey },
+      );
+      const text = res?.choices?.[0]?.message?.content || '';
+      const idx = [...text.toUpperCase().matchAll(/\b([A-Z])\b/g)]
+        .map((m) => m[1].charCodeAt(0) - 65)
+        .filter((i) => i >= 0 && i < options.length);
+      return idx.length ? { hit: true, indexes: idx, matchedBy: 'ai' } : null;
+    } catch (e) {
+      log('  AI 搜题失败：' + e.message, 'warn');
+      return null;
+    }
+  }
+
+  function gmPostJson(url, body, headers) {
+    return new Promise((resolve, reject) => {
+      GM_xmlhttpRequest({
+        method: 'POST',
+        url,
+        headers: { 'Content-Type': 'application/json', ...(headers || {}) },
+        data: JSON.stringify(body),
+        timeout: 60000,
+        onload: (res) => {
+          let body = null;
+          try { body = JSON.parse(res.responseText); } catch (e) { body = null; }
+          if (res.status >= 200 && res.status < 300 && body) { resolve(body); return; }
+          const msg = (body && body.error && body.error.message) || ('HTTP ' + res.status);
+          reject(new Error(msg));
+        },
+        onerror: () => reject(new Error('网络错误')),
+        ontimeout: () => reject(new Error('超时')),
+      });
+    });
+  }
+
   function pickOptionIds(question, serverResult, fallbackRandom) {
     const options = question.optionList || [];
     if (!options.length) return [];
@@ -179,13 +284,6 @@
     return [options[0].id];
   }
 
-  // ────────────────────────────────────────────────────────────────────────
-  // 2.5 动画加速：课程页的「慢」来自 CSS animation
-  //     实测 src/online-*/mcwk 的 CSS 里 animation 时长 2.4~6s，且带
-  //     animation-delay（单页最多等 4.8s）。翻一页要等动画播完，这是卡顿
-  //     的主因。这里注入一份覆盖样式把它们压缩到极短。
-  //     —— 只改「播放速度」，不跳过页面逻辑，页面该有的状态切换照常发生。
-  // ────────────────────────────────────────────────────────────────────────
 
   const SPEED_STYLE_ID = 'weban-speedup';
 
@@ -195,7 +293,6 @@
       if (!doc || doc.getElementById(SPEED_STYLE_ID)) return;
       const style = doc.createElement('style');
       style.id = SPEED_STYLE_ID;
-      // 用 !important 覆盖页面所有 animation/transition
       style.textContent =
         '*, *::before, *::after {' +
         '  animation-duration: ' + speed + 's !important;' +
@@ -207,8 +304,6 @@
     } catch { /* 跨域等情况忽略 */ }
   }
 
-  // 加速 setTimeout：item.js 里用 setTimeout(fn, 2600) 等交互反馈，
-  // 这是纯等待，压缩它不会影响正确性（页面逻辑按顺序执行）。
   function installTimerBoost(win, scale = 0.05) {
     try {
       const w = win;
@@ -216,7 +311,6 @@
       const nativeSetTimeout = w.setTimeout.bind(w);
       w.setTimeout = function (fn, delay, ...args) {
         const d = Number(delay) || 0;
-        // 只压缩 100ms 以上的等待，短延时保持原样避免竞态
         const next = d > 100 ? Math.max(20, Math.round(d * scale)) : d;
         return nativeSetTimeout(fn, next, ...args);
       };
@@ -224,12 +318,6 @@
     } catch { /* ignore */ }
   }
 
-  // ────────────────────────────────────────────────────────────────────────
-  // 2.55 拦截页面 alert / confirm
-  //     实测：课程已完成后重复完课，页面会 alert("发送完成失败")，
-  //     弹窗会阻塞脚本执行（Playwright 下整页 evaluate 直接卡住）。
-  //     所以注入时就把 alert 换成记录 + 继续，并在结束时汇总提示。
-  // ────────────────────────────────────────────────────────────────────────
 
   function installDialogGuard(win, sink) {
     try {
@@ -238,7 +326,6 @@
       const nativeAlert = w.alert;
       w.alert = function (msg) {
         try { sink.push(String(msg)); } catch { /* ignore */ }
-        // 不弹窗，只记录
         return undefined;
       };
       w.confirm = function (msg) {
@@ -250,12 +337,6 @@
     } catch { /* ignore */ }
   }
 
-  // ────────────────────────────────────────────────────────────────────────
-  // 2.6 静音：课程页点击时用 <audio id="click-base"> 播提示音
-  //     （item.js: clickbase.play()），视频课也有声音。
-  //     默认全部静音：改 muted + volume=0，并拦截 HTMLMediaElement.play()，
-  //     防止页面之后重新调起有声播放。
-  // ────────────────────────────────────────────────────────────────────────
 
   function installMute(win) {
     try {
@@ -273,7 +354,6 @@
         return nativePlay.apply(this, arguments);
       };
 
-      // 已有的 audio/video 也立刻静音
       const muteAll = () => {
         try {
           for (const el of w.document.querySelectorAll('audio, video')) {
@@ -284,7 +364,6 @@
         } catch { /* ignore */ }
       };
       muteAll();
-      // 页面后续动态插入的媒体元素也覆盖
       const mo = new w.MutationObserver(muteAll);
       mo.observe(w.document.documentElement, { childList: true, subtree: true });
       w.__webanMuteHook = true;
@@ -292,18 +371,10 @@
     } catch { /* 跨域等忽略 */ }
   }
 
-  // ────────────────────────────────────────────────────────────────────────
-  // 3. 课程学习：真实打开课程页，驱动页面 DOM
-  //    依据 src/online-*/mcwk/course-A11078/item.js：
-  //      .btn-next      翻页（点击后 pageNums++）
-  //      .btn-next-end  完课（pageNums >= 7 才允许，内部调 finishWxCourse()）
-  //    完课请求由页面自己发出，签名/参数/token 全由页面处理。
-  // ────────────────────────────────────────────────────────────────────────
 
   const COURSE_PAGE_TIMEOUT = 30000;
   let courseTab = null;
 
-  // 在后台标签页打开课程页；学完后关闭
   async function openCourseTab(courseUrl) {
     const win = window.open(courseUrl, '_blank');
     if (!win) {
@@ -318,70 +389,83 @@
     courseTab = null;
   }
 
-  // 等待课程页渲染完成（.btn-next 出现）
   async function waitCourseReady(win, timeout = COURSE_PAGE_TIMEOUT) {
     const start = Date.now();
     while (Date.now() - start < timeout) {
       try {
         const doc = win.document;
-        if (doc && doc.querySelector('.btn-next')) return true;
+        if (doc && doc.querySelector('.btn-next, .btn-start, .page-start-btn')) return true;
       } catch { /* 跨域或未就绪 */ }
       await sleep(500);
     }
     throw new Error('课程页加载超时');
   }
 
-  // ────────────────────────────────────────────────────────────────────────
-  // 通用驱动：52 门课实测出的按钮家族（按出现频次）
-  //   btn-next (429) / btn-next-N / page-next-btn / btn-ti /
-  //   answer-btn-next / pN_next / page-success-button2
-  // 完课标志统一是：页面出现 .page-end.page-active，或 finishWxCourse 被调用。
-  // 策略：不枚举课程，而是「找当前可见的前进控件，点它，看状态是否前进」。
-  // ────────────────────────────────────────────────────────────────────────
 
-  // 前进按钮候选选择器（按优先级）。全部是站点实际用到的类名。
-  const FORWARD_SELECTORS = [
-    // 起始页专用（实测 A11036/.btn-start、A32006/.page-start-btn）
-    '.page-active .btn-start',
-    '.page-active .page-start-btn',
-    '.page-active .btn-ce',
-    '.page-active .btn-at',
-    // 特殊功能按钮必须优先于全局导航条：
-    // 实测 A32006 的 page-16 导航条被永久隐藏，只能点 page-test-btn 前进
-    '.page-active .page-test-btn',
-    '.page-active [class*="test-btn"]',
-    '.page-active [class*="success-button"]',
-    '.page-active [class*="-btn"]:not([class*="prev"])',
-    // 全局底部导航条（实测 A32006：<section class="btn-next-prev"> 里的 .btn-next）
-    '.btn-next-prev .btn-next',
-    '.btn-next-prev .page-content-common.btn-next',
-    '.page-active .btn-next',
-    '.page-active .page-next-btn',
-    '.page-active .answer-btn-next',
-    '.page-active .btn-ti',
-    '.page-active [class*="btn-next"]',
-    '.page-active [class*="_next"]',
-    '.page-active .page-success-button2',
-    '.page-active .page-success-button',
-    '.page-active .page-end-button',
-    // 当前页没有按钮时，由下一屏的按钮驱动（起始页常见）
-    '.page-item.page-active.btn-next-prev',
-    '.btn-next:not(.btn-next-end)',
-    '.p0_next, .p1_next, .p2_next, .p3_next, .p4_next',
+  // 前进控件的语义分类：一次定义，选择器 / 兜底正则 / 分支页判断共用
+  const ANSWER_URLS = [
+    'https://cdn.jsdelivr.net/gh/hangone/WeBan@main/answer/answer.json',
+    'https://raw.githubusercontent.com/hangone/WeBan/main/answer/answer.json',
   ];
 
-  // 返回所有「可见的、候选的前进控件」，按优先级排序。
-  // 不只看第一个：实测 A32006 里靠前选择器会命中隐藏元素，
-  // 所以由调用方「点一个 → 看是否前进 → 不行再点下一个」。
+  const AI_DEFAULT = {
+    baseUrl: 'https://api.deepseek.com/v1',
+    model: 'deepseek-chat',
+  };
+
+  const FORWARD_PATTERNS = {
+    start: ['btn-start', 'page-start-btn', 'pri-start-btn', 'pub-test-btn'],
+    continue: ['btn-ce', 'btn-at', 'btn-ti', 'question-continue', 'p14btn', 'p15btn', 'p16btn'],
+    next: ['btn-next', 'page-next-btn', 'answer-btn-next', '_next', 'next10'],
+    test: ['test-btn'],
+    success: ['success-button'],
+    finish: ['btn-next-end', 'page-end-button'],
+  };
+
+  const QUIZ_SELECTORS = {
+    aq: '.aq-item-label',
+    quest: '.ques-list-item',
+    radio: '.page-radio',
+    aqSubmit: '[class*="btn-aq-"]',
+    questSubmit: '[class*="btn-ti"]',
+    interactiveSubmit: '.p0511',
+  };
+
+  const FORWARD_RE = new RegExp(
+    Object.values(FORWARD_PATTERNS).flat().join('|'),
+  );
+
+  const BACK_RE = /prev|back-list|icon-back/;
+
+  function forwardSelectors() {
+    const inPage = (t) => '.page-active [class*="' + t + '"]';
+    return [
+      ...FORWARD_PATTERNS.start.map(inPage),
+      ...FORWARD_PATTERNS.continue.map(inPage),
+      ...FORWARD_PATTERNS.test.map(inPage),
+      ...FORWARD_PATTERNS.success.map(inPage),
+      ...FORWARD_PATTERNS.next.map(inPage),
+      '.page-active [class*="-btn"]:not([class*="prev"])',
+      '.btn-next-prev .btn-next',
+    ];
+  }
+
+  const FORWARD_SELECTORS = forwardSelectors();
+
+  // 可见性统一判断：用 computedStyle，不用 getBoundingClientRect
+  // （入场动画期间尺寸为 0，但元素可点）
+  function visibleIn(win, n) {
+    if (!n) return false;
+    try {
+      const cs = win.getComputedStyle(n);
+      return cs.display !== 'none' && cs.visibility !== 'hidden' && Number(cs.opacity) !== 0;
+    } catch {
+      return false;
+    }
+  }
+
   function collectForwardButtons(win) {
     const doc = win.document;
-    const isVisible = (n) => {
-      if (!n) return false;
-      try {
-        const r = n.getBoundingClientRect();
-        return r.width > 0 && r.height > 0;
-      } catch { return false; }
-    };
     const skip = (n) => n.classList.contains('btn-next-end')
       || n.classList.contains('btn-prev')
       || n.classList.contains('btn-next-prev');
@@ -389,13 +473,11 @@
     const out = [];
     const seen = new Set();
     const push = (n, sel) => {
-      if (!n || seen.has(n) || skip(n) || !isVisible(n)) return;
+      if (!n || seen.has(n) || skip(n) || !visibleIn(win, n)) return;
       seen.add(n);
       out.push({ el: n, sel });
     };
 
-    // 可用的「所在页」：当前激活页 + 紧跟它的下一屏。
-    // 实测 A05037 page-7 是分支页，出口按钮在其下一屏 page-8 里。
     const pages = [...doc.querySelectorAll('.page-item')];
     const activeIdx = pages.findIndex((p) => p.classList.contains('page-active'));
     const scope = [];
@@ -404,20 +486,20 @@
       if (pages[activeIdx + 1]) scope.push(pages[activeIdx + 1]);
     }
 
+    const navNext = doc.querySelector('.btn-next-prev .btn-next');
+    if (navNext) push(navNext, 'global-nav');
+
     for (const sel of FORWARD_SELECTORS) {
       let nodes;
       try { nodes = [...doc.querySelectorAll(sel)]; } catch { continue; }
       for (const n of nodes) {
-        // 按钮有多组同名（实测 A05037 三个 answer-btn-next 分属
-        // at00/at01/at02），只用当前页或下一屏里的那个，
-        // 否则会一直点第一个、原地打转。
-        if (scope.length && /btn|next|answer/i.test(sel)) {
+        const inNav = n.closest('.btn-next-prev');
+        if (!inNav && scope.length && /btn|next|answer/i.test(sel)) {
           if (!scope.some((p) => p.contains(n))) continue;
         }
         push(n, sel);
       }
     }
-    // 兜底：语义匹配
     for (const n of doc.querySelectorAll('a, button, img, div, span')) {
       const cls = String(n.className || '');
       if (!/next|btn-start|start-btn|btn-ce|btn-at\b|btn-ti|success-button/.test(cls)) continue;
@@ -432,8 +514,6 @@
     return list.length ? list[0] : null;
   }
 
-  // 分支页：当前页没有可用的前进按钮，但有返回按钮。
-  // 实测 A05037 的 page-7/8/9 就是这样（点击收集点后弹出的内容页）。
   function isBranchPage(win) {
     try {
       const d = win.document;
@@ -443,16 +523,16 @@
         const cs = win.getComputedStyle(n);
         return cs.display !== 'none' && cs.visibility !== 'hidden';
       };
-      const hasForward = [...act.querySelectorAll('[class*="next"], [class*="btn-start"], [class*="btn-ce"], [class*="btn-at"], [class*="success-button"]')]
-        .some((n) => visible(n) && !/prev/.test(n.className));
-      const hasBack = [...act.querySelectorAll('[class*="prev"]')].some(visible);
+      const hasForward = [...act.querySelectorAll('*')]
+        .some((n) => visible(n) && FORWARD_RE.test(String(n.className)) && !BACK_RE.test(String(n.className)));
+      const hasBack = [...act.querySelectorAll('*')]
+        .some((n) => visible(n) && /prev/.test(String(n.className)));
       return !hasForward && hasBack;
     } catch {
       return false;
     }
   }
 
-  // 页面是否已经到了结束页（多门课共用的结束标志）
   function reachedEnd(win) {
     try {
       const doc = win.document;
@@ -468,7 +548,6 @@
     }
   }
 
-  // 点一次前进。返回 { clicked, found }
   async function clickForward(win) {
     const btn = findForwardButton(win);
     if (!btn) return { clicked: false, found: false };
@@ -490,7 +569,6 @@
   }
 
   function getPageNumber(win) {
-    // item.js 用 pageNums 计数，页面里还有 .page-reciprocal 显示页码
     try {
       const el = win.document.querySelector('.page-reciprocal');
       const text = el ? el.textContent : '';
@@ -500,32 +578,8 @@
     return null;
   }
 
-  // 课程页「交互题」自动答题。
-  // 依据 src/online-*/mcwk/course-A11078/item.js：
-  //   - 每个选项按钮 .p0502/.p0503/... 绑定 p5btn()，点击后记录到 Set
-  //   - 提交按钮 .p0511 点击后把选项标记为 over，并 setTimeout 2600ms 后复位
-  //   - 集满 5 个不同选项才显示 .btn-base（下一页按钮）
-  // 所以自动答题要做的是：把页面上所有可点选项依次点一遍，再点提交。
-  // 交互题真实流程（实测 A11078 page-5）：
-  //   1. 初始 5 个选项都可见、提交按钮(.p0511)不可见
-  //   2. 点一个选项 → 该选项加 p050Nactive、提交按钮出现
-  //   3. 点提交 → 选项标记 over，2600ms 后复位
-  //   4. 必须依次把所有选项都走完这一步，页面才放出下一页
-  // 关键：一次只点一个，不能连点（连点会把页面状态搞乱、卡死）。
-  // 交互题真实流程（在 A11078 第 6 页实测确认）：
-  //   - 页面元素：img.p0502 ~ img.p0506 五个选项，img.p0511 是提交
-  //   - 点选项后：该选项加 p050Nactive 类，提交按钮变可见
-  //   - 点提交后：选项短暂变 over 再复位；提交按钮隐藏
-  //   - 每点完一个选项都要提交一次，页面才继续放行
-  // 判断「还没点过」不能只看类名含 active：必须精确比对该选项自己的
-  // active 类（p0502active 只对应 p0502），否则会反复点同一个。
-  const INTERACTIVE_IDS = ['p0502', 'p0503', 'p0504', 'p0505', 'p0506'];
+  const INTERACTIVE_IDS = [2, 3, 4, 5, 6].map((i) => 'p050' + i);
 
-  // 判断选项「是否还没点过」。
-  // 实测：点过的选项有两个标志——
-  //   1) 类名变成 p050Nover（并隐藏）
-  //   2) src 从 p050N.png 变成 p050N-1.png
-  // 只看类名不够（点了但还没提交时类名仍是 p050N），所以两个都看。
   function optionUntouched(el, base) {
     if (!el) return false;
     const parts = (el.className || '').split(/\s+/);
@@ -538,29 +592,22 @@
   async function autoAnswerInteractive(win, opts = {}) {
     const { maxSteps = 20, waitAfterSubmit = 3200 } = opts;
     const pause = opts.sleep || sleep;
-    const isVisible = (node) => {
-      if (!node) return false;
-      const r = node.getBoundingClientRect();
-      return r.width > 0 && r.height > 0;
-    };
 
     for (let step = 0; step < maxSteps; step++) {
       let d;
       try { d = win.document; } catch { return false; }
 
-      // 1) 有未提交的选择就先提交，等复位
-      const submit = d.querySelector('.p0511');
-      if (isVisible(submit)) {
+      const submit = d.querySelector(QUIZ_SELECTORS.interactiveSubmit);
+      if (visibleIn(win, submit)) {
         try { submit.click(); } catch { /* ignore */ }
         await pause(waitAfterSubmit);
         continue;
       }
 
-      // 2) 找一个还没点过的选项（可见 且 未 over 且 src 没有 -N 后缀）
       let target = null;
       for (const base of INTERACTIVE_IDS) {
         const node = d.querySelector('.' + base);
-        if (node && isVisible(node) && optionUntouched(node, base)) {
+        if (node && visibleIn(win, node) && optionUntouched(node, base)) {
           target = node;
           break;
         }
@@ -573,10 +620,6 @@
     return true;
   }
 
-  // ── 视频课 ──────────────────────────────────────────────
-  // 实测：视频页只有 <video>，播到结尾时 videojs 的 timeupdate 触发
-  // finishWxCourse()（见 video-play-loader.js）。脚本不需要伪造进度，
-  // 只要等它播完；可选按配置设倍速（官方播放器自带 1/1.5/2）。
   function hasVideo(win) {
     try {
       const v = win.document.querySelector('video');
@@ -587,18 +630,22 @@
     }
   }
 
-  async function waitVideoEnd(win, opts = {}) {
-    const { videoRate = 2, maxWaitMin = 90 } = opts;
+  async function handleVideo(win, opts = {}) {
+    const {
+      videoMode = 'duration',
+      studyTime = 20,
+      videoRate = 2,
+      onCancel,
+      maxWaitMin = 120,
+    } = opts;
+
     const deadline = Date.now() + maxWaitMin * 60000;
     let applied = false;
 
-    while (Date.now() < deadline) {
-      if (opts.onCancel && opts.onCancel()) return false;
+    const kick = () => {
       let video;
-      try { video = win.document.querySelector('video'); } catch { return false; }
-      if (!video) return false;
-
-      // 静音 + 启动播放
+      try { video = win.document.querySelector('video'); } catch { return null; }
+      if (!video) return null;
       try {
         video.muted = true;
         video.volume = 0;
@@ -608,30 +655,55 @@
           applied = true;
         }
         if (video.paused) {
-          const p = video.play();
-          if (p && p.catch) p.catch(() => { /* 需要用户手势时忽略 */ });
+          const pr = video.play();
+          if (pr && pr.catch) pr.catch(() => { /* 需手势时忽略 */ });
         }
       } catch { /* ignore */ }
+      return video;
+    };
 
-      // 播完：currentTime 接近 duration，或页面已到结束态
-      const dur = video.duration || 0;
-      const cur = video.currentTime || 0;
-      if (dur > 0 && cur >= dur - 0.5) return true;
+    if (videoMode === 'wait') {
+      log('  视频模式：等待播放结束');
+      while (Date.now() < deadline) {
+        if (onCancel && onCancel()) return false;
+        const video = kick();
+        if (!video) return false;
+        if (video.ended) return true;
+        const dur = video.duration || 0;
+        if (dur > 0 && (video.currentTime || 0) >= dur - 0.5) return true;
+        if (reachedEnd(win)) return true;
+        await sleep(1000);
+      }
+      return false;
+    }
+
+    const need = studyTime * 1000;
+    log('  视频模式：播放 ' + studyTime + ' 秒后直接提交完课');
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < need) {
+      if (onCancel && onCancel()) return false;
+      kick();
+      await sleep(Math.min(1000, need - (Date.now() - startedAt)));
+    }
+
+    const ok = callFinishFn(win);
+    if (ok) {
+      log('  已调用 finishWxCourse() 提交完课', 'ok');
+      await sleep(2000);
+      return true;
+    }
+    log('  页面没有 finishWxCourse，退回等待播放结束', 'warn');
+    while (Date.now() < deadline) {
+      if (onCancel && onCancel()) return false;
+      const video = kick();
+      if (!video) return false;
       if (video.ended) return true;
       if (reachedEnd(win)) return true;
-
       await sleep(1000);
     }
     return false;
   }
 
-  // ── 选择题 ──────────────────────────────────────────────
-  // 实测 A11036 的 item.js 末尾直接写着答案：
-  //   slFn(".btn-aq-01", "input[name='ai00']:checked", ".page-at00", ".page-af00", ["A","B","C"])
-  // 即「点 .btn-aq-01 提交，勾选值排序后等于 ["A","B","C"] 就跳 page-at00」。
-  // 所以不用猜：从页面脚本里把答案表读出来，按答案勾选即可。
-  // 页面结构：隐藏的 input[type=checkbox] + 可见的 <label class="aq-item-label">，
-  // 必须点 label 才会勾上。
   function collectPageScripts(win) {
     const texts = [];
     try {
@@ -643,9 +715,6 @@
     return texts;
   }
 
-  // 解析 slFn(...) 调用，得到 { inputName: { answers: [...], atPage, afPage } }
-  // 例：slFn(".btn-aq-01", "input[name='ai00']:checked", ".page-at00", ".page-af00", ["A","B","C"])
-  // 不靠复杂正则，按括号配对取出参数列表再解析，抗格式差异。
   function parseAnswerTable(source) {
     const table = {};
     const marker = 'slFn(';
@@ -655,7 +724,6 @@
       if (at < 0) break;
       from = at + marker.length;
 
-      // 取括号内完整参数串
       let depth = 0;
       let i = at + marker.length - 1;
       let end = -1;
@@ -670,7 +738,6 @@
       if (end < 0) break;
       const argStr = source.slice(at + marker.length, end);
 
-      // 按「不在字符串、也不在 [] / () 里的逗号」切分
       const args = [];
       let buf = '';
       let quote = null;
@@ -691,7 +758,6 @@
 
       if (args.length < 5) continue;
 
-      // args[1] 形如 "input[name='ai00']:checked"
       const nameMatch = /name\s*=\s*['"]([^'"]+)['"]/.exec(args[1]);
       if (!nameMatch) continue;
 
@@ -729,17 +795,11 @@
     return table;
   }
 
-  // 只有「题目选项可见」才算需要答题。
-  // 答对页(page-at0N)里仍残留 btn-aq 按钮但选项不可见，不能当成题目未完成。
   function hasQuiz(win) {
     try {
       const d = win.document;
-      const labels = [...d.querySelectorAll('.aq-item-label')];
-      const isVisible = (n) => {
-        const r = n.getBoundingClientRect();
-        return r.width > 0 && r.height > 0;
-      };
-      return labels.some(isVisible);
+      const labels = [...d.querySelectorAll(QUIZ_SELECTORS.aq)];
+      return labels.some((n) => visibleIn(win, n));
     } catch {
       return false;
     }
@@ -747,13 +807,6 @@
 
   async function autoAnswerQuiz(win, opts = {}) {
     const { onCancel, maxRounds = 4 } = opts;
-    const isVisible = (n) => {
-      if (!n) return false;
-      try {
-        const r = n.getBoundingClientRect();
-        return r.width > 0 && r.height > 0;
-      } catch { return false; }
-    };
     const table = await getAnswerTable(win);
 
     for (let round = 0; round < maxRounds; round++) {
@@ -761,30 +814,30 @@
       let d;
       try { d = win.document; } catch { return false; }
 
-      // 没有可见选项 = 本题已答完，交给上层继续前进
-      if (![...d.querySelectorAll('.aq-item-label')].some(isVisible)) return true;
+      if (![...d.querySelectorAll(QUIZ_SELECTORS.aq)].some((n) => visibleIn(win, n))) return true;
 
-      const submit = [...d.querySelectorAll('[class*="btn-aq"]')].find(isVisible);
+      const submit = [...d.querySelectorAll('[class*="btn-aq"]')].find((n) => visibleIn(win, n));
       if (!submit) return true;
 
-      // 结构：每个 <label class="aq-item-label"> 里包着一个
-      // <input type=checkbox name="ai0N" value="A">。
-      // 按 name + value 精确定位，不能按标签顺序（顺序里混着各题的 label）。
-      const labels = [...d.querySelectorAll('.aq-item-label')];
+      const labels = [...d.querySelectorAll(QUIZ_SELECTORS.aq)];
       const boxes = [...d.querySelectorAll('input[type=checkbox], input[type=radio]')];
 
-      // 当前题组：第一个「可见 label」里包的 input 的 name
       let groupName = null;
       for (const l of labels) {
-        if (!isVisible(l)) continue;
+        if (!visibleIn(win, l)) continue;
         const b = boxes.find((x) => l.contains(x));
         if (b) { groupName = b.name; break; }
       }
-      // 题目区不可见说明已答完本页
       if (!groupName) return true;
 
       const mine = boxes.filter((b) => b.name === groupName);
-      for (const b of mine) { if (b.checked) { try { b.checked = false; } catch { /* ignore */ } } }
+      for (const b of mine) {
+        if (!b.checked) continue;
+        try {
+          b.checked = false;
+          b.dispatchEvent(new win.Event('change', { bubbles: true }));
+        } catch { /* ignore */ }
+      }
       await sleep(120);
 
       const entry = table[groupName];
@@ -800,7 +853,6 @@
         }
         log('  选择题 ' + groupName + '：按页面答案 ' + entry.answers.join(',') + ' 勾选');
       } else {
-        // 页面没写答案：全选（这类题的答案通常就是全选）
         for (const box of mine) {
           const label = labels.find((l) => l.contains(box));
           try {
@@ -811,7 +863,7 @@
         log('  选择题 ' + groupName + '：页面无答案表，全选尝试', 'warn');
       }
 
-      const btn = [...d.querySelectorAll('[class*="btn-aq"]')].find(isVisible);
+      const btn = [...d.querySelectorAll('[class*="btn-aq"]')].find((n) => visibleIn(win, n));
       if (!btn) return false;
       try { btn.click(); await sleep(1000); } catch { return false; }
 
@@ -822,7 +874,7 @@
 
       if (atActive) return true;          // 答对
       if (afActive) {
-        const back = d.querySelector('.btn-at');
+        const back = d.querySelector('.' + FORWARD_PATTERNS.continue[1]);
         if (back) { try { back.click(); } catch { /* ignore */ } await sleep(700); }
         continue;
       }
@@ -831,28 +883,14 @@
     return true;
   }
 
-  // ── 多点收集型（实测 A05037 page-6）────────────────────
-  // 源码：$(".p0813, .p0814, .p0815").click(... clickedSet.size === 3
-  //        → $(".page-6 .btn-base").css("display","block"))
-  // 即必须把本页所有 pNNNN 图层都点一遍，页面才放出前进按钮。
-  // 注意：不能用 getBoundingClientRect 判断可见性——入场动画期间
-  // 尺寸为 0，但元素本身可点（实测坑）。
   async function clickAllCollectibles(win, opts = {}) {
     const { onCancel, limit = 15 } = opts;
-    const isClickable = (n) => {
-      if (!n) return false;
-      try {
-        const cs = win.getComputedStyle(n);
-        if (cs.display === 'none' || cs.visibility === 'hidden') return false;
-        return true;
-      } catch { return false; }
-    };
     const d = win.document;
     const page = d.querySelector('.page-item.page-active');
     if (!page) return 0;
 
     const nodes = [...page.querySelectorAll('*')].filter((n) => {
-      if (!isClickable(n)) return false;
+      if (!visibleIn(win, n)) return false;
       const cls = String(n.className || '');
       if (/btn-|prev|next|back-list|icon-back/i.test(cls)) return false;
       return /\bp\d{4}\b/.test(cls);
@@ -867,9 +905,6 @@
         await sleep(250);
       } catch { /* ignore */ }
 
-      // 点 pNNNN 可能跳到分支页（实测 A05037：page-6 的 p0813/p0814/p0815
-      // 分别跳到 page-7/8/9，而这些页只有 btn-prev6 能回来）。
-      // 一旦离开原页，先点返回按钮回到原页再继续点下一个。
       const now = d.querySelector('.page-item.page-active');
       if (now && now !== page) {
         const back = [...now.querySelectorAll('[class*="prev"]')]
@@ -885,8 +920,6 @@
     return clicked;
   }
 
-  // 当前激活页是不是「答题反馈页」（page-atNN / page-afNN）。
-  // 这类页面上仍残留选项元素，必须走前进逻辑而不是重新作答（实测坑）。
   function onAnswerFeedbackPage(win) {
     try {
       const act = win.document.querySelector('.page-item.page-active');
@@ -897,13 +930,6 @@
     }
   }
 
-  // ── 列表型单选（实测 A05037）──────────────────────────
-  // 结构：.ques-list-item 是选项（点击加 ques-list-active），
-  //       .btn-ti-01 / .btn-ti-02 是提交按钮。
-  // 源码里正确答案写死在 if (qsone == 0) / if (qstwo == 1) 判断中，
-  // 脚本按「第几个选项」逐次尝试，答错会进 page-af0N，再回来重试。
-  // 只有「题目页(page-qsNN)处于激活状态」并且选项可见时才算待答题。
-  // 答对页(page-atNN)里仍残留 .ques-list-item，不能当成未完成（实测坑）。
   function hasQuestList(win) {
     try {
       const d = win.document;
@@ -911,7 +937,7 @@
       const cls = active ? String(active.className) : '';
       if (/page-(at|af)\d/.test(cls)) return false;
       const box = active || d;
-      return [...box.querySelectorAll('.ques-list-item')].some((n) => {
+      return [...box.querySelectorAll(QUIZ_SELECTORS.quest)].some((n) => {
         try {
           const cs = win.getComputedStyle(n);
           return cs.display !== 'none' && cs.visibility !== 'hidden';
@@ -922,14 +948,8 @@
     }
   }
 
-  // 答案解析（实测 A05037 item.js）：
-  //   $(".btn-ti-01").click(() => { if (qsone == 0) → page-at00 else page-af00 })
-  //   $(".btn-ti-02").click(() => { if (qstwo == 1) → page-at01 else page-af01 })
-  //   $(".btn-ti-03").click(() => { if (three == 1) → page-at02 else page-af02 })
-  // 即「第 N 个按钮对应第 M 个选项正确」，可以直接从脚本里读出来。
   function parseQuestAnswers(source) {
     const map = {};
-    // 匹配 if (<var> == <n>) 附近的 btn-ti-NN 绑定
     const re = /\$\("\.btn-ti-(\d+)"\)\.click\(function\(\)\s*\{[\s\S]*?if\s*\(\s*\w+\s*==\s*(\d+)\s*\)/g;
     let m;
     while ((m = re.exec(source))) {
@@ -959,26 +979,17 @@
 
   async function answerQuestList(win, opts = {}) {
     const { onCancel } = opts;
-    const isVisible = (n) => {
-      if (!n) return false;
-      try {
-        const cs = win.getComputedStyle(n);
-        return cs.display !== 'none' && cs.visibility !== 'hidden';
-      } catch { return false; }
-    };
     const d = win.document;
 
-    // 必须锁定到「当前正在显示的题目页 page-qsNN」。
-    // 页面上三组题目同时存在，全局查 btn-ti 会拿到第一组（实测坑）。
     const active = d.querySelector('.page-item.page-active');
     if (!active) return false;
     const qsMatch = /page-qs(\d+)/.exec(String(active.className));
     if (!qsMatch) return false;
 
-    const items = [...active.querySelectorAll('.ques-list-item')].filter(isVisible);
+    const items = [...active.querySelectorAll(QUIZ_SELECTORS.quest)].filter((n) => visibleIn(win, n));
     if (!items.length) return false;
 
-    const btn = [...active.querySelectorAll('[class*="btn-ti"]')].find(isVisible);
+    const btn = [...active.querySelectorAll(QUIZ_SELECTORS.questSubmit)].find((n) => visibleIn(win, n));
     if (!btn) return false;
 
     const noMatch = /btn-ti-(\d+)/.exec(String(btn.className));
@@ -994,7 +1005,7 @@
     try {
       items[idx].click();
       await sleep(250);
-      const again = [...active.querySelectorAll('[class*="btn-ti"]')].find(isVisible);
+      const again = [...active.querySelectorAll(QUIZ_SELECTORS.questSubmit)].find((n) => visibleIn(win, n));
       if (again) again.click();
       await sleep(900);
     } catch { return false; }
@@ -1008,14 +1019,10 @@
     return true;
   }
 
-  // ── 自定义单选（实测 A32006 page-17/18）──────────────────  // ── 自定义单选（实测 A32006 page-17/18）──────────────────
-  // 页面用 span.page-radio 当选项：点击 toggleClass("page-radio-active")，
-  // 提交按钮 .page-N-btn 判断 .page-N-radio1 是否 active —— radio1 就是正确答案。
-  // 所以：点 radio1 → 点对应按钮 → 出现 page-success 就继续。
   function hasCustomRadio(win) {
     try {
       const d = win.document;
-      return [...d.querySelectorAll('.page-radio')].some((n) => {
+      return [...d.querySelectorAll(QUIZ_SELECTORS.radio)].some((n) => {
         const r = n.getBoundingClientRect();
         return r.width > 0 && r.height > 0;
       });
@@ -1026,29 +1033,19 @@
 
   async function answerCustomRadio(win, opts = {}) {
     const { onCancel } = opts;
-    const isVisible = (n) => {
-      if (!n) return false;
-      try {
-        const r = n.getBoundingClientRect();
-        return r.width > 0 && r.height > 0;
-      } catch { return false; }
-    };
     const d = win.document;
 
-    // 当前页的 radio 组（可见的那些）
-    const radios = [...d.querySelectorAll('.page-radio')].filter(isVisible);
+    const radios = [...d.querySelectorAll(QUIZ_SELECTORS.radio)].filter((n) => visibleIn(win, n));
     if (!radios.length) return false;
 
-    // radio1 是正确答案：优先点它，没有再按顺序
     const first = radios.find((n) => /radio1\b|-radio1$/.test(n.className)) || radios[0];
     try { first.click(); await sleep(250); } catch { return false; }
 
-    // 对应页面的提交按钮：.page-N-btn
     const page = first.closest('.page-item');
     const pageCls = page ? page.className : '';
     const m = /\bpage-(\d+)\b/.exec(pageCls);
     let submit = m ? d.querySelector('.page-' + m[1] + '-btn') : null;
-    if (!submit) submit = [...d.querySelectorAll('[class*="-btn"]')].find(isVisible);
+    if (!submit) submit = [...d.querySelectorAll('[class*="-btn"]')].find((n) => visibleIn(win, n));
     if (!submit) return false;
 
     try { submit.click(); await sleep(900); } catch { return false; }
@@ -1056,7 +1053,7 @@
     return true;
   }
 
-  // ── 兜底完课 ────────────────────────────────────────────  // ── 兜底完课 ────────────────────────────────────────────  // ── 兜底完课 ────────────────────────────────────────────
+  // ── 兜底完课 ────────────────────────────────────────────
   function callFinishFn(win) {
     try {
       if (typeof win.finishWxCourse === 'function') {
@@ -1067,16 +1064,14 @@
     return false;
   }
 
-  // 判断当前页是不是交互题页（有选项按钮）
   function hasInteractive(win) {
     try {
-      return !!win.document.querySelector('.p0502, .p0503, .p0504, .p0505, .p0506');
+      return INTERACTIVE_IDS.some((id) => win.document.querySelector('.' + id));
     } catch {
       return false;
     }
   }
 
-  // 学一门课：打开 → 翻到底 → 点完课按钮
   async function studyCourse(course, project, opts = {}) {
     const { onCancel, pageInterval = 1500 } = opts;
     const name = course.resourceName || course.resourceId;
@@ -1084,7 +1079,6 @@
       if (onCancel?.()) throw Object.assign(new Error('已取消'), { cancelled: true });
     };
 
-    // 用页面自己的 action 拿课程地址（study.do + getCourseUrl.do 都在里面）
     const url = await dispatch('getCourseUrl', {
       userProjectId: project.userProjectId,
       courseId: course.resourceId,
@@ -1099,11 +1093,9 @@
       await waitCourseReady(win);
       checkCancel();
 
-      // 先拦弹窗：页面完课失败会 alert，弹窗会卡住后续所有操作
       const dialogs = [];
       installDialogGuard(win, dialogs);
 
-      // 注入加速：CSS 动画 + 长 setTimeout
       if (opts.speedup !== false) {
         installSpeedup(win, opts.animSpeed ?? 0.05);
         installTimerBoost(win, opts.timerScale ?? 0.05);
@@ -1114,33 +1106,9 @@
       const info = getPageNumber(win);
       log('  ' + name + '：共 ' + (info ? info.total : '?') + ' 页，开始翻页');
 
-      // 翻页主循环。实测结论：
-      //   - 内容页在 .page-item 里，按钮就在各自页面内
-      //   - 起始页没有按钮，要用下一页的按钮前进
-      //   - 交互题页必须先答完才放出下一页
-      //   - 最后一页是 page-N，没有按钮；完课按钮藏在最后一个隐藏页里
-      // ── 最小学习时长（对齐 client.py 的 study_time 逻辑）──────────
-      // 服务端要求 study.do 之后至少停留一段时间才接受完课；
-      // Python 版默认 20 秒 + 0~5 秒随机。这里翻页前先补足。
-      const minStudy = Number(opts.studyTime ?? 20);
-      if (minStudy > 0) {
-        const jitter = Math.floor(Math.random() * 5);
-        const need = minStudy + jitter;
-        const started = Date.now();
-        log('  最小学习时长：等待 ' + need + ' 秒');
-        while (Date.now() - started < need * 1000) {
-          if (checkCancel()) break;
-          await sleep(1000);
-        }
-      }
+      const studyStartedAt = Date.now();
 
       // ── 学习主状态机 ──────────────────────────────────────────────
-      // 每轮做一件事，然后重新观察页面（不假设固定的页数或按钮结构）：
-      //   1) 是视频页 → 等播放到结尾（页面自己会完课）
-      //   2) 有交互题/答题 → 答题
-      //   3) 已到结束页 → 收尾并完课
-      //   4) 还有前进按钮 → 点它
-      //   5) 都没有 → 尝试直接调完课
       let guard = 0;
       let idle = 0;
       let lastSig = '';
@@ -1150,14 +1118,11 @@
         if (checkCancel()) break;
         if (++guard > 600) throw new Error('页面推进次数异常，已停止');
 
-        // 1) 视频课
         if (hasVideo(win)) {
-          log('  视频页：等待播放结束（页面播完自动完课）');
-          finished = await waitVideoEnd(win, opts);
+          finished = await handleVideo(win, opts);
           break;
         }
 
-        // 2) 交互题 / 单选答题
         if (hasInteractive(win)) {
           log('  发现交互题，自动作答');
           await autoAnswerInteractive(win);
@@ -1183,14 +1148,11 @@
           continue;
         }
 
-        // 3) 结束页
         if (reachedEnd(win)) {
           log('  已到结束页');
           break;
         }
 
-        // 3.5) 分支页：只有返回按钮、没有前进按钮（实测 A05037 的 page-7/8/9）
-        //      这类页是点击收集点后弹出的内容，点 prev 回到主链继续。
         if (isBranchPage(win)) {
           const back = [...win.document.querySelectorAll('.page-item.page-active [class*="prev"]')]
             .find((b) => {
@@ -1207,7 +1169,6 @@
           }
         }
 
-        // 4) 前进：依次尝试候选按钮，直到页面真的变化
         const before = pageSignature(win);
         const candidates = collectForwardButtons(win);
         let advanced = false;
@@ -1217,6 +1178,7 @@
           await sleep(400);
           if (pageSignature(win) !== before || reachedEnd(win)) {
             advanced = true;
+            debugLog('前进成功：' + String(cand.sel || ''));
             break;
           }
         }
@@ -1227,10 +1189,6 @@
           continue;
         }
 
-        // 所有候选都点不动：可能导航条被页面故意隐藏了一段时间
-        // （实测 A32006 在 page-4/6 隐藏 9 秒，page-21 隐藏 3.8 秒）
-        // 实测最长隐藏 9 秒，这里最多等 3 轮 × 4.5 秒 ≈ 13.5 秒
-        // 先尝试「点满本页收集点」：部分课程要求点齐若干元素才放行
         if (idle === 0) {
           const n = await clickAllCollectibles(win, opts);
           if (n > 0) {
@@ -1239,7 +1197,6 @@
             continue;
           }
         }
-        // 导航条可能被页面故意隐藏一段时间（实测最长 9 秒）
         if (idle === 0) log('  未找到可点元素，等待页面放出继续按钮…');
         await sleep(opts.hiddenNavWait ?? 5000);
         if (++idle >= 4) break;
@@ -1250,13 +1207,29 @@
       checkCancel();
 
       // ── 收尾完课 ────────────────────────────────────────────────
+      const minStudy = Number(opts.studyTime ?? 20);
+      if (minStudy > 0) {
+        const need = (minStudy + Math.floor(Math.random() * 5)) * 1000;
+        const elapsed = Date.now() - studyStartedAt;
+        const remain = need - elapsed;
+        if (remain > 0) {
+          log('  补足学习时长：还需 ' + Math.ceil(remain / 1000) + ' 秒');
+          const until = Date.now() + remain;
+          while (Date.now() < until) {
+            if (checkCancel()) break;
+            await sleep(Math.min(1000, until - Date.now()));
+          }
+        } else {
+          log('  学习时长已满足（翻页用了 ' + Math.round(elapsed / 1000) + ' 秒）');
+        }
+      }
+
       const nums = currentPageNums(win);
       log('  ' + name + '：页面推进到第 ' + (nums ?? '?') + ' 页，尝试完课');
 
       if (!finished) {
-        // 优先点站点自己的完课按钮
         const endBtn = win.document.querySelector(
-          '.btn-next-end, .page-success-button2, .page-success-button, .page-end-button',
+          FORWARD_PATTERNS.finish.map((t) => '.' + t).join(', ') + ', .page-success-button',
         );
         if (endBtn) {
           try { endBtn.click(); } catch { /* ignore */ }
@@ -1265,7 +1238,6 @@
       }
 
       if (!detectFinish(win)) {
-        // 兜底：直接调页面的完课函数（sdk.js 定义，94% 的课程都有）
         const called = callFinishFn(win);
         if (called) {
           log('  已直接调用 finishWxCourse()', 'warn');
@@ -1293,7 +1265,6 @@
     }
   }
 
-  // 页面状态指纹：用于判断「翻页是否真的前进了」
   function pageSignature(win) {
     try {
       const doc = win.document;
@@ -1307,7 +1278,6 @@
     }
   }
 
-  // 从课程页判断是否完课成功
   function detectFinish(win) {
     try {
       const doc = win.document;
@@ -1321,11 +1291,6 @@
   }
 
 
-  // ────────────────────────────────────────────────────────────────────────
-  // 4. 考试：同样走页面 action
-  //    数据流见 src/online-*/main-site/src/store/services.js 与 client.py：
-  //    beforePaper → preparePaper → startPaper → recordQuestion → submitPaper
-  // ────────────────────────────────────────────────────────────────────────
 
   async function takeExam(plan, project, opts = {}) {
     const { onCancel, questionSeconds = 3, randomAnswer = true } = opts;
@@ -1344,37 +1309,55 @@
     if (!questionList.length) throw new Error('试卷没有题目');
     log('  试卷 ' + questionList.length + ' 题，限时 ' + (paper.answerTime || '?') + ' 分钟');
 
-    let matched = 0;
+    const nextDelayMs = typeof opts.examDelayMs === 'function'
+      ? opts.examDelayMs
+      : () => (opts.examDelayMs != null ? opts.examDelayMs : 3000);
+
+    // startPaper 已返回全部题目，先批量查一遍，再逐题提交
+    const answers = new Map();
+    const serverMap = await askServerBatch(questionList);
+    for (const q of questionList) {
+      const hit = serverMap && serverMap.get(q.id);
+      if (hit) { answers.set(q.id, hit); continue; }
+      const options = (q.optionList || []).map((o) => o.content || '');
+      const local = await askBank(q, options) || await askAI(q, options);
+      if (local) answers.set(q.id, local);
+    }
+    const matched = answers.size;
+    log('  预查完成：' + matched + '/' + questionList.length + ' 题有答案');
+
     for (let i = 0; i < questionList.length; i++) {
       checkCancel();
       const q = questionList[i];
-      const options = (q.optionList || []).map((o) => o.content || '');
-      const serverResult = await askServerAnswer(q, options);
-      if (serverResult) matched++;
+      const delayMs = nextDelayMs();
+      const serverResult = answers.get(q.id) || null;
       const ids = pickOptionIds(q, serverResult, randomAnswer);
       await dispatch('recordQuestion', {
         userExamPlanId: planId,
         questionId: q.id,
-        useTime: Math.max(1, Math.round(questionSeconds)),
+        useTime: Math.max(1, Math.round(delayMs / 1000)),
         examPlanId: plan.examPlanId,
         answerIds: ids.join(','),
       });
       if (i % 5 === 0) log('  答题 ' + (i + 1) + '/' + questionList.length);
-      if (questionSeconds > 0) await sleep(questionSeconds * 1000);
+      if (delayMs > 0) await sleep(delayMs);
     }
 
     checkCancel();
     const rate = Math.round((matched / questionList.length) * 100);
     log('  题库命中 ' + matched + '/' + questionList.length + '（' + rate + '%）');
+    // exam_submit_match_rate：匹配率不足且不随机作答时放弃交卷
+    const minRate = Number(opts.minMatchRate ?? 90);
+    if (!randomAnswer && rate < minRate) {
+      log('  匹配率 ' + rate + '% 低于设定 ' + minRate + '%，放弃交卷', 'warn');
+      return { score: null, matched, total: questionList.length, skipped: true };
+    }
     const submitted = await dispatch('submitPaper', { userExamPlanId: planId });
     const score = submitted && submitted.score;
     log('  交卷完成，得分 ' + (score ?? '?'), 'ok');
     return { score, matched, total: questionList.length };
   }
 
-  // ────────────────────────────────────────────────────────────────────────
-  // 5. 采集：全部走页面 action
-  // ────────────────────────────────────────────────────────────────────────
 
   const COURSE_CATEGORIES = [
     [3, '必修课', 'requiredNum', 'requiredFinishedNum'],
@@ -1474,24 +1457,50 @@
   }
 
 
-  // ────────────────────────────────────────────────────────────────────────
-  // 6. UI
-  // ────────────────────────────────────────────────────────────────────────
 
   const UI = { root: null, running: false, cancelled: false, logs: [], progress: '' };
 
   function settings() {
     const cfg = GM_getValue(STORE.settings, null) || {};
-    return {
-      pageInterval: Number(cfg.pageInterval ?? 0.8),
-      examQuestionTime: Number(cfg.examQuestionTime ?? 2),
-      randomAnswer: cfg.randomAnswer !== false,
-      speedup: cfg.speedup !== false,
-      animSpeed: Number(cfg.animSpeed ?? 0.05),
-      mute: cfg.mute !== false,
-      videoRate: Number(cfg.videoRate ?? 2),
-      studyTime: Number(cfg.studyTime ?? 20),
+    const ai = GM_getValue(STORE.ai, null) || {};
+    const num = (v, def, min) => {
+      const n = Number(v);
+      return Number.isFinite(n) && n >= min ? n : def;
     };
+    return {
+      // 学习
+      studyMode: ['false', 'true', 'force'].includes(cfg.studyMode) ? cfg.studyMode : 'true',
+      studyTime: num(cfg.studyTime, 20, 0),
+      pageInterval: num(cfg.pageInterval, 0.8, 0.2),
+      speedup: cfg.speedup !== false,
+      animSpeed: Math.min(1, Math.max(0.01, num(cfg.animSpeed, 0.05, 0.01))),
+      mute: cfg.mute !== false,
+      jupiterFallback: cfg.jupiterFallback === true,
+      // 视频
+      videoRate: Math.min(4, Math.max(0, num(cfg.videoRate, 2, 0))),
+      videoMode: cfg.videoMode === 'wait' ? 'wait' : 'duration',
+      // 考试
+      examMode: ['false', 'true', 'perfect', 'force'].includes(cfg.examMode) ? cfg.examMode : 'perfect',
+      examQuestionTime: cfg.examQuestionTime ?? '3,3',
+      examSubmitMatchRate: num(cfg.examSubmitMatchRate, 90, 0),
+      randomAnswer: cfg.randomAnswer !== false,
+      // AI 搜题
+      aiEnable: ai.enable === true,
+      aiBaseUrl: String(ai.baseUrl || AI_DEFAULT.baseUrl),
+      aiApiKey: String(ai.apiKey || ''),
+      aiModel: String(ai.model || AI_DEFAULT.model),
+      // 调试
+      debug: cfg.debug === true,
+    };
+  }
+
+  // exam_question_time 支持 "3,3" 形式（基础,随机上限），返回毫秒
+  function examDelayMs(cfg) {
+    const raw = String(cfg.examQuestionTime ?? '3,3');
+    const parts = raw.split(',').map((x) => Number(x.trim()));
+    const base = Number.isFinite(parts[0]) && parts[0] >= 0 ? parts[0] : 3;
+    const extra = Number.isFinite(parts[1]) && parts[1] >= 0 ? parts[1] : 0;
+    return (base + Math.floor(Math.random() * (extra + 1))) * 1000;
   }
 
   function captchaConfig() {
@@ -1502,6 +1511,11 @@
   }
 
   const el = (id) => document.getElementById(id);
+
+  function debugLog(msg) {
+    if (!settings().debug) return;
+    log('[debug] ' + msg, 'info');
+  }
 
   function log(msg, level = 'info') {
     const box = el('weban-log');
@@ -1521,7 +1535,6 @@
     console.log('[WeBan] ' + msg);
   }
 
-  // 进度条：显示当前项目 / 第几门 / 总数
   function setProgress(text, ratio) {
     const box = el('weban-progress');
     if (!box) return;
@@ -1556,8 +1569,8 @@
       .weban-warn { color: #e3b341; } .weban-ok { color: #56d364; } .weban-err { color: #ff7b72; }
       .weban-f { margin-bottom: 6px; }
       .weban-f label { display: block; font-size: 11.5px; color: #656d76; margin-bottom: 2px; }
-      .weban-f input { width: 100%; box-sizing: border-box; padding: 5px 7px;
-        border: 1px solid #d0d7de; border-radius: 6px; font-size: 12px; }
+      .weban-f input, .weban-f select { width: 100%; box-sizing: border-box; padding: 5px 7px;
+        border: 1px solid #d0d7de; border-radius: 6px; font-size: 12px; background: #fff; }
       .weban-tip { font-size: 11.5px; color: #656d76; margin-bottom: 6px; }
       .weban-tip.bad { color: #cf222e; }
       .weban-sec { font-size: 11px; color: #8c959f; margin: 8px 0 4px; font-weight: 600;
@@ -1644,35 +1657,99 @@
     const srv = serverConfig();
     const row = (id, label, type, value, extra) =>
       '<div class="weban-f"><label>' + label + '</label>' +
-      '<input id="' + id + '" type="' + type + '"' + (extra || '') + ' value="' + esc(String(value)) + '"></div>';
+      '<input id="' + id + '" type="' + type + '"' + (extra || '') +
+      ' value="' + esc(String(value)) + '"></div>';
     const check = (id, label, checked) =>
       '<div class="weban-tip"><label><input id="' + id + '" type="checkbox"' +
       (checked ? ' checked' : '') + '> ' + label + '</label></div>';
+    const select = (id, label, options, value) =>
+      '<div class="weban-f"><label>' + label + '</label><select id="' + id + '">' +
+      options.map((o) => '<option value="' + o[0] + '"' +
+        (o[0] === value ? ' selected' : '') + '>' + o[1] + '</option>').join('') +
+      '</select></div>';
 
     box.innerHTML =
       '<div class="weban-sec">学习</div>' +
+      select('set-study-mode', '学习模式', [
+        ['false', '关闭'], ['true', '正常'], ['force', '强制重学'],
+      ], cfg.studyMode) +
+      row('set-study', '最少停留时长（秒）', 'number', cfg.studyTime, ' min="0" step="1"') +
       row('set-page', '翻页间隔（秒）', 'number', cfg.pageInterval, ' min="0.2" step="0.1"') +
-      check('set-speedup', '动画加速（大幅缩短课程页等待）', cfg.speedup) +
-      check('set-mute', '静音（关闭点击音效）', cfg.mute) +
+      check('set-speedup', '动画加速', cfg.speedup) +
+      row('set-anim', '动画时长（秒）', 'number', cfg.animSpeed, ' min="0.01" max="1" step="0.01"') +
+      check('set-mute', '静音', cfg.mute) +
+      check('set-jupiter', '补发 jupiter 轨迹（课程未加载 apicenext 时）', cfg.jupiterFallback) +
+
+      '<div class="weban-sec">视频课</div>' +
+      row('set-vrate', '播放倍速（0=不等视频时长）', 'number', cfg.videoRate, ' min="0" max="4" step="0.5"') +
+      check('set-vmode', '等视频播完再完课（默认等够时长就提交）', cfg.videoMode === 'wait') +
+
       '<div class="weban-sec">考试</div>' +
-      row('set-exam', '答题间隔（秒）', 'number', cfg.examQuestionTime, ' min="0" step="0.5"') +
-      check('set-random', '题库外的题随机作答', cfg.randomAnswer) +
-      '<div class="weban-sec">辅助服务（题库/验证码）</div>' +
+      select('set-exam-mode', '考试模式', [
+        ['false', '关闭'], ['true', '正常'], ['perfect', '追求满分'], ['force', '强制重考'],
+      ], cfg.examMode) +
+      row('set-exam-time', '每题等待（基础,随机）', 'text', cfg.examQuestionTime) +
+      row('set-match-rate', '最低匹配率（%）', 'number', cfg.examSubmitMatchRate, ' min="0" max="100"') +
+      check('set-random', '题库外随机作答', cfg.randomAnswer) +
+
+      '<div class="weban-sec">AI 搜题</div>' +
+      check('set-ai-enable', '题库未命中时用 AI 作答', cfg.aiEnable) +
+      row('set-ai-key', 'DeepSeek API Key', 'password', cfg.aiApiKey) +
+      row('set-ai-url', 'API 地址', 'text', cfg.aiBaseUrl) +
+      row('set-ai-model', '模型', 'text', cfg.aiModel) +
+
+      '<div class="weban-sec">辅助服务（验证码）</div>' +
       row('set-endpoint', '服务地址', 'text', srv.endpoint) +
-      row('set-token', '服务 Token', 'text', srv.token);
+      row('set-token', '服务 Token', 'text', srv.token) +
+
+      '<div class="weban-sec">调试</div>' +
+      check('set-debug', '输出调试日志', cfg.debug);
+
+    const val = (id) => {
+      const n = box.querySelector('#' + id);
+      return n ? n.value : '';
+    };
+    const on = (id) => {
+      const n = box.querySelector('#' + id);
+      return n ? n.checked : false;
+    };
+    const num = (id, def, min) => {
+      const v = Number(val(id));
+      return Number.isFinite(v) && v >= min ? v : def;
+    };
 
     const save = () => {
       GM_setValue(STORE.settings, {
-        pageInterval: Math.max(0.2, Number(box.querySelector('#set-page').value) || 0.8),
-        examQuestionTime: Math.max(0, Number(box.querySelector('#set-exam').value) || 0),
-        randomAnswer: box.querySelector('#set-random').checked,
-        speedup: box.querySelector('#set-speedup').checked,
-        mute: box.querySelector('#set-mute').checked,
+        studyMode: val('set-study-mode') || 'true',
+        studyTime: num('set-study', 20, 0),
+        pageInterval: num('set-page', 0.8, 0.2),
+        speedup: on('set-speedup'),
+        animSpeed: Math.min(1, Math.max(0.01, num('set-anim', 0.05, 0.01))),
+        mute: on('set-mute'),
+        jupiterFallback: on('set-jupiter'),
+        videoRate: Math.min(4, Math.max(0, num('set-vrate', 2, 0))),
+        videoMode: on('set-vmode') ? 'wait' : 'duration',
+        examMode: val('set-exam-mode') || 'perfect',
+        examQuestionTime: val('set-exam-time') || '3,3',
+        examSubmitMatchRate: Math.min(100, Math.max(0, num('set-match-rate', 90, 0))),
+        randomAnswer: on('set-random'),
+        debug: on('set-debug'),
       });
-      GM_setValue(STORE.captchaEndpoint, box.querySelector('#set-endpoint').value.trim());
-      GM_setValue(STORE.captchaToken, box.querySelector('#set-token').value.trim());
+      GM_setValue(STORE.ai, {
+        enable: on('set-ai-enable'),
+        apiKey: val('set-ai-key').trim(),
+        baseUrl: val('set-ai-url').trim() || AI_DEFAULT.baseUrl,
+        model: val('set-ai-model').trim() || AI_DEFAULT.model,
+      });
+      GM_setValue(STORE.captchaEndpoint, val('set-endpoint').trim());
+      GM_setValue(STORE.captchaToken, val('set-token').trim());
+      log('设置已保存', 'ok');
     };
-    for (const id of ['set-page', 'set-exam', 'set-random', 'set-speedup', 'set-mute', 'set-endpoint', 'set-token']) {
+    const ids = ['set-study-mode','set-study','set-page','set-speedup','set-anim','set-mute',
+      'set-jupiter','set-vrate','set-vmode','set-exam-mode','set-exam-time','set-match-rate',
+      'set-random','set-ai-enable','set-ai-key','set-ai-url','set-ai-model',
+      'set-endpoint','set-token','set-debug'];
+    for (const id of ids) {
       const node = box.querySelector('#' + id);
       if (node) node.addEventListener('change', save);
     }
@@ -1685,9 +1762,6 @@
   }
 
 
-  // ────────────────────────────────────────────────────────────────────────
-  // 7. 主流程
-  // ────────────────────────────────────────────────────────────────────────
 
   async function run() {
     if (UI.running) return;
@@ -1706,10 +1780,20 @@
 
       const projects = await collectPlan(user, () => UI.cancelled);
 
+      const doStudy = cfg.studyMode !== 'false';
+      const forceStudy = cfg.studyMode === 'force';
+      const doExam = cfg.examMode !== 'false';
+      const forceExam = cfg.examMode === 'force';
+      if (!doStudy) log('学习模式：关闭（跳过所有课程）', 'warn');
+      if (!doExam) log('考试模式：关闭（跳过所有考试）', 'warn');
+      if (forceStudy) log('学习模式：强制（已完成课程也重学）', 'warn');
+      if (forceExam) log('考试模式：强制（已及格也重考）', 'warn');
+
       for (const project of projects) {
         if (UI.cancelled) break;
-        for (const [label, rows] of Object.entries(project.categories)) {
-          const pending = rows.filter((r) => !r.finished);
+        const categories = doStudy ? Object.entries(project.categories) : [];
+        for (const [label, rows] of categories) {
+          const pending = forceStudy ? rows : rows.filter((r) => !r.finished);
           if (!pending.length) continue;
           log('【' + project.projectName + '】' + label + ' 待学 ' + pending.length + ' 门');
           for (let i = 0; i < pending.length; i++) {
@@ -1726,6 +1810,7 @@
                 animSpeed: cfg.animSpeed,
                 mute: cfg.mute,
                 videoRate: cfg.videoRate,
+                videoMode: cfg.videoMode,
                 studyTime: cfg.studyTime,
               });
               summary.studied++;
@@ -1737,14 +1822,23 @@
           }
         }
 
+        if (!doExam) continue;
         for (const plan of project.examPlans) {
           if (UI.cancelled) break;
           if (plan.examOddNum - plan.examFinishNum <= 0) continue;
+          // perfect 模式：已满分则跳过；force 模式：已及格也重考
+          if (!forceExam && plan.examMode !== 'force') {
+            const passScore = Number(plan.passScore ?? 80);
+            const got = Number(plan.examScore ?? 0);
+            if (cfg.examMode === 'perfect' && got >= 100) continue;
+            if (cfg.examMode === 'true' && got >= passScore) continue;
+          }
           log('【' + project.projectName + '】考试：' + plan.examPlanName);
           try {
             const r = await takeExam(plan, project, {
               onCancel: () => UI.cancelled,
-              questionSeconds: cfg.examQuestionTime,
+              examDelayMs: () => examDelayMs(cfg),
+              minMatchRate: cfg.examSubmitMatchRate,
               randomAnswer: cfg.randomAnswer,
             });
             summary.exams.push({ project: project.projectName, ...r });
@@ -1771,14 +1865,9 @@
     }
   }
 
-  // ────────────────────────────────────────────────────────────────────────
-  // 8. 课程页（mcwk）内的辅助：页面自身就能完成任务，脚本只补一个状态提示
-  // ────────────────────────────────────────────────────────────────────────
 
   function coursePageHint() {
     if (!isCoursePage()) return;
-    // 课程页不需要脚本做任何事：翻页和完课都由主站窗口驱动。
-    // 这里只放一个很小的提示，避免用户以为脚本没生效。
     const tip = document.createElement('div');
     tip.style.cssText =
       'position:fixed;left:12px;bottom:12px;z-index:2147483000;background:rgba(0,0,0,.75);' +
@@ -1787,9 +1876,6 @@
     document.body.appendChild(tip);
   }
 
-  // ────────────────────────────────────────────────────────────────────────
-  // 9. 启动
-  // ────────────────────────────────────────────────────────────────────────
 
   if (isCoursePage()) {
     coursePageHint();
@@ -1807,23 +1893,6 @@
       boot();
     }
 
-    // 调试入口
-    unsafeWindow.__weban = {
-      version: VERSION,
-      dispatch,
-      getApp,
-      getPageUser,
-      collectPlan,
-      studyCourse,
-      takeExam,
-      askServerAnswer,
-      pickOptionIds,
-      installSpeedup,
-      installTimerBoost,
-      installMute,
-      autoAnswerInteractive,
-      run,
-    };
   }
 })();
 
