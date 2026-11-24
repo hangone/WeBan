@@ -1099,7 +1099,9 @@ class CaptchaHandler:
             try:
                 return await nodriver.start(
                     headless=headless,
-                    browser_executable_path=self.browser_path or None,
+                    # 占位路径：nodriver 的 Config 在路径为空时必定调用
+                    # find_chrome_executable()，无 Chrome 的镜像会直接抛错
+                    browser_executable_path=self.browser_path or "cdp",
                     browser_args=browser_args,
                     host=self.cdp_host,
                     port=self.cdp_port,
