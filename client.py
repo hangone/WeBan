@@ -1461,17 +1461,16 @@ class WeBanClient:
                     for course in courses.get("data", []):
                         if not force_restudy and int(course.get("finished", 0)) == 1:
                             continue
-                        if not self._learn_course(
+                        self._learn_course(
                             course,
                             task,
                             category_prefix,
                             project_prefix,
                             answers_json,
                             force_restudy,
-                        ):
-                            return
+                        )
 
-            self.log.success(f"{project_prefix} 课程学习完成")
+            self.log.info(f"{project_prefix} 课程处理结束")
             self._check_project_course_done(task, project_prefix)
 
     def _check_project_course_done(
@@ -1510,11 +1509,8 @@ class WeBanClient:
         project_prefix: str,
         answers_json: dict,
         force_restudy: bool,
-    ) -> bool:
-        """学习单门课程并校验进度是否更新（折叠/扁平两条列表路径共用）。
-
-        :return: True 可继续下一门；False 表示账号异常/锁定，应停止本账号
-        """
+    ) -> None:
+        """学习单门课程，失败时跳过；账号限制异常向上传递。"""
         course_prefix = f"{category_prefix}/{course['resourceName']}"
         try:
             progress_before = self.get_progress(
@@ -1524,16 +1520,15 @@ class WeBanClient:
             if progress_before.get("code", -1) == "0":
                 d = progress_before["data"]
                 finished_before = sum(d[done] for _, _, _, done in COURSE_CATEGORIES)
-            ok = self._study_one_course(
+            if not self._study_one_course(
                 course,
                 task,
                 category_prefix,
                 project_prefix,
                 answers_json,
                 force_restudy,
-            )
-            if not ok:
-                raise PermissionError("检测到行为异常或账号锁定，已停止当前账号")
+            ):
+                return
             progress_after = self.get_progress(task["userProjectId"], project_prefix)
             if progress_after.get("code", -1) == "0":
                 d = progress_after["data"]
@@ -1552,7 +1547,6 @@ class WeBanClient:
             # 网络异常（DNS/连接/SSL）跳过本门课程，不中断整个账号；
             # 未完成的课程下次运行会自动重学
             self.log.warning(f"{course_prefix}：网络异常，跳过本门课程（{e}）")
-        return True
 
     def _study_flat_courses(
         self,
@@ -1609,27 +1603,14 @@ class WeBanClient:
                 continue
             category_name = course.get("categoryName") or label
             category_prefix = f"{label} {project_prefix}/{category_name}"
-            if not self._learn_course(
+            self._learn_course(
                 course,
                 task,
                 category_prefix,
                 project_prefix,
                 answers_json,
                 force_restudy,
-            ):
-                return
-
-    @staticmethod
-    def _is_account_blocked(res: dict) -> bool:
-        """完课/接口返回是否表示行为异常或账号锁定，应立即停跑。"""
-        if not res:
-            return False
-        detail = str(res.get("detailCode", ""))
-        msg = str(res.get("msg", ""))
-        raw = str(res.get("raw", ""))
-        if detail in {"10018", "701"}:
-            return True
-        return ("行为存在异常" in msg or "Account locked" in raw or "Account locked" in msg)
+            )
 
     def _study_one_course(
         self,
@@ -1644,7 +1625,7 @@ class WeBanClient:
 无 apicenext 的默认只答题+完课（对齐官方页面行为），配置
 jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
 
-        :return: True 可继续下一门；False 表示账号异常/锁定，应停止本账号
+        :return: True 表示课程已完成；False 表示失败或跳过
         """
         course_prefix = f"{category_prefix}/{course['resourceName']}"
 
@@ -1658,7 +1639,7 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
         if not _check_code_ok(study_res):
             msg = study_res.get("message") or study_res.get("msg") or "课程暂时无法学习"
             self.log.warning(f"{course_prefix}：{msg}，跳过")
-            return True
+            return False
         study_start = time.time()
 
         # 官方 H5 完课不依赖列表对象的 userCourseId：课程页 URL 由
@@ -1679,7 +1660,7 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                 course["userCourseId"] = uid[0]
             else:
                 self.log.warning(f"{course_prefix}：未获取到学习记录（userCourseId 为空），跳过")
-                return True
+                return False
 
         course_code = ""
         url_path = urlparse(course_url).path
@@ -1835,7 +1816,8 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
         if finish_first:
             res = self._finish_course(course, task, query, course_url, unique_no)
             if not _check_code_ok(res, allow_200=False):
-                raise RuntimeError(f"{course_prefix} 完成失败，已停止学习：{res}")
+                self.log.error(f"{course_prefix} 完成失败，本次跳过并继续后续课程：{res}")
+                return False
         if total_step and trace_enabled:
             send_trace(total_step, finish=1)
         if item_info.get("trace_after_finish") and total_step and trace_enabled:
@@ -1847,7 +1829,8 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
             res = self._finish_course(course, task, query, course_url, unique_no)
         # 完课走 JSONP（sdk.js finishWxCourse）：checkCode 只认 code∈{0,1}
         if not _check_code_ok(res, allow_200=False):
-            raise RuntimeError(f"{course_prefix} 完成失败，已停止学习：{res}")
+            self.log.error(f"{course_prefix} 完成失败，本次跳过并继续后续课程：{res}")
+            return False
 
         if query.get("csComm", [None])[0] == "true" and query.get("weiban", [None])[0] == "weiban":
             for label, load in (

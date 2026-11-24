@@ -245,8 +245,86 @@ docker run --rm \
 3. **Playwright 浏览器**：自动查找 `~/.cache/ms-playwright` 下的 Chromium
 4. **系统浏览器**：自动查找已安装的 Chrome / Chromium / Edge
 
-## 演示
+## 油猴脚本（浏览器版）
 
+[`weban.user.js`](weban.user.js) 在浏览器里完成整套流程，**不需要 Python 环境**：自动学完未完成课程、自动处理交互题、自动答题、自动交卷。
+
+**安装**：Tampermonkey → 新建脚本 → 粘贴 `weban.user.js` → 先在官网登录 → 打开 <https://weiban.mycourse.cn/> → 面板点「开始」。
+
+### 解决的实际问题
+
+| 痛点 | 做法 |
+| --- | --- |
+| 动画太慢 | CSS `animation`/`transition` 压到 0.05s，长 `setTimeout` 按比例压缩 |
+| 点击有声音 | **默认静音**：覆盖 audio/video 并拦截 `HTMLMediaElement.play()`，动态插入的媒体也处理 |
+| 手动点翻页 | 自动翻到底，再触达完课按钮 |
+| 交互题要手点 | 逐选项「点一个 → 提交 → 等复位 → 下一个」，走完页面才放行 |
+| 考试手答 | 从 `server.py` 查题库，按答案文本匹配选项 |
+
+### 控制面板
+
+- **学习**：翻页间隔、动画加速开关、静音开关
+- **考试**：答题间隔、题库外随机作答
+- **辅助服务**：题库/验证码服务地址与 Token
+- **日志**：实时滚动、可清空、可复制；顶部进度条显示当前第几门课
+
+### 实测记录（真实课程 A11078，16 页）
+
+- 15 页全流程 **19.8 秒**走完，`pageNums=9`，满足完课条件
+- 3 个 `audio` 元素全部 `muted`，动画 `0.05s` 生效
+- 交互题 5 个选项逐个点击 + 提交，全部变 `-1.png`，成功放出下一页
+
+### 原理
+
+主站是 Vue + Vuex 应用，接口都封装在 store actions 里。脚本用 `#app.__vue__` 拿根实例后直接 `dispatch` 官方 action，签名、加密、token 全交给页面。课程页则由脚本真实点击按钮驱动，完课请求由页面自己的 `finishWxCourse()` 发出。源码见 `src/online-*/ `（sourcemap 还原）。
+
+### 课程结构适配（52 门实测）
+
+平台课程页面差异极大，实测 52 门课至少 8 种完课方式。脚本不做逐课适配，而是用**通用状态机**：
+
+| 类型 | 数量 | 处理方式 |
+| --- | --- | --- |
+| 标准翻页 + `btn-next-end` | 7 门 | 翻到底点完课按钮 |
+| 翻页 + `btn-at` 选择题 | 4 门 | 从 `item.js` 的 `slFn()` 读答案勾选 |
+| `apicenext` 轨迹上报 | 2 门 | 页面自己上报，脚本只管翻页 |
+| 纯视频课 | 7 门 | 等播放结束，页面自动完课 |
+| 混合型 | 32 门 | 按页面实际出现的元素逐项处理 |
+
+通用机制覆盖率：`finishWxCourse` **49/52**（其余 3 门是视频课，由播放器回调触发）。
+
+**前进按钮**共识别 12 种：`btn-start`、`btn-ce`、`btn-at`、`btn-next`、`page-next-btn`、`answer-btn-next`、`btn-ti`、`page-success-button2`、`pN_next` 等，另有兜底匹配。
+
+### 已知限制
+
+- **视频课不做倍速破解**：官方播放器 `playbackRates` 上限 2 倍，需在播放器菜单手动选；脚本只等它播完
+- 页面报错会 `alert`（如重复完课提示"发送完成失败"），脚本已拦截并转为日志，不会卡死
+- 已完成课程重复学习时，服务端会拒绝完课，脚本会提示但不算成功
+
+## 辅助服务 server.py（可选）
+
+[`server.py`](server.py) 提供**题库查询**和**验证码识别**，脚本不配也能跑（只是题库外的题随机、验证码要手点）。
+
+```bash
+python server.py                          # 127.0.0.1:8765，无鉴权
+WB_TOKEN=随机串 python server.py            # 开鉴权
+python server.py --host 0.0.0.0 --token 随机串   # 对外，必须带 token
+```
+
+| 接口 | 作用 |
+| --- | --- |
+| `POST /answer/query` | 传 `{title, options}`，返回 `{hit, indexes, answers, matchedBy}` |
+| `POST /answer/match` | 一次传多题，返回每题结果 |
+| `POST /captcha/point` | 点选验证码 → 3 个坐标 |
+| `POST /captcha/text` | 登录验证码 → 4 位字符 |
+| `GET /answer/stats` / `GET /health` | 题库统计 / 健康检查 |
+
+题库来自 `answer/answer.json`（3700+ 题），文件改动后自动重载。题目文本会做规范化（去空格标点、全角转半角、小写），所以「带空格或标点不同」的同一道题也能命中。
+
+在脚本面板「辅助服务地址」里填 `http://127.0.0.1:8765` 即可。
+
+安全约束：默认只监听回环地址；对外必须带 token；图片地址限制 https + 域名白名单 + DNS 内网校验（防 SSRF）；请求体与图片都有大小上限；按 IP 限流。
+
+## 演示
 ![study](images/study.png)
 ![exam](images/exam.png)
 ![old](images/old.png)
@@ -256,6 +334,8 @@ docker run --rm \
 - ### 浏览器检测失败 / 启动失败
 
 关闭代理软件的系统代理再试，或把 `127.0.0.1`、`localhost` 加入代理软件的 bypass 列表。
+
+Chrome 自动更新后首次启动需要额外加载与签名校验，健康检查默认等 30 秒；机器更慢时用 `WB_BROWSER_START_TIMEOUT`（秒）放宽。
 
 - ### 部分无法直接登录的学校/Token 登录方法
 
@@ -270,6 +350,7 @@ docker run --rm \
 2. 课程点选验证码会自动识别（无头浏览器 + OpenCV，最多 2 轮 × 3 次，可用 WB_CAPTCHA_ROUNDS/WB_CAPTCHA_ATTEMPTS 调整），失败后在交互模式会打开浏览器手动操作，无交互模式（Docker 等）会跳过该课程并告警
 3. 账号锁定后，请等待1小时再按原方式登录
 4. 有新手引导时，先在官网完成
+5. 单课完课失败会跳过本门并继续后续课程，不自动重发完课请求。未完成课程下次运行会重新学习。账号锁定或登录失效仍停止当前账号，是否完成以平台进度为准。
 
 - ### 考试
 
