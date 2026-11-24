@@ -51,6 +51,10 @@ jobs:
     name: Build ${{ matrix.os }}
     needs: version
     runs-on: ${{ matrix.os }}
+    env:
+      # uv 默认优先使用 runner 自带的系统解释器，那样 managed Python 目录为空，
+      # cache-python 保存时找不到可缓存内容。统一走 managed 解释器。
+      UV_PYTHON_PREFERENCE: only-managed
     strategy:
       fail-fast: false
       matrix:
@@ -81,8 +85,6 @@ jobs:
           python-version: "3.12"
           cache-python: true
           enable-cache: true
-        env:
-          UV_PYTHON_PREFERENCE: only-managed
 
       - run: uv sync
 
@@ -232,7 +234,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: actions/download-artifact@v8
         with:
