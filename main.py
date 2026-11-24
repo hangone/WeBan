@@ -74,6 +74,7 @@ from loguru import logger
 from ai_client import parse_bool
 from captcha import check_browser_health, is_non_interactive
 from client import WeBanClient, read_first_existing
+from exam_ui import run_demo_exam_ui
 from knowledge import parse_knowledge_paths
 
 # ── 命令行参数与环境变量（优先级：CLI > 环境变量 > 配置文件）────────
@@ -190,6 +191,27 @@ def _parse_args() -> tuple[argparse.Namespace, list[str]]:
         help="允许交卷的最低题库匹配率（百分比，覆盖配置文件）",
     )
     parser.add_argument(
+        "--exam-ui",
+        choices=["true", "false"],
+        help="是否启用交互式考试核对页面：自动答题、键鼠纠正且绝不自动提交（覆盖配置文件）",
+    )
+    parser.add_argument(
+        "--exam-ui-port",
+        type=int,
+        metavar="PORT",
+        help="交互式考试页面监听端口（默认 0 自动分配可用端口，覆盖配置文件）",
+    )
+    parser.add_argument(
+        "--exam-ui-demo",
+        action="store_true",
+        help="启动交互式考试页面演示模式（默认调用你配置的真实 AI 接口与 knowledge/ 文档，配合 --mock 可切离线假数据）",
+    )
+    parser.add_argument(
+        "--mock",
+        action="store_true",
+        help="配合 --exam-ui-demo 使用离线模拟 AI 响应（不发送真实 API 请求）",
+    )
+    parser.add_argument(
         "--browser-path",
         metavar="PATH",
         help="浏览器可执行文件路径（覆盖配置文件）",
@@ -234,6 +256,11 @@ def _parse_args() -> tuple[argparse.Namespace, list[str]]:
         "--ai-model",
         metavar="NAME",
         help="AI 模型名称（覆盖配置文件 [ai].model）",
+    )
+    parser.add_argument(
+        "--ai-api-mode",
+        choices=["auto", "responses", "chat"],
+        help="AI 接口协议：auto=优先 /responses 不支持自动回退 /chat/completions（覆盖配置文件 [ai].api_mode）",
     )
     parser.add_argument(
         "--ai-timeout",
@@ -301,6 +328,7 @@ def merge_ai_config(opts: argparse.Namespace, ai: dict) -> dict:
         "base_url": opts.ai_base_url,
         "api_key": opts.ai_api_key,
         "model": opts.ai_model,
+        "api_mode": opts.ai_api_mode,
         "timeout": opts.ai_timeout,
         "max_retries": opts.ai_max_retries,
         "reasoning_effort": opts.ai_reasoning_effort,
@@ -391,7 +419,11 @@ else:
     base_path = os.path.dirname(os.path.abspath(__file__))
     bundle_path = base_path
 
-if _data_dir:
+_cli_config = _OPTS.config or os.environ.get("WB_CONFIG", "").strip() or None
+if _cli_config:
+    config_path = _cli_config
+    logs_dir = os.path.join(_data_dir or base_path, "logs")
+elif _data_dir:
     # Docker/数据目录模式：config/logs/answer 全部放数据目录（可挂载持久化）
     config_path = os.path.join(_data_dir, "config.toml")
     logs_dir = os.path.join(_data_dir, "logs")
@@ -760,6 +792,20 @@ def run_account(
             get_setting("exam_submit_match_rate", 90),
         )
     )
+    exam_ui_raw = cli_or_env(
+        "exam_ui",
+        _OPTS.exam_ui,
+        get_setting("exam_ui", True),
+    )
+    exam_ui = False if NON_INTERACTIVE else parse_bool(exam_ui_raw, default=True)
+    exam_ui_port = int(
+        cli_or_env(
+            "exam_ui_port",
+            _OPTS.exam_ui_port,
+            get_setting("exam_ui_port", 0),
+        )
+        or 0
+    )
     browser_path = (
         _OPTS.browser_path
         or os.environ.get("WB_BROWSER_PATH", "").strip()
@@ -824,6 +870,8 @@ def run_account(
                 video_speed=video_speed,
                 jupiter_fallback=jupiter_fallback,
                 data_dir=_data_dir,
+                exam_ui=exam_ui,
+                exam_ui_port=exam_ui_port,
             )
         elif tenant_name and username:
             # 密码登录 — password 默认为 username
@@ -841,6 +889,8 @@ def run_account(
                 video_speed=video_speed,
                 jupiter_fallback=jupiter_fallback,
                 data_dir=_data_dir,
+                exam_ui=exam_ui,
+                exam_ui_port=exam_ui_port,
             )
         else:
             log.error(
@@ -901,6 +951,41 @@ def run_account(
 if __name__ == "__main__":
     try:
         logger.info(f"程序启动，当前版本：{VERSION}")
+        if _OPTS.exam_ui_demo:
+            demo_ai_cfg: dict = {}
+            if os.path.exists(config_path):
+                try:
+                    with open(config_path, "rb") as f:
+                        demo_ai_cfg = tomllib.load(f).get("ai", {})
+                    logger.info(f"已加载配置文件：{config_path}")
+                except tomllib.TOMLDecodeError as e:
+                    logger.error(
+                        f"配置文件语法错误（{config_path}）：{e}。"
+                        "提示：Windows 路径请用单引号 'D:\\...' 或正斜杠 \"D:/...\""
+                    )
+                    sys.exit(1)
+                except OSError as e:
+                    logger.error(f"读取配置文件失败（{config_path}）：{e}")
+                    sys.exit(1)
+            else:
+                logger.warning(f"未找到配置文件：{config_path}，当前使用 CLI/环境变量或默认 AI 配置")
+            demo_ai_cfg = merge_ai_config(_OPTS, demo_ai_cfg)
+            demo_port = int(
+                _OPTS.exam_ui_port
+                if _OPTS.exam_ui_port is not None
+                else os.environ.get("WB_EXAM_UI_PORT", "0") or 0
+            )
+            outcome = run_demo_exam_ui(
+                ai_config=demo_ai_cfg,
+                base_path=base_path,
+                data_dir=_data_dir,
+                port=demo_port,
+                open_browser=not NON_INTERACTIVE,
+                use_mock=bool(_OPTS.mock),
+                log=logger,
+            )
+            logger.info(f"演示模式结束：{outcome.get('action')}")
+            sys.exit(0)
         _check_update_async()  # 异步检查更新，失败/无新版不阻塞主流程
         logger.info(f"程序更新地址：https://github.com/{GITHUB_REPO}")
 

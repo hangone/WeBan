@@ -12,9 +12,16 @@ from uuid import uuid4
 
 from loguru import logger
 
-from ai_client import parse_ai_response, request_ai_answer
+from ai_client import (
+    extract_endpoint_host,
+    parse_ai_response,
+    parse_bool,
+    request_ai_answer,
+    solve_question_with_ai,
+)
 from api import WeBanAPI
 from captcha import CaptchaHandler, LoginCaptchaSolver, is_non_interactive
+from exam_ui import ExamSessionController, run_interactive_exam_ui
 
 if getattr(sys, "frozen", False):
     base_path = os.path.dirname(os.path.abspath(sys.executable))
@@ -834,6 +841,8 @@ class WeBanClient:
         video_speed: float = 1.0,
         jupiter_fallback: bool = False,
         data_dir: str | None = None,
+        exam_ui: bool = False,
+        exam_ui_port: int = 0,
     ) -> None:
         """
         :param tenant_name: 学校全称
@@ -870,6 +879,8 @@ class WeBanClient:
         self.cdp_port = cdp_port
         self.ai_config = ai_config
         self.data_dir = data_dir or _data_dir or None
+        self.exam_ui = bool(exam_ui)
+        self.exam_ui_port = int(exam_ui_port or 0)
         self._ai_key_warned = False  # api_key 未配置提醒只打一次
         if user and all([user.get("userId"), user.get("token")]):
             self.api = WeBanAPI(user=user, debug=debug, log=log)
@@ -2098,6 +2109,113 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                     f"题目总数：{question_num}，有答案的题目数：{len(have_answer)}，"
                     f"无答案的题目数：{len(no_answer)}，题库匹配率：{match_rate:.1f}%"
                 )
+
+                # ── 交互式 Web 答题控制台模式（自动执行 + 键鼠人工纠正 + 绝不自动提交）──
+                if self.exam_ui and not is_non_interactive():
+                    bank_answers_map: dict[str, list[str]] = {}
+                    for question in have_answer:
+                        answers = answers_json[clean_text(question["title"])]
+                        ans_ids = [
+                            str(opt["id"])
+                            for opt in question["optionList"]
+                            if clean_text(opt["content"]) in answers
+                        ]
+                        if ans_ids:
+                            bank_answers_map[str(question["id"])] = ans_ids
+
+                    ai_enabled = bool(
+                        self.ai_config
+                        and parse_bool(self.ai_config.get("enable"), default=False)
+                    )
+
+                    def _ui_ai_solver(
+                        q_dict,
+                        effort_override,
+                        on_delta,
+                        on_kb,
+                        on_tool,
+                    ):
+                        warned_state = [self._ai_key_warned]
+                        res = solve_question_with_ai(
+                            session=self.api.session,
+                            ai_config=self.ai_config or {},
+                            question=q_dict,
+                            base_path=base_path,
+                            data_dir=self.data_dir,
+                            log=self.log,
+                            warned_key_state=warned_state,
+                            reasoning_effort_override=effort_override,
+                            on_thinking_delta=on_delta,
+                            on_kb_result=on_kb,
+                            on_tool_event=on_tool,
+                            suppress_stdout_stream=True,
+                        )
+                        self._ai_key_warned = warned_state[0]
+                        return res
+
+                    def _ui_record(
+                        qid: str,
+                        use_time: int,
+                        ans_ids: list[str],
+                        _u_plan=user_exam_plan_id,
+                        _e_plan=exam_plan_id,
+                    ) -> bool:
+                        return self.record_answer(
+                            _u_plan, qid, use_time, ans_ids, _e_plan
+                        )
+
+                    def _ui_submit(_u_plan=user_exam_plan_id) -> dict[str, Any]:
+                        submit_res = self.api.exam_submit_paper(_u_plan)
+                        if not _check_code_ok(submit_res):
+                            raise RuntimeError(f"提交试卷失败：{submit_res}")
+                        return submit_res
+
+                    controller = ExamSessionController(
+                        plan_name=plan_name,
+                        user_label=(
+                            f"{prepare_paper.get('realName', '')}"
+                            f" ({prepare_paper.get('userIDLabel', '')})"
+                        ).strip(),
+                        paper_score=prepare_paper.get("paperScore", 100),
+                        answer_time_minutes=int(prepare_paper.get("answerTime") or 0),
+                        questions=question_list,
+                        bank_answers_map=bank_answers_map,
+                        ai_solver=_ui_ai_solver if ai_enabled else None,
+                        record_fn=_ui_record,
+                        submit_fn=_ui_submit,
+                        question_base_time=question_base_time,
+                        question_random_upper=question_random_upper,
+                        default_reasoning_effort=str(
+                            (self.ai_config or {}).get("reasoning_effort", "") or ""
+                        ),
+                        ai_model=str((self.ai_config or {}).get("model", "") or ""),
+                        ai_endpoint_host=extract_endpoint_host(
+                            str((self.ai_config or {}).get("base_url", "") or "")
+                        ),
+                        ai_enabled=ai_enabled,
+                        log=self.log,
+                    )
+                    outcome = run_interactive_exam_ui(
+                        controller,
+                        port=self.exam_ui_port,
+                        open_browser=True,
+                        log=self.log,
+                    )
+                    if outcome.get("action") == "submitted":
+                        score = outcome.get("score")
+                        self.log.success(
+                            f"试卷已由人工确认提交，考试完成，成绩：{score} 分"
+                        )
+                        self._update_exam_eta(time.time() - plan_start_ts)
+                    else:
+                        self.log.warning(
+                            f"{plan_name} 已在交互控制台放弃交卷，未提交试卷"
+                        )
+                    continue
+                if self.exam_ui and is_non_interactive():
+                    self.log.warning(
+                        "当前处于无交互环境，无法打开交互式答题页面，已自动回退为常规考试流程"
+                    )
 
                 # perfect 模式：匹配率不足且 random_answer=False 时警告
                 if exam_mode == "perfect" and match_rate < 100 and not random_answer:

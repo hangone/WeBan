@@ -625,6 +625,120 @@ class KnowledgeBase:
             matched_chunks=len(selected_blocks),
         )
 
+    def full_text_bundle(self) -> str:
+        """返回确定性拼接的完整参考文档文本（用于放入固定 system 前缀以命中 KV Cache）。"""
+        if not self.documents:
+            return ""
+        blocks = [f"【参考文档：{doc.source}】\n{doc.text}" for doc in self.documents]
+        return "\n\n---\n\n".join(blocks)
+
+    def _chunk_counts_by_source(self) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for chunk in self.chunks:
+            counts[chunk.source] = counts.get(chunk.source, 0) + 1
+        return counts
+
+    def catalog_summary(self, max_chars: int = 2400) -> str:
+        """生成紧凑的知识库目录摘要（供大模型在工具模式下按需检索，避免每题塞入全文）。"""
+        if not self.documents:
+            return ""
+        counts = self._chunk_counts_by_source()
+        lines: list[str] = []
+        used = 0
+        for idx, doc in enumerate(self.documents, start=1):
+            headings = [
+                line.strip().lstrip("#").strip()
+                for line in doc.text.splitlines()
+                if line.strip()
+            ][:3]
+            preview = " / ".join(h[:36] for h in headings)
+            if len(preview) > 100:
+                preview = preview[:100].rstrip() + "..."
+            entry = (
+                f"{idx}. {doc.source}（{len(doc.text)} 字，共 {counts.get(doc.source, 0)} 段）"
+                + (f"：{preview}" if preview else "")
+            )
+            if used + len(entry) + 1 > max_chars and lines:
+                lines.append(f"...其余 {len(self.documents) - idx + 1} 篇已省略，可用 search_knowledge 检索")
+                break
+            lines.append(entry)
+            used += len(entry) + 1
+        return "\n".join(lines)
+
+    def search_chunks(
+        self,
+        query: str,
+        *,
+        top_k: int = 5,
+        max_chars: int = 4500,
+    ) -> list[dict[str, Any]]:
+        """供 Agent 工具 `search_knowledge` 调用的本地 BM25 片段检索。"""
+        if not self.chunks or not query.strip():
+            return []
+        q_tokens = tokenize_text(query)
+        phrases = [seq for seq in _TOKEN_CJK_RE.findall(query.lower()) if len(seq) >= 4]
+        scored: list[tuple[float, KnowledgeChunk]] = []
+        for chunk in self.chunks:
+            s = self._score_chunk(chunk, q_tokens, [], phrases)
+            if s > 0:
+                scored.append((s, chunk))
+        if not scored:
+            return []
+        scored.sort(key=lambda item: item[0], reverse=True)
+
+        counts = self._chunk_counts_by_source()
+        results: list[dict[str, Any]] = []
+        used = 0
+        limit_k = max(1, min(10, int(top_k)))
+        for score, chunk in scored[:limit_k]:
+            text = chunk.text
+            if used + len(text) > max_chars and results:
+                break
+            results.append(
+                {
+                    "source": chunk.source,
+                    "chunk_index": chunk.index,
+                    "total_chunks": counts.get(chunk.source, chunk.index),
+                    "score": round(score, 2),
+                    "text": text,
+                }
+            )
+            used += len(text)
+        return results
+
+    def get_chunk(
+        self,
+        source: str,
+        chunk_index: int,
+        *,
+        window: int = 1,
+    ) -> list[dict[str, Any]]:
+        """供 Agent 工具 `read_document_chunk` 按文档名与段号读取指定及相邻段落。"""
+        target = source.strip().lower()
+        if not target or not self.chunks:
+            return []
+        # 优先精确匹配，其次子串匹配文件名
+        doc_chunks = [c for c in self.chunks if c.source.lower() == target]
+        if not doc_chunks:
+            doc_chunks = [c for c in self.chunks if target in c.source.lower()]
+        if not doc_chunks:
+            return []
+
+        w = max(0, min(2, int(window)))
+        lo = max(1, int(chunk_index) - w)
+        hi = int(chunk_index) + w
+        total = len(doc_chunks)
+        return [
+            {
+                "source": c.source,
+                "chunk_index": c.index,
+                "total_chunks": total,
+                "text": c.text,
+            }
+            for c in doc_chunks
+            if lo <= c.index <= hi
+        ]
+
 
 def _discover_files(
     paths: list[str],
