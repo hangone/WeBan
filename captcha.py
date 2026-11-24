@@ -870,6 +870,45 @@ async def _wait_cdp_ready(
     )
 
 
+async def _connect_ready_browser(
+    user_data_dir: str,
+    headless: bool,
+    browser_path: str,
+    browser_args: list[str],
+    host: str,
+    port: int,
+) -> nodriver.Browser:
+    """调试端口就绪后交给 nodriver 连接。
+
+    Chrome 冷启动偶发「端口已响应，但 nodriver 连接失败」——其内部只重试
+    5 次 × 0.5s。此时浏览器进程本身可用，重试一次即可；失败时把注册进
+    nodriver 的半成品实例清掉，避免残留。
+    """
+    from nodriver.core.util import get_registered_instances
+
+    last_exc: Exception | None = None
+    for attempt in range(2):
+        before = set(get_registered_instances())
+        try:
+            return await nodriver.start(
+                user_data_dir=user_data_dir,
+                headless=headless,
+                browser_executable_path=browser_path,
+                browser_args=browser_args,
+                host=host,
+                port=port,
+            )
+        except Exception as e:
+            for inst in get_registered_instances() - before:
+                get_registered_instances().discard(inst)
+            if "Failed to connect to browser" not in str(e) or attempt == 1:
+                raise
+            last_exc = e
+            await asyncio.sleep(1)
+    assert last_exc is not None
+    raise last_exc
+
+
 async def _launch_browser(
     browser_path: str,
     headless: bool,
@@ -912,13 +951,8 @@ async def _launch_browser(
         await _wait_cdp_ready(
             host, port, proc, tail, BROWSER_START_TIMEOUT if timeout is None else timeout
         )
-        browser = await nodriver.start(
-            user_data_dir=user_data_dir,
-            headless=headless,
-            browser_executable_path=browser_path,
-            browser_args=browser_args,
-            host=host,
-            port=port,
+        browser = await _connect_ready_browser(
+            user_data_dir, headless, browser_path, browser_args, host, port
         )
     except BaseException:
         await _kill_proc(proc, drain)
