@@ -71,8 +71,6 @@ _bypass_proxy_for_local_hosts()
 import requests
 from loguru import logger
 
-from console import Stream, ask
-
 # ── 命令行参数与环境变量（优先级：CLI > 环境变量 > 配置文件）────────
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -291,12 +289,14 @@ elif os.environ.get("WB_DATA_DIR"):
 from api import AccountBlockedError
 from captcha import check_browser_health, is_non_interactive
 from client import WeBanClient, read_first_existing
-from paths import (
+from utils import (
     APP_DIR,
     CONFIG_EXAMPLE_CANDIDATES,
     CONFIG_PATH,
     LOGS_DIR,
     USED_FALLBACK,
+    Stream,
+    ask,
 )
 
 

@@ -12,13 +12,13 @@ from loguru import logger
 
 from api import AccountBlockedError, WeBanAPI
 from captcha import CaptchaHandler, LoginCaptchaSolver, is_non_interactive
-from console import ask
-from paths import (
+from utils import (
     ANSWER_DIR,
     ANSWER_PATH,
     BUNDLE_ANSWER_PATH,
     LOGS_DIR,
     ROOT_ANSWER_PATH,
+    ask,
 )
 
 # 无交互模式判定复用 captcha.is_non_interactive（ENVIRONMENT=docker / stdin 非 TTY）
