@@ -237,7 +237,7 @@ def _expand_course_pages(html: str, script: str) -> str:
         fragment = template.group(2)
         if not re.search(r"<section\b[^>]*\bpage-item\b[^>]*\bpage-\$\{", fragment):
             continue  # 课后题 page-aq 等模板由题目分支处理。
-        error = "无法解析动态内容页，已停止学习，请在官网完成该课程"
+        error = "无法解析动态内容页，跳过本门课程，请在官网完成该课程"
         loops = [
             match for match in re.finditer(r"\bfor\s*\(([^)]*)\)\s*\{", script)
             if match.end() <= template.start() < _js_block_end(script, match.end())
@@ -711,7 +711,7 @@ def _question_trace_flow(html: str, script: str) -> tuple[int, int]:
             return per_question, after
         if reached:
             after += int(any("btn-next" in item for item in _class_lists(section.group(2))))
-    raise RuntimeError("题目返回正文后的轨迹路径无法完整解析，已停止学习")
+    raise RuntimeError("题目返回正文后的轨迹路径无法完整解析，跳过本门课程")
 
 
 def _course_completion_timing(script: str, has_questions: bool | None = None) -> tuple[bool, float] | None:
@@ -810,7 +810,7 @@ def _count_nav_pages(html: str) -> tuple[int, int]:
 
 
 def _fetch_text(session, url: str, referer: str | None = None) -> str:
-    """读取计算课程路径所必需的 HTML/JS，失败时停止，不能按缺失脚本完课。
+    """读取计算课程路径所必需的 HTML/JS，失败时抛出，跳过本门课程。
     :param session: LoggingSession 实例
     :param url: 目标 URL
     :param referer: 自定义 Referer（抓 mcwk 资源时应传课程播放页 URL，
@@ -822,10 +822,95 @@ def _fetch_text(session, url: str, referer: str | None = None) -> str:
         headers["Referer"] = referer
     resp = session.get(url, timeout=10, headers=headers)
     if resp.status_code == 701:
-        raise AccountBlockedError("课程资源请求被限制，已停止学习")
+        raise AccountBlockedError("课程资源请求被限制，已停止当前账号")
     if resp.status_code != 200 or not resp.text.strip():
-        raise RuntimeError(f"课程资源读取失败（HTTP {resp.status_code}），已停止学习")
+        raise RuntimeError(f"课程资源读取失败（HTTP {resp.status_code}），跳过本门课程")
     return resp.text
+
+
+def _fetch_video_duration(session, video_url: str) -> float:
+    """读取单个视频地址的时长（秒），取不到返回 0.0。
+
+    m3u8 累加 EXTINF；mp4 按 box 长度逐段跳转定位 mvhd（moov 可能在
+    mdat 之后）。网络异常（含 CDN 证书过期）按取不到处理，由调用方
+    切换备用镜像，不能中断整个账号。
+    """
+    video_duration = 0.0
+    try:
+        if urlparse(video_url).path.endswith(".m3u8"):
+            # m3u8：累加 EXTINF 时长
+            playlist = session.get(video_url, timeout=10)
+            if playlist.status_code == 200:
+                segments = re.findall(
+                    r"#EXTINF:\s*([0-9]+(?:\.[0-9]+)?)",
+                    playlist.text,
+                )
+                if not segments:
+                    variant = re.search(
+                        r"#EXT-X-STREAM-INF:[^\n]*\n\s*(\S+)",
+                        playlist.text,
+                    )
+                    if variant:
+                        playlist = session.get(
+                            urljoin(video_url, variant.group(1)),
+                            timeout=10,
+                        )
+                        if playlist.status_code == 200:
+                            segments = re.findall(
+                                r"#EXTINF:\s*([0-9]+(?:\.[0-9]+)?)",
+                                playlist.text,
+                            )
+                video_duration = sum(float(s) for s in segments)
+        else:
+            # moov 可能在 mdat 后，按 box 长度跳转定位。
+            offset = 0
+            movie_end = None
+            full_content = None
+            for _ in range(128):
+                if full_content is None:
+                    metadata = session.get(
+                        video_url,
+                        headers={"Range": f"bytes={offset}-{offset + 63}"},
+                        timeout=10,
+                    )
+                    if metadata.status_code not in (200, 206):
+                        break
+                    if metadata.status_code == 200:
+                        full_content = metadata.content
+                    buf = metadata.content if full_content is None else full_content[offset:offset + 64]
+                else:
+                    buf = full_content[offset:offset + 64]
+                if len(buf) < 8:
+                    break
+                size = int.from_bytes(buf[:4], "big")
+                kind = buf[4:8]
+                header = 16 if size == 1 else 8
+                if size == 1:
+                    size = int.from_bytes(buf[8:16], "big")
+                if size < header:
+                    break
+                if kind == b"moov":
+                    movie_end = offset + size
+                    offset += header
+                    continue
+                if kind == b"mvhd" and movie_end is not None:
+                    version = buf[header]
+                    scale_pos = header + (20 if version == 1 else 12)
+                    duration_pos = scale_pos + 4
+                    duration_size = 8 if version == 1 else 4
+                    if version not in (0, 1) or len(buf) < duration_pos + duration_size:
+                        break
+                    timescale = int.from_bytes(buf[scale_pos:duration_pos], "big")
+                    duration = int.from_bytes(buf[duration_pos:duration_pos + duration_size], "big")
+                    if timescale:
+                        video_duration = duration / timescale
+                    break
+                offset += size
+                if movie_end is not None and offset >= movie_end:
+                    break
+    except OSError:
+        return 0.0
+    return video_duration
 
 
 # ---------------------------------------------------------------------------
@@ -846,7 +931,7 @@ class WeBanClient:
         cdp_port: int | None = None,
         debug: bool = False,
         ai_config: dict[str, Any] | None = None,
-        video_speed: float = 1.0,
+        video_speed: float = 2.0,
         jupiter_fallback: bool = False,
     ) -> None:
         """
@@ -861,7 +946,7 @@ class WeBanClient:
         :param debug: 是否启用调试日志
         :param ai_config: AI 搜题配置
         :param video_speed: 视频课程学习倍速，完课前按 视频时长/倍速 等待；
-            0 表示不按视频时长等待，只按 study_time 学习时长
+            2 表示按半速等待，0 表示不按视频时长等待，只按 study_time 学习时长
         :param jupiter_fallback: 对未加载 apicenext.js 的课程也补发 jupiter
             翻页轨迹。官方页面只有加载 apicenext.js（定义全局 uuid 并调用
             callApinext）的课程才上报轨迹，默认 False 完全对齐官方行为；
@@ -1545,6 +1630,12 @@ class WeBanClient:
             if progress_before.get("code", -1) == "0":
                 d = progress_before["data"]
                 finished_before = sum(d[done] for _, _, _, done in COURSE_CATEGORIES)
+        except PermissionError:
+            raise  # Token 失效，立即终止该账号
+        except OSError as e:
+            self.log.warning(f"{course_prefix}：网络异常，跳过本门课程（{e}）")
+            return
+        try:
             if not self._study_one_course(
                 course,
                 task,
@@ -1554,6 +1645,14 @@ class WeBanClient:
                 force_restudy,
             ):
                 return
+        except PermissionError:
+            raise  # Token 失效、账号受限，立即终止该账号
+        except Exception as e:  # noqa: BLE001 -- 课程级异常只跳过本门课程
+            # 轨迹、资源、题目解析等课程级异常只跳过本门课程，未完成的
+            # 课程下次运行会自动重学；网络异常同理。
+            self.log.warning(f"{course_prefix}：本门课程失败，跳过（{e}）")
+            return
+        try:
             progress_after = self.get_progress(task["userProjectId"], project_prefix)
             if progress_after.get("code", -1) == "0":
                 d = progress_after["data"]
@@ -1569,8 +1668,6 @@ class WeBanClient:
         except PermissionError:
             raise  # Token 失效，立即终止该账号
         except OSError as e:
-            # 网络异常（DNS/连接/SSL）跳过本门课程，不中断整个账号；
-            # 未完成的课程下次运行会自动重学
             self.log.warning(f"{course_prefix}：网络异常，跳过本门课程（{e}）")
 
     def _study_flat_courses(
@@ -1706,6 +1803,17 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
             }
         )
 
+        # 视频时长只在 video_speed>0 时用于对齐等待；所有 CDN 都取不到时
+        # 跳过本门课程，避免按 study_time 完课与实际视频长度不符，也不能
+        # 因一门课的时长读不到中断整个账号（其他课程下次仍会重试）。
+        if (
+            self.video_speed > 0
+            and item_info.get("has_video")
+            and not item_info.get("video_duration")
+        ):
+            self.log.warning(f"{course_prefix}：视频时长未知，跳过本门课程")
+            return False
+
         nonstr_map = item_info.get("nonstr_map", {})
         total_step = item_info.get("total_step", 0)
         total_step_source = item_info.get("total_step_source", "")
@@ -1724,7 +1832,7 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
         branch = "with_questions" if questions.get("examQuestionList") else "without_questions"
         steps = dynamic_steps.get(branch)
         if uses_apinext and "dynamic_steps" in item_info and not steps:
-            raise RuntimeError("课程轨迹路径未能完整解析，已停止学习，不使用页数推测")
+            raise RuntimeError("课程轨迹路径未能完整解析，跳过本门课程，不使用页数推测")
         finish_step = None
         question_trace, after_question_trace = item_info.get("question_trace_flow", (0, 0))
         if steps:
@@ -1757,7 +1865,7 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
 
         completion_timing = (item_info.get("completion_timings") or {}).get(branch) or item_info.get("completion_timing")
         if trace_enabled and "completion_timing" in item_info and completion_timing is None:
-            raise RuntimeError("课程完课顺序未能完整解析，已停止学习")
+            raise RuntimeError("课程完课顺序未能完整解析，跳过本门课程")
         exam_questions = questions.get("examQuestionList", [])
         deferred_steps = len(exam_questions) * question_trace + after_question_trace if exam_questions else 0
         if total_step and trace_enabled:
@@ -1864,7 +1972,7 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
             ):
                 response = load()
                 if not _check_code_ok(response):
-                    raise RuntimeError(f"完课评价页{label}读取失败，已停止学习")
+                    raise RuntimeError(f"完课评价页{label}读取失败，跳过本门课程")
         self.log.success(f"{course_prefix} 完成")
         return True
 
@@ -2343,93 +2451,34 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
             video_urls.extend(urljoin(html_url, src) for src in re.findall(
                 r'''["']([^"'\s<>]+\.(?:mp4|m3u8)(?:\?[^"'\s<>]*)?)["']''', script
             ))
-            # 备用 CDN 不重复计时，多段视频累计时长。
-            video_sources = {}
+            # 同一文件有多个 CDN 镜像（如 BaseCDN/WangSuCDN）：按文件名分组，
+            # 每个文件只计一次时长；镜像按出现顺序尝试，前一个取不到
+            # （如备用 CDN 证书过期）换下一个，多段视频累计时长。
+            video_sources: dict[str, list[str]] = {}
             for video_url in video_urls:
                 name = urlparse(video_url).path.rsplit("/", 1)[-1].rsplit(".", 1)[0]
-                video_sources.setdefault(name, video_url)
+                mirrors = video_sources.setdefault(name, [])
+                if video_url not in mirrors:
+                    mirrors.append(video_url)
             durations = []
-            for video_url in video_sources.values():
+            for mirrors in video_sources.values():
                 result["has_video"] = True
                 video_duration = 0.0
-                try:
-                    if urlparse(video_url).path.endswith(".m3u8"):
-                        # m3u8：累加 EXTINF 时长
-                        playlist = self.api.session.get(video_url, timeout=10)
-                        if playlist.status_code == 200:
-                            segments = re.findall(
-                                r"#EXTINF:\s*([0-9]+(?:\.[0-9]+)?)",
-                                playlist.text,
-                            )
-                            if not segments:
-                                variant = re.search(
-                                    r"#EXT-X-STREAM-INF:[^\n]*\n\s*(\S+)",
-                                    playlist.text,
-                                )
-                                if variant:
-                                    playlist = self.api.session.get(
-                                        urljoin(video_url, variant.group(1)),
-                                        timeout=10,
-                                    )
-                                    if playlist.status_code == 200:
-                                        segments = re.findall(
-                                            r"#EXTINF:\s*([0-9]+(?:\.[0-9]+)?)",
-                                            playlist.text,
-                                        )
-                            video_duration = sum(float(s) for s in segments)
-                    else:
-                        # moov 可能在 mdat 后，按 box 长度跳转定位。
-                        offset = 0
-                        movie_end = None
-                        full_content = None
-                        for _ in range(128):
-                            if full_content is None:
-                                metadata = self.api.session.get(
-                                    video_url,
-                                    headers={"Range": f"bytes={offset}-{offset + 63}"},
-                                    timeout=10,
-                                )
-                                if metadata.status_code not in (200, 206):
-                                    break
-                                if metadata.status_code == 200:
-                                    full_content = metadata.content
-                                buf = metadata.content if full_content is None else full_content[offset:offset + 64]
-                            else:
-                                buf = full_content[offset:offset + 64]
-                            if len(buf) < 8:
-                                break
-                            size = int.from_bytes(buf[:4], "big")
-                            kind = buf[4:8]
-                            header = 16 if size == 1 else 8
-                            if size == 1:
-                                size = int.from_bytes(buf[8:16], "big")
-                            if size < header:
-                                break
-                            if kind == b"moov":
-                                movie_end = offset + size
-                                offset += header
-                                continue
-                            if kind == b"mvhd" and movie_end is not None:
-                                version = buf[header]
-                                scale_pos = header + (20 if version == 1 else 12)
-                                duration_pos = scale_pos + 4
-                                duration_size = 8 if version == 1 else 4
-                                if version not in (0, 1) or len(buf) < duration_pos + duration_size:
-                                    break
-                                timescale = int.from_bytes(buf[scale_pos:duration_pos], "big")
-                                duration = int.from_bytes(buf[duration_pos:duration_pos + duration_size], "big")
-                                if timescale:
-                                    video_duration = duration / timescale
-                                break
-                            offset += size
-                            if movie_end is not None and offset >= movie_end:
-                                break
-                except OSError:
-                    pass
+                for mirror_url in mirrors:
+                    video_duration = _fetch_video_duration(self.api.session, mirror_url)
+                    if video_duration > 0:
+                        break
                 durations.append(video_duration)
             if durations:
-                if not all(durations) and self.video_speed > 0:
-                    raise RuntimeError("视频时长获取失败")
+                if not all(durations):
+                    self.log.warning(
+                        "视频课程，视频时长获取失败（所有 CDN 镜像均不可用）"
+                        + (
+                            "，跳过本门课程"
+                            if self.video_speed > 0
+                            else "，本次不按视频时长等待"
+                        )
+                    )
                 result["video_duration"] = sum(durations) if all(durations) else 0.0
                 self.log.info(
                     "视频课程，视频时长 "
@@ -2453,7 +2502,7 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
         except (PermissionError, RuntimeError):
             raise
         except Exception as e:  # 解析边界转为明确失败，不能降级为无轨迹完课
-            raise RuntimeError(f"课程资源或脚本解析失败（{type(e).__name__}），已停止学习") from e
+            raise RuntimeError(f"课程资源或脚本解析失败（{type(e).__name__}），跳过本门课程") from e
         return result
 
     # ---- apinext / answer helpers -------------------------------------------
@@ -2502,7 +2551,7 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
                 unique_no=unique_no,
             )
             if not resp.get("success"):
-                raise RuntimeError(f"apinext [{label}] 返回失败，已停止学习")
+                raise RuntimeError(f"apinext [{label}] 返回失败，跳过本门课程")
             self.log.info(f"apinext [{label}] finish={finish} 已发送")
 
         if finish == 2:
@@ -2561,7 +2610,7 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
         title = clean_text(question.get("title", ""))
         option_list = question.get("optionList", [])
         if not option_list:
-            raise RuntimeError("课程题目缺少选项，已停止学习")
+            raise RuntimeError("课程题目缺少选项，跳过本门课程")
 
         answer_ids = []
         if title in answers_json:
@@ -2576,32 +2625,32 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
 
         res = save_func(course_id, question["id"], json.dumps(answer_ids), source)
         if not _check_code_ok(res):
-            raise RuntimeError("课程答案保存失败，已停止学习")
+            raise RuntimeError("课程答案保存失败，跳过本门课程")
         data = res.get("data")
         if isinstance(data, list):
             return matched
         if not isinstance(data, dict):
-            raise TypeError("课程答案响应格式异常，已停止学习")
+            raise TypeError("课程答案响应格式异常，跳过本门课程")
         if data.get("isRight") in (1, "1"):
             return matched
 
         # 题库错答也复用本次反馈，不再额外试答或遍历选项。
         answer_label = data.get("answerLabel", "")
         if not answer_label:
-            raise RuntimeError("课后题未通过且缺少反馈答案，已停止学习")
+            raise RuntimeError("课后题未通过且缺少反馈答案，跳过本门课程")
         if not isinstance(answer_label, str):
-            raise TypeError("课后题反馈答案格式异常，已停止学习")
+            raise TypeError("课后题反馈答案格式异常，跳过本门课程")
         correct_letters = {ch for ch in answer_label.replace("-", "") if ch.isalpha()}
         if not correct_letters:
-            raise RuntimeError("课后题反馈答案格式异常，已停止学习")
+            raise RuntimeError("课后题反馈答案格式异常，跳过本门课程")
         letter_to_opt = {chr(65 + idx): opt for idx, opt in enumerate(option_list)}
         if not correct_letters.issubset(letter_to_opt):
-            raise RuntimeError("课后题反馈无法匹配选项，已停止学习")
+            raise RuntimeError("课后题反馈无法匹配选项，跳过本门课程")
         answer_ids = [opt["id"] for letter, opt in letter_to_opt.items() if letter in correct_letters]
         corrected = save_func(course_id, question["id"], json.dumps(answer_ids), source)
         corrected_data = corrected.get("data")
         if not _check_code_ok(corrected) or not isinstance(corrected_data, dict) or corrected_data.get("isRight") not in (1, "1"):
-            raise RuntimeError("课后题修正后仍未通过，已停止学习")
+            raise RuntimeError("课后题修正后仍未通过，跳过本门课程")
         return False
 
     def record_answer(

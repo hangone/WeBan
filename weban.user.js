@@ -21,6 +21,8 @@
 // @connect      localhost
 // @connect      cdn.jsdelivr.net
 // @connect      raw.githubusercontent.com
+// @connect      gh-proxy.com
+// @connect      ghfast.top
 // @connect      api.deepseek.com
 // @updateURL    https://cdn.jsdelivr.net/gh/hangone/WeBan@main/weban.user.js
 // @downloadURL  https://cdn.jsdelivr.net/gh/hangone/WeBan@main/weban.user.js
@@ -405,6 +407,8 @@
   // 前进控件的语义分类：一次定义，选择器 / 兜底正则 / 分支页判断共用
   const ANSWER_URLS = [
     'https://cdn.jsdelivr.net/gh/hangone/WeBan@main/answer/answer.json',
+    'https://gh-proxy.com/https://raw.githubusercontent.com/hangone/WeBan/main/answer/answer.json',
+    'https://ghfast.top/https://raw.githubusercontent.com/hangone/WeBan/main/answer/answer.json',
     'https://raw.githubusercontent.com/hangone/WeBan/main/answer/answer.json',
   ];
 
