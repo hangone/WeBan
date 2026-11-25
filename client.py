@@ -1,8 +1,6 @@
 import json
 import os
 import re
-import sys
-import threading
 import time
 import webbrowser
 from random import randint
@@ -12,27 +10,22 @@ from uuid import uuid4
 
 from loguru import logger
 
-from api import WeBanAPI
+from api import AccountBlockedError, WeBanAPI
 from captcha import CaptchaHandler, LoginCaptchaSolver, is_non_interactive
-
-if getattr(sys, "frozen", False):
-    base_path = os.path.dirname(os.path.abspath(sys.executable))
-    bundle_path = sys._MEIPASS  # type: ignore[attr-defined]
-else:
-    base_path = os.path.dirname(os.path.abspath(__file__))
-    bundle_path = base_path
+from console import ask
+from paths import (
+    ANSWER_DIR,
+    ANSWER_PATH,
+    BUNDLE_ANSWER_PATH,
+    LOGS_DIR,
+    ROOT_ANSWER_PATH,
+)
 
 # 无交互模式判定复用 captcha.is_non_interactive（ENVIRONMENT=docker / stdin 非 TTY）
 
-# 数据目录模式（main.py --data-dir / WB_DATA_DIR）：answer 也放数据目录，便于挂载持久化
-_data_dir = os.environ.get("WB_DATA_DIR", "")
-if _data_dir:
-    answer_dir = os.path.join(_data_dir, "answer")
-else:
-    answer_dir = os.path.join(base_path, "answer")
-answer_path = os.path.join(answer_dir, "answer.json")
-root_answer_path = os.path.join(_data_dir, "answer.json") if _data_dir else os.path.join(base_path, "answer.json")
-bundle_answer_path = os.path.join(bundle_path, "answer", "answer.json")
+
+class AnswerBankError(RuntimeError):
+    """本地与远程题库均不可用（文件不可读或内容无效）。"""
 
 
 def clean_text(text):
@@ -79,6 +72,31 @@ def read_first_existing(paths: list[str]) -> str | None:
         except OSError:
             continue
     return None
+
+
+def read_text_with_retry(path: str, attempts: int = 3) -> str:
+    """读取文本文件，对瞬时文件锁重试。
+
+    Windows 上杀软扫描刚解压的题库时，open 会报 PermissionError（共享
+    冲突同样是 errno 13），重试几次即可恢复。文件不存在不重试。
+
+    :param path: 文件路径
+    :param attempts: 最大尝试次数
+    :return: 文件文本
+    :raises OSError: 重试后仍不可读，或文件不存在
+    """
+    delays = (0.2, 0.5, 1.0)
+    for attempt in range(attempts):
+        try:
+            with open(path, encoding="utf-8") as f:
+                return f.read()
+        except FileNotFoundError:
+            raise
+        except OSError:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(delays[min(attempt, len(delays) - 1)])
+    raise AssertionError("unreachable")
 
 
 def _check_code_ok(data: dict, allow_200: bool = True) -> bool:
@@ -804,7 +822,7 @@ def _fetch_text(session, url: str, referer: str | None = None) -> str:
         headers["Referer"] = referer
     resp = session.get(url, timeout=10, headers=headers)
     if resp.status_code == 701:
-        raise PermissionError("课程资源请求被限制，已停止学习")
+        raise AccountBlockedError("课程资源请求被限制，已停止学习")
     if resp.status_code != 200 or not resp.text.strip():
         raise RuntimeError(f"课程资源读取失败（HTTP {resp.status_code}），已停止学习")
     return resp.text
@@ -816,8 +834,6 @@ def _fetch_text(session, url: str, referer: str | None = None) -> str:
 
 
 class WeBanClient:
-    _stdin_lock = threading.Lock()
-
     def __init__(
         self,
         tenant_name: str,
@@ -993,43 +1009,52 @@ class WeBanClient:
             self.log.debug(f"问卷列表请求失败（网络异常）：{e}")
 
     def _prompt(self, message: str) -> str:
-        """线程安全的 input 封装，多线程下避免 input 输出交错
+        """读取一行输入，提示显示期间日志缓冲，避免输出交错
         :param message: 提示信息
         :return: 去除首尾空白的用户输入
         """
-        with self._stdin_lock:
-            return input(message).strip()
+        return ask(message).strip()
+
+    @staticmethod
+    def _parse_answers(text: str) -> dict:
+        """解析题库 JSON 为 {clean_text(题目): {clean_text(正确选项), ...}}"""
+        answers: dict = {}
+        for title, options in json.loads(text).items():
+            title = clean_text(title)
+            answers.setdefault(title, set()).update(
+                clean_text(a["content"])
+                for a in options.get("optionList", [])
+                if a["isCorrect"] == 1
+            )
+        return answers
 
     def _load_answers_json(self, warn_on_fail: bool = False) -> dict:
         """加载题库，返回 {clean_text(题目): {clean_text(正确选项), ...}}
 
+        按 根目录 answer.json > answer/answer.json > 打包内置 的顺序尝试，
+        单次读取对瞬时文件锁重试；某个来源不可读或格式错误时继续尝试下一个。
+
         :param warn_on_fail: True 时加载失败只警告不抛异常（学习模式容错），
-            False 时抛出异常（考试模式必须要有题库）
+            False 时抛 AnswerBankError（考试模式必须要有题库）
         :return: 清洗后的题目标题 → 正确答案内容集合的映射
+        :raises AnswerBankError: 所有来源均不可用，且 warn_on_fail 为 False
         """
-        answers: dict = {}
-        # 优先级: 根目录 answer.json > answer/answer.json > 打包内置
-        if os.path.exists(root_answer_path):
-            load_path = root_answer_path
-        elif os.path.exists(answer_path):
-            load_path = answer_path
-        else:
-            load_path = bundle_answer_path
-        try:
-            with open(load_path, encoding="utf-8") as f:
-                for title, options in json.load(f).items():
-                    title = clean_text(title)
-                    answers.setdefault(title, set()).update(
-                        clean_text(a["content"])
-                        for a in options.get("optionList", [])
-                        if a["isCorrect"] == 1
-                    )
-        except Exception:
-            if warn_on_fail:
-                self.log.warning("题库加载失败，课后习题将随机作答")
-            else:
-                raise
-        return answers
+        candidates = [
+            p
+            for p in (ROOT_ANSWER_PATH, ANSWER_PATH, BUNDLE_ANSWER_PATH)
+            if os.path.exists(p)
+        ] or [BUNDLE_ANSWER_PATH]
+        errors: list[str] = []
+        for load_path in candidates:
+            try:
+                return self._parse_answers(read_text_with_retry(load_path))
+            except Exception as e:  # noqa: BLE001 -- 单个来源失败继续尝试下一个
+                errors.append(f"{load_path}: {e}")
+        reason = "；".join(errors)
+        if warn_on_fail:
+            self.log.warning(f"题库加载失败（{reason}），课后习题将随机作答")
+            return {}
+        raise AnswerBankError(f"题库不可用（{reason}）")
 
     @staticmethod
     def get_project_type(project_category: int) -> str:
@@ -1226,7 +1251,7 @@ class WeBanClient:
                 account_id = (
                     self.api.account or self.api.user.get("userId") or "unknown"
                 )
-                captcha_dir = os.path.join(base_path, "logs", account_id)
+                captcha_dir = os.path.join(LOGS_DIR, account_id)
                 os.makedirs(captcha_dir, exist_ok=True)
                 captcha_path = os.path.join(captcha_dir, "verify_code.png")
                 with open(captcha_path, "wb") as f:
@@ -1937,7 +1962,12 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
             question_random_upper = 3
         self.exam_mode = exam_mode
 
-        answers_json = self._load_answers_json()
+        try:
+            answers_json = self._load_answers_json()
+        except AnswerBankError as e:
+            # 考试次数有限，没有题库不用随机答案硬考；课程结果保留
+            self.log.error(f"{e}，已跳过考试")
+            return
 
         if only_project is not None:
             projects = [only_project]
@@ -2806,55 +2836,88 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
             for entry in merged.values()
         }
 
+    def _write_answer_bank(self, text: str) -> None:
+        """把题库写到可写目录；失败只记录，不影响本次运行。"""
+        try:
+            os.makedirs(ANSWER_DIR, exist_ok=True)
+            with open(ANSWER_PATH, "w", encoding="utf-8") as f:
+                f.write(text)
+        except OSError as e:
+            self.log.error(f"题库写入失败（{ANSWER_PATH}）：{e}，本次使用内存题库")
+
+    def _fallback_local_bank(self) -> dict | None:
+        """按 打包内置 > answer/ > 根目录 读取原始题库，全部不可用返回 None
+
+        读到后尽力写回可写目录，下次运行不再依赖内置临时文件。
+        """
+        for path in (BUNDLE_ANSWER_PATH, ANSWER_PATH, ROOT_ANSWER_PATH):
+            try:
+                text = read_text_with_retry(path)
+                data = json.loads(text)
+            except Exception as e:  # noqa: BLE001 -- 换下一个来源
+                self.log.debug(f"本地题库不可用（{path}）：{e}")
+                continue
+            if self._is_valid_answers(data):
+                self._write_answer_bank(text)
+                return data
+            self.log.warning(f"本地题库格式无效（{path}），继续尝试其他来源")
+        return None
+
     def sync_answers(self) -> None:
         """同步答案
         :return: 无返回值
         """
-        os.makedirs(answer_dir, exist_ok=True)
+        try:
+            os.makedirs(ANSWER_DIR, exist_ok=True)
+        except OSError as e:
+            self.log.error(f"题库目录不可用（{ANSWER_DIR}）：{e}，跳过题库同步")
+            return
+
         # 按优先级查找已有题库: 根目录 > answer/ > 打包内置
         existing_path: str | None = None
-        for p in [root_answer_path, answer_path, bundle_answer_path]:
+        for p in (ROOT_ANSWER_PATH, ANSWER_PATH, BUNDLE_ANSWER_PATH):
             if os.path.exists(p):
                 existing_path = p
                 break
         need_download = existing_path is None
 
         answers_json: dict | None = None
-        if not need_download:
-            assert existing_path is not None
+        if existing_path is not None:
             try:
-                with open(existing_path, encoding="utf-8") as f:
-                    answers_json = json.load(f)
+                answers_json = json.loads(read_text_with_retry(existing_path))
+            except Exception:  # noqa: BLE001 -- 读不到或格式错误都转去下载
+                need_download = True
+            else:
                 if not self._is_valid_answers(answers_json):
                     need_download = True
-            except (json.JSONDecodeError, OSError):
-                need_download = True
+                    answers_json = None
 
         if need_download:
-            # 与模板下载同构：远程 jsDelivr 失败后回退打包内置/本地文件兜底
+            # 与模板下载同构：远程下载失败后回退本地文件兜底
             self.log.info("题库不存在或格式错误，正在下载...")
+            remote: str | None = None
             try:
                 remote = self.api.download_answer()
                 self.log.success("题库已从远程下载")
             except Exception as e:  # noqa: BLE001 -- 网络失败不应中断整个账号流程
-                self.log.warning(f"题库下载失败：{e}，回退本地内置题库")
-                remote = read_first_existing(
-                    [bundle_answer_path, answer_path, root_answer_path]
-                )
-                if remote is None:
+                self.log.warning(f"题库下载失败：{e}，回退本地题库")
+            if remote is not None:
+                try:
+                    answers_json = json.loads(remote)
+                except ValueError as e:
+                    self.log.error(f"下载的题库格式无效：{e}")
+                    answers_json = None
+                else:
+                    if self._is_valid_answers(answers_json):
+                        self._write_answer_bank(remote)
+                    else:
+                        self.log.error("下载的题库格式无效，应为非空 JSON 对象")
+                        answers_json = None
+            if answers_json is None:
+                answers_json = self._fallback_local_bank()
+                if answers_json is None:
                     self.log.warning("本地无可用题库，本次跳过题库同步")
                     return
-            with open(answer_path, "w", encoding="utf-8") as f:
-                f.write(remote)
-            try:
-                with open(answer_path, encoding="utf-8") as f:
-                    answers_json = json.load(f)
-            except (json.JSONDecodeError, OSError) as e:
-                self.log.error(f"读取题库失败：{e}")
-                return
-            if not self._is_valid_answers(answers_json):
-                self.log.error("下载的题库格式无效，应为非空 JSON 对象")
-                return
 
         if answers_json is None:
             self.log.error("题库加载失败")
@@ -2963,12 +3026,17 @@ jupiter_fallback=true 时也补翻页轨迹。再答题，最后完课。
         # 与 _load_answers_json 的加载优先级保持一致，避免同步结果不被加载
         write_path = (
             existing_path
-            if existing_path is not None and existing_path != bundle_answer_path
-            else answer_path
+            if existing_path is not None and existing_path != BUNDLE_ANSWER_PATH
+            else ANSWER_PATH
         )
-        os.makedirs(os.path.dirname(write_path), exist_ok=True)
-        with open(write_path, "w", encoding="utf-8") as f:
-            f.write(
-                json.dumps(answers_json, indent=2, ensure_ascii=False, sort_keys=True)
-            )
-            f.write("\n")
+        try:
+            os.makedirs(os.path.dirname(write_path), exist_ok=True)
+            with open(write_path, "w", encoding="utf-8") as f:
+                f.write(
+                    json.dumps(
+                        answers_json, indent=2, ensure_ascii=False, sort_keys=True
+                    )
+                )
+                f.write("\n")
+        except OSError as e:
+            self.log.error(f"题库保存失败（{write_path}）：{e}，本次结果未落盘")

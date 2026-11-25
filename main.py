@@ -71,8 +71,7 @@ _bypass_proxy_for_local_hosts()
 import requests
 from loguru import logger
 
-from captcha import check_browser_health, is_non_interactive
-from client import WeBanClient, read_first_existing
+from console import Stream, ask
 
 # ── 命令行参数与环境变量（优先级：CLI > 环境变量 > 配置文件）────────
 
@@ -282,12 +281,23 @@ def merge_ai_config(opts: argparse.Namespace, ai: dict) -> dict:
 
 # 命令行 > 环境变量 > 自动检测（配置文件在 load_config 后再合并）
 _OPTS, _ = _parse_args()
+# --data-dir 必须在导入 client/paths 之前写回环境变量：题库与日志目录
+# 由 paths 在导入时解析，只认 WB_DATA_DIR
 if _OPTS.data_dir:
-    _data_dir = _OPTS.data_dir
+    os.environ["WB_DATA_DIR"] = os.path.abspath(_OPTS.data_dir)
 elif os.environ.get("WB_DATA_DIR"):
-    _data_dir = os.environ["WB_DATA_DIR"]
-else:
-    _data_dir = None
+    os.environ["WB_DATA_DIR"] = os.path.abspath(os.environ["WB_DATA_DIR"])
+
+from api import AccountBlockedError
+from captcha import check_browser_health, is_non_interactive
+from client import WeBanClient, read_first_existing
+from paths import (
+    APP_DIR,
+    CONFIG_EXAMPLE_CANDIDATES,
+    CONFIG_PATH,
+    LOGS_DIR,
+    USED_FALLBACK,
+)
 
 
 def _detect_non_interactive() -> bool:
@@ -337,26 +347,11 @@ def _resolve_version() -> str:
 
 VERSION = f"v{_resolve_version()}"
 
-if getattr(sys, "frozen", False):
-    base_path = os.path.dirname(os.path.abspath(sys.executable))
-    bundle_path = sys._MEIPASS  # type: ignore[attr-defined]
-else:
-    base_path = os.path.dirname(os.path.abspath(__file__))
-    bundle_path = base_path
-
-if _data_dir:
-    # Docker/数据目录模式：config/logs/answer 全部放数据目录（可挂载持久化）
-    config_path = os.path.join(_data_dir, "config.toml")
-    logs_dir = os.path.join(_data_dir, "logs")
-else:
-    config_path = os.path.join(base_path, "config.toml")
-    logs_dir = os.path.join(base_path, "logs")
-# 模板可能位于: 打包资源目录(_MEIPASS, onefile 解压) / exe 旁 / 源码目录
-# frozen 时 base_path 是 exe 目录而模板在 bundle 里，必须 bundle 优先
-config_example_candidates = [
-    os.path.join(bundle_path, "config.example.toml"),
-    os.path.join(base_path, "config.example.toml"),
-]
+# config/logs/answer 统一由 paths 解析：数据目录优先，程序目录不可写时
+# 自动回退用户数据目录
+config_path = CONFIG_PATH
+logs_dir = LOGS_DIR
+config_example_candidates = list(CONFIG_EXAMPLE_CANDIDATES)
 
 # 本次进程启动时间戳，用于日志文件名区分每次运行（如 20260810-132642）
 run_start_ts = time.strftime("%Y%m%d-%H%M%S")
@@ -396,7 +391,7 @@ log_format = (
 # 终端输出转义为单行并截断超长消息（DEBUG 模式请求/响应详情可能刷屏）；
 # 日志文件使用完整格式，不转义、不截断
 logger.add(
-    sink=sys.stdout,
+    sink=Stream(),
     colorize=True,
     format=_log_format_message,
 )
@@ -488,7 +483,7 @@ def open_editor(path: str):
         logger.warning("无法打开编辑器，请手动编辑上述文件")
     try:
         print("编辑完成后按回车键继续...", flush=True)
-        input()
+        ask()
     except EOFError:  # stdin 关闭（如管道执行）时直接结束
         pass
 
@@ -511,9 +506,9 @@ def prompt_account_interactive() -> dict | None:
     """交互式提示输入学校/用户名/密码，返回账号 dict；输入被中断或未填完整返回 None"""
     print("\n请输入账号信息：")
     try:
-        tenant_name = input("  学校全称（如：北京交通大学）: ").strip()
-        username = input("  用户名（学号）: ").strip()
-        password = input("  密码（默认同用户名）: ").strip()
+        tenant_name = ask("  学校全称（如：北京交通大学）: ").strip()
+        username = ask("  用户名（学号）: ").strip()
+        password = ask("  密码（默认同用户名）: ").strip()
     except (EOFError, KeyboardInterrupt):
         logger.warning("输入被中断")
         return None
@@ -829,8 +824,11 @@ def run_account(
         log.success("执行完成")
         return True
 
+    except AccountBlockedError as e:
+        log.error(f"账号受限: {e}")
+        return False
     except PermissionError as e:
-        log.error(f"权限错误: {e}")
+        log.error(f"文件访问被拒绝: {e}")
         return False
     except RuntimeError as e:
         log.error(f"运行时错误: {e}")
@@ -851,6 +849,8 @@ def run_account(
 if __name__ == "__main__":
     try:
         logger.info(f"程序启动，当前版本：{VERSION}")
+        if USED_FALLBACK:
+            logger.warning(f"程序目录不可写，配置、题库和日志改存：{APP_DIR}")
         _check_update_async()  # 异步检查更新，失败/无新版不阻塞主流程
         logger.info("程序更新地址：https://github.com/hangone/WeBan")
 
@@ -974,7 +974,7 @@ if __name__ == "__main__":
                 or acct.get("tenant_name", "")
             )
             choice = (
-                input(f"当前账号：{acct_name}，是否更换账号？(y/N，默认N): ")
+                ask(f"当前账号：{acct_name}，是否更换账号？(y/N，默认N): ")
                 .strip()
                 .lower()
             )
@@ -1054,7 +1054,7 @@ if __name__ == "__main__":
 
         if len(accounts) > 1 and not NON_INTERACTIVE:
             choice = (
-                input(f"检测到 {len(accounts)} 个账号，是否同时运行？(Y/n，默认Y): ")
+                ask(f"检测到 {len(accounts)} 个账号，是否同时运行？(Y/n，默认Y): ")
                 .strip()
                 .lower()
             )
@@ -1114,6 +1114,6 @@ if __name__ == "__main__":
 
     if not NON_INTERACTIVE:
         try:
-            input("按回车键退出")
+            ask("按回车键退出")
         except EOFError:
             pass

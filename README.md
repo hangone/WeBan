@@ -70,7 +70,7 @@
 
 输入后程序会**自动验证账号**：登录成功就会把账号自动保存到配置文件 `config.toml`，然后开始学习和考试；**如果学校全称或用户名密码错了，会提示你重新输入，不会写坏配置文件**。之后每次运行都会接着上次的进度继续。
 
-> 配置文件 `config.toml` 在程序旁边（Windows 是 exe 所在文件夹，Mac/Linux 是运行命令的目录），下次运行前也可以手动改它。用 `--data-dir` 可以指定固定位置（见下方参数表）。
+> 配置文件 `config.toml` 在程序旁边（Windows 是 exe 所在文件夹，Mac/Linux 是运行命令的目录），下次运行前也可以手动改它。用 `--data-dir` 可以指定固定位置（见下方参数表）。程序目录不可写时（例如 exe 放在 `Program Files`），配置、题库和日志自动改存用户数据目录（Windows `%LOCALAPPDATA%\WeBan`、macOS `~/Library/Application Support/WeBan`、Linux `~/.local/share/weban`），启动日志会打印实际路径。
 
 **不想交互输入？一条命令直接跑**（学校/学号/密码写在命令里，无需配置文件）：
 
@@ -343,6 +343,12 @@ Chrome 自动更新后首次启动需要额外加载与签名校验，健康检�
 
 ![chrome](images/chrome.png)
 ![firefox](images/firefox.png)
+
+- ### 日志报「文件访问被拒绝」或题库读取失败
+
+题库先读本地（根目录 `answer.json` → `answer/answer.json` → 打包内置），本地都不可读时才下载。下载按 jsDelivr、fastly 镜像、raw.githubusercontent 依次尝试。考试阶段拿不到题库会跳过考试并保留课程结果，不再把整个账号记为失败。
+
+Windows 上杀软扫描打包临时目录时可能短暂锁住 `answer.json`，程序会自动重试。持续报错时把 exe 加入杀软白名单，或手动把 `answer.json` 放到 exe 同目录的 `answer\` 下，程序会优先读这份。
 
 - ### 学习
 

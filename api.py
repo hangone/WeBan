@@ -11,6 +11,10 @@ import requests
 from loguru import logger
 
 
+class AccountBlockedError(PermissionError):
+    """账号被限制或登录失效：当前账号停止，其他账号继续。"""
+
+
 def pkcs7_pad(data: bytes, block_size: int = 16) -> bytes:
     pad_len = block_size - (len(data) % block_size)
     return data + bytes([pad_len] * pad_len)
@@ -24,11 +28,11 @@ def _check_http_status(response: requests.Response) -> None:
         message = f"HTTP {response.status_code}"
         if "Account locked" in response.text:
             message += ": Account locked"
-        raise PermissionError(message)
+        raise AccountBlockedError(message)
     if response.status_code == 403:
-        raise PermissionError("Token 无效，不允许同时登录，请重新登录")
+        raise AccountBlockedError("Token 无效，不允许同时登录，请重新登录")
     if response.status_code in (401, 463):
-        raise PermissionError("登录已失效，请按原方式重新登录")
+        raise AccountBlockedError("登录已失效，请按原方式重新登录")
     if response.status_code != 200:
         raise RuntimeError(f"接口请求失败（HTTP {response.status_code}），已停止当前账号")
 
@@ -43,14 +47,14 @@ def _check_account_response(result: Any) -> dict[str, Any]:
         detail = str(payload.get("detailCode", ""))
         messages = (str(payload.get("msg", "")), str(payload.get("message", "")))
         if detail == "-105":
-            raise PermissionError("登录已失效，请按原方式重新登录")
+            raise AccountBlockedError("登录已失效，请按原方式重新登录")
         if detail in {"701", "10018"} or any(
             text in message
             for message in messages
             for text in ("Account locked", "行为存在异常", "学习行为异常")
         ):
             message = payload.get("msg") or payload.get("message") or f"detailCode={detail}"
-            raise PermissionError(message)
+            raise AccountBlockedError(message)
     return wrapped if isinstance(wrapped, dict) else result
 
 
@@ -144,10 +148,12 @@ class WeBanAPI:
         "Referer": MCWK_ORIGIN + "/",
     }
 
-    # 题库下载地址（jsDelivr CDN 稳定；gh-proxy 免费公共代理会限流 403，
-    # github 官方 raw 域名在国内不稳定，均不用）
-    ANSWER_URL = (
-        "https://cdn.jsdelivr.net/gh/hangone/WeBan@main/answer/answer.json"
+    # 题库下载地址：主源不可达时依次换镜像。按域名分别尝试才能绕开
+    # 按域名中断连接的本地软件；不用 gh-proxy（免费公共代理会限流 403）。
+    ANSWER_URLS: ClassVar[tuple[str, ...]] = (
+        "https://cdn.jsdelivr.net/gh/hangone/WeBan@main/answer/answer.json",
+        "https://fastly.jsdelivr.net/gh/hangone/WeBan@main/answer/answer.json",
+        "https://raw.githubusercontent.com/hangone/WeBan/main/answer/answer.json",
     )
 
     def __init__(
@@ -1405,7 +1411,11 @@ class WeBanAPI:
     # ========================================================================
 
     def download_answer(self) -> str:
-        """下载最新题库
+        """下载最新题库，按镜像顺序尝试，每个镜像重试一次。
+
+        用独立的 requests.get 而不是 self.session，避免把账号 X-Token
+        发给第三方 CDN。
+
         :return: 题库 JSON 字符串
         {
           "(       )是麻醉诱导常用的药物之一。": {
@@ -1418,10 +1428,26 @@ class WeBanAPI:
             "type": 1
           }
         }
+        :raises RuntimeError: 所有镜像均失败
         """
-        resp = self.session.get(self.ANSWER_URL, timeout=self.timeout)
-        resp.raise_for_status()
-        return resp.text
+        last_error: Exception | None = None
+        for url in self.ANSWER_URLS:
+            for attempt in range(2):
+                try:
+                    resp = requests.get(
+                        url,
+                        timeout=self.timeout,
+                        headers={"User-Agent": self.session.headers.get("User-Agent", "")},
+                    )
+                    resp.raise_for_status()
+                    if not isinstance(json.loads(resp.text), dict):
+                        raise TypeError("题库格式无效：顶层不是 JSON 对象")
+                    return resp.text
+                except (requests.RequestException, ValueError, TypeError) as e:
+                    last_error = e
+                    if attempt == 0:
+                        time.sleep(0.5)
+        raise RuntimeError(f"题库下载失败：{last_error}") from last_error
 
     def apinext(
         self,
