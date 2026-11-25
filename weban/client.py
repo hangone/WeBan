@@ -10,9 +10,9 @@ from uuid import uuid4
 
 from loguru import logger
 
-from api import AccountBlockedError, WeBanAPI
-from captcha import CaptchaHandler, LoginCaptchaSolver, is_non_interactive
-from utils import (
+from weban.api import AccountBlockedError, WeBanAPI
+from weban.captcha import CaptchaHandler, LoginCaptchaSolver, is_non_interactive
+from weban.utils import (
     ANSWER_DIR,
     ANSWER_PATH,
     BUNDLE_ANSWER_PATH,

@@ -279,17 +279,17 @@ def merge_ai_config(opts: argparse.Namespace, ai: dict) -> dict:
 
 # 命令行 > 环境变量 > 自动检测（配置文件在 load_config 后再合并）
 _OPTS, _ = _parse_args()
-# --data-dir 必须在导入 client/paths 之前写回环境变量：题库与日志目录
-# 由 paths 在导入时解析，只认 WB_DATA_DIR
+# --data-dir 必须在导入 client/utils 之前写回环境变量：题库与日志目录
+# 由 utils 在导入时解析，只认 WB_DATA_DIR
 if _OPTS.data_dir:
     os.environ["WB_DATA_DIR"] = os.path.abspath(_OPTS.data_dir)
 elif os.environ.get("WB_DATA_DIR"):
     os.environ["WB_DATA_DIR"] = os.path.abspath(os.environ["WB_DATA_DIR"])
 
-from api import AccountBlockedError
-from captcha import check_browser_health, is_non_interactive
-from client import WeBanClient, read_first_existing
-from utils import (
+from weban.api import AccountBlockedError
+from weban.captcha import check_browser_health, is_non_interactive
+from weban.client import WeBanClient, read_first_existing
+from weban.utils import (
     APP_DIR,
     CONFIG_EXAMPLE_CANDIDATES,
     CONFIG_PATH,
@@ -326,7 +326,8 @@ def _resolve_version() -> str:
         bundle = getattr(sys, "_MEIPASS", None)
         if bundle:
             candidates.append(os.path.join(bundle, "pyproject.toml"))
-    candidates.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "pyproject.toml"))
+    package_dir = os.path.dirname(os.path.abspath(__file__))
+    candidates.append(os.path.join(os.path.dirname(package_dir), "pyproject.toml"))
 
     for path in candidates:
         try:
@@ -844,7 +845,7 @@ def run_account(
 
 # ── 入口 ────────────────────────────────────────────────────
 
-if __name__ == "__main__":
+def main() -> None:
     try:
         logger.info(f"程序启动，当前版本：{VERSION}")
         if USED_FALLBACK:
@@ -1115,3 +1116,7 @@ if __name__ == "__main__":
             ask("按回车键退出")
         except EOFError:
             pass
+
+
+if __name__ == "__main__":
+    main()

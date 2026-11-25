@@ -22,16 +22,17 @@ assert n==1, 'version field not found'; open(p,'w',encoding='utf-8').write(s2)" 
     fi
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --no-install-project
+    uv sync --no-dev --no-install-project
 
-COPY *.py captcha_model.onnx config.example.toml ./
+COPY weban/ weban/
+COPY config.example.toml ./
 COPY answer/ answer/
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv run pyinstaller --noconfirm --onefile \
     --name WeBan \
-    --add-data "captcha_model.onnx:." \
-    --add-data "answer/answer.json:answer/answer.json" \
+    --add-data "weban/data/captcha_model.onnx:weban/data" \
+    --add-data "answer/answer.json:answer" \
     --add-data "config.example.toml:." \
     --add-data "pyproject.toml:." \
     --hidden-import nodriver \
@@ -39,7 +40,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --hidden-import numpy \
     --hidden-import cv2 \
     --collect-submodules nodriver \
-    main.py \
+    --paths . \
+    weban/__main__.py \
     && strip dist/WeBan
 
 # ── without-browser: 纯二进制，CDP 连接宿主机浏览器 ────────
@@ -59,7 +61,7 @@ ENTRYPOINT ["/app/WeBan"]
 FROM chromedp/headless-shell:stable AS with-browser
 
 COPY --from=builder /build/dist/WeBan /app/WeBan
-COPY entrypoint.sh /app/entrypoint.sh
+COPY docker/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 WORKDIR /app
 

@@ -100,8 +100,8 @@ jobs:
           sep=$(python -c "import os; print(os.pathsep)")
           uv run pyinstaller --noconfirm --onefile \
             --name "$name" \
-            --add-data "captcha_model.onnx${sep}." \
-            --add-data "answer/answer.json${sep}answer/answer.json" \
+            --add-data "weban/data/captcha_model.onnx${sep}weban/data" \
+            --add-data "answer/answer.json${sep}answer" \
             --add-data "config.example.toml${sep}." \
             --add-data "pyproject.toml${sep}." \
             --hidden-import nodriver \
@@ -109,7 +109,8 @@ jobs:
             --hidden-import numpy \
             --hidden-import cv2 \
             --collect-submodules nodriver \
-            main.py
+            --paths . \
+            weban/__main__.py
 
           echo "name=$name" >> "$GITHUB_ENV"
 
@@ -149,7 +150,7 @@ jobs:
         id: build
         with:
           context: .
-          file: Dockerfile
+          file: docker/Dockerfile
           target: ${{ matrix.variant }}
           platforms: ${{ matrix.platform }}
           build-args: |

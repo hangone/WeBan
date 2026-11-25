@@ -35,6 +35,7 @@ import logging
 import os
 import re
 import socket
+import sys
 import threading
 import time
 from dataclasses import dataclass
@@ -45,9 +46,12 @@ from urllib.parse import urlparse
 
 import numpy as np
 
-from captcha import LoginCaptchaSolver, detect_points
+from weban.captcha import LoginCaptchaSolver, detect_points
 
-ANSWER_FILE = Path(__file__).parent / "answer" / "answer.json"
+if getattr(sys, "frozen", False):
+    ANSWER_FILE = Path(sys._MEIPASS) / "answer" / "answer.json"
+else:
+    ANSWER_FILE = Path(__file__).parent.parent / "answer" / "answer.json"
 
 # ── 配置 ────────────────────────────────────────────────
 

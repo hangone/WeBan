@@ -146,16 +146,16 @@ git clone --depth 1 https://github.com/hangone/WeBan
 3. 安装依赖
 
 ```bash
-pip install -r requirements.txt # 或 uv sync
+uv sync # 或 pip install .
 ```
 
 4. 运行
 
 ```bash
-python main.py # 或 uv run main.py
+uv run weban # 或 python -m weban
 ```
 
-运行 `python main.py --help` 可查看全部参数。
+运行 `python -m weban --help` 可查看全部参数。
 
 ### Docker
 
@@ -300,14 +300,14 @@ docker run --rm \
 - 页面报错会 `alert`（如重复完课提示"发送完成失败"），脚本已拦截并转为日志，不会卡死
 - 已完成课程重复学习时，服务端会拒绝完课，脚本会提示但不算成功
 
-## 辅助服务 server.py（可选）
+## 辅助服务 weban.server
 
-[`server.py`](server.py) 提供**题库查询**和**验证码识别**，脚本不配也能跑（只是题库外的题随机、验证码要手点）。
+[`weban/server.py`](weban/server.py) 提供**题库查询**和**验证码识别**，脚本不配也能跑，题库外的题随机、验证码要手点。
 
 ```bash
-python server.py                          # 127.0.0.1:8765，无鉴权
-WB_TOKEN=随机串 python server.py            # 开鉴权
-python server.py --host 0.0.0.0 --token 随机串   # 对外，必须带 token
+python -m weban.server                          # 127.0.0.1:8765，无鉴权
+WB_TOKEN=随机串 python -m weban.server            # 开鉴权
+python -m weban.server --host 0.0.0.0 --token 随机串   # 对外，必须带 token
 ```
 
 | 接口 | 作用 |

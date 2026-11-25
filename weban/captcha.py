@@ -579,9 +579,9 @@ class LoginCaptchaSolver:
                 if not cls._initialized:
                     try:
                         if getattr(sys, "frozen", False):
-                            model_path = Path(sys._MEIPASS) / "captcha_model.onnx"  # type: ignore[attr-defined]
+                            model_path = Path(sys._MEIPASS) / "weban" / "data" / "captcha_model.onnx"  # type: ignore[attr-defined]
                         else:
-                            model_path = Path(__file__).parent / "captcha_model.onnx"
+                            model_path = Path(__file__).parent / "data" / "captcha_model.onnx"
 
                         if not model_path.exists():
                             log.warning(f"验证码模型文件不存在: {model_path}")

@@ -26,11 +26,14 @@ def _is_frozen() -> bool:
     return bool(getattr(sys, "frozen", False))
 
 
+PACKAGE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
 def _program_dir() -> str:
     """源码运行时为项目目录，打包后为 exe 所在目录。"""
     if _is_frozen():
         return os.path.dirname(os.path.abspath(sys.executable))
-    return os.path.dirname(os.path.abspath(__file__))
+    return os.path.dirname(PACKAGE_DIR)
 
 
 BASE_DIR = _program_dir()
