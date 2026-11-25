@@ -347,8 +347,6 @@ def _resolve_version() -> str:
 
 VERSION = f"v{_resolve_version()}"
 
-# config/logs/answer 统一由 paths 解析：数据目录优先，程序目录不可写时
-# 自动回退用户数据目录
 config_path = CONFIG_PATH
 logs_dir = LOGS_DIR
 config_example_candidates = list(CONFIG_EXAMPLE_CANDIDATES)
