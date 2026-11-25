@@ -149,10 +149,13 @@ class WeBanAPI:
     }
 
     # 题库下载地址：主源不可达时依次换镜像。按域名分别尝试才能绕开
-    # 按域名中断连接的本地软件；不用 gh-proxy（免费公共代理会限流 403）。
+    # 按域名中断连接的本地软件；raw.githubusercontent 国内直连不通，
+    # 排在两个 GitHub 代理之后兜底。
     ANSWER_URLS: ClassVar[tuple[str, ...]] = (
         "https://cdn.jsdelivr.net/gh/hangone/WeBan@main/answer/answer.json",
         "https://fastly.jsdelivr.net/gh/hangone/WeBan@main/answer/answer.json",
+        "https://gh-proxy.com/https://raw.githubusercontent.com/hangone/WeBan/main/answer/answer.json",
+        "https://ghfast.top/https://raw.githubusercontent.com/hangone/WeBan/main/answer/answer.json",
         "https://raw.githubusercontent.com/hangone/WeBan/main/answer/answer.json",
     )
 

@@ -372,10 +372,13 @@ def _log_format_message(record) -> str:
     # 必须显式加 \n，否则终端所有日志挤在一行
     return log_format + "\n"  # loguru 会基于修改后的 record 替换占位符
 
-# 远程模板下载地址（jsDelivr CDN 稳定；gh-proxy 免费公共代理会限流 403，
-# github 官方 raw 域名在国内不稳定，均不用）
-CONFIG_EXAMPLE_URL = (
-    "https://cdn.jsdelivr.net/gh/hangone/WeBan@main/config.example.toml"
+# 远程模板下载地址：jsDelivr 与 GitHub 代理依次尝试。gh-proxy 免费
+# 公共代理会限流 403，只在前面几个源都失败时才走到。
+CONFIG_EXAMPLE_URLS = (
+    "https://cdn.jsdelivr.net/gh/hangone/WeBan@main/config.example.toml",
+    "https://fastly.jsdelivr.net/gh/hangone/WeBan@main/config.example.toml",
+    "https://gh-proxy.com/https://raw.githubusercontent.com/hangone/WeBan/main/config.example.toml",
+    "https://ghfast.top/https://raw.githubusercontent.com/hangone/WeBan/main/config.example.toml",
 )
 
 # ── 日志 ──
@@ -419,40 +422,76 @@ def _parse_version(text: str) -> tuple[int, ...]:
     return tuple(int(part) for part in re.findall(r"\d+", text or ""))
 
 
+def _fetch_latest_release() -> tuple[str, str] | None:
+    """获取最新 Release 的 (tag, 发布页 URL)，全部源失败返回 None。
+
+    直连 api.github.com 在国内经常超时：gh-proxy 支持代理 API，ghfast
+    不代理 API，改用 releases/latest 的 302 跳转取 tag。
+    """
+    api_url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "User-Agent": f"WeBan/{VERSION}",
+    }
+    for name, url in (
+        ("GitHub", api_url),
+        ("gh-proxy.com", f"https://gh-proxy.com/{api_url}"),
+    ):
+        try:
+            resp = requests.get(url, headers=headers, timeout=UPDATE_CHECK_TIMEOUT)
+        except requests.RequestException as e:
+            logger.debug(f"更新检查：{name} 失败（{e}）")
+            continue
+        if resp.status_code != 200:
+            logger.debug(f"更新检查：{name} 返回 HTTP {resp.status_code}")
+            continue
+        try:
+            data = resp.json()
+        except ValueError as e:
+            logger.debug(f"更新检查：{name} 响应解析失败（{e}）")
+            continue
+        tag = data.get("tag_name") if isinstance(data, dict) else ""
+        if not tag:
+            logger.debug(f"更新检查：{name} 响应缺少 tag_name")
+            continue
+        return tag, data.get("html_url") or (
+            f"https://github.com/{GITHUB_REPO}/releases/tag/{tag}"
+        )
+
+    page_url = f"https://ghfast.top/https://github.com/{GITHUB_REPO}/releases/latest"
+    try:
+        resp = requests.get(
+            page_url,
+            headers={"User-Agent": f"WeBan/{VERSION}"},
+            timeout=UPDATE_CHECK_TIMEOUT,
+            allow_redirects=False,
+        )
+        match = re.search(
+            r"/releases/tag/([^/?#]+)", resp.headers.get("Location", "")
+        )
+        if match:
+            tag = match.group(1)
+            return tag, f"https://github.com/{GITHUB_REPO}/releases/tag/{tag}"
+        logger.debug(
+            f"更新检查：ghfast.top 返回 HTTP {resp.status_code}，未跳转到标签页"
+        )
+    except requests.RequestException as e:
+        logger.debug(f"更新检查：ghfast.top 失败（{e}）")
+    return None
+
+
 def _run_update_check() -> None:
     """执行一次 GitHub 最新 Release 检查并输出结果（同步实现）。
 
     有新版 → WARNING 提示下载地址；无新版 → DEBUG；
-    网络/HTTP/解析失败 → WARNING 说明原因并跳过（不重试、不阻塞）。
+    GitHub 与镜像全部失败 → WARNING 说明并跳过（不重试、不阻塞）。
     """
-    try:
-        resp = requests.get(
-            f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest",
-            headers={
-                "Accept": "application/vnd.github+json",
-                "User-Agent": f"WeBan/{VERSION}",
-            },
-            timeout=UPDATE_CHECK_TIMEOUT,
-        )
-    except requests.RequestException as e:
-        logger.warning(f"检查更新失败（网络异常）：{e}，已跳过")
+    release = _fetch_latest_release()
+    if release is None:
+        logger.warning("检查更新失败（GitHub 及镜像均不可用），已跳过")
         return
-    if resp.status_code != 200:
-        logger.warning(f"检查更新失败：GitHub API 返回 {resp.status_code}，已跳过")
-        return
-    try:
-        data = resp.json()
-        if not isinstance(data, dict):
-            logger.warning("检查更新失败：响应格式异常，已跳过")
-            return
-    except ValueError:
-        logger.warning("检查更新失败：响应解析异常，已跳过")
-        return
-    latest = data.get("tag_name") or ""
+    latest, latest_url = release
     if _parse_version(latest) > _parse_version(VERSION):
-        latest_url = data.get("html_url") or (
-            f"https://github.com/{GITHUB_REPO}/releases/latest"
-        )
         logger.warning(
             f"发现新版本 {latest}（当前 {VERSION}），请前往 {latest_url} 下载更新"
         )
@@ -579,18 +618,26 @@ def load_config() -> dict:
             return {"settings": {}, "ai": {}, "account": []}
         logger.info("config.toml 不存在，正在下载远程模板...")
         downloaded = False
-        try:
-            resp = requests.get(CONFIG_EXAMPLE_URL, timeout=30)
-            resp.raise_for_status()
-            os.makedirs(os.path.dirname(config_path), exist_ok=True)
-            with open(config_path, "w", encoding="utf-8") as f:
-                f.write(resp.text)
-            logger.success(f"远程模板已下载到 {config_path}")
-            downloaded = True
-        except OSError as e:
-            logger.warning(f"下载远程模板失败 ({CONFIG_EXAMPLE_URL}): {e}")
+        for url in CONFIG_EXAMPLE_URLS:
+            try:
+                resp = requests.get(url, timeout=30)
+                resp.raise_for_status()
+                try:
+                    tomllib.loads(resp.text)
+                except ValueError as e:
+                    logger.debug(f"远程模板内容无效 ({url}): {e}")
+                    continue
+                os.makedirs(os.path.dirname(config_path), exist_ok=True)
+                with open(config_path, "w", encoding="utf-8") as f:
+                    f.write(resp.text)
+                logger.success(f"远程模板已下载到 {config_path}")
+                downloaded = True
+                break
+            except OSError as e:
+                logger.debug(f"下载远程模板失败 ({url}): {e}")
 
         if not downloaded:
+            logger.warning("下载远程模板失败（所有源均不可用），尝试本地模板")
             local_template = read_first_existing(config_example_candidates)
             if local_template is not None:
                 os.makedirs(os.path.dirname(config_path), exist_ok=True)
@@ -693,7 +740,7 @@ def run_account(
         cli_or_env(
             "video_speed",
             _OPTS.video_speed,
-            get_setting("video_speed", 1),
+            get_setting("video_speed", 2),
         )
     )
     exam_question_time = cli_or_env(
