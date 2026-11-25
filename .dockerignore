@@ -11,4 +11,5 @@ dist
 build
 images
 *.md
+!README.md
 LICENSE

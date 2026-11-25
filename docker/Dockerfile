@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends binutils \
 WORKDIR /build
 
 ARG APP_VERSION
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml uv.lock README.md ./
 RUN if [ -n "$APP_VERSION" ]; then \
       python -c "import re,sys; \
 p='pyproject.toml'; s=open(p,encoding='utf-8').read(); \

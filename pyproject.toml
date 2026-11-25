@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "loguru>=0.7.3",
-    "nodriver>=0.50.3",
+    "nodriver>=0.50.99",
     "numpy>=2.5.5",
     "opencv-python-headless==4.10.0.84",
     "pyaes>=1.6.1",
