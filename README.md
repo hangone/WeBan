@@ -132,29 +132,30 @@ WB_STUDY_TIME="20,5" WB_VIDEO_SPEED=0 ./WeBan-macos-arm64
 
 ### 源码运行
 
-不需要代码基础的用户**跳过本节**（直接下载二进制即可）。开发者/想改代码时用：
+不需要代码基础的用户跳过本节，直接下载二进制即可。开发者或想改代码时用：
 
-1. 安装 Python 3（建议使用 [uv](https://github.com/astral-sh/uv)）和 Git
+1. 安装 [uv](https://github.com/astral-sh/uv) 和 Git。项目需要 Python 3.14，uv 会按 `.python-version` 自动装好。
 
-2. 克隆本仓库
+2. 克隆仓库并进入目录
 
 ```bash
 git clone --depth 1 https://github.com/hangone/WeBan
+cd WeBan
 ```
 
 3. 安装依赖
 
 ```bash
-uv sync # 或 pip install .
+uv sync
 ```
 
 4. 运行
 
 ```bash
-uv run weban # 或 python -m weban
+uv run weban
 ```
 
-运行 `python -m weban --help` 可查看全部参数。
+`uv run weban --help` 可查看全部参数。
 
 ### Docker
 
@@ -304,9 +305,9 @@ docker run --rm \
 [`weban/server.py`](weban/server.py) 提供**题库查询**和**验证码识别**，脚本不配也能跑，题库外的题随机、验证码要手点。
 
 ```bash
-python -m weban.server                          # 127.0.0.1:8765，无鉴权
-WB_TOKEN=随机串 python -m weban.server            # 开鉴权
-python -m weban.server --host 0.0.0.0 --token 随机串   # 对外，必须带 token
+uv run python -m weban.server                          # 127.0.0.1:8765，无鉴权
+WB_TOKEN=随机串 uv run python -m weban.server            # 开鉴权
+uv run python -m weban.server --host 0.0.0.0 --token 随机串   # 对外，必须带 token
 ```
 
 | 接口 | 作用 |
