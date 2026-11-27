@@ -39,6 +39,10 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --hidden-import loguru \
     --hidden-import numpy \
     --hidden-import cv2 \
+    --hidden-import pypdf \
+    --hidden-import docx \
+    --hidden-import pptx \
+    --hidden-import openpyxl \
     --collect-submodules nodriver \
     --paths . \
     weban/__main__.py \
