@@ -13,8 +13,12 @@ dependencies = [
     "nodriver>=0.50.99",
     "numpy>=2.5.5",
     "opencv-python-headless==4.10.0.84",
+    "openpyxl>=3.1.5",
     "pyaes>=1.6.1",
+    "pypdf>=5.0.0",
     "PySocks>=1.7.1",
+    "python-docx>=1.1.2",
+    "python-pptx>=1.0.2",
     "requests>=2.34.2",
 ]
 

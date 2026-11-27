@@ -185,6 +185,27 @@ def _parse_args() -> tuple[argparse.Namespace, list[str]]:
         help="允许交卷的最低题库匹配率（百分比，覆盖配置文件）",
     )
     parser.add_argument(
+        "--exam-ui",
+        choices=["true", "false"],
+        help="是否启用交互式考试核对页面：自动答题、键鼠纠正且绝不自动提交（覆盖配置文件）",
+    )
+    parser.add_argument(
+        "--exam-ui-port",
+        type=int,
+        metavar="PORT",
+        help="交互式考试页面监听端口（默认 0 自动分配可用端口，覆盖配置文件）",
+    )
+    parser.add_argument(
+        "--exam-ui-demo",
+        action="store_true",
+        help="启动交互式考试页面演示模式（默认调用你配置的真实 AI 接口与 knowledge/ 文档，配合 --mock 可切离线假数据）",
+    )
+    parser.add_argument(
+        "--mock",
+        action="store_true",
+        help="配合 --exam-ui-demo 使用离线模拟 AI 响应（不发送真实 API 请求）",
+    )
+    parser.add_argument(
         "--browser-path",
         metavar="PATH",
         help="浏览器可执行文件路径（覆盖配置文件）",
@@ -231,6 +252,11 @@ def _parse_args() -> tuple[argparse.Namespace, list[str]]:
         help="AI 模型名称（覆盖配置文件 [ai].model）",
     )
     parser.add_argument(
+        "--ai-api-mode",
+        choices=["auto", "responses", "chat"],
+        help="AI 接口协议：auto=优先 /responses 不支持自动回退 /chat/completions（覆盖配置文件 [ai].api_mode）",
+    )
+    parser.add_argument(
         "--ai-timeout",
         type=int,
         metavar="SEC",
@@ -242,6 +268,43 @@ def _parse_args() -> tuple[argparse.Namespace, list[str]]:
         metavar="N",
         help="AI 请求失败最大重试次数（覆盖配置文件 [ai].max_retries）",
     )
+    parser.add_argument(
+        "--ai-reasoning-effort",
+        metavar="LEVEL",
+        help="AI 思考强度，按 OpenAI 标准传给 reasoning_effort（如 none/low/medium/high/xhigh，覆盖配置文件 [ai].reasoning_effort）",
+    )
+    parser.add_argument(
+        "--ai-stream",
+        choices=["true", "false"],
+        help="是否启用 AI 流式传输（覆盖配置文件 [ai].stream）",
+    )
+    parser.add_argument(
+        "--ai-show-thinking",
+        choices=["true", "false"],
+        help="是否显示 AI 思考过程（覆盖配置文件 [ai].show_thinking）",
+    )
+    parser.add_argument(
+        "--ai-knowledge-enable",
+        choices=["true", "false"],
+        help="是否启用参考文档知识库（覆盖配置文件 [ai].knowledge_enable）",
+    )
+    parser.add_argument(
+        "--ai-knowledge-paths",
+        metavar="PATHS",
+        help="参考文档文件或目录路径，多个用分号或逗号分隔（覆盖配置文件 [ai].knowledge_paths）",
+    )
+    parser.add_argument(
+        "--ai-knowledge-max-chars",
+        type=int,
+        metavar="N",
+        help="参考知识库全文注入阈值及最大上下文字符数（覆盖配置文件 [ai].knowledge_max_chars）",
+    )
+    parser.add_argument(
+        "--ai-knowledge-top-k",
+        type=int,
+        metavar="N",
+        help="参考知识库超出阈值时 BM25 召回的最大片段数（覆盖配置文件 [ai].knowledge_top_k）",
+    )
     opts, unknown = parser.parse_known_args()
     return opts, unknown
 
@@ -252,28 +315,37 @@ def merge_ai_config(opts: argparse.Namespace, ai: dict) -> dict:
     未通过 CLI/env 指定的字段保留配置文件原值。
     """
     merged = dict(ai)
+    bool_keys = {"enable", "stream", "show_thinking", "knowledge_enable"}
+    int_keys = {"timeout", "max_retries", "knowledge_max_chars", "knowledge_top_k"}
     cli_map = {
         "enable": opts.ai_enable,
         "base_url": opts.ai_base_url,
         "api_key": opts.ai_api_key,
         "model": opts.ai_model,
+        "api_mode": opts.ai_api_mode,
         "timeout": opts.ai_timeout,
         "max_retries": opts.ai_max_retries,
+        "reasoning_effort": opts.ai_reasoning_effort,
+        "stream": opts.ai_stream,
+        "show_thinking": opts.ai_show_thinking,
+        "knowledge_enable": opts.ai_knowledge_enable,
+        "knowledge_paths": opts.ai_knowledge_paths,
+        "knowledge_max_chars": opts.ai_knowledge_max_chars,
+        "knowledge_top_k": opts.ai_knowledge_top_k,
     }
     for key, cli_val in cli_map.items():
         env_val = os.environ.get(f"WB_AI_{key.upper()}")
-        if cli_val is not None:
-            merged[key] = (
-                str(cli_val).strip().lower() in ("1", "true", "yes")
-                if key == "enable"
-                else cli_val
-            )
-        elif env_val is not None:
-            merged[key] = (
-                env_val.strip().lower() in ("1", "true", "yes")
-                if key == "enable"
-                else env_val
-            )
+        raw_val = cli_val if cli_val is not None else env_val
+        if raw_val is None:
+            continue
+        if key in bool_keys:
+            merged[key] = parse_bool(raw_val)
+        elif key in int_keys:
+            merged[key] = int(raw_val)
+        elif key == "knowledge_paths":
+            merged[key] = parse_knowledge_paths(raw_val)
+        else:
+            merged[key] = raw_val
     return merged
 
 
@@ -286,13 +358,18 @@ if _OPTS.data_dir:
 elif os.environ.get("WB_DATA_DIR"):
     os.environ["WB_DATA_DIR"] = os.path.abspath(os.environ["WB_DATA_DIR"])
 
+from weban.ai_client import parse_bool
 from weban.api import AccountBlockedError
 from weban.captcha import check_browser_health, is_non_interactive
 from weban.client import WeBanClient, read_first_existing
+from weban.exam_ui import run_demo_exam_ui
+from weban.knowledge import parse_knowledge_paths
 from weban.utils import (
     APP_DIR,
+    BASE_DIR,
     CONFIG_EXAMPLE_CANDIDATES,
     CONFIG_PATH,
+    DATA_DIR,
     LOGS_DIR,
     USED_FALLBACK,
     Stream,
@@ -348,7 +425,8 @@ def _resolve_version() -> str:
 
 VERSION = f"v{_resolve_version()}"
 
-config_path = CONFIG_PATH
+_cli_config = _OPTS.config or os.environ.get("WB_CONFIG", "").strip() or None
+config_path = _cli_config or CONFIG_PATH
 logs_dir = LOGS_DIR
 config_example_candidates = list(CONFIG_EXAMPLE_CANDIDATES)
 
@@ -391,11 +469,12 @@ log_format = (
     "<cyan>{message}</cyan>"
 )
 # 终端输出转义为单行并截断超长消息（DEBUG 模式请求/响应详情可能刷屏）；
-# 日志文件使用完整格式，不转义、不截断
+# 标记 file_only=True 的日志（如已流式展示过的思考摘要）仅写入日志文件
 logger.add(
     sink=Stream(),
     colorize=True,
     format=_log_format_message,
+    filter=lambda record: not record["extra"].get("file_only"),
 )
 
 os.makedirs(logs_dir, exist_ok=True)
@@ -627,7 +706,7 @@ def load_config() -> dict:
                 except ValueError as e:
                     logger.debug(f"远程模板内容无效 ({url}): {e}")
                     continue
-                os.makedirs(os.path.dirname(config_path), exist_ok=True)
+                os.makedirs(os.path.dirname(config_path) or ".", exist_ok=True)
                 with open(config_path, "w", encoding="utf-8") as f:
                     f.write(resp.text)
                 logger.success(f"远程模板已下载到 {config_path}")
@@ -640,7 +719,7 @@ def load_config() -> dict:
             logger.warning("下载远程模板失败（所有源均不可用），尝试本地模板")
             local_template = read_first_existing(config_example_candidates)
             if local_template is not None:
-                os.makedirs(os.path.dirname(config_path), exist_ok=True)
+                os.makedirs(os.path.dirname(config_path) or ".", exist_ok=True)
                 with open(config_path, "w", encoding="utf-8") as f:
                     f.write(local_template)
                 logger.success(f"已从本地模板创建 {config_path}")
@@ -753,6 +832,20 @@ def run_account(
             get_setting("exam_submit_match_rate", 90),
         )
     )
+    exam_ui_raw = cli_or_env(
+        "exam_ui",
+        _OPTS.exam_ui,
+        get_setting("exam_ui", True),
+    )
+    exam_ui = False if NON_INTERACTIVE else parse_bool(exam_ui_raw, default=True)
+    exam_ui_port = int(
+        cli_or_env(
+            "exam_ui_port",
+            _OPTS.exam_ui_port,
+            get_setting("exam_ui_port", 0),
+        )
+        or 0
+    )
     browser_path = (
         _OPTS.browser_path
         or os.environ.get("WB_BROWSER_PATH", "").strip()
@@ -816,6 +909,9 @@ def run_account(
                 ai_config=ai_config,
                 video_speed=video_speed,
                 jupiter_fallback=jupiter_fallback,
+                data_dir=DATA_DIR or None,
+                exam_ui=exam_ui,
+                exam_ui_port=exam_ui_port,
             )
         elif tenant_name and username:
             # 密码登录 — password 默认为 username
@@ -832,6 +928,9 @@ def run_account(
                 ai_config=ai_config,
                 video_speed=video_speed,
                 jupiter_fallback=jupiter_fallback,
+                data_dir=DATA_DIR or None,
+                exam_ui=exam_ui,
+                exam_ui_port=exam_ui_port,
             )
         else:
             log.error(
@@ -897,8 +996,43 @@ def main() -> None:
         logger.info(f"程序启动，当前版本：{VERSION}")
         if USED_FALLBACK:
             logger.warning(f"程序目录不可写，配置、题库和日志改存：{APP_DIR}")
+        if _OPTS.exam_ui_demo:
+            demo_ai_cfg: dict = {}
+            if os.path.exists(config_path):
+                try:
+                    with open(config_path, "rb") as f:
+                        demo_ai_cfg = tomllib.load(f).get("ai", {})
+                    logger.info(f"已加载配置文件：{config_path}")
+                except tomllib.TOMLDecodeError as e:
+                    logger.error(
+                        f"配置文件语法错误（{config_path}）：{e}。"
+                        "提示：Windows 路径请用单引号 'D:\\...' 或正斜杠 \"D:/...\""
+                    )
+                    sys.exit(1)
+                except OSError as e:
+                    logger.error(f"读取配置文件失败（{config_path}）：{e}")
+                    sys.exit(1)
+            else:
+                logger.warning(f"未找到配置文件：{config_path}，当前使用 CLI/环境变量或默认 AI 配置")
+            demo_ai_cfg = merge_ai_config(_OPTS, demo_ai_cfg)
+            demo_port = int(
+                _OPTS.exam_ui_port
+                if _OPTS.exam_ui_port is not None
+                else os.environ.get("WB_EXAM_UI_PORT", "0") or 0
+            )
+            outcome = run_demo_exam_ui(
+                ai_config=demo_ai_cfg,
+                base_path=BASE_DIR,
+                data_dir=DATA_DIR or (APP_DIR if USED_FALLBACK else None),
+                port=demo_port,
+                open_browser=not NON_INTERACTIVE,
+                use_mock=bool(_OPTS.mock),
+                log=logger,
+            )
+            logger.info(f"演示模式结束：{outcome.get('action')}")
+            sys.exit(0)
         _check_update_async()  # 异步检查更新，失败/无新版不阻塞主流程
-        logger.info("程序更新地址：https://github.com/hangone/WeBan")
+        logger.info(f"程序更新地址：https://github.com/{GITHUB_REPO}")
 
         # 加载配置文件
         def load_all_config():
@@ -910,6 +1044,7 @@ def main() -> None:
             )
 
         global_settings, ai_config, accounts = load_all_config()
+        ai_config = merge_ai_config(_OPTS, ai_config)
 
         # 命令行/环境变量直传单账号（免配置文件，如 Docker 单用户）：
         # --tenant-name + --username [--password] 或 WB_TENANT_NAME + WB_USERNAME [WB_PASSWORD]

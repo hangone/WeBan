@@ -11,7 +11,11 @@
 ## 功能特性
 
 - **课程学习**：自动遍历项目 → 分类 → 课程，模拟翻页、答题、等待学习时长后完课；按项目交替完成课程与考试
-- **自动考试**：基于题库自动答题，支持单选/多选，未匹配题目可随机作答或手动输入
+- **交互式答题与核对控制台（防 AI 出错）**：桌面端考试默认自动打开本地 Web 控制台，后台自动执行题库匹配与 AI 流式搜题，同时支持键盘/鼠标随时暂停、切题、人工纠正选项、单题重跑 AI，且**绝不自动提交试卷**，必须人工二次确认后才交卷（也支持 `--exam-ui-demo` 免登录体验）
+- **AI 搜题增强**：
+  - **自定义思考强度**：支持配置 OpenAI 标准 `reasoning_effort` 参数（如 `none`/`low`/`medium`/`high`/`xhigh`）
+  - **流式思考过程展示**：支持 SSE 流式传输，交互终端下实时淡色显示 LLM 思考过程（自动兼容 `reasoning_content`、`reasoning`、`<think>` 标签），多账号并发防错乱，无交互环境自动缓冲输出，并将思考摘要写入账号日志
+  - **多格式参考文档知识库**：支持引入 `.pdf`、`.docx`、`.pptx`、`.xlsx`、`.md`、`.txt`、`.csv`、`.json`、`.html` 等格式资料扩充知识库；采用自适应策略（总长未超阈值时全文注入，超出时自动本地中英文 BM25 检索召回 Top-K 片段），并在 Prompt 中要求 LLM 优先依据参考知识库思考作答
 - **验证码识别**：登录验证码自动识别；课程点选验证码自动识别（OpenCV，2 轮 × 3 次），失败才转手动
 - **多账号并发**：支持配置多个账号，可多线程同时执行
 - **题库同步**：考试前后自动从服务器同步题库，支持多用户共享
@@ -99,6 +103,9 @@ WB_TENANT_NAME="你的学校全称" WB_USERNAME=你的学号 WB_PASSWORD=你的�
 | `video_speed`            | `--video-speed N`            | `WB_VIDEO_SPEED`            | 视频课程倍速：`0`=不按视频时长等待、`1`=原速、`2`=半速（默认）                       |
 | `exam_question_time`     | `--exam-question-time SEC`   | `WB_EXAM_QUESTION_TIME`     | 每道考试题答题等待时长 `"基础,随机上限"`（秒）                                     |
 | `exam_submit_match_rate` | `--exam-submit-match-rate N` | `WB_EXAM_SUBMIT_MATCH_RATE` | 允许交卷的最低题库匹配率（百分比）                                                 |
+| `exam_ui`                | `--exam-ui`                  | `WB_EXAM_UI`                | 是否启用交互式答题与核对页面（`true`/`false`，桌面端默认 `true`，绝不自动交卷）    |
+| `exam_ui_port`           | `--exam-ui-port PORT`        | `WB_EXAM_UI_PORT`           | 交互式答题页面本地监听端口（`0`=自动分配）                                         |
+| —                        | `--exam-ui-demo`             | —                           | 启动交互式答题演示模式（默认调用已配置的真实 AI 接口与知识库，配合 `--mock` 切离线模拟） |
 | `browser_path`           | `--browser-path PATH`        | `WB_BROWSER_PATH`           | 浏览器可执行文件路径                                                               |
 | `cdp_host`               | `--cdp-host HOST`            | `WB_CDP_HOST`               | CDP 浏览器地址                                                                     |
 | `cdp_port`               | `--cdp-port PORT`            | `WB_CDP_PORT`               | CDP 浏览器端口                                                                     |
@@ -114,8 +121,16 @@ WB_TENANT_NAME="你的学校全称" WB_USERNAME=你的学号 WB_PASSWORD=你的�
 | `[ai].base_url`          | `--ai-base-url URL`          | `WB_AI_BASE_URL`            | AI 服务 API 基础路径                                                               |
 | `[ai].api_key`           | `--ai-api-key KEY`           | `WB_AI_API_KEY`             | AI 服务 API Key                                                                    |
 | `[ai].model`             | `--ai-model NAME`            | `WB_AI_MODEL`               | AI 模型名称                                                                        |
-| `[ai].timeout`           | `--ai-timeout SEC`           | `WB_AI_TIMEOUT`             | AI 请求超时秒数                                                                    |
-| `[ai].max_retries`       | `--ai-max-retries N`         | `WB_AI_MAX_RETRIES`         | AI 请求失败最大重试次数                                                            |
+| `[ai].api_mode`          | `--ai-api-mode MODE`         | `WB_AI_API_MODE`            | AI 接口协议（`auto`/`responses`/`chat`，默认 `auto`）                              |
+| `[ai].timeout`             | `--ai-timeout SEC`             | `WB_AI_TIMEOUT`             | AI 请求超时秒数                                                                    |
+| `[ai].max_retries`         | `--ai-max-retries N`           | `WB_AI_MAX_RETRIES`         | AI 请求失败最大重试次数                                                            |
+| `[ai].reasoning_effort`    | `--ai-reasoning-effort LEVEL`  | `WB_AI_REASONING_EFFORT`    | AI 思考强度（OpenAI 标准 `reasoning_effort`，如 `none`/`low`/`medium`/`high`/`xhigh`） |
+| `[ai].stream`              | `--ai-stream`                  | `WB_AI_STREAM`              | 是否启用 AI 流式传输（`true`/`false`，默认 `true`）                                |
+| `[ai].show_thinking`       | `--ai-show-thinking`           | `WB_AI_SHOW_THINKING`       | 是否展示 AI 思考过程（`true`/`false`，默认 `true`）                                |
+| `[ai].knowledge_enable`    | `--ai-knowledge-enable`        | `WB_AI_KNOWLEDGE_ENABLE`    | 是否启用参考文档知识库（`true`/`false`，默认 `true`）                              |
+| `[ai].knowledge_paths`     | `--ai-knowledge-paths PATHS`   | `WB_AI_KNOWLEDGE_PATHS`     | 额外参考文档文件或目录路径（CLI/env 用分号或逗号分隔）                             |
+| `[ai].knowledge_max_chars` | `--ai-knowledge-max-chars N`   | `WB_AI_KNOWLEDGE_MAX_CHARS` | 知识库全文注入阈值与最大上下文字符数（默认 `12000`）                               |
+| `[ai].knowledge_top_k`     | `--ai-knowledge-top-k N`       | `WB_AI_KNOWLEDGE_TOP_K`     | BM25 分块检索召回的最大片段数（默认 `5`）                                          |
 
 无交互自动判定：`ENVIRONMENT=docker`（或 container）、stdin 非 TTY（cron/后台/管道）、或显式 `--non-interactive`。
 
@@ -129,6 +144,29 @@ WB_STUDY_TIME="20,5" WB_VIDEO_SPEED=0 ./WeBan-macos-arm64
 ./WeBan-macos-arm64 --tenant-name "你的学校全称" --username 你的学号 \
   --study-time "20,5" --video-speed 0
 ```
+
+### 交互式答题与核对页面（防 AI 出错）
+
+在桌面交互环境下，`exam_ui = true` 默认开启。进入考试后程序会自动打开本地 Web 控制台：
+
+- **自动执行**：自动标记本地题库命中题，并顺序对未命中题发起 AI 搜题，在右侧面板实时流式显示 AI 思考过程、参考文档来源与作答理由。
+- **键鼠双控 + 随时人工纠正**：可在自动答题期间随时暂停、切题、修改选项或切换思考强度重新让 AI 思考；**人工修改过的题目绝不会被后台自动引擎覆盖**。
+- **绝不自动交卷**：所有题目作答完成后会停留在“等待人工核对”状态，只有人工点击「提交试卷」（或 `Ctrl+Enter`）并通过二次确认弹窗后才会调用交卷接口；也可以点击「放弃交卷」安全退出（不消耗考试次数）。
+- **免登录实测**：运行 `uv run weban --exam-ui-demo` 将直接调用你在 `config.toml` / 环境变量 / CLI 中配置的真实模型 API 与 `knowledge/` 知识库，并在界面实时显示接入的模型与接口、TTFT、TPS、上下文长度、累计 Token（含缓存命中）与 Agent 工具检索轨迹；追加 `--mock` 可切换为离线模拟模式。
+
+常用快捷键：
+`←`/`→` 或 `K`/`J` 切题 · `1`-`9` / `A`-`I` 选答案 · `N` 跳下一待核对题 · `V` 标记已核对 · `F` 标星存疑 · `P` 暂停/继续自动答题 · `R` 重跑 AI · `G` 跟随当前执行题 · `Ctrl+Enter` 打开手动提交确认 · `?` 查看帮助。
+
+### AI 搜题与参考文档知识库
+
+当题目未命中本地题库 `answer.json` 且 `[ai].enable = true` 时，程序会自动调用 OpenAI 兼容接口进行答题：
+
+1. **自定义思考强度**：在 `config.toml` 的 `[ai]` 段设置 `reasoning_effort = "high"`（或 `low`/`medium`/`xhigh`/`none`，留空则不传该参数），或通过 `--ai-reasoning-effort` / `WB_AI_REASONING_EFFORT` 覆盖。
+2. **流式思考过程显示**：默认开启 `stream = true` 与 `show_thinking = true`，交互式终端会实时以淡色打印模型思考过程，思考完成后输出解析出的推荐选项与理由；无交互环境（如 Docker/后台）会自动缓冲输出，且思考摘要会记录到账号日志。
+3. **参考文档知识库**：
+   - 将参考资料直接放入程序目录（或 `--data-dir`）下的 `knowledge/` 目录即可自动加载，也可在 `[ai].knowledge_paths` 中配置额外的单文件或目录路径。
+   - 支持格式：`.pdf`（文本型 PDF，扫描件将提示先 OCR）、`.docx`（含段落与表格）、`.pptx`（含幻灯片、表格与备注）、`.xlsx`/`.xlsm`、`.md`/`.txt`/`.csv`/`.tsv`/`.json`/`.html` 等。
+   - **自适应检索**：资料总字数 ≤ `knowledge_max_chars`（默认 12000）时直接全文注入上下文；超出时自动按段落切块，用本地中英文 BM25 算法综合题干与选项召回最相关的 Top-K 片段（默认 5 条），无需额外 Embedding API。Prompt 会明确要求模型优先依据参考知识库思考并注明来源。
 
 ### 源码运行
 

@@ -66,6 +66,15 @@ exam_question_time = "3,3"
 # 当匹配率低于此值且 random_answer = false 时，程序会放弃交卷
 exam_submit_match_rate = 90
 
+# 是否启用交互式答题与人工核对页面（推荐在桌面交互环境开启）：
+# true  = 自动打开本地 Web 控制台，自动完成题库作答与 AI 流式搜题，
+#         支持键盘/鼠标随时暂停、切题、人工纠正、重跑 AI，且绝不自动提交试卷
+# false = 沿用原命令行自动答题并自动交卷流程（无交互/Docker 环境自动降级为 false）
+exam_ui = true
+
+# 交互式答题页面本地监听端口（0 = 自动分配空闲端口）
+exam_ui_port = 0
+
 # 多账号并发时允许的最大线程数
 # 实际并发数 = min(账号数, max_workers)
 max_workers = 5
@@ -92,18 +101,25 @@ debug = false
 # ── 配置优先级（高→低）──
 #   1. 命令行参数（--config / --data-dir / --non-interactive / --study-mode /
 #      --exam-mode / --random-answer / --study-time / --video-speed /
-#      --exam-question-time / --exam-submit-match-rate / --browser-path /
+#      --exam-question-time / --exam-submit-match-rate / --exam-ui /
+#      --exam-ui-port / --exam-ui-demo / --browser-path /
 #      --cdp-host / --cdp-port / --jupiter-fallback / --max-workers / --debug /
 #      --tenant-name / --username / --password / --user-id / --token /
 #      --ai-enable / --ai-base-url / --ai-api-key / --ai-model / --ai-timeout /
-#      --ai-max-retries）
+#      --ai-max-retries / --ai-reasoning-effort / --ai-stream /
+#      --ai-show-thinking / --ai-knowledge-enable / --ai-knowledge-paths /
+#      --ai-knowledge-max-chars / --ai-knowledge-top-k）
 #   2. 环境变量（同名加 WB_ 前缀：WB_STUDY_MODE / WB_EXAM_MODE /
 #      WB_RANDOM_ANSWER / WB_STUDY_TIME / WB_VIDEO_SPEED /
-#      WB_EXAM_QUESTION_TIME / WB_EXAM_SUBMIT_MATCH_RATE / WB_BROWSER_PATH /
+#      WB_EXAM_QUESTION_TIME / WB_EXAM_SUBMIT_MATCH_RATE / WB_EXAM_UI /
+#      WB_EXAM_UI_PORT / WB_BROWSER_PATH /
 #      WB_CDP_HOST / WB_CDP_PORT / WB_JUPITER_FALLBACK / WB_MAX_WORKERS /
 #      WB_DEBUG / WB_TENANT_NAME / WB_USERNAME / WB_PASSWORD / WB_USER_ID /
 #      WB_TOKEN / WB_AI_ENABLE / WB_AI_BASE_URL / WB_AI_API_KEY / WB_AI_MODEL /
-#      WB_AI_TIMEOUT / WB_AI_MAX_RETRIES / WB_CONFIG / WB_DATA_DIR）
+#      WB_AI_TIMEOUT / WB_AI_MAX_RETRIES / WB_AI_REASONING_EFFORT /
+#      WB_AI_STREAM / WB_AI_SHOW_THINKING / WB_AI_KNOWLEDGE_ENABLE /
+#      WB_AI_KNOWLEDGE_PATHS / WB_AI_KNOWLEDGE_MAX_CHARS /
+#      WB_AI_KNOWLEDGE_TOP_K / WB_CONFIG / WB_DATA_DIR）
 #   3. 本配置文件（[settings] 与 [[account]]）
 #
 # 三类名称一一对应：配置文件键名（snake_case）= 命令行参数（--kebab-case）=
@@ -135,7 +151,34 @@ base_url = "https://opencode.ai/zen/v1"
 api_key = ""
 # 调用的模型名称，如 deepseek-v4-flash 等
 model = "nemotron-3-ultra-free"
+# 接口协议模式：
+# auto      = 优先探测 OpenAI Responses API (/responses，原生支持 reasoning.summary 与更省 Token)，
+#             若服务端返回 404/不支持则自动缓存并回退 /chat/completions
+# responses = 强制使用 /responses
+# chat      = 强制使用 /chat/completions
+api_mode = "auto"
 # 请求超时时间（秒）
 timeout = 60
 # 请求失败时的最大重试次数
 max_retries = 2
+# 自定义思考强度（OpenAI 标准 reasoning_effort 参数，如 "none"、"low"、"medium"、"high"、"xhigh"；
+# 留空 "" 表示不传递该字段，按模型默认行为执行）
+reasoning_effort = ""
+# 是否启用流式传输（true 时通过 SSE 实时接收模型响应与思考过程）
+stream = true
+# 是否显示模型思考过程（交互式终端下实时淡色流式输出，无交互环境下缓冲输出；
+# 自动兼容 reasoning_content / reasoning / <think> 标签）
+show_thinking = true
+# 是否启用参考文档知识库（自动扫描程序目录或 --data-dir 下的 knowledge/ 目录，
+# 支持 .pdf/.docx/.pptx/.xlsx/.md/.txt/.csv/.json/.html 等格式，LLM 将优先依据知识库作答）
+knowledge_enable = true
+# 额外指定的参考文档文件或目录路径列表（可选，留空时仍会自动扫描默认 knowledge/ 目录）
+# 注意：Windows 路径请用单引号 'D:\...' 或正斜杠 "D:/..."（双引号内反斜杠需写成 \\）
+# 示例: knowledge_paths = ['D:\notes\安全手册.pdf', "./my_docs"]
+knowledge_paths = []
+# 知识库自适应策略阈值与上下文上限（字符数）：
+# - 文档总长度 <= 此值时直接全文注入上下文
+# - 文档总长度 > 此值时自动切块并通过本地中英文 BM25 检索召回最相关片段
+knowledge_max_chars = 12000
+# 触发 BM25 检索时最多召回的片段数量
+knowledge_top_k = 5
